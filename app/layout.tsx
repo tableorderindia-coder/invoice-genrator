@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import NextTopLoader from "nextjs-toploader";
 import "./globals.css";
 
 const inter = localFont({
@@ -42,6 +43,15 @@ export default function RootLayout({
 
         {/* Main content */}
         <div className="relative z-10 flex-1 flex flex-col">
+          <NextTopLoader
+             color="var(--accent-1)"
+             shadow="0 0 10px var(--accent-1),0 0 5px var(--accent-1)"
+             showSpinner={false}
+             speed={200}
+             height={3}
+             crawl={true}
+             showAtBottom={false}
+          />
           {children}
         </div>
       </body>

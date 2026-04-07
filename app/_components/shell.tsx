@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { type ReactNode, useTransition, useState } from "react";
 
 const links = [
   {
@@ -95,6 +95,21 @@ export function Shell({
   children: ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
+
+  const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey || e.button !== 0) return;
+    
+    if (pathname === href) return;
+    
+    e.preventDefault();
+    setPendingHref(href);
+    startTransition(() => {
+      router.push(href);
+    });
+  };
 
   return (
     <div className="min-h-screen" style={{ color: "var(--text-primary)" }}>
@@ -130,20 +145,32 @@ export function Shell({
                   link.href === "/"
                     ? pathname === "/"
                     : pathname.startsWith(link.href);
+                const isNavigatingToThis = isPending && pendingHref === link.href;
 
                 return (
                   <Link
                     key={link.href}
                     href={link.href}
-                    className="flex items-center gap-2 rounded-xl px-3.5 py-2 font-medium transition-all"
+                    onClick={(e) => handleNavClick(e, link.href)}
+                    className="flex items-center justify-center gap-2 rounded-xl px-3.5 py-2 font-medium transition-all relative overflow-hidden"
                     style={{
                       color: isActive ? "var(--accent-1)" : "var(--text-secondary)",
                       background: isActive ? "rgba(99, 102, 241, 0.1)" : "transparent",
                       borderBottom: isActive ? "2px solid var(--accent-1)" : "2px solid transparent",
                     }}
                   >
-                    {link.icon}
-                    <span className="hidden sm:inline">{link.label}</span>
+                    <div className={`transition-opacity ${isNavigatingToThis ? 'opacity-0 scale-95' : 'opacity-100 scale-100'} flex items-center gap-2`}>
+                      {link.icon}
+                      <span className="hidden sm:inline">{link.label}</span>
+                    </div>
+                    {isNavigatingToThis && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <svg className="animate-spin h-5 w-5" style={{ color: "var(--accent-1)" }} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                      </div>
+                    )}
                   </Link>
                 );
               })}
