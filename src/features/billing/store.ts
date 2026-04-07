@@ -5,6 +5,14 @@ import {
   calculateLineItemTotals,
   createRealizationRecord,
 } from "./domain";
+import {
+  assertNoCaseInsensitiveDuplicate,
+  assertNoDuplicateEmployeeInTeam,
+} from "./duplicate-guards";
+import {
+  buildAvailableTeamNames,
+  getMatchingEmployeesForTeam,
+} from "./team-catalog";
 import type {
   AdjustmentType,
   Company,
@@ -15,6 +23,7 @@ import type {
   InvoiceLineItem,
   InvoiceRealization,
   InvoiceStatus,
+  Team,
   InvoiceTeam,
 } from "./types";
 
@@ -56,6 +65,13 @@ type DbEmployee = {
   active_from: string;
   active_to: string | null;
   is_active: boolean;
+  created_at: string;
+};
+
+type DbTeam = {
+  id: string;
+  company_id: string;
+  name: string;
   created_at: string;
 };
 
@@ -149,6 +165,15 @@ function mapEmployee(row: DbEmployee): Employee {
     activeFrom: row.active_from,
     activeTo: row.active_to ?? undefined,
     isActive: row.is_active,
+    createdAt: row.created_at,
+  };
+}
+
+function mapTeam(row: DbTeam): Team {
+  return {
+    id: row.id,
+    companyId: row.company_id,
+    name: row.name,
     createdAt: row.created_at,
   };
 }
@@ -286,6 +311,17 @@ export async function createCompany(input: {
   defaultNote: string;
 }) {
   const supabase = getSupabaseOrThrow();
+  const { data: existingCompanyRows, error: existingCompanyError } = await supabase
+    .from("companies")
+    .select("name");
+  if (existingCompanyError) throw existingCompanyError;
+
+  assertNoCaseInsensitiveDuplicate({
+    existingValues: (existingCompanyRows ?? []).map((row) => String(row.name)),
+    candidateValue: input.name,
+    entityLabel: "Company",
+  });
+
   const payload = {
     id: nextId("company"),
     name: input.name,
@@ -313,6 +349,58 @@ export async function listEmployees(companyId?: string) {
   return (data ?? []).map((row) => mapEmployee(row as DbEmployee));
 }
 
+export async function listTeams(companyId?: string) {
+  const supabase = getSupabaseOrThrow();
+  let query = supabase.from("teams").select("*").order("name");
+  if (companyId) {
+    query = query.eq("company_id", companyId);
+  }
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data ?? []).map((row) => mapTeam(row as DbTeam));
+}
+
+export async function listAvailableTeamNames(companyId: string) {
+  const [teams, employees] = await Promise.all([
+    listTeams(companyId),
+    listEmployees(companyId),
+  ]);
+
+  return buildAvailableTeamNames({
+    masterTeamNames: teams.map((team) => team.name),
+    employeeDefaultTeams: employees.map((employee) => employee.defaultTeam),
+  });
+}
+
+export async function createTeam(input: {
+  companyId: string;
+  name: string;
+}) {
+  const supabase = getSupabaseOrThrow();
+  const existingTeamNames = await listAvailableTeamNames(input.companyId);
+
+  assertNoCaseInsensitiveDuplicate({
+    existingValues: existingTeamNames,
+    candidateValue: input.name,
+    entityLabel: "Team",
+  });
+
+  const payload = {
+    id: nextId("team_master"),
+    company_id: input.companyId,
+    name: input.name.trim().replace(/\s+/g, " "),
+    created_at: nowIso(),
+  };
+
+  const { data, error } = await supabase
+    .from("teams")
+    .insert(payload)
+    .select()
+    .single();
+  if (error) throw error;
+  return mapTeam(data as DbTeam);
+}
+
 export async function createEmployee(input: {
   companyId: string;
   fullName: string;
@@ -324,6 +412,18 @@ export async function createEmployee(input: {
   activeTo?: string;
 }) {
   const supabase = getSupabaseOrThrow();
+  const { data: existingEmployeeRows, error: existingEmployeeError } = await supabase
+    .from("employees")
+    .select("full_name")
+    .eq("company_id", input.companyId);
+  if (existingEmployeeError) throw existingEmployeeError;
+
+  assertNoCaseInsensitiveDuplicate({
+    existingValues: (existingEmployeeRows ?? []).map((row) => String(row.full_name)),
+    candidateValue: input.fullName,
+    entityLabel: "Employee",
+  });
+
   const payload = {
     id: nextId("employee"),
     company_id: input.companyId,
@@ -381,8 +481,20 @@ export async function createInvoiceDraft(input: {
   billingDate: string;
   dueDate: string;
   duplicateSourceId?: string;
+  selectedTeamNames?: string[];
 }) {
   const supabase = getSupabaseOrThrow();
+  const { data: existingInvoiceRows, error: existingInvoiceError } = await supabase
+    .from("invoices")
+    .select("invoice_number");
+  if (existingInvoiceError) throw existingInvoiceError;
+
+  assertNoCaseInsensitiveDuplicate({
+    existingValues: (existingInvoiceRows ?? []).map((row) => String(row.invoice_number)),
+    candidateValue: input.invoiceNumber,
+    entityLabel: "Invoice",
+  });
+
   const { data: companyRow, error: companyError } = await supabase
     .from("companies")
     .select("*")
@@ -425,7 +537,9 @@ export async function createInvoiceDraft(input: {
     }
 
     for (const team of sourceDetail.teams) {
-      const insertedTeam = await addInvoiceTeam(invoiceId, team.teamName);
+      const insertedTeam = await addInvoiceTeam(invoiceId, team.teamName, {
+        autoIncludeMembers: false,
+      });
       for (const lineItem of team.lineItems) {
         await addInvoiceLineItem({
           invoiceId,
@@ -449,13 +563,37 @@ export async function createInvoiceDraft(input: {
     }
 
     await updateInvoiceNote(invoiceId, sourceDetail.invoice.noteText);
+  } else {
+    const selectedTeamNames = buildAvailableTeamNames({
+      masterTeamNames: input.selectedTeamNames ?? [],
+      employeeDefaultTeams: [],
+    });
+    for (const teamName of selectedTeamNames) {
+      await addInvoiceTeam(invoiceId, teamName, { autoIncludeMembers: true });
+    }
   }
 
   return mapInvoice(data as DbInvoice);
 }
 
-export async function addInvoiceTeam(invoiceId: string, teamName: string) {
+export async function addInvoiceTeam(
+  invoiceId: string,
+  teamName: string,
+  options?: { autoIncludeMembers?: boolean },
+) {
   const supabase = getSupabaseOrThrow();
+  const { data: existingTeamRows, error: existingTeamError } = await supabase
+    .from("invoice_teams")
+    .select("team_name")
+    .eq("invoice_id", invoiceId);
+  if (existingTeamError) throw existingTeamError;
+
+  assertNoCaseInsensitiveDuplicate({
+    existingValues: (existingTeamRows ?? []).map((row) => String(row.team_name)),
+    candidateValue: teamName,
+    entityLabel: "Team",
+  });
+
   const { count, error: countError } = await supabase
     .from("invoice_teams")
     .select("*", { count: "exact", head: true })
@@ -476,8 +614,36 @@ export async function addInvoiceTeam(invoiceId: string, teamName: string) {
     .single();
   if (error) throw error;
 
+  const mappedTeam = mapInvoiceTeam(data as DbInvoiceTeam);
+
+  if (options?.autoIncludeMembers !== false) {
+    const { data: invoiceRow, error: invoiceError } = await supabase
+      .from("invoices")
+      .select("company_id")
+      .eq("id", invoiceId)
+      .single();
+    if (invoiceError) throw invoiceError;
+
+    const employees = await listEmployees(String(invoiceRow.company_id));
+    const matchingEmployees = getMatchingEmployeesForTeam({
+      teamName,
+      employees,
+    });
+
+    for (const employee of matchingEmployees) {
+      await addInvoiceLineItem({
+        invoiceId,
+        invoiceTeamId: mappedTeam.id,
+        employeeId: employee.id,
+        hoursBilled: 0,
+        billingRateUsdCents: employee.billingRateUsdCents,
+        payoutRateUsdCents: employee.payoutRateUsdCents,
+      });
+    }
+  }
+
   await recomputeSupabaseInvoice(invoiceId);
-  return mapInvoiceTeam(data as DbInvoiceTeam);
+  return mappedTeam;
 }
 
 export async function deleteInvoiceTeam(invoiceId: string, invoiceTeamId: string) {
@@ -515,6 +681,17 @@ export async function addInvoiceLineItem(input: {
   if (employeeError) throw employeeError;
   if (teamError) throw teamError;
 
+  const { data: existingLineRows, error: existingLineError } = await supabase
+    .from("invoice_line_items")
+    .select("employee_id")
+    .eq("invoice_team_id", input.invoiceTeamId);
+  if (existingLineError) throw existingLineError;
+
+  assertNoDuplicateEmployeeInTeam({
+    existingEmployeeIds: (existingLineRows ?? []).map((row) => String(row.employee_id)),
+    employeeId: input.employeeId,
+  });
+
   const employee = mapEmployee(employeeRow as DbEmployee);
   const team = mapInvoiceTeam(teamRow as DbInvoiceTeam);
   const billingRateUsdCents =
@@ -551,6 +728,53 @@ export async function addInvoiceLineItem(input: {
 
   await recomputeSupabaseInvoice(input.invoiceId);
   return mapInvoiceLineItem(data as DbInvoiceLineItem);
+}
+
+export async function deleteInvoiceLineItem(invoiceId: string, lineItemId: string) {
+  const supabase = getSupabaseOrThrow();
+  const { error } = await supabase
+    .from("invoice_line_items")
+    .delete()
+    .eq("id", lineItemId);
+  if (error) throw error;
+
+  await recomputeSupabaseInvoice(invoiceId);
+}
+
+export async function updateInvoiceLineItem(input: {
+  invoiceId: string;
+  lineItemId: string;
+  hoursBilled: number;
+  billingRateUsdCents: number;
+}) {
+  const supabase = getSupabaseOrThrow();
+  const { data: lineRow, error: lineError } = await supabase
+    .from("invoice_line_items")
+    .select("*")
+    .eq("id", input.lineItemId)
+    .single();
+  if (lineError) throw lineError;
+
+  const existingLineItem = mapInvoiceLineItem(lineRow as DbInvoiceLineItem);
+  const calculated = calculateLineItemTotals({
+    billingRateUsdCents: input.billingRateUsdCents,
+    payoutRateUsdCents: existingLineItem.payoutRateUsdCents,
+    hoursBilled: input.hoursBilled,
+  });
+
+  const { error: updateError } = await supabase
+    .from("invoice_line_items")
+    .update({
+      billing_rate_usd_cents: input.billingRateUsdCents,
+      hours_billed: input.hoursBilled,
+      billed_total_usd_cents: calculated.billedTotalUsdCents,
+      payout_total_usd_cents: calculated.payoutTotalUsdCents,
+      profit_total_usd_cents: calculated.profitTotalUsdCents,
+    })
+    .eq("id", input.lineItemId);
+  if (updateError) throw updateError;
+
+  await recomputeSupabaseInvoice(input.invoiceId);
 }
 
 export async function addInvoiceAdjustment(input: {

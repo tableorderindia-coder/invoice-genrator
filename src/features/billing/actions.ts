@@ -11,7 +11,10 @@ import {
   createCompany,
   createEmployee,
   createInvoiceDraft,
+  createTeam,
+  deleteInvoiceLineItem,
   deleteInvoiceTeam,
+  updateInvoiceLineItem,
   updateInvoiceNote,
   updateInvoiceStatus,
 } from "./store";
@@ -51,6 +54,11 @@ export async function createEmployeeAction(formData: FormData) {
 }
 
 export async function createInvoiceDraftAction(formData: FormData) {
+  const selectedTeamNames = formData
+    .getAll("selectedTeamNames")
+    .map((value) => String(value).trim())
+    .filter(Boolean);
+
   const invoice = await createInvoiceDraft({
     companyId: getString(formData, "companyId"),
     month: Number.parseInt(getString(formData, "month"), 10),
@@ -59,6 +67,7 @@ export async function createInvoiceDraftAction(formData: FormData) {
     billingDate: getString(formData, "billingDate"),
     dueDate: getString(formData, "dueDate"),
     duplicateSourceId: getString(formData, "duplicateSourceId") || undefined,
+    selectedTeamNames,
   });
 
   revalidatePath("/");
@@ -69,7 +78,24 @@ export async function createInvoiceDraftAction(formData: FormData) {
 
 export async function addInvoiceTeamAction(formData: FormData) {
   const invoiceId = getString(formData, "invoiceId");
-  await addInvoiceTeam(invoiceId, getString(formData, "teamName"));
+  const companyId = getString(formData, "companyId");
+  const selectedTeamName = getString(formData, "selectedTeamName");
+  const newTeamName = getString(formData, "newTeamName");
+
+  let teamName = selectedTeamName;
+  if (!teamName && newTeamName) {
+    const team = await createTeam({
+      companyId,
+      name: newTeamName,
+    });
+    teamName = team.name;
+  }
+
+  if (!teamName) {
+    throw new Error("Select an existing team or create a new one.");
+  }
+
+  await addInvoiceTeam(invoiceId, teamName);
 
   revalidatePath(`/invoices/${invoiceId}`);
   revalidatePath(`/invoices/drafts/${invoiceId}`);
@@ -91,9 +117,6 @@ export async function addInvoiceLineItemAction(formData: FormData) {
     billingRateUsdCents: getString(formData, "billingRateUsd")
       ? centsFromUsd(getString(formData, "billingRateUsd"))
       : undefined,
-    payoutRateUsdCents: getString(formData, "payoutRateUsd")
-      ? centsFromUsd(getString(formData, "payoutRateUsd"))
-      : undefined,
   });
 
   revalidatePath(`/invoices/${invoiceId}`);
@@ -113,6 +136,39 @@ export async function deleteInvoiceTeamAction(formData: FormData) {
   revalidatePath(`/invoices/${invoiceId}`);
   revalidatePath(`/invoices/drafts/${invoiceId}`);
   revalidatePath("/invoices");
+  revalidatePath("/dashboard");
+}
+
+export async function deleteInvoiceLineItemAction(formData: FormData) {
+  const invoiceId = getString(formData, "invoiceId");
+  const lineItemId = getString(formData, "lineItemId");
+  if (!lineItemId) {
+    throw new Error("Select a member before removing it.");
+  }
+
+  await deleteInvoiceLineItem(invoiceId, lineItemId);
+
+  revalidatePath(`/invoices/${invoiceId}`);
+  revalidatePath(`/invoices/drafts/${invoiceId}`);
+  revalidatePath("/dashboard");
+}
+
+export async function updateInvoiceLineItemAction(formData: FormData) {
+  const invoiceId = getString(formData, "invoiceId");
+  const lineItemId = getString(formData, "lineItemId");
+  if (!lineItemId) {
+    throw new Error("Select a member before updating it.");
+  }
+
+  await updateInvoiceLineItem({
+    invoiceId,
+    lineItemId,
+    hoursBilled: Number.parseFloat(getString(formData, "hoursBilled")),
+    billingRateUsdCents: centsFromUsd(getString(formData, "billingRateUsd")),
+  });
+
+  revalidatePath(`/invoices/${invoiceId}`);
+  revalidatePath(`/invoices/drafts/${invoiceId}`);
   revalidatePath("/dashboard");
 }
 

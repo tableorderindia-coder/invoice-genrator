@@ -20,6 +20,13 @@ create table if not exists employees (
   created_at timestamptz not null default now()
 );
 
+create table if not exists teams (
+  id text primary key,
+  company_id text not null references companies (id) on delete cascade,
+  name text not null,
+  created_at timestamptz not null default now()
+);
+
 create table if not exists invoices (
   id text primary key,
   company_id text not null references companies (id) on delete cascade,
@@ -81,3 +88,21 @@ create table if not exists invoice_realizations (
   notes text,
   created_at timestamptz not null default now()
 );
+
+create unique index if not exists companies_name_unique_ci
+  on companies (lower(btrim(name)));
+
+create unique index if not exists employees_company_full_name_unique_ci
+  on employees (company_id, lower(btrim(full_name)));
+
+create unique index if not exists invoices_invoice_number_unique_ci
+  on invoices (lower(btrim(invoice_number)));
+
+create unique index if not exists teams_company_name_unique_ci
+  on teams (company_id, lower(btrim(name)));
+
+create unique index if not exists invoice_teams_invoice_team_name_unique_ci
+  on invoice_teams (invoice_id, lower(btrim(team_name)));
+
+create unique index if not exists invoice_line_items_team_employee_unique
+  on invoice_line_items (invoice_team_id, employee_id);

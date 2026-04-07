@@ -8,6 +8,13 @@ export type Company = {
   createdAt: string;
 };
 
+export type Team = {
+  id: string;
+  companyId: string;
+  name: string;
+  createdAt: string;
+};
+
 export type Employee = {
   id: string;
   companyId: string;
