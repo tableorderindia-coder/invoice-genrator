@@ -6,6 +6,7 @@ import { GlassPanel } from "../../../_components/glass-panel";
 import { inputClass } from "../../../_components/field";
 import {
   addInvoiceAdjustmentAction,
+  assignInvoiceMemberAction,
   addInvoiceTeamAction,
   deleteInvoiceLineItemAction,
   deleteInvoiceTeamAction,
@@ -15,18 +16,26 @@ import {
 } from "@/src/features/billing/actions";
 import {
   getInvoiceDetail,
+  listEmployees,
   listAvailableTeamNames,
 } from "@/src/features/billing/store";
+import { filterEligibleEmployeesForTeam } from "@/src/features/billing/member-assignment";
 import { formatDate, formatMonthYear, formatUsd } from "@/src/features/billing/utils";
 
 export const dynamic = "force-dynamic";
 
 export default async function DraftInvoicePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{
+    flashStatus?: string | string[];
+    flashMessage?: string | string[];
+  }>;
 }) {
   const { id } = await params;
+  const resolvedSearchParams = await searchParams;
   const detail = await getInvoiceDetail(id);
 
   if (!detail) {
@@ -38,10 +47,18 @@ export default async function DraftInvoicePage({
   }
 
   const availableTeamNames = await listAvailableTeamNames(detail.company.id);
+  const employees = await listEmployees(detail.company.id);
   const selectedTeamNames = new Set(detail.teams.map((team) => team.teamName.toLowerCase()));
   const remainingTeamNames = availableTeamNames.filter(
     (teamName) => !selectedTeamNames.has(teamName.toLowerCase()),
   );
+  const flashStatus = Array.isArray(resolvedSearchParams.flashStatus)
+    ? resolvedSearchParams.flashStatus[0]
+    : resolvedSearchParams.flashStatus;
+  const flashMessage = Array.isArray(resolvedSearchParams.flashMessage)
+    ? resolvedSearchParams.flashMessage[0]
+    : resolvedSearchParams.flashMessage;
+  const returnTo = `/invoices/drafts/${detail.invoice.id}`;
 
   return (
     <Shell title={detail.invoice.invoiceNumber} eyebrow="Draft editor">
@@ -92,6 +109,7 @@ export default async function DraftInvoicePage({
               <form action={updateInvoiceStatusAction}>
                 <input type="hidden" name="invoiceId" value={detail.invoice.id} />
                 <input type="hidden" name="status" value="generated" />
+                <input type="hidden" name="returnTo" value={returnTo} />
                 <button type="submit" className="gradient-btn">
                   Mark generated
                 </button>
@@ -110,6 +128,25 @@ export default async function DraftInvoicePage({
                 </h3>
               </div>
             </div>
+
+            {flashMessage ? (
+              <div
+                className="mb-4 rounded-2xl px-4 py-3 text-sm font-medium"
+                style={{
+                  background:
+                    flashStatus === "error"
+                      ? "rgba(248, 113, 113, 0.08)"
+                      : "rgba(16, 185, 129, 0.08)",
+                  border:
+                    flashStatus === "error"
+                      ? "1px solid rgba(248, 113, 113, 0.25)"
+                      : "1px solid rgba(16, 185, 129, 0.25)",
+                  color: flashStatus === "error" ? "#fca5a5" : "#6ee7b7",
+                }}
+              >
+                {flashMessage}
+              </div>
+            ) : null}
 
             <div className="space-y-6">
               {detail.teams.map((team) => (
@@ -133,6 +170,7 @@ export default async function DraftInvoicePage({
                     <form action={deleteInvoiceTeamAction}>
                       <input type="hidden" name="invoiceId" value={detail.invoice.id} />
                       <input type="hidden" name="invoiceTeamId" value={team.id} />
+                      <input type="hidden" name="returnTo" value={returnTo} />
                       <button type="submit" className="btn-outline">
                         Remove team
                       </button>
@@ -154,46 +192,50 @@ export default async function DraftInvoicePage({
                             <td className="font-semibold">{lineItem.employeeNameSnapshot}</td>
                             <td>{lineItem.designationSnapshot}</td>
                             <td>
-                              <form action={updateInvoiceLineItemAction} className="flex flex-wrap items-center gap-2">
-                                <input type="hidden" name="invoiceId" value={detail.invoice.id} />
-                                <input type="hidden" name="lineItemId" value={lineItem.id} />
-                                <input
-                                  name="billingRateUsd"
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
-                                  defaultValue={(lineItem.billingRateUsdCents / 100).toFixed(2)}
-                                  className={inputClass}
-                                  style={{ minWidth: "7rem" }}
-                                />
-                                <input
-                                  name="hoursBilled"
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
-                                  defaultValue={lineItem.hoursBilled}
-                                  className={inputClass}
-                                  style={{ minWidth: "6rem" }}
-                                />
-                                <button type="submit" className="btn-outline">
-                                  Update
-                                </button>
-                              </form>
+                              <form id={`line-item-${lineItem.id}`} action={updateInvoiceLineItemAction}></form>
+                              <input type="hidden" form={`line-item-${lineItem.id}`} name="invoiceId" value={detail.invoice.id} />
+                              <input type="hidden" form={`line-item-${lineItem.id}`} name="lineItemId" value={lineItem.id} />
+                              <input type="hidden" form={`line-item-${lineItem.id}`} name="returnTo" value={returnTo} />
+                              <input
+                                form={`line-item-${lineItem.id}`}
+                                name="billingRateUsd"
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                defaultValue={(lineItem.billingRateUsdCents / 100).toFixed(2)}
+                                className={inputClass}
+                                style={{ minWidth: "7rem" }}
+                              />
                             </td>
-                            <td style={{ fontFamily: "var(--font-jetbrains-mono), monospace" }}>
-                              {lineItem.hoursBilled}
+                            <td>
+                              <input
+                                form={`line-item-${lineItem.id}`}
+                                name="hoursBilled"
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                defaultValue={lineItem.hoursBilled}
+                                className={inputClass}
+                                style={{ minWidth: "6rem" }}
+                              />
                             </td>
                             <td style={{ fontFamily: "var(--font-jetbrains-mono), monospace" }}>
                               {formatUsd(lineItem.billedTotalUsdCents)}
                             </td>
                             <td>
-                              <form action={deleteInvoiceLineItemAction}>
-                                <input type="hidden" name="invoiceId" value={detail.invoice.id} />
-                                <input type="hidden" name="lineItemId" value={lineItem.id} />
-                                <button type="submit" className="btn-outline">
-                                  Remove member
+                              <div className="flex flex-wrap gap-2">
+                                <button type="submit" form={`line-item-${lineItem.id}`} className="btn-outline">
+                                  Update
                                 </button>
-                              </form>
+                                <form action={deleteInvoiceLineItemAction}>
+                                  <input type="hidden" name="invoiceId" value={detail.invoice.id} />
+                                  <input type="hidden" name="lineItemId" value={lineItem.id} />
+                                  <input type="hidden" name="returnTo" value={returnTo} />
+                                  <button type="submit" className="btn-outline">
+                                    Remove member
+                                  </button>
+                                </form>
+                              </div>
                             </td>
                           </tr>
                         ))}
@@ -206,6 +248,48 @@ export default async function DraftInvoicePage({
                         )}
                       </tbody>
                     </table>
+                  </div>
+
+                  <div className="mt-4">
+                    {(() => {
+                      const eligibleEmployees = filterEligibleEmployeesForTeam({
+                        employees,
+                        currentTeamMemberIds: team.lineItems.map((lineItem) => lineItem.employeeId),
+                      });
+
+                      return (
+                        <form action={assignInvoiceMemberAction} className="flex flex-wrap items-center gap-3">
+                          <input type="hidden" name="invoiceId" value={detail.invoice.id} />
+                          <input type="hidden" name="invoiceTeamId" value={team.id} />
+                          <input type="hidden" name="returnTo" value={returnTo} />
+                          <select
+                            name="employeeId"
+                            className={inputClass}
+                            disabled={eligibleEmployees.length === 0}
+                            defaultValue={eligibleEmployees[0]?.id ?? ""}
+                            style={{ minWidth: "16rem" }}
+                          >
+                            {eligibleEmployees.length === 0 ? (
+                              <option value="">All company members are already in this team</option>
+                            ) : (
+                              eligibleEmployees.map((employee) => (
+                                <option key={employee.id} value={employee.id}>
+                                  {employee.fullName} · {employee.defaultTeam}
+                                </option>
+                              ))
+                            )}
+                          </select>
+                          <button
+                            type="submit"
+                            className="gradient-btn"
+                            disabled={eligibleEmployees.length === 0}
+                            style={eligibleEmployees.length === 0 ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
+                          >
+                            Add member to {team.teamName}
+                          </button>
+                        </form>
+                      );
+                    })()}
                   </div>
                 </div>
               ))}
@@ -276,6 +360,7 @@ export default async function DraftInvoicePage({
             <form action={addInvoiceTeamAction} className="mt-4 space-y-3">
               <input type="hidden" name="invoiceId" value={detail.invoice.id} />
               <input type="hidden" name="companyId" value={detail.company.id} />
+              <input type="hidden" name="returnTo" value={returnTo} />
               <select
                 name="selectedTeamName"
                 className={inputClass}
@@ -310,6 +395,7 @@ export default async function DraftInvoicePage({
             <form action={addInvoiceTeamAction} className="mt-4 space-y-3">
               <input type="hidden" name="invoiceId" value={detail.invoice.id} />
               <input type="hidden" name="companyId" value={detail.company.id} />
+              <input type="hidden" name="returnTo" value={returnTo} />
               <input name="newTeamName" required placeholder="Operations" className={inputClass} />
               <button type="submit" className="gradient-btn w-full">
                 Create team and add to invoice
@@ -323,6 +409,7 @@ export default async function DraftInvoicePage({
             </h3>
             <form action={addInvoiceAdjustmentAction} className="mt-4 space-y-3">
               <input type="hidden" name="invoiceId" value={detail.invoice.id} />
+              <input type="hidden" name="returnTo" value={returnTo} />
               <select name="type" className={inputClass}>
                 <option value="onboarding">Onboarding</option>
                 <option value="offboarding">Offboarding deduction</option>
@@ -343,6 +430,7 @@ export default async function DraftInvoicePage({
             </h3>
             <form action={updateInvoiceNoteAction} className="mt-4 space-y-3">
               <input type="hidden" name="invoiceId" value={detail.invoice.id} />
+              <input type="hidden" name="returnTo" value={returnTo} />
               <textarea name="noteText" defaultValue={detail.invoice.noteText} rows={5} className={inputClass} />
               <button type="submit" className="btn-outline w-full">
                 Save note

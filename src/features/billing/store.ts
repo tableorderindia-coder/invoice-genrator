@@ -13,6 +13,7 @@ import {
   buildAvailableTeamNames,
   getMatchingEmployeesForTeam,
 } from "./team-catalog";
+import { findExistingLineItemForEmployee } from "./member-assignment";
 import type {
   AdjustmentType,
   Company,
@@ -773,6 +774,120 @@ export async function updateInvoiceLineItem(input: {
     })
     .eq("id", input.lineItemId);
   if (updateError) throw updateError;
+
+  const { error: employeeUpdateError } = await supabase
+    .from("employees")
+    .update({
+      billing_rate_usd_cents: input.billingRateUsdCents,
+    })
+    .eq("id", existingLineItem.employeeId);
+  if (employeeUpdateError) throw employeeUpdateError;
+
+  await recomputeSupabaseInvoice(input.invoiceId);
+}
+
+export async function assignEmployeeToInvoiceTeam(input: {
+  invoiceId: string;
+  invoiceTeamId: string;
+  employeeId: string;
+}) {
+  const supabase = getSupabaseOrThrow();
+  const [
+    detail,
+    { data: targetTeamRow, error: targetTeamError },
+    { data: employeeRow, error: employeeError },
+  ] = await Promise.all([
+    getInvoiceDetail(input.invoiceId),
+    supabase
+      .from("invoice_teams")
+      .select("*")
+      .eq("id", input.invoiceTeamId)
+      .single(),
+    supabase.from("employees").select("*").eq("id", input.employeeId).single(),
+  ]);
+
+  if (!detail) {
+    throw new Error("Invoice not found");
+  }
+  if (targetTeamError) throw targetTeamError;
+  if (employeeError) throw employeeError;
+
+  const targetTeam = mapInvoiceTeam(targetTeamRow as DbInvoiceTeam);
+  const employee = mapEmployee(employeeRow as DbEmployee);
+  const existingAssignment = findExistingLineItemForEmployee({
+    employeeId: input.employeeId,
+    teams: detail.teams.map((team) => ({
+      id: team.id,
+      lineItems: team.lineItems.map((lineItem) => ({
+        id: lineItem.id,
+        employeeId: lineItem.employeeId,
+      })),
+    })),
+  });
+
+  if (existingAssignment?.teamId === targetTeam.id) {
+    const { error: employeeUpdateError } = await supabase
+      .from("employees")
+      .update({
+        default_team: targetTeam.teamName,
+      })
+      .eq("id", employee.id);
+    if (employeeUpdateError) throw employeeUpdateError;
+    return;
+  }
+
+  if (existingAssignment) {
+    const { data: existingRows, error: existingRowsError } = await supabase
+      .from("invoice_line_items")
+      .select("id")
+      .in(
+        "invoice_team_id",
+        detail.teams.map((team) => team.id),
+      )
+      .eq("employee_id", input.employeeId);
+    if (existingRowsError) throw existingRowsError;
+
+    const rows = existingRows ?? [];
+    const rowToKeep = rows.find((row) => row.id === existingAssignment.lineItemId);
+    const rowsToDelete = rows.filter((row) => row.id !== existingAssignment.lineItemId);
+
+    const { error: moveError } = await supabase
+      .from("invoice_line_items")
+      .update({
+        invoice_team_id: targetTeam.id,
+        team_name_snapshot: targetTeam.teamName,
+      })
+      .eq("id", rowToKeep?.id ?? existingAssignment.lineItemId);
+    if (moveError) throw moveError;
+
+    if (rowsToDelete.length > 0) {
+      const { error: deleteDuplicatesError } = await supabase
+        .from("invoice_line_items")
+        .delete()
+        .in(
+          "id",
+          rowsToDelete.map((row) => row.id),
+        );
+      if (deleteDuplicatesError) throw deleteDuplicatesError;
+    }
+  } else {
+    await addInvoiceLineItem({
+      invoiceId: input.invoiceId,
+      invoiceTeamId: targetTeam.id,
+      employeeId: employee.id,
+      hoursBilled: 0,
+      billingRateUsdCents: employee.billingRateUsdCents,
+      payoutRateUsdCents: employee.payoutRateUsdCents,
+    });
+  }
+
+  const { error: employeeUpdateError } = await supabase
+    .from("employees")
+    .update({
+      default_team: targetTeam.teamName,
+    })
+    .eq("id", employee.id);
+  if (employeeUpdateError) throw employeeUpdateError;
 
   await recomputeSupabaseInvoice(input.invoiceId);
 }

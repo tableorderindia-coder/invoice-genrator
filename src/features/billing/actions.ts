@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import {
   addInvoiceAdjustment,
   addInvoiceLineItem,
+  assignEmployeeToInvoiceTeam,
   addInvoiceTeam,
   cashOutInvoice,
   createCompany,
@@ -22,6 +23,15 @@ import { centsFromUsd } from "./utils";
 
 function getString(formData: FormData, key: string) {
   return String(formData.get(key) || "").trim();
+}
+
+function buildFlashRedirect(path: string, status: "success" | "error", message: string) {
+  const separator = path.includes("?") ? "&" : "?";
+  return `${path}${separator}flashStatus=${encodeURIComponent(status)}&flashMessage=${encodeURIComponent(message)}`;
+}
+
+function getDraftReturnPath(formData: FormData, invoiceId: string) {
+  return getString(formData, "returnTo") || `/invoices/drafts/${invoiceId}`;
 }
 
 export async function createCompanyAction(formData: FormData) {
@@ -78,28 +88,42 @@ export async function createInvoiceDraftAction(formData: FormData) {
 
 export async function addInvoiceTeamAction(formData: FormData) {
   const invoiceId = getString(formData, "invoiceId");
-  const companyId = getString(formData, "companyId");
-  const selectedTeamName = getString(formData, "selectedTeamName");
-  const newTeamName = getString(formData, "newTeamName");
+  const returnTo = getDraftReturnPath(formData, invoiceId);
 
-  let teamName = selectedTeamName;
-  if (!teamName && newTeamName) {
-    const team = await createTeam({
-      companyId,
-      name: newTeamName,
-    });
-    teamName = team.name;
+  try {
+    const companyId = getString(formData, "companyId");
+    const selectedTeamName = getString(formData, "selectedTeamName");
+    const newTeamName = getString(formData, "newTeamName");
+
+    let teamName = selectedTeamName;
+    if (!teamName && newTeamName) {
+      const team = await createTeam({
+        companyId,
+        name: newTeamName,
+      });
+      teamName = team.name;
+    }
+
+    if (!teamName) {
+      throw new Error("Select an existing team or create a new one.");
+    }
+
+    await addInvoiceTeam(invoiceId, teamName);
+
+    revalidatePath(`/invoices/${invoiceId}`);
+    revalidatePath(`/invoices/drafts/${invoiceId}`);
+    revalidatePath("/invoices");
+  } catch (error) {
+    redirect(
+      buildFlashRedirect(
+        returnTo,
+        "error",
+        error instanceof Error ? error.message : "Unable to add team.",
+      ),
+    );
   }
 
-  if (!teamName) {
-    throw new Error("Select an existing team or create a new one.");
-  }
-
-  await addInvoiceTeam(invoiceId, teamName);
-
-  revalidatePath(`/invoices/${invoiceId}`);
-  revalidatePath(`/invoices/drafts/${invoiceId}`);
-  revalidatePath("/invoices");
+  redirect(buildFlashRedirect(returnTo, "success", "Team added to invoice."));
 }
 
 export async function addInvoiceLineItemAction(formData: FormData) {
@@ -124,95 +148,212 @@ export async function addInvoiceLineItemAction(formData: FormData) {
   revalidatePath("/dashboard");
 }
 
-export async function deleteInvoiceTeamAction(formData: FormData) {
+export async function assignInvoiceMemberAction(formData: FormData) {
   const invoiceId = getString(formData, "invoiceId");
-  const invoiceTeamId = getString(formData, "invoiceTeamId");
-  if (!invoiceTeamId) {
-    throw new Error("Select a team before removing it.");
+  const returnTo = getDraftReturnPath(formData, invoiceId);
+
+  try {
+    const invoiceTeamId = getString(formData, "invoiceTeamId");
+    const employeeId = getString(formData, "employeeId");
+    if (!invoiceTeamId || !employeeId) {
+      throw new Error("Select a team and member before adding.");
+    }
+
+    await assignEmployeeToInvoiceTeam({
+      invoiceId,
+      invoiceTeamId,
+      employeeId,
+    });
+
+    revalidatePath(`/invoices/${invoiceId}`);
+    revalidatePath(`/invoices/drafts/${invoiceId}`);
+    revalidatePath("/dashboard");
+  } catch (error) {
+    redirect(
+      buildFlashRedirect(
+        returnTo,
+        "error",
+        error instanceof Error ? error.message : "Unable to add member.",
+      ),
+    );
   }
 
-  await deleteInvoiceTeam(invoiceId, invoiceTeamId);
+  redirect(buildFlashRedirect(returnTo, "success", "Member assigned to team."));
+}
 
-  revalidatePath(`/invoices/${invoiceId}`);
-  revalidatePath(`/invoices/drafts/${invoiceId}`);
-  revalidatePath("/invoices");
-  revalidatePath("/dashboard");
+export async function deleteInvoiceTeamAction(formData: FormData) {
+  const invoiceId = getString(formData, "invoiceId");
+  const returnTo = getDraftReturnPath(formData, invoiceId);
+
+  try {
+    const invoiceTeamId = getString(formData, "invoiceTeamId");
+    if (!invoiceTeamId) {
+      throw new Error("Select a team before removing it.");
+    }
+
+    await deleteInvoiceTeam(invoiceId, invoiceTeamId);
+
+    revalidatePath(`/invoices/${invoiceId}`);
+    revalidatePath(`/invoices/drafts/${invoiceId}`);
+    revalidatePath("/invoices");
+    revalidatePath("/dashboard");
+  } catch (error) {
+    redirect(
+      buildFlashRedirect(
+        returnTo,
+        "error",
+        error instanceof Error ? error.message : "Unable to remove team.",
+      ),
+    );
+  }
+
+  redirect(buildFlashRedirect(returnTo, "success", "Team removed from invoice."));
 }
 
 export async function deleteInvoiceLineItemAction(formData: FormData) {
   const invoiceId = getString(formData, "invoiceId");
-  const lineItemId = getString(formData, "lineItemId");
-  if (!lineItemId) {
-    throw new Error("Select a member before removing it.");
+  const returnTo = getDraftReturnPath(formData, invoiceId);
+
+  try {
+    const lineItemId = getString(formData, "lineItemId");
+    if (!lineItemId) {
+      throw new Error("Select a member before removing it.");
+    }
+
+    await deleteInvoiceLineItem(invoiceId, lineItemId);
+
+    revalidatePath(`/invoices/${invoiceId}`);
+    revalidatePath(`/invoices/drafts/${invoiceId}`);
+    revalidatePath("/dashboard");
+  } catch (error) {
+    redirect(
+      buildFlashRedirect(
+        returnTo,
+        "error",
+        error instanceof Error ? error.message : "Unable to remove member.",
+      ),
+    );
   }
 
-  await deleteInvoiceLineItem(invoiceId, lineItemId);
-
-  revalidatePath(`/invoices/${invoiceId}`);
-  revalidatePath(`/invoices/drafts/${invoiceId}`);
-  revalidatePath("/dashboard");
+  redirect(buildFlashRedirect(returnTo, "success", "Member removed from invoice."));
 }
 
 export async function updateInvoiceLineItemAction(formData: FormData) {
   const invoiceId = getString(formData, "invoiceId");
-  const lineItemId = getString(formData, "lineItemId");
-  if (!lineItemId) {
-    throw new Error("Select a member before updating it.");
+  const returnTo = getDraftReturnPath(formData, invoiceId);
+
+  try {
+    const lineItemId = getString(formData, "lineItemId");
+    if (!lineItemId) {
+      throw new Error("Select a member before updating it.");
+    }
+
+    await updateInvoiceLineItem({
+      invoiceId,
+      lineItemId,
+      hoursBilled: Number.parseFloat(getString(formData, "hoursBilled")),
+      billingRateUsdCents: centsFromUsd(getString(formData, "billingRateUsd")),
+    });
+
+    revalidatePath(`/invoices/${invoiceId}`);
+    revalidatePath(`/invoices/drafts/${invoiceId}`);
+    revalidatePath("/dashboard");
+  } catch (error) {
+    redirect(
+      buildFlashRedirect(
+        returnTo,
+        "error",
+        error instanceof Error ? error.message : "Unable to update member.",
+      ),
+    );
   }
 
-  await updateInvoiceLineItem({
-    invoiceId,
-    lineItemId,
-    hoursBilled: Number.parseFloat(getString(formData, "hoursBilled")),
-    billingRateUsdCents: centsFromUsd(getString(formData, "billingRateUsd")),
-  });
-
-  revalidatePath(`/invoices/${invoiceId}`);
-  revalidatePath(`/invoices/drafts/${invoiceId}`);
-  revalidatePath("/dashboard");
+  redirect(buildFlashRedirect(returnTo, "success", "Member details updated."));
 }
 
 export async function addInvoiceAdjustmentAction(formData: FormData) {
   const invoiceId = getString(formData, "invoiceId");
-  const type = getString(formData, "type") as
-    | "onboarding"
-    | "offboarding"
-    | "reimbursement";
-  const rawAmount = centsFromUsd(getString(formData, "amountUsd"));
+  const returnTo = getDraftReturnPath(formData, invoiceId);
 
-  await addInvoiceAdjustment({
-    invoiceId,
-    type,
-    label: getString(formData, "label"),
-    employeeName: getString(formData, "employeeName") || undefined,
-    amountUsdCents: type === "offboarding" ? -Math.abs(rawAmount) : rawAmount,
-  });
+  try {
+    const type = getString(formData, "type") as
+      | "onboarding"
+      | "offboarding"
+      | "reimbursement";
+    const rawAmount = centsFromUsd(getString(formData, "amountUsd"));
 
-  revalidatePath(`/invoices/${invoiceId}`);
-  revalidatePath(`/invoices/drafts/${invoiceId}`);
-  revalidatePath("/dashboard");
+    await addInvoiceAdjustment({
+      invoiceId,
+      type,
+      label: getString(formData, "label"),
+      employeeName: getString(formData, "employeeName") || undefined,
+      amountUsdCents: type === "offboarding" ? -Math.abs(rawAmount) : rawAmount,
+    });
+
+    revalidatePath(`/invoices/${invoiceId}`);
+    revalidatePath(`/invoices/drafts/${invoiceId}`);
+    revalidatePath("/dashboard");
+  } catch (error) {
+    redirect(
+      buildFlashRedirect(
+        returnTo,
+        "error",
+        error instanceof Error ? error.message : "Unable to add adjustment.",
+      ),
+    );
+  }
+
+  redirect(buildFlashRedirect(returnTo, "success", "Adjustment added."));
 }
 
 export async function updateInvoiceNoteAction(formData: FormData) {
   const invoiceId = getString(formData, "invoiceId");
-  await updateInvoiceNote(invoiceId, getString(formData, "noteText"));
+  const returnTo = getDraftReturnPath(formData, invoiceId);
 
-  revalidatePath(`/invoices/${invoiceId}`);
-  revalidatePath(`/invoices/drafts/${invoiceId}`);
+  try {
+    await updateInvoiceNote(invoiceId, getString(formData, "noteText"));
+
+    revalidatePath(`/invoices/${invoiceId}`);
+    revalidatePath(`/invoices/drafts/${invoiceId}`);
+  } catch (error) {
+    redirect(
+      buildFlashRedirect(
+        returnTo,
+        "error",
+        error instanceof Error ? error.message : "Unable to save note.",
+      ),
+    );
+  }
+
+  redirect(buildFlashRedirect(returnTo, "success", "Invoice note saved."));
 }
 
 export async function updateInvoiceStatusAction(formData: FormData) {
   const invoiceId = getString(formData, "invoiceId");
-  await updateInvoiceStatus(
-    invoiceId,
-    getString(formData, "status") as "draft" | "generated" | "sent" | "cashed_out",
-  );
+  const returnTo = getDraftReturnPath(formData, invoiceId);
 
-  revalidatePath(`/invoices/${invoiceId}`);
-  revalidatePath(`/invoices/drafts/${invoiceId}`);
-  revalidatePath("/invoices");
-  revalidatePath("/cashout");
-  revalidatePath("/dashboard");
+  try {
+    await updateInvoiceStatus(
+      invoiceId,
+      getString(formData, "status") as "draft" | "generated" | "sent" | "cashed_out",
+    );
+
+    revalidatePath(`/invoices/${invoiceId}`);
+    revalidatePath(`/invoices/drafts/${invoiceId}`);
+    revalidatePath("/invoices");
+    revalidatePath("/cashout");
+    revalidatePath("/dashboard");
+  } catch (error) {
+    redirect(
+      buildFlashRedirect(
+        returnTo,
+        "error",
+        error instanceof Error ? error.message : "Unable to update invoice status.",
+      ),
+    );
+  }
+
+  redirect(buildFlashRedirect(returnTo, "success", "Invoice status updated."));
 }
 
 export async function cashOutInvoiceAction(formData: FormData) {
