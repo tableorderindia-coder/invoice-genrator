@@ -63,7 +63,8 @@ export async function createInvoiceDraftAction(formData: FormData) {
 
   revalidatePath("/");
   revalidatePath("/invoices");
-  redirect(`/invoices/${invoice.id}`);
+  revalidatePath("/invoices/create");
+  redirect(`/invoices/drafts/${invoice.id}`);
 }
 
 export async function addInvoiceTeamAction(formData: FormData) {
@@ -71,6 +72,7 @@ export async function addInvoiceTeamAction(formData: FormData) {
   await addInvoiceTeam(invoiceId, getString(formData, "teamName"));
 
   revalidatePath(`/invoices/${invoiceId}`);
+  revalidatePath(`/invoices/drafts/${invoiceId}`);
   revalidatePath("/invoices");
 }
 
@@ -95,6 +97,7 @@ export async function addInvoiceLineItemAction(formData: FormData) {
   });
 
   revalidatePath(`/invoices/${invoiceId}`);
+  revalidatePath(`/invoices/drafts/${invoiceId}`);
   revalidatePath("/dashboard");
 }
 
@@ -108,6 +111,7 @@ export async function deleteInvoiceTeamAction(formData: FormData) {
   await deleteInvoiceTeam(invoiceId, invoiceTeamId);
 
   revalidatePath(`/invoices/${invoiceId}`);
+  revalidatePath(`/invoices/drafts/${invoiceId}`);
   revalidatePath("/invoices");
   revalidatePath("/dashboard");
 }
@@ -129,6 +133,7 @@ export async function addInvoiceAdjustmentAction(formData: FormData) {
   });
 
   revalidatePath(`/invoices/${invoiceId}`);
+  revalidatePath(`/invoices/drafts/${invoiceId}`);
   revalidatePath("/dashboard");
 }
 
@@ -137,6 +142,7 @@ export async function updateInvoiceNoteAction(formData: FormData) {
   await updateInvoiceNote(invoiceId, getString(formData, "noteText"));
 
   revalidatePath(`/invoices/${invoiceId}`);
+  revalidatePath(`/invoices/drafts/${invoiceId}`);
 }
 
 export async function updateInvoiceStatusAction(formData: FormData) {
@@ -147,7 +153,9 @@ export async function updateInvoiceStatusAction(formData: FormData) {
   );
 
   revalidatePath(`/invoices/${invoiceId}`);
+  revalidatePath(`/invoices/drafts/${invoiceId}`);
   revalidatePath("/invoices");
+  revalidatePath("/cashout");
   revalidatePath("/dashboard");
 }
 
@@ -156,6 +164,8 @@ export async function cashOutInvoiceAction(formData: FormData) {
   await cashOutInvoice(invoiceId, getString(formData, "realizedAt"));
 
   revalidatePath(`/invoices/${invoiceId}`);
+  revalidatePath(`/invoices/drafts/${invoiceId}`);
   revalidatePath("/dashboard");
   revalidatePath("/invoices");
+  revalidatePath("/cashout");
 }

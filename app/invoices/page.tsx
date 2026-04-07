@@ -2,6 +2,8 @@ import Link from "next/link";
 
 import { Shell } from "../_components/shell";
 import { GlassPanel } from "../_components/glass-panel";
+import { updateInvoiceStatusAction } from "@/src/features/billing/actions";
+import { filterIssuedInvoices } from "@/src/features/billing/invoice-workflow";
 import { listCompanies, listInvoices } from "@/src/features/billing/store";
 import { formatDate, formatMonthYear, formatUsd } from "@/src/features/billing/utils";
 
@@ -12,28 +14,24 @@ function getStatusClass(status: string) {
 }
 
 export default async function InvoicesPage() {
-  const invoices = await listInvoices();
-  const companies = await listCompanies();
+  const [allInvoices, companies] = await Promise.all([listInvoices(), listCompanies()]);
+  const invoices = filterIssuedInvoices(allInvoices);
   const companyMap = new Map(companies.map((company) => [company.id, company.name]));
 
   return (
-    <Shell title="Invoices" eyebrow="Snapshot history">
+    <Shell title="Invoices" eyebrow="Issued invoices">
       <GlassPanel gradient>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4">
           <div>
             <h2 className="text-xl font-semibold" style={{ color: "var(--text-primary)" }}>
               Invoice register
             </h2>
             <p className="mt-1 text-sm" style={{ color: "var(--text-secondary)" }}>
-              Every invoice is a frozen monthly snapshot.
+              Generated and sent invoices live here for daily operations.
             </p>
           </div>
-          <Link href="/invoices/new" className="gradient-btn flex items-center gap-2">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            Create invoice
+          <Link href="/invoices/create" className="btn-outline">
+            Go to create invoice
           </Link>
         </div>
 
@@ -41,7 +39,7 @@ export default async function InvoicesPage() {
           <table className="glass-table">
             <thead>
               <tr>
-                {["Invoice", "Company", "Period", "Billing date", "Status", "Total"].map((heading) => (
+                {["Invoice", "Company", "Period", "Billing date", "Status", "Total", "Actions"].map((heading) => (
                   <th key={heading}>{heading}</th>
                 ))}
               </tr>
@@ -49,14 +47,8 @@ export default async function InvoicesPage() {
             <tbody>
               {invoices.map((invoice) => (
                 <tr key={invoice.id}>
-                  <td className="font-semibold">
-                    <Link
-                      href={`/invoices/${invoice.id}`}
-                      className="hover:underline underline-offset-4"
-                      style={{ color: "var(--text-accent)" }}
-                    >
-                      {invoice.invoiceNumber}
-                    </Link>
+                  <td className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                    {invoice.invoiceNumber}
                   </td>
                   <td>{companyMap.get(invoice.companyId)}</td>
                   <td>{formatMonthYear(invoice.month, invoice.year)}</td>
@@ -76,12 +68,41 @@ export default async function InvoicesPage() {
                   >
                     {formatUsd(invoice.grandTotalUsdCents)}
                   </td>
+                  <td>
+                    <div className="flex flex-wrap gap-2">
+                      <Link
+                        href={`/api/invoices/${invoice.id}/pdf`}
+                        className="btn-outline"
+                      >
+                        Open PDF
+                      </Link>
+                      {invoice.status === "generated" ? (
+                        <form action={updateInvoiceStatusAction}>
+                          <input type="hidden" name="invoiceId" value={invoice.id} />
+                          <input type="hidden" name="status" value="sent" />
+                          <button type="submit" className="gradient-btn">
+                            Mark sent
+                          </button>
+                        </form>
+                      ) : (
+                        <span
+                          className="rounded-full px-3 py-2 text-xs font-semibold"
+                          style={{
+                            border: "1px solid var(--glass-border)",
+                            color: "var(--text-muted)",
+                          }}
+                        >
+                          Sent
+                        </span>
+                      )}
+                    </div>
+                  </td>
                 </tr>
               ))}
               {invoices.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="text-center py-8" style={{ color: "var(--text-muted)" }}>
-                    No invoices created yet.
+                  <td colSpan={7} className="text-center py-8" style={{ color: "var(--text-muted)" }}>
+                    No generated or sent invoices yet.
                   </td>
                 </tr>
               )}
