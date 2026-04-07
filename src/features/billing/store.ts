@@ -480,6 +480,18 @@ export async function addInvoiceTeam(invoiceId: string, teamName: string) {
   return mapInvoiceTeam(data as DbInvoiceTeam);
 }
 
+export async function deleteInvoiceTeam(invoiceId: string, invoiceTeamId: string) {
+  const supabase = getSupabaseOrThrow();
+  const { error } = await supabase
+    .from("invoice_teams")
+    .delete()
+    .eq("id", invoiceTeamId)
+    .eq("invoice_id", invoiceId);
+  if (error) throw error;
+
+  await recomputeSupabaseInvoice(invoiceId);
+}
+
 export async function addInvoiceLineItem(input: {
   invoiceId: string;
   invoiceTeamId: string;

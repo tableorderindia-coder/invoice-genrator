@@ -6,6 +6,8 @@
    ───────────────────────────────────────────── */
 
 :root {
+  --font-jetbrains-mono: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+
   /* Surface colors */
   --bg-deep: #06060f;
   --bg-base: #0a0a1a;

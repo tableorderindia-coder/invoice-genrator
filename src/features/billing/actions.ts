@@ -11,6 +11,7 @@ import {
   createCompany,
   createEmployee,
   createInvoiceDraft,
+  deleteInvoiceTeam,
   updateInvoiceNote,
   updateInvoiceStatus,
 } from "./store";
@@ -75,9 +76,14 @@ export async function addInvoiceTeamAction(formData: FormData) {
 
 export async function addInvoiceLineItemAction(formData: FormData) {
   const invoiceId = getString(formData, "invoiceId");
+  const invoiceTeamId = getString(formData, "invoiceTeamId");
+  if (!invoiceTeamId) {
+    throw new Error("Select a team before adding a candidate.");
+  }
+
   await addInvoiceLineItem({
     invoiceId,
-    invoiceTeamId: getString(formData, "invoiceTeamId"),
+    invoiceTeamId,
     employeeId: getString(formData, "employeeId"),
     hoursBilled: Number.parseFloat(getString(formData, "hoursBilled")),
     billingRateUsdCents: getString(formData, "billingRateUsd")
@@ -89,6 +95,20 @@ export async function addInvoiceLineItemAction(formData: FormData) {
   });
 
   revalidatePath(`/invoices/${invoiceId}`);
+  revalidatePath("/dashboard");
+}
+
+export async function deleteInvoiceTeamAction(formData: FormData) {
+  const invoiceId = getString(formData, "invoiceId");
+  const invoiceTeamId = getString(formData, "invoiceTeamId");
+  if (!invoiceTeamId) {
+    throw new Error("Select a team before removing it.");
+  }
+
+  await deleteInvoiceTeam(invoiceId, invoiceTeamId);
+
+  revalidatePath(`/invoices/${invoiceId}`);
+  revalidatePath("/invoices");
   revalidatePath("/dashboard");
 }
 

@@ -3,15 +3,17 @@ import { notFound } from "next/navigation";
 
 import { Shell } from "../../_components/shell";
 import { GlassPanel } from "../../_components/glass-panel";
-import { Field, inputClass } from "../../_components/field";
+import { inputClass } from "../../_components/field";
 import {
   addInvoiceAdjustmentAction,
   addInvoiceLineItemAction,
   addInvoiceTeamAction,
   cashOutInvoiceAction,
+  deleteInvoiceTeamAction,
   updateInvoiceNoteAction,
   updateInvoiceStatusAction,
 } from "@/src/features/billing/actions";
+import { resolveSelectedTeam } from "@/src/features/billing/invoice-editor";
 import {
   getInvoiceDetail,
   listEmployees,
@@ -26,10 +28,13 @@ function getStatusClass(status: string) {
 
 export default async function InvoiceDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ teamId?: string | string[] }>;
 }) {
   const { id } = await params;
+  const { teamId } = await searchParams;
   const detail = await getInvoiceDetail(id);
 
   if (!detail) {
@@ -37,6 +42,10 @@ export default async function InvoiceDetailPage({
   }
 
   const employees = await listEmployees(detail.company.id);
+  const selectedTeam = resolveSelectedTeam(
+    detail.teams,
+    Array.isArray(teamId) ? teamId[0] : teamId,
+  );
 
   return (
     <Shell title={detail.invoice.invoiceNumber} eyebrow="Invoice detail">
@@ -106,72 +115,87 @@ export default async function InvoiceDetailPage({
             </div>
           </GlassPanel>
 
-          {/* Team tables */}
-          <div className="space-y-4">
-            {detail.teams.map((team) => (
-              <GlassPanel key={team.id}>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xl font-semibold" style={{ color: "var(--text-primary)" }}>
-                    {team.teamName}
-                  </h3>
-                  <span
-                    className="rounded-full px-3 py-1 text-xs font-semibold"
-                    style={{
-                      background: "rgba(99,102,241,0.1)",
-                      color: "var(--text-accent)",
-                      border: "1px solid rgba(99,102,241,0.15)",
-                    }}
-                  >
-                    {team.lineItems.length} candidates
-                  </span>
-                </div>
-                <div className="overflow-x-auto rounded-2xl" style={{ border: "1px solid var(--glass-border)" }}>
-                  <table className="glass-table">
-                    <thead>
-                      <tr>
-                        {["Candidate", "Designation", "Rate", "Hours", "Total", "Profit"].map((heading) => (
-                          <th key={heading}>{heading}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {team.lineItems.map((lineItem) => (
-                        <tr key={lineItem.id}>
-                          <td className="font-semibold">{lineItem.employeeNameSnapshot}</td>
-                          <td>{lineItem.designationSnapshot}</td>
-                          <td style={{ fontFamily: "var(--font-jetbrains-mono), monospace" }}>
-                            {formatUsd(lineItem.billingRateUsdCents)}
-                          </td>
-                          <td style={{ fontFamily: "var(--font-jetbrains-mono), monospace" }}>
-                            {lineItem.hoursBilled}
-                          </td>
-                          <td style={{ fontFamily: "var(--font-jetbrains-mono), monospace" }}>
-                            {formatUsd(lineItem.billedTotalUsdCents)}
-                          </td>
-                          <td
-                            className="font-semibold"
-                            style={{
-                              fontFamily: "var(--font-jetbrains-mono), monospace",
-                              color: "#34d399",
-                            }}
-                          >
-                            {formatUsd(lineItem.profitTotalUsdCents)}
-                          </td>
-                        </tr>
+          <GlassPanel>
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] gradient-text">
+                  Team workspace
+                </p>
+                <h3 className="mt-1 text-xl font-semibold" style={{ color: "var(--text-primary)" }}>
+                  {selectedTeam ? selectedTeam.teamName : "No team selected"}
+                </h3>
+              </div>
+              {selectedTeam ? (
+                <span
+                  className="rounded-full px-3 py-1 text-xs font-semibold"
+                  style={{
+                    background: "rgba(99,102,241,0.1)",
+                    color: "var(--text-accent)",
+                    border: "1px solid rgba(99,102,241,0.15)",
+                  }}
+                >
+                  {selectedTeam.lineItems.length} candidates
+                </span>
+              ) : null}
+            </div>
+            {selectedTeam ? (
+              <div className="overflow-x-auto rounded-2xl" style={{ border: "1px solid var(--glass-border)" }}>
+                <table className="glass-table">
+                  <thead>
+                    <tr>
+                      {["Candidate", "Designation", "Rate", "Hours", "Total", "Profit"].map((heading) => (
+                        <th key={heading}>{heading}</th>
                       ))}
-                      {team.lineItems.length === 0 && (
-                        <tr>
-                          <td colSpan={6} className="text-center py-6" style={{ color: "var(--text-muted)" }}>
-                            No candidates in this team yet.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </GlassPanel>
-            ))}
-          </div>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedTeam.lineItems.map((lineItem) => (
+                      <tr key={lineItem.id}>
+                        <td className="font-semibold">{lineItem.employeeNameSnapshot}</td>
+                        <td>{lineItem.designationSnapshot}</td>
+                        <td style={{ fontFamily: "var(--font-jetbrains-mono), monospace" }}>
+                          {formatUsd(lineItem.billingRateUsdCents)}
+                        </td>
+                        <td style={{ fontFamily: "var(--font-jetbrains-mono), monospace" }}>
+                          {lineItem.hoursBilled}
+                        </td>
+                        <td style={{ fontFamily: "var(--font-jetbrains-mono), monospace" }}>
+                          {formatUsd(lineItem.billedTotalUsdCents)}
+                        </td>
+                        <td
+                          className="font-semibold"
+                          style={{
+                            fontFamily: "var(--font-jetbrains-mono), monospace",
+                            color: "#34d399",
+                          }}
+                        >
+                          {formatUsd(lineItem.profitTotalUsdCents)}
+                        </td>
+                      </tr>
+                    ))}
+                    {selectedTeam.lineItems.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="text-center py-6" style={{ color: "var(--text-muted)" }}>
+                          No candidates in this team yet.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div
+                className="rounded-2xl p-6 text-sm"
+                style={{
+                  background: "rgba(255,255,255,0.02)",
+                  border: "1px solid var(--glass-border)",
+                  color: "var(--text-muted)",
+                }}
+              >
+                Create a team and select it to start adding candidates.
+              </div>
+            )}
+          </GlassPanel>
 
           {/* Adjustments */}
           <GlassPanel>
@@ -221,7 +245,7 @@ export default async function InvoiceDetailPage({
         <div className="space-y-6">
           <GlassPanel gradient>
             <h3 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
-              Add team section
+              Team manager
             </h3>
             <form action={addInvoiceTeamAction} className="mt-4 space-y-3">
               <input type="hidden" name="invoiceId" value={detail.invoice.id} />
@@ -235,22 +259,77 @@ export default async function InvoiceDetailPage({
                 Add team
               </button>
             </form>
+            <div className="mt-4 space-y-3">
+              {detail.teams.map((team) => {
+                const isSelected = selectedTeam?.id === team.id;
+
+                return (
+                  <Link
+                    key={team.id}
+                    href={`/invoices/${detail.invoice.id}?teamId=${team.id}`}
+                    className="block rounded-2xl p-4 transition"
+                    style={{
+                      background: isSelected
+                        ? "linear-gradient(135deg, rgba(99,102,241,0.18), rgba(14,165,233,0.12))"
+                        : "rgba(255,255,255,0.03)",
+                      border: isSelected
+                        ? "1px solid rgba(99,102,241,0.35)"
+                        : "1px solid var(--glass-border)",
+                    }}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                          {team.teamName}
+                        </p>
+                        <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                          {team.lineItems.length} candidates
+                        </p>
+                      </div>
+                      {isSelected ? (
+                        <span className="text-xs font-semibold" style={{ color: "var(--text-accent)" }}>
+                          Selected
+                        </span>
+                      ) : null}
+                    </div>
+                  </Link>
+                );
+              })}
+              {detail.teams.length === 0 ? (
+                <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                  No teams yet. Add one to start the invoice workspace.
+                </p>
+              ) : null}
+            </div>
+            <form action={deleteInvoiceTeamAction} className="mt-4">
+              <input type="hidden" name="invoiceId" value={detail.invoice.id} />
+              <input type="hidden" name="invoiceTeamId" value={selectedTeam?.id ?? ""} />
+              <button
+                type="submit"
+                disabled={!selectedTeam}
+                className="btn-outline w-full"
+                style={!selectedTeam ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
+              >
+                Remove selected team
+              </button>
+            </form>
           </GlassPanel>
 
           <GlassPanel gradient>
             <h3 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
-              Add candidate
+              {selectedTeam
+                ? `Add candidate to ${selectedTeam.teamName}`
+                : "Add candidate"}
             </h3>
             <form action={addInvoiceLineItemAction} className="mt-4 space-y-3">
               <input type="hidden" name="invoiceId" value={detail.invoice.id} />
-              <select name="invoiceTeamId" required className={inputClass}>
-                {detail.teams.map((team) => (
-                  <option key={team.id} value={team.id}>
-                    {team.teamName}
-                  </option>
-                ))}
-              </select>
-              <select name="employeeId" required className={inputClass}>
+              <input type="hidden" name="invoiceTeamId" value={selectedTeam?.id ?? ""} />
+              <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                {selectedTeam
+                  ? `Selected team: ${selectedTeam.teamName}`
+                  : "Create and select a team before adding candidates."}
+              </p>
+              <select name="employeeId" required disabled={!selectedTeam} className={inputClass}>
                 {employees.map((employee) => (
                   <option key={employee.id} value={employee.id}>
                     {employee.fullName} · {employee.defaultTeam}
@@ -258,11 +337,16 @@ export default async function InvoiceDetailPage({
                 ))}
               </select>
               <div className="grid gap-3 sm:grid-cols-3">
-                <input name="hoursBilled" type="number" step="0.01" min="0" required placeholder="Hours" className={inputClass} />
-                <input name="billingRateUsd" type="number" step="0.01" min="0" placeholder="Bill $/hr" className={inputClass} />
-                <input name="payoutRateUsd" type="number" step="0.01" min="0" placeholder="Payout $/hr" className={inputClass} />
+                <input name="hoursBilled" type="number" step="0.01" min="0" required disabled={!selectedTeam} placeholder="Hours" className={inputClass} />
+                <input name="billingRateUsd" type="number" step="0.01" min="0" disabled={!selectedTeam} placeholder="Bill $/hr" className={inputClass} />
+                <input name="payoutRateUsd" type="number" step="0.01" min="0" disabled={!selectedTeam} placeholder="Payout $/hr" className={inputClass} />
               </div>
-              <button type="submit" className="gradient-btn w-full">
+              <button
+                type="submit"
+                disabled={!selectedTeam}
+                className="gradient-btn w-full"
+                style={!selectedTeam ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
+              >
                 Add candidate
               </button>
             </form>
