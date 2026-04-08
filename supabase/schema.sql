@@ -71,9 +71,11 @@ create table if not exists invoice_line_items (
 create table if not exists invoice_adjustments (
   id text primary key,
   invoice_id text not null references invoices (id) on delete cascade,
-  type text not null check (type in ('onboarding', 'offboarding', 'reimbursement')),
+  type text not null check (type in ('onboarding', 'offboarding', 'reimbursement', 'appraisal')),
   label text not null,
   employee_name text,
+  rate_usd_cents integer,
+  hours numeric(8,2),
   amount_usd_cents integer not null,
   sort_order integer not null default 1
 );

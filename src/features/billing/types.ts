@@ -73,7 +73,8 @@ export type InvoiceLineItem = {
 export type AdjustmentType =
   | "onboarding"
   | "offboarding"
-  | "reimbursement";
+  | "reimbursement"
+  | "appraisal";
 
 export type InvoiceAdjustment = {
   id: string;
@@ -81,6 +82,8 @@ export type InvoiceAdjustment = {
   type: AdjustmentType;
   label: string;
   employeeName?: string;
+  rateUsdCents?: number;
+  hours?: number;
   amountUsdCents: number;
   sortOrder: number;
 };

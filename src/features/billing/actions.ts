@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { buildInvoiceAdjustmentPayload } from "./adjustments";
 import {
   addInvoiceAdjustment,
   addInvoiceLineItem,
@@ -279,15 +280,26 @@ export async function addInvoiceAdjustmentAction(formData: FormData) {
     const type = getString(formData, "type") as
       | "onboarding"
       | "offboarding"
-      | "reimbursement";
-    const rawAmount = centsFromUsd(getString(formData, "amountUsd"));
+      | "reimbursement"
+      | "appraisal";
+
+    const payload =
+      type === "reimbursement"
+        ? buildInvoiceAdjustmentPayload({
+            type,
+            label: getString(formData, "label"),
+            amountUsdCents: centsFromUsd(getString(formData, "amountUsd")),
+          })
+        : buildInvoiceAdjustmentPayload({
+            type,
+            employeeName: getString(formData, "employeeName"),
+            rateUsdCents: centsFromUsd(getString(formData, "rateUsd")),
+            hours: Number.parseFloat(getString(formData, "hours") || "0"),
+          });
 
     await addInvoiceAdjustment({
       invoiceId,
-      type,
-      label: getString(formData, "label"),
-      employeeName: getString(formData, "employeeName") || undefined,
-      amountUsdCents: type === "offboarding" ? -Math.abs(rawAmount) : rawAmount,
+      ...payload,
     });
 
     revalidatePath(`/invoices/${invoiceId}`);

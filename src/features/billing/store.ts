@@ -104,6 +104,8 @@ type DbInvoiceAdjustment = {
   type: AdjustmentType;
   label: string;
   employee_name: string | null;
+  rate_usd_cents: number | null;
+  hours: number | null;
   amount_usd_cents: number;
   sort_order: number;
 };
@@ -142,6 +144,29 @@ function getSupabaseOrThrow() {
   }
 
   return client;
+}
+
+function normalizeInvoiceAdjustmentSchemaError(error: unknown) {
+  if (
+    error &&
+    typeof error === "object" &&
+    "code" in error &&
+    typeof error.code === "string"
+  ) {
+    if (error.code === "PGRST204") {
+      return new Error(
+        "Supabase is missing the latest invoice adjustment columns. Run the invoice adjustment migration first.",
+      );
+    }
+
+    if (error.code === "23514") {
+      return new Error(
+        "Supabase is missing the latest invoice adjustment type rules. Run the invoice adjustment migration first.",
+      );
+    }
+  }
+
+  return error;
 }
 
 function mapCompany(row: DbCompany): Company {
@@ -233,6 +258,8 @@ function mapInvoiceAdjustment(row: DbInvoiceAdjustment) {
     type: row.type,
     label: row.label,
     employeeName: row.employee_name ?? undefined,
+    rateUsdCents: row.rate_usd_cents ?? undefined,
+    hours: row.hours ?? undefined,
     amountUsdCents: row.amount_usd_cents,
     sortOrder: row.sort_order,
   };
@@ -559,6 +586,8 @@ export async function createInvoiceDraft(input: {
         type: adjustment.type,
         label: adjustment.label,
         employeeName: adjustment.employeeName,
+        rateUsdCents: adjustment.rateUsdCents,
+        hours: adjustment.hours,
         amountUsdCents: adjustment.amountUsdCents,
       });
     }
@@ -897,6 +926,8 @@ export async function addInvoiceAdjustment(input: {
   type: AdjustmentType;
   label: string;
   employeeName?: string;
+  rateUsdCents?: number;
+  hours?: number;
   amountUsdCents: number;
 }) {
   const supabase = getSupabaseOrThrow();
@@ -912,6 +943,8 @@ export async function addInvoiceAdjustment(input: {
     type: input.type,
     label: input.label,
     employee_name: input.employeeName ?? null,
+    rate_usd_cents: input.rateUsdCents ?? null,
+    hours: input.hours ?? null,
     amount_usd_cents: input.amountUsdCents,
     sort_order: (count ?? 0) + 1,
   };
@@ -921,7 +954,7 @@ export async function addInvoiceAdjustment(input: {
     .insert(payload)
     .select()
     .single();
-  if (error) throw error;
+  if (error) throw normalizeInvoiceAdjustmentSchemaError(error);
 
   await recomputeSupabaseInvoice(input.invoiceId);
   return mapInvoiceAdjustment(data as DbInvoiceAdjustment);

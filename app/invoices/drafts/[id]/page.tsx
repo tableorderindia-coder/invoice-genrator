@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { Shell } from "../../../_components/shell";
 import { GlassPanel } from "../../../_components/glass-panel";
 import { inputClass } from "../../../_components/field";
+import { AdjustmentForms } from "./adjustment-forms";
 import {
   addInvoiceAdjustmentAction,
   assignInvoiceMemberAction,
@@ -23,6 +24,19 @@ import { filterEligibleEmployeesForTeam } from "@/src/features/billing/member-as
 import { formatDate, formatMonthYear, formatUsd } from "@/src/features/billing/utils";
 
 export const dynamic = "force-dynamic";
+
+function formatAdjustmentTypeLabel(type: "onboarding" | "offboarding" | "reimbursement" | "appraisal") {
+  switch (type) {
+    case "onboarding":
+      return "Onboarding advance";
+    case "offboarding":
+      return "Offboarding deduction";
+    case "reimbursement":
+      return "Reimbursement";
+    case "appraisal":
+      return "Appraisal advance";
+  }
+}
 
 export default async function DraftInvoicePage({
   params,
@@ -317,7 +331,7 @@ export default async function DraftInvoicePage({
               {detail.adjustments.map((adjustment) => (
                 <div
                   key={adjustment.id}
-                  className="flex items-center justify-between rounded-2xl p-4"
+                  className="flex items-center justify-between gap-4 rounded-2xl p-4"
                   style={{
                     background: "rgba(255,255,255,0.02)",
                     border: "1px solid var(--glass-border)",
@@ -325,11 +339,22 @@ export default async function DraftInvoicePage({
                 >
                   <div>
                     <p className="font-medium" style={{ color: "var(--text-primary)" }}>
-                      {adjustment.label}
+                      {formatAdjustmentTypeLabel(adjustment.type)}
                     </p>
                     <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-                      {adjustment.type}
-                      {adjustment.employeeName ? ` · ${adjustment.employeeName}` : ""}
+                      {adjustment.type === "reimbursement"
+                        ? adjustment.label
+                        : [
+                            adjustment.employeeName,
+                            adjustment.rateUsdCents !== undefined
+                              ? `${formatUsd(adjustment.rateUsdCents)}/hr`
+                              : undefined,
+                            adjustment.hours !== undefined
+                              ? `${adjustment.hours} hrs`
+                              : undefined,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")}
                     </p>
                   </div>
                   <p
@@ -405,23 +430,15 @@ export default async function DraftInvoicePage({
 
           <GlassPanel gradient>
             <h3 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
-              Add adjustment
+              Add adjustments
             </h3>
-            <form action={addInvoiceAdjustmentAction} className="mt-4 space-y-3">
-              <input type="hidden" name="invoiceId" value={detail.invoice.id} />
-              <input type="hidden" name="returnTo" value={returnTo} />
-              <select name="type" className={inputClass}>
-                <option value="onboarding">Onboarding</option>
-                <option value="offboarding">Offboarding deduction</option>
-                <option value="reimbursement">Reimbursement</option>
-              </select>
-              <input name="label" required placeholder="Label" className={inputClass} />
-              <input name="employeeName" placeholder="Employee (optional)" className={inputClass} />
-              <input name="amountUsd" required type="number" step="0.01" min="0" placeholder="Amount in USD" className={inputClass} />
-              <button type="submit" className="gradient-btn w-full">
-                Add adjustment
-              </button>
-            </form>
+            <div className="mt-4">
+              <AdjustmentForms
+                invoiceId={detail.invoice.id}
+                returnTo={returnTo}
+                action={addInvoiceAdjustmentAction}
+              />
+            </div>
           </GlassPanel>
 
           <GlassPanel>

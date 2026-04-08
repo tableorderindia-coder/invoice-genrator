@@ -11,8 +11,11 @@ test("shows inline success feedback on the draft invoice page", async ({ page })
   await page.getByRole("button", { name: "Create draft" }).click();
   await page.waitForURL(/\/invoices\/drafts\//);
 
-  await page.locator('textarea[name="noteText"]').fill("Updated from Playwright e2e.");
-  await page.getByRole("button", { name: "Save note" }).click();
+  await page.getByPlaceholder("Name").first().fill("Playwright Member");
+  await page.locator('input[name="rateUsd"]').first().fill("25");
+  await page.locator('input[name="hours"]').first().fill("4");
+  await expect(page.getByLabel("Onboarding advance total")).toHaveValue("100.00");
+  await page.getByRole("button", { name: "Add onboarding advance" }).click();
 
-  await expect(page.getByText("Invoice note saved.")).toBeVisible();
+  await expect(page.getByText("Adjustment added.")).toBeVisible();
 });
