@@ -59,12 +59,15 @@ describe("billing domain", () => {
             profitTotalUsdCents: 12000,
           },
         ],
-        adjustmentsUsdCents: 2000,
         realizedAt: "2026-06-10",
+        dollarInboundUsdCents: 32000,
+        usdInrRate: 83.25,
       }),
     ).toEqual({
       invoiceId: "inv_1",
       realizedAt: "2026-06-10",
+      dollarInboundUsdCents: 32000,
+      usdInrRate: 83.25,
       realizedRevenueUsdCents: 32000,
       realizedPayoutUsdCents: 18000,
       realizedProfitUsdCents: 14000,
@@ -75,9 +78,42 @@ describe("billing domain", () => {
         invoiceId: "inv_1",
         alreadyRealized: true,
         lineItems: [],
-        adjustmentsUsdCents: 0,
         realizedAt: "2026-06-10",
+        dollarInboundUsdCents: 0,
+        usdInrRate: 83.25,
       }),
     ).toThrow("Invoice has already been cashed out");
+  });
+
+  it("derives realized payout directly from line-item payout totals", () => {
+    expect(
+      createRealizationRecord({
+        invoiceId: "invoice_1",
+        alreadyRealized: false,
+        lineItems: [
+          {
+            billedTotalUsdCents: 100000,
+            payoutTotalUsdCents: 70000,
+            profitTotalUsdCents: 30000,
+          },
+          {
+            billedTotalUsdCents: 25000,
+            payoutTotalUsdCents: 5000,
+            profitTotalUsdCents: 20000,
+          },
+        ],
+        realizedAt: "2026-04-08",
+        dollarInboundUsdCents: 98000,
+        usdInrRate: 83.45,
+      }),
+    ).toEqual({
+      invoiceId: "invoice_1",
+      realizedAt: "2026-04-08",
+      dollarInboundUsdCents: 98000,
+      usdInrRate: 83.45,
+      realizedRevenueUsdCents: 98000,
+      realizedPayoutUsdCents: 75000,
+      realizedProfitUsdCents: 23000,
+    });
   });
 });

@@ -21,8 +21,8 @@ export default async function DashboardPage() {
   );
 
   return (
-    <Shell title="Dashboard" eyebrow="Realized profit only">
-      <StaggerGrid className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <Shell title="Dashboard" eyebrow="Settlement insights">
+      <StaggerGrid className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <div className="stagger-item">
           <MetricCard label="Draft invoices" value={String(metrics.invoiceStatusCounts.draft)} />
         </div>
@@ -33,7 +33,22 @@ export default async function DashboardPage() {
           <MetricCard label="Sent" value={String(metrics.invoiceStatusCounts.sent)} />
         </div>
         <div className="stagger-item">
+          <MetricCard
+            label="Inbound revenue"
+            value={formatUsd(metrics.realizedRevenueUsdCents)}
+          />
+        </div>
+        <div className="stagger-item">
+          <MetricCard label="Bank charges" value={formatUsd(metrics.bankChargesUsdCents)} />
+        </div>
+      </StaggerGrid>
+
+      <StaggerGrid className="grid gap-4 sm:grid-cols-2 lg:grid-cols-2">
+        <div className="stagger-item">
           <MetricCard label="Realized profit" value={formatUsd(metrics.realizedProfitUsdCents)} />
+        </div>
+        <div className="stagger-item">
+          <MetricCard label="Pending cashout" value={String(metrics.pendingCashOutCount)} />
         </div>
       </StaggerGrid>
 

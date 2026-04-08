@@ -85,6 +85,8 @@ create table if not exists invoice_realizations (
   id text primary key,
   invoice_id text not null unique references invoices (id) on delete cascade,
   realized_at date not null,
+  dollar_inbound_usd_cents integer not null,
+  usd_inr_rate numeric(12,4) check (usd_inr_rate is null or usd_inr_rate > 0),
   realized_revenue_usd_cents integer not null,
   realized_payout_usd_cents integer not null,
   realized_profit_usd_cents integer not null,

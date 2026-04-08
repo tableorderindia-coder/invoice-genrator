@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 test("shows inline success feedback on the draft invoice page", async ({ page }) => {
+  test.setTimeout(120000);
   const stamp = Date.now();
   const companyName = `Playwright Co ${stamp}`;
   const teamName = `Data Team ${stamp}`;
@@ -76,4 +77,18 @@ test("shows inline success feedback on the draft invoice page", async ({ page })
     .getByRole("button", { name: "Remove", exact: true })
     .click();
   await expect(page.getByText("Adjustment removed.")).toBeVisible();
+
+  await page.getByRole("button", { name: "Mark generated" }).click();
+  await page.waitForURL(/\/invoices/);
+
+  await page.goto("http://localhost:3000/cashout");
+  const cashoutRow = page.locator("tr", { hasText: invoiceNumber });
+  await expect(cashoutRow).toBeVisible();
+
+  await cashoutRow.getByLabel("Dollar inbound (USD)").fill("4300.00");
+  await cashoutRow.getByLabel("USD/INR rate").fill("83.2500");
+  await cashoutRow.getByRole("button", { name: "Mark cashout" }).click();
+
+  await expect(page.getByText("Invoice marked as cashed out.")).toBeVisible();
+  await expect(page.locator("tr", { hasText: invoiceNumber })).toHaveCount(0);
 });

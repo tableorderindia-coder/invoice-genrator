@@ -116,6 +116,8 @@ type DbInvoiceRealization = {
   id: string;
   invoice_id: string;
   realized_at: string;
+  dollar_inbound_usd_cents?: number;
+  usd_inr_rate?: number | null;
   realized_revenue_usd_cents: number;
   realized_payout_usd_cents: number;
   realized_profit_usd_cents: number;
@@ -269,10 +271,14 @@ function mapInvoiceAdjustment(row: DbInvoiceAdjustment) {
 }
 
 function mapInvoiceRealization(row: DbInvoiceRealization): InvoiceRealization {
+  const inboundUsdCents =
+    row.dollar_inbound_usd_cents ?? row.realized_revenue_usd_cents;
   return {
     id: row.id,
     invoiceId: row.invoice_id,
     realizedAt: row.realized_at,
+    dollarInboundUsdCents: inboundUsdCents,
+    usdInrRate: Number(row.usd_inr_rate ?? 0),
     realizedRevenueUsdCents: row.realized_revenue_usd_cents,
     realizedPayoutUsdCents: row.realized_payout_usd_cents,
     realizedProfitUsdCents: row.realized_profit_usd_cents,
@@ -1025,7 +1031,12 @@ export async function updateInvoiceStatus(invoiceId: string, status: InvoiceStat
   return mapInvoice(data as DbInvoice);
 }
 
-export async function cashOutInvoice(invoiceId: string, realizedAt: string) {
+export async function cashOutInvoice(
+  invoiceId: string,
+  realizedAt: string,
+  dollarInboundUsdCents: number,
+  usdInrRate: number,
+) {
   const detail = await getInvoiceDetail(invoiceId);
   if (!detail) {
     throw new Error("Invoice not found");
@@ -1035,11 +1046,9 @@ export async function cashOutInvoice(invoiceId: string, realizedAt: string) {
     invoiceId,
     alreadyRealized: Boolean(detail.realization),
     lineItems: detail.teams.flatMap((team) => team.lineItems),
-    adjustmentsUsdCents: detail.adjustments.reduce(
-      (sum, adjustment) => sum + adjustment.amountUsdCents,
-      0,
-    ),
     realizedAt,
+    dollarInboundUsdCents,
+    usdInrRate,
   });
 
   const supabase = getSupabaseOrThrow();
@@ -1047,6 +1056,8 @@ export async function cashOutInvoice(invoiceId: string, realizedAt: string) {
     id: nextId("realization"),
     invoice_id: invoiceId,
     realized_at: realizedAt,
+    dollar_inbound_usd_cents: realization.dollarInboundUsdCents,
+    usd_inr_rate: realization.usdInrRate,
     realized_revenue_usd_cents: realization.realizedRevenueUsdCents,
     realized_payout_usd_cents: realization.realizedPayoutUsdCents,
     realized_profit_usd_cents: realization.realizedProfitUsdCents,
@@ -1059,7 +1070,39 @@ export async function cashOutInvoice(invoiceId: string, realizedAt: string) {
     .insert(payload)
     .select()
     .single();
-  if (error) throw error;
+  if (error) {
+    const message =
+      typeof error === "object" && error && "message" in error
+        ? String(error.message)
+        : "";
+    const missingInboundColumn = message.includes("dollar_inbound_usd_cents");
+    const missingRateColumn = message.includes("usd_inr_rate");
+
+    if (!missingInboundColumn && !missingRateColumn) {
+      throw error;
+    }
+
+    const fallbackPayload = {
+      id: payload.id,
+      invoice_id: payload.invoice_id,
+      realized_at: payload.realized_at,
+      realized_revenue_usd_cents: payload.realized_revenue_usd_cents,
+      realized_payout_usd_cents: payload.realized_payout_usd_cents,
+      realized_profit_usd_cents: payload.realized_profit_usd_cents,
+      notes: payload.notes,
+      created_at: payload.created_at,
+    };
+
+    const { data: fallbackData, error: fallbackError } = await supabase
+      .from("invoice_realizations")
+      .insert(fallbackPayload)
+      .select()
+      .single();
+    if (fallbackError) throw fallbackError;
+
+    await updateInvoiceStatus(invoiceId, "cashed_out");
+    return mapInvoiceRealization(fallbackData as DbInvoiceRealization);
+  }
 
   await updateInvoiceStatus(invoiceId, "cashed_out");
   return mapInvoiceRealization(data as DbInvoiceRealization);
@@ -1171,11 +1214,16 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
   );
   const companyProfitMap = new Map<string, number>();
   const employeeProfitMap = new Map<string, number>();
+  let realizedRevenueUsdCents = 0;
+  let bankChargesUsdCents = 0;
   let realizedProfitUsdCents = 0;
 
   for (const detail of details.filter(Boolean) as InvoiceDetail[]) {
     if (!detail.realization) continue;
+    realizedRevenueUsdCents += detail.realization.realizedRevenueUsdCents;
     realizedProfitUsdCents += detail.realization.realizedProfitUsdCents;
+    bankChargesUsdCents +=
+      detail.invoice.grandTotalUsdCents - detail.realization.dollarInboundUsdCents;
     companyProfitMap.set(
       detail.company.id,
       (companyProfitMap.get(detail.company.id) ?? 0) +
@@ -1194,6 +1242,8 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
   return {
     invoiceStatusCounts,
     pendingCashOutCount,
+    realizedRevenueUsdCents,
+    bankChargesUsdCents,
     realizedProfitUsdCents,
     realizedProfitByCompany: [...companyProfitMap.entries()].map(
       ([companyId, profit]) => ({

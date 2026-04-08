@@ -93,6 +93,8 @@ export type InvoiceRealization = {
   id: string;
   invoiceId: string;
   realizedAt: string;
+  dollarInboundUsdCents: number;
+  usdInrRate: number;
   realizedRevenueUsdCents: number;
   realizedPayoutUsdCents: number;
   realizedProfitUsdCents: number;
@@ -111,6 +113,8 @@ export type InvoiceDetail = {
 export type DashboardMetrics = {
   invoiceStatusCounts: Record<InvoiceStatus, number>;
   pendingCashOutCount: number;
+  realizedRevenueUsdCents: number;
+  bankChargesUsdCents: number;
   realizedProfitUsdCents: number;
   realizedProfitByCompany: Array<{
     companyId: string;

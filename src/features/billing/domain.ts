@@ -19,8 +19,9 @@ type RealizationInput = {
   invoiceId: string;
   alreadyRealized: boolean;
   lineItems: CalculatedLineItem[];
-  adjustmentsUsdCents: number;
   realizedAt: string;
+  dollarInboundUsdCents: number;
+  usdInrRate: number;
 };
 
 const roundCurrency = (value: number) => Math.round(value);
@@ -72,23 +73,26 @@ export function createRealizationRecord({
   invoiceId,
   alreadyRealized,
   lineItems,
-  adjustmentsUsdCents,
   realizedAt,
+  dollarInboundUsdCents,
+  usdInrRate,
 }: RealizationInput) {
   if (alreadyRealized) {
     throw new Error("Invoice has already been cashed out");
   }
 
-  const totals = calculateInvoiceTotals({
-    lineItems,
-    adjustments: [adjustmentsUsdCents],
-  });
+  const realizedPayoutUsdCents = lineItems.reduce(
+    (sum, lineItem) => sum + lineItem.payoutTotalUsdCents,
+    0,
+  );
 
   return {
     invoiceId,
     realizedAt,
-    realizedRevenueUsdCents: totals.grandTotalUsdCents,
-    realizedPayoutUsdCents: totals.payoutTotalUsdCents,
-    realizedProfitUsdCents: totals.profitTotalUsdCents,
+    dollarInboundUsdCents,
+    usdInrRate,
+    realizedRevenueUsdCents: dollarInboundUsdCents,
+    realizedPayoutUsdCents,
+    realizedProfitUsdCents: dollarInboundUsdCents - realizedPayoutUsdCents,
   };
 }

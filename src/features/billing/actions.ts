@@ -36,6 +36,24 @@ function getDraftReturnPath(formData: FormData, invoiceId: string) {
   return getString(formData, "returnTo") || `/invoices/drafts/${invoiceId}`;
 }
 
+function getPositiveNumberOrThrow(rawValue: string, fieldLabel: string) {
+  const value = Number.parseFloat(rawValue);
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error(`${fieldLabel} must be greater than 0.`);
+  }
+  return value;
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (error && typeof error === "object" && "message" in error) {
+    return String(error.message);
+  }
+  return fallback;
+}
+
 export async function createCompanyAction(formData: FormData) {
   await createCompany({
     name: getString(formData, "name"),
@@ -400,11 +418,40 @@ export async function updateInvoiceStatusAction(formData: FormData) {
 
 export async function cashOutInvoiceAction(formData: FormData) {
   const invoiceId = getString(formData, "invoiceId");
-  await cashOutInvoice(invoiceId, getString(formData, "realizedAt"));
+  const returnTo = getString(formData, "returnTo") || "/cashout";
 
-  revalidatePath(`/invoices/${invoiceId}`);
-  revalidatePath(`/invoices/drafts/${invoiceId}`);
-  revalidatePath("/dashboard");
-  revalidatePath("/invoices");
-  revalidatePath("/cashout");
+  try {
+    const realizedAt = getString(formData, "realizedAt");
+    if (!realizedAt) {
+      throw new Error("Select a cashout date.");
+    }
+
+    const dollarInboundUsdCents = centsFromUsd(getString(formData, "dollarInboundUsd"));
+    if (dollarInboundUsdCents <= 0) {
+      throw new Error("Dollar inbound must be greater than 0.");
+    }
+
+    const usdInrRate = getPositiveNumberOrThrow(
+      getString(formData, "usdInrRate"),
+      "USD/INR rate",
+    );
+
+    await cashOutInvoice(invoiceId, realizedAt, dollarInboundUsdCents, usdInrRate);
+
+    revalidatePath(`/invoices/${invoiceId}`);
+    revalidatePath(`/invoices/drafts/${invoiceId}`);
+    revalidatePath("/dashboard");
+    revalidatePath("/invoices");
+    revalidatePath("/cashout");
+  } catch (error) {
+    redirect(
+      buildFlashRedirect(
+        returnTo,
+        "error",
+        getErrorMessage(error, "Unable to mark cashout."),
+      ),
+    );
+  }
+
+  redirect(buildFlashRedirect(returnTo, "success", "Invoice marked as cashed out."));
 }
