@@ -329,44 +329,42 @@ export function AdjustmentForms({
                 onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
               />
             </Field>
-            <div className="grid gap-4 lg:grid-cols-3">
-              <Field label="Rate ($/hr)">
-                <input
-                  name="rateUsd"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="Enter hourly rate"
-                  className={`${inputClass} min-h-14`}
-                  value={form.rateUsd}
-                  onChange={(event) =>
-                    setForm((current) => ({ ...current, rateUsd: event.target.value }))
-                  }
-                />
-              </Field>
-              <Field label="Hours">
-                <input
-                  name="hours"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="Enter number of hours"
-                  className={`${inputClass} min-h-14`}
-                  value={form.hours}
-                  onChange={(event) =>
-                    setForm((current) => ({ ...current, hours: event.target.value }))
-                  }
-                />
-              </Field>
-              <Field label="Total">
-                <input
-                  readOnly
-                  value={totalPreview}
-                  aria-label="Total"
-                  className={`${inputClass} min-h-14`}
-                />
-              </Field>
-            </div>
+            <Field label="Rate ($/hr)">
+              <input
+                name="rateUsd"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="Enter hourly rate"
+                className={`${inputClass} min-h-14`}
+                value={form.rateUsd}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, rateUsd: event.target.value }))
+                }
+              />
+            </Field>
+            <Field label="Hours">
+              <input
+                name="hours"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="Enter number of hours"
+                className={`${inputClass} min-h-14`}
+                value={form.hours}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, hours: event.target.value }))
+                }
+              />
+            </Field>
+            <Field label="Total">
+              <input
+                readOnly
+                value={totalPreview}
+                aria-label="Total"
+                className={`${inputClass} min-h-14`}
+              />
+            </Field>
           </div>
         ) : null}
 
