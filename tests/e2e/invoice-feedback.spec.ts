@@ -91,4 +91,20 @@ test("shows inline success feedback on the draft invoice page", async ({ page })
 
   await expect(page.getByText("Invoice marked as cashed out.")).toBeVisible();
   await expect(page.locator("tr", { hasText: invoiceNumber })).toHaveCount(0);
+
+  await page.goto("http://localhost:3000/employee-payout");
+  const payoutInvoiceOption = page
+    .locator('select[name="invoiceId"] option')
+    .filter({ hasText: invoiceNumber })
+    .first();
+  const payoutInvoiceValue = await payoutInvoiceOption.getAttribute("value");
+  expect(payoutInvoiceValue).toBeTruthy();
+  await page.getByLabel("Select cashed-out invoice").selectOption(String(payoutInvoiceValue));
+  await page.getByRole("button", { name: "Load invoice employees" }).click();
+  await expect(page.locator("tr", { hasText: employeeName })).toBeVisible();
+
+  const payoutRow = page.locator("tr", { hasText: employeeName });
+  await payoutRow.getByPlaceholder("Enter paid rate").fill("82.1000");
+  await payoutRow.getByRole("button", { name: "Update" }).click();
+  await expect(page.getByText("Employee payout updated.")).toBeVisible();
 });

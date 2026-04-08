@@ -102,6 +102,31 @@ export type InvoiceRealization = {
   createdAt: string;
 };
 
+export type EmployeePayout = {
+  id: string;
+  invoiceId: string;
+  employeeId: string;
+  invoiceLineItemId: string;
+  employeeNameSnapshot: string;
+  dollarInwardUsdCents: number;
+  employeeMonthlyUsdCents: number;
+  cashoutUsdInrRate: number;
+  paidUsdInrRate?: number;
+  fxCommissionInrCents?: number;
+  totalCommissionUsdCents: number;
+  commissionEarnedInrCents?: number;
+  isPaid: boolean;
+  paidAt?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type EmployeePayoutInvoice = {
+  invoice: Invoice;
+  realization: InvoiceRealization;
+  rows: EmployeePayout[];
+};
+
 export type InvoiceDetail = {
   invoice: Invoice;
   company: Company;

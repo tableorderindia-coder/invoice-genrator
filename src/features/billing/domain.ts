@@ -24,6 +24,13 @@ type RealizationInput = {
   usdInrRate: number;
 };
 
+type EmployeePayoutMetricsInput = {
+  dollarInwardUsdCents: number;
+  employeeMonthlyUsdCents: number;
+  cashoutUsdInrRate: number;
+  paidUsdInrRate: number;
+};
+
 const roundCurrency = (value: number) => Math.round(value);
 const MONTHS_PER_YEAR = 12;
 const WEEKS_PER_YEAR = 52;
@@ -94,5 +101,30 @@ export function createRealizationRecord({
     realizedRevenueUsdCents: dollarInboundUsdCents,
     realizedPayoutUsdCents,
     realizedProfitUsdCents: dollarInboundUsdCents - realizedPayoutUsdCents,
+  };
+}
+
+export function calculateEmployeePayoutMetrics({
+  dollarInwardUsdCents,
+  employeeMonthlyUsdCents,
+  cashoutUsdInrRate,
+  paidUsdInrRate,
+}: EmployeePayoutMetricsInput) {
+  const totalCommissionUsdCents = dollarInwardUsdCents - employeeMonthlyUsdCents;
+
+  const fxCommissionInrCents = roundCurrency(
+    (cashoutUsdInrRate - paidUsdInrRate) * employeeMonthlyUsdCents,
+  );
+
+  const commissionEarnedInrCents = roundCurrency(
+    dollarInwardUsdCents * cashoutUsdInrRate -
+      employeeMonthlyUsdCents * paidUsdInrRate -
+      fxCommissionInrCents,
+  );
+
+  return {
+    totalCommissionUsdCents,
+    fxCommissionInrCents,
+    commissionEarnedInrCents,
   };
 }

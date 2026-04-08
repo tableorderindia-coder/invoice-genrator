@@ -20,6 +20,8 @@ import {
   updateInvoiceLineItem,
   updateInvoiceNote,
   updateInvoiceStatus,
+  updateEmployeePayout,
+  markEmployeePayoutPaid,
 } from "./store";
 import { centsFromUsd } from "./utils";
 
@@ -443,6 +445,7 @@ export async function cashOutInvoiceAction(formData: FormData) {
     revalidatePath("/dashboard");
     revalidatePath("/invoices");
     revalidatePath("/cashout");
+    revalidatePath("/employee-payout");
   } catch (error) {
     redirect(
       buildFlashRedirect(
@@ -454,4 +457,65 @@ export async function cashOutInvoiceAction(formData: FormData) {
   }
 
   redirect(buildFlashRedirect(returnTo, "success", "Invoice marked as cashed out."));
+}
+
+export async function updateEmployeePayoutAction(formData: FormData) {
+  const payoutId = getString(formData, "payoutId");
+  const returnTo = getString(formData, "returnTo") || "/employee-payout";
+
+  try {
+    const employeeMonthlyUsdCents = centsFromUsd(getString(formData, "employeeMonthlyUsd"));
+    if (employeeMonthlyUsdCents <= 0) {
+      throw new Error("Employee monthly dollars must be greater than 0.");
+    }
+
+    const paidUsdInrRate = getPositiveNumberOrThrow(
+      getString(formData, "paidUsdInrRate"),
+      "Paid USD/INR rate",
+    );
+
+    await updateEmployeePayout({
+      payoutId,
+      employeeMonthlyUsdCents,
+      paidUsdInrRate,
+    });
+
+    revalidatePath("/employee-payout");
+    revalidatePath("/dashboard");
+  } catch (error) {
+    redirect(
+      buildFlashRedirect(
+        returnTo,
+        "error",
+        getErrorMessage(error, "Unable to update employee payout."),
+      ),
+    );
+  }
+
+  redirect(buildFlashRedirect(returnTo, "success", "Employee payout updated."));
+}
+
+export async function markEmployeePayoutPaidAction(formData: FormData) {
+  const payoutId = getString(formData, "payoutId");
+  const returnTo = getString(formData, "returnTo") || "/employee-payout";
+
+  try {
+    await markEmployeePayoutPaid({
+      payoutId,
+      paidAt: getString(formData, "paidAt") || new Date().toISOString().slice(0, 10),
+    });
+
+    revalidatePath("/employee-payout");
+    revalidatePath("/dashboard");
+  } catch (error) {
+    redirect(
+      buildFlashRedirect(
+        returnTo,
+        "error",
+        getErrorMessage(error, "Unable to mark employee payout as paid."),
+      ),
+    );
+  }
+
+  redirect(buildFlashRedirect(returnTo, "success", "Employee payout marked as paid."));
 }

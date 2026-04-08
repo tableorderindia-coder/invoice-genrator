@@ -1,6 +1,7 @@
 import { createSupabaseServerClient } from "@/src/lib/supabase/server";
 import { getSupabaseMode } from "@/src/lib/supabase/config";
 import {
+  calculateEmployeePayoutMetrics,
   calculateInvoiceTotals,
   calculateLineItemTotals,
   createRealizationRecord,
@@ -20,6 +21,8 @@ import type {
   Company,
   DashboardMetrics,
   Employee,
+  EmployeePayout,
+  EmployeePayoutInvoice,
   Invoice,
   InvoiceDetail,
   InvoiceLineItem,
@@ -123,6 +126,25 @@ type DbInvoiceRealization = {
   realized_profit_usd_cents: number;
   notes: string | null;
   created_at: string;
+};
+
+type DbEmployeePayout = {
+  id: string;
+  invoice_id: string;
+  employee_id: string;
+  invoice_line_item_id: string;
+  employee_name_snapshot: string;
+  dollar_inward_usd_cents: number;
+  employee_monthly_usd_cents: number;
+  cashout_usd_inr_rate: number;
+  paid_usd_inr_rate: number | null;
+  fx_commission_inr_cents: number | null;
+  total_commission_usd_cents: number;
+  commission_earned_inr_cents: number | null;
+  is_paid: boolean;
+  paid_at: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 const sortInvoicesDesc = (left: Invoice, right: Invoice) =>
@@ -284,6 +306,34 @@ function mapInvoiceRealization(row: DbInvoiceRealization): InvoiceRealization {
     realizedProfitUsdCents: row.realized_profit_usd_cents,
     notes: row.notes ?? undefined,
     createdAt: row.created_at,
+  };
+}
+
+function mapEmployeePayout(row: DbEmployeePayout): EmployeePayout {
+  return {
+    id: row.id,
+    invoiceId: row.invoice_id,
+    employeeId: row.employee_id,
+    invoiceLineItemId: row.invoice_line_item_id,
+    employeeNameSnapshot: row.employee_name_snapshot,
+    dollarInwardUsdCents: row.dollar_inward_usd_cents,
+    employeeMonthlyUsdCents: row.employee_monthly_usd_cents,
+    cashoutUsdInrRate: Number(row.cashout_usd_inr_rate),
+    paidUsdInrRate:
+      row.paid_usd_inr_rate === null ? undefined : Number(row.paid_usd_inr_rate),
+    fxCommissionInrCents:
+      row.fx_commission_inr_cents === null
+        ? undefined
+        : Number(row.fx_commission_inr_cents),
+    totalCommissionUsdCents: row.total_commission_usd_cents,
+    commissionEarnedInrCents:
+      row.commission_earned_inr_cents === null
+        ? undefined
+        : Number(row.commission_earned_inr_cents),
+    isPaid: row.is_paid,
+    paidAt: row.paid_at ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   };
 }
 
@@ -1106,6 +1156,154 @@ export async function cashOutInvoice(
 
   await updateInvoiceStatus(invoiceId, "cashed_out");
   return mapInvoiceRealization(data as DbInvoiceRealization);
+}
+
+async function ensureEmployeePayoutRows(invoiceId: string) {
+  const supabase = getSupabaseOrThrow();
+  const detail = await getInvoiceDetail(invoiceId);
+  if (!detail) {
+    throw new Error("Invoice not found");
+  }
+  if (detail.invoice.status !== "cashed_out" || !detail.realization) {
+    throw new Error("Employee payout is available only for cashed-out invoices.");
+  }
+  if (detail.realization.usdInrRate <= 0) {
+    throw new Error(
+      "This invoice is missing cashout USD/INR rate. Re-cashout this invoice with a rate.",
+    );
+  }
+
+  const { data: existingRows, error: existingError } = await supabase
+    .from("employee_payouts")
+    .select("employee_id")
+    .eq("invoice_id", invoiceId);
+  if (existingError) throw existingError;
+
+  const existingEmployeeIds = new Set(
+    (existingRows ?? []).map((row) => String(row.employee_id)),
+  );
+
+  for (const lineItem of detail.teams.flatMap((team) => team.lineItems)) {
+    if (existingEmployeeIds.has(lineItem.employeeId)) {
+      continue;
+    }
+
+    const payload = {
+      id: nextId("employee_payout"),
+      invoice_id: invoiceId,
+      employee_id: lineItem.employeeId,
+      invoice_line_item_id: lineItem.id,
+      employee_name_snapshot: lineItem.employeeNameSnapshot,
+      dollar_inward_usd_cents: lineItem.billedTotalUsdCents,
+      employee_monthly_usd_cents: lineItem.payoutMonthlyUsdCentsSnapshot,
+      cashout_usd_inr_rate: detail.realization.usdInrRate,
+      paid_usd_inr_rate: null,
+      fx_commission_inr_cents: null,
+      total_commission_usd_cents:
+        lineItem.billedTotalUsdCents - lineItem.payoutMonthlyUsdCentsSnapshot,
+      commission_earned_inr_cents: null,
+      is_paid: false,
+      paid_at: null,
+      created_at: nowIso(),
+      updated_at: nowIso(),
+    };
+
+    const { error: insertError } = await supabase
+      .from("employee_payouts")
+      .insert(payload);
+    if (insertError) throw insertError;
+  }
+}
+
+export async function getEmployeePayoutInvoice(
+  invoiceId: string,
+): Promise<EmployeePayoutInvoice | undefined> {
+  await ensureEmployeePayoutRows(invoiceId);
+  const detail = await getInvoiceDetail(invoiceId);
+  if (!detail || !detail.realization) {
+    return undefined;
+  }
+
+  const supabase = getSupabaseOrThrow();
+  const { data: rows, error } = await supabase
+    .from("employee_payouts")
+    .select("*")
+    .eq("invoice_id", invoiceId)
+    .order("employee_name_snapshot");
+  if (error) throw error;
+
+  return {
+    invoice: detail.invoice,
+    realization: detail.realization,
+    rows: (rows ?? []).map((row) => mapEmployeePayout(row as DbEmployeePayout)),
+  };
+}
+
+export async function updateEmployeePayout(input: {
+  payoutId: string;
+  employeeMonthlyUsdCents: number;
+  paidUsdInrRate: number;
+}) {
+  const supabase = getSupabaseOrThrow();
+  const { data: row, error } = await supabase
+    .from("employee_payouts")
+    .select("*")
+    .eq("id", input.payoutId)
+    .single();
+  if (error) throw error;
+
+  const payout = mapEmployeePayout(row as DbEmployeePayout);
+  const computed = calculateEmployeePayoutMetrics({
+    dollarInwardUsdCents: payout.dollarInwardUsdCents,
+    employeeMonthlyUsdCents: input.employeeMonthlyUsdCents,
+    cashoutUsdInrRate: payout.cashoutUsdInrRate,
+    paidUsdInrRate: input.paidUsdInrRate,
+  });
+
+  const { data: updated, error: updateError } = await supabase
+    .from("employee_payouts")
+    .update({
+      employee_monthly_usd_cents: input.employeeMonthlyUsdCents,
+      paid_usd_inr_rate: input.paidUsdInrRate,
+      fx_commission_inr_cents: computed.fxCommissionInrCents,
+      total_commission_usd_cents: computed.totalCommissionUsdCents,
+      commission_earned_inr_cents: computed.commissionEarnedInrCents,
+      updated_at: nowIso(),
+    })
+    .eq("id", input.payoutId)
+    .select()
+    .single();
+  if (updateError) throw updateError;
+
+  return mapEmployeePayout(updated as DbEmployeePayout);
+}
+
+export async function markEmployeePayoutPaid(input: {
+  payoutId: string;
+  paidAt: string;
+}) {
+  const supabase = getSupabaseOrThrow();
+  const { data: currentRow, error: currentError } = await supabase
+    .from("employee_payouts")
+    .select("*")
+    .eq("id", input.payoutId)
+    .single();
+  if (currentError) throw currentError;
+
+  const current = mapEmployeePayout(currentRow as DbEmployeePayout);
+  if (!current.paidUsdInrRate || current.paidUsdInrRate <= 0) {
+    throw new Error("Enter paid USD/INR rate and update row before marking as paid.");
+  }
+
+  const { error } = await supabase
+    .from("employee_payouts")
+    .update({
+      is_paid: true,
+      paid_at: input.paidAt,
+      updated_at: nowIso(),
+    })
+    .eq("id", input.payoutId);
+  if (error) throw error;
 }
 
 export async function getInvoiceDetail(

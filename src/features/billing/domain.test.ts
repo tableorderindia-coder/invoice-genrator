@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  calculateEmployeePayoutMetrics,
   calculateInvoiceTotals,
   calculateLineItemTotals,
   createRealizationRecord,
@@ -114,6 +115,21 @@ describe("billing domain", () => {
       realizedRevenueUsdCents: 98000,
       realizedPayoutUsdCents: 75000,
       realizedProfitUsdCents: 23000,
+    });
+  });
+
+  it("calculates employee payout commission metrics", () => {
+    expect(
+      calculateEmployeePayoutMetrics({
+        dollarInwardUsdCents: 500000,
+        employeeMonthlyUsdCents: 300000,
+        cashoutUsdInrRate: 83.25,
+        paidUsdInrRate: 82.1,
+      }),
+    ).toEqual({
+      totalCommissionUsdCents: 200000,
+      fxCommissionInrCents: 345000,
+      commissionEarnedInrCents: 16650000,
     });
   });
 });

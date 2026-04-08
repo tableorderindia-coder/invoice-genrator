@@ -14,6 +14,14 @@ export function formatUsd(cents: number) {
   }).format(cents / 100);
 }
 
+export function formatInr(cents: number) {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 2,
+  }).format(cents / 100);
+}
+
 export function formatMonthYear(month: number, year: number) {
   return new Intl.DateTimeFormat("en-US", {
     month: "long",
