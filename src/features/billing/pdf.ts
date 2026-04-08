@@ -3,6 +3,7 @@ import path from "node:path";
 
 import PDFDocument from "pdfkit";
 
+import { groupInvoiceAdjustments } from "./adjustments";
 import type { InvoiceAdjustment, InvoiceDetail } from "./types";
 
 type PdfSectionRow = {
@@ -85,27 +86,48 @@ export function buildInvoicePdfModel(detail: InvoiceDetail): PdfModel {
       ),
     }));
 
-  const nextSectionIndex = teamSections.length;
-  const onboardingRows = buildOnboardingRows(detail.adjustments);
-  const offboardingRows = buildOffboardingRows(detail.adjustments);
+  const groupedAdjustments = groupInvoiceAdjustments(detail.adjustments);
   const sections: PdfSection[] = [...teamSections];
 
-  if (onboardingRows.length > 0) {
-    sections.push({
+  const adjustmentSections = [
+    {
       title: "Onboarding Advance",
-      totalLabel: `Total (${sectionLetter(nextSectionIndex)})`,
-      rows: onboardingRows,
-      totalAmount: formatUsdCompact(sumRows(onboardingRows)),
-    });
-  }
-
-  if (offboardingRows.length > 0) {
-    sections.push({
+      items: groupedAdjustments.onboarding.items,
+      isDeduction: false,
+    },
+    {
+      title: "Appraisal Advance",
+      items: groupedAdjustments.appraisal.items,
+      isDeduction: false,
+    },
+    {
+      title: "Reimbursements / Expenses",
+      items: groupedAdjustments.reimbursement.items,
+      isDeduction: false,
+    },
+    {
       title: "Off-Boarding Adjustments",
-      totalLabel: `Total (${sectionLetter(sections.length)})`,
-      rows: offboardingRows,
-      totalAmount: formatUsdCompact(sumRows(offboardingRows)),
+      items: groupedAdjustments.offboarding.items,
       isDeduction: true,
+    },
+  ];
+
+  for (const adjustmentSection of adjustmentSections) {
+    const rows = buildAdjustmentRows(
+      adjustmentSection.items,
+      adjustmentSection.isDeduction,
+    );
+
+    if (rows.length === 0) {
+      continue;
+    }
+
+    sections.push({
+      title: adjustmentSection.title,
+      totalLabel: `Total (${sectionLetter(sections.length)})`,
+      rows,
+      totalAmount: formatUsdCompact(sumRows(rows)),
+      isDeduction: adjustmentSection.isDeduction,
     });
   }
 
@@ -417,41 +439,24 @@ export async function buildInvoicePdf(detail: InvoiceDetail) {
   return Buffer.concat(chunks);
 }
 
-function buildOnboardingRows(adjustments: InvoiceAdjustment[]) {
-  const rows: PdfSectionRow[] = [];
-
-  adjustments.forEach((adjustment) => {
-    if (adjustment.type === "onboarding") {
-      rows.push({
-        contractorName: adjustment.employeeName ?? adjustment.label,
-        hourlyRate: "",
-        hours: "",
-        total: formatUsdCompact(adjustment.amountUsdCents),
-      });
-    }
-
-    if (adjustment.type === "reimbursement") {
-      rows.push({
-        contractorName: adjustment.label,
-        hourlyRate: "",
-        hours: "",
-        total: formatUsdCompact(adjustment.amountUsdCents),
-      });
-    }
-  });
-
-  return rows;
-}
-
-function buildOffboardingRows(adjustments: InvoiceAdjustment[]) {
-  return adjustments
-    .filter((adjustment) => adjustment.type === "offboarding")
-    .map((adjustment) => ({
-      contractorName: adjustment.employeeName ?? adjustment.label,
-      hourlyRate: "",
-      hours: "",
-      total: formatUsdCompact(Math.abs(adjustment.amountUsdCents)),
-    }));
+function buildAdjustmentRows(
+  adjustments: InvoiceAdjustment[],
+  isDeduction: boolean,
+) {
+  return adjustments.map((adjustment) => ({
+    contractorName:
+      adjustment.type === "reimbursement"
+        ? adjustment.label
+        : adjustment.employeeName ?? adjustment.label,
+    hourlyRate:
+      adjustment.rateUsdCents !== undefined
+        ? formatUsdCompact(adjustment.rateUsdCents)
+        : "",
+    hours: adjustment.hours !== undefined ? formatHours(adjustment.hours) : "",
+    total: formatUsdCompact(
+      isDeduction ? Math.abs(adjustment.amountUsdCents) : adjustment.amountUsdCents,
+    ),
+  }));
 }
 
 function sumRows(rows: PdfSectionRow[]) {

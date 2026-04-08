@@ -14,6 +14,7 @@ import {
   getMatchingEmployeesForTeam,
 } from "./team-catalog";
 import { findExistingLineItemForEmployee } from "./member-assignment";
+import { buildAdjustmentDuplicateSignature } from "./adjustments";
 import type {
   AdjustmentType,
   Company,
@@ -931,6 +932,24 @@ export async function addInvoiceAdjustment(input: {
   amountUsdCents: number;
 }) {
   const supabase = getSupabaseOrThrow();
+  const { data: existingRows, error: existingError } = await supabase
+    .from("invoice_adjustments")
+    .select("*")
+    .eq("invoice_id", input.invoiceId);
+  if (existingError) throw existingError;
+
+  const candidateSignature = buildAdjustmentDuplicateSignature(input);
+  const duplicateExists = (existingRows ?? [])
+    .map((row) => mapInvoiceAdjustment(row as DbInvoiceAdjustment))
+    .some(
+      (adjustment) =>
+        buildAdjustmentDuplicateSignature(adjustment) === candidateSignature,
+    );
+
+  if (duplicateExists) {
+    throw new Error("Duplicate adjustment already added.");
+  }
+
   const { count, error: countError } = await supabase
     .from("invoice_adjustments")
     .select("*", { count: "exact", head: true })
@@ -958,6 +977,18 @@ export async function addInvoiceAdjustment(input: {
 
   await recomputeSupabaseInvoice(input.invoiceId);
   return mapInvoiceAdjustment(data as DbInvoiceAdjustment);
+}
+
+export async function deleteInvoiceAdjustment(invoiceId: string, adjustmentId: string) {
+  const supabase = getSupabaseOrThrow();
+  const { error } = await supabase
+    .from("invoice_adjustments")
+    .delete()
+    .eq("id", adjustmentId)
+    .eq("invoice_id", invoiceId);
+  if (error) throw error;
+
+  await recomputeSupabaseInvoice(invoiceId);
 }
 
 export async function updateInvoiceNote(invoiceId: string, noteText: string) {

@@ -14,6 +14,7 @@ import {
   createEmployee,
   createInvoiceDraft,
   createTeam,
+  deleteInvoiceAdjustment,
   deleteInvoiceLineItem,
   deleteInvoiceTeam,
   updateInvoiceLineItem,
@@ -316,6 +317,34 @@ export async function addInvoiceAdjustmentAction(formData: FormData) {
   }
 
   redirect(buildFlashRedirect(returnTo, "success", "Adjustment added."));
+}
+
+export async function deleteInvoiceAdjustmentAction(formData: FormData) {
+  const invoiceId = getString(formData, "invoiceId");
+  const returnTo = getDraftReturnPath(formData, invoiceId);
+
+  try {
+    const adjustmentId = getString(formData, "adjustmentId");
+    if (!adjustmentId) {
+      throw new Error("Select an adjustment before removing it.");
+    }
+
+    await deleteInvoiceAdjustment(invoiceId, adjustmentId);
+
+    revalidatePath(`/invoices/${invoiceId}`);
+    revalidatePath(`/invoices/drafts/${invoiceId}`);
+    revalidatePath("/dashboard");
+  } catch (error) {
+    redirect(
+      buildFlashRedirect(
+        returnTo,
+        "error",
+        error instanceof Error ? error.message : "Unable to remove adjustment.",
+      ),
+    );
+  }
+
+  redirect(buildFlashRedirect(returnTo, "success", "Adjustment removed."));
 }
 
 export async function updateInvoiceNoteAction(formData: FormData) {

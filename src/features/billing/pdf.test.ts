@@ -88,19 +88,38 @@ const detail: InvoiceDetail = {
     {
       id: "adj_2",
       invoiceId: "invoice_1",
-      type: "reimbursement",
-      label: "One Time Laptop Allowance",
-      amountUsdCents: 80000,
+      type: "appraisal",
+      label: "Appraisal Advance",
+      employeeName: "Riya Solanki",
+      amountUsdCents: 23000,
       sortOrder: 1,
     },
     {
       id: "adj_3",
       invoiceId: "invoice_1",
+      type: "reimbursement",
+      label: "One Time Laptop Allowance",
+      amountUsdCents: 80000,
+      sortOrder: 2,
+    },
+    {
+      id: "adj_4",
+      invoiceId: "invoice_1",
+      type: "reimbursement",
+      label: "Travel Desk Expense",
+      amountUsdCents: 12000,
+      sortOrder: 3,
+    },
+    {
+      id: "adj_5",
+      invoiceId: "invoice_1",
       type: "offboarding",
       label: "Off-Boarding Adjustments",
       employeeName: "Darshan Tukaram Bandache",
+      rateUsdCents: 5000,
+      hours: 16,
       amountUsdCents: -520000,
-      sortOrder: 2,
+      sortOrder: 4,
     },
   ],
 };
@@ -117,22 +136,26 @@ describe("branded invoice pdf model", () => {
       "Data Team :",
       "Finance Team :",
       "Onboarding Advance",
+      "Appraisal Advance",
+      "Reimbursements / Expenses",
       "Off-Boarding Adjustments",
     ]);
 
     expect(model.sections[0].totalLabel).toBe("Total (A)");
     expect(model.sections[1].totalLabel).toBe("Total (B)");
-    expect(model.sections[2].rows).toHaveLength(2);
-    expect(model.sections[2].rows[1]).toMatchObject({
+    expect(model.sections[2].rows).toHaveLength(1);
+    expect(model.sections[3].rows).toHaveLength(1);
+    expect(model.sections[4].rows).toHaveLength(2);
+    expect(model.sections[4].rows[0]).toMatchObject({
       contractorName: "One Time Laptop Allowance",
       hourlyRate: "",
       hours: "",
       total: "$800",
     });
-    expect(model.sections[3].isDeduction).toBe(true);
+    expect(model.sections[5].isDeduction).toBe(true);
 
     expect(model.grandTotal.formula).toBe(
-      "Grand Total = Total(A) + Total(B) + Total(C) - Total(D)",
+      "Grand Total = Total(A) + Total(B) + Total(C) + Total(D) + Total(E) - Total(F)",
     );
     expect(model.grandTotal.amount).toBe("$24,582");
   });

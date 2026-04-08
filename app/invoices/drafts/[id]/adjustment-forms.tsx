@@ -1,195 +1,399 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { inputClass } from "@/app/_components/field";
+import {
+  buildAdjustmentDuplicateSignature,
+  buildInvoiceAdjustmentPayload,
+  calculatePersonAdjustmentTotalUsdCents,
+  groupInvoiceAdjustments,
+} from "@/src/features/billing/adjustments";
+import type { InvoiceAdjustment } from "@/src/features/billing/types";
+import { centsFromUsd, formatUsd } from "@/src/features/billing/utils";
 
 type AdjustmentFormAction = (formData: FormData) => void | Promise<void>;
 
-function formatPreviewUsd(amount: number) {
-  return amount.toFixed(2);
-}
+type AdjustmentTypeOption =
+  | ""
+  | "onboarding"
+  | "appraisal"
+  | "reimbursement"
+  | "offboarding";
 
-function calculatePreviewTotal(rateUsd: string, hours: string) {
-  const rate = Number.parseFloat(rateUsd || "0");
-  const billedHours = Number.parseFloat(hours || "0");
+type FormState = {
+  type: AdjustmentTypeOption;
+  name: string;
+  rateUsd: string;
+  hours: string;
+  label: string;
+  amountUsd: string;
+};
 
-  if (Number.isNaN(rate) || Number.isNaN(billedHours)) {
-    return 0;
+const INITIAL_FORM: FormState = {
+  type: "",
+  name: "",
+  rateUsd: "",
+  hours: "",
+  label: "",
+  amountUsd: "",
+};
+
+function formatHours(hours: number | undefined) {
+  if (hours === undefined) {
+    return "";
   }
 
-  return Math.round(rate * billedHours * 100) / 100;
+  return Number.isInteger(hours) ? String(hours) : String(hours);
 }
 
-function PersonAdjustmentCard({
+function buildClientAdjustmentPayload(form: FormState) {
+  if (!form.type) {
+    throw new Error("Select an adjustment type.");
+  }
+
+  if (form.type === "reimbursement") {
+    return buildInvoiceAdjustmentPayload({
+      type: "reimbursement",
+      label: form.label,
+      amountUsdCents: centsFromUsd(form.amountUsd),
+    });
+  }
+
+  return buildInvoiceAdjustmentPayload({
+    type: form.type,
+    employeeName: form.name,
+    rateUsdCents: centsFromUsd(form.rateUsd),
+    hours: Number.parseFloat(form.hours || "0"),
+  });
+}
+
+function getTypeLabel(type: Exclude<AdjustmentTypeOption, "">) {
+  switch (type) {
+    case "onboarding":
+      return "Onboarding Advance";
+    case "appraisal":
+      return "Appraisal Advance";
+    case "reimbursement":
+      return "Reimbursements / Expenses";
+    case "offboarding":
+      return "Offboarding Deductions";
+  }
+}
+
+function describeAdjustment(adjustment: InvoiceAdjustment) {
+  if (adjustment.type === "reimbursement") {
+    return adjustment.label;
+  }
+
+  return [
+    adjustment.employeeName,
+    adjustment.rateUsdCents !== undefined
+      ? `${formatUsd(adjustment.rateUsdCents)}/hr`
+      : undefined,
+    adjustment.hours !== undefined ? `${formatHours(adjustment.hours)} hrs` : undefined,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+function AdjustmentGroup({
   title,
-  type,
-  submitLabel,
+  items,
+  totalUsdCents,
   invoiceId,
   returnTo,
-  action,
+  deleteAction,
 }: {
   title: string;
-  type: "onboarding" | "offboarding" | "appraisal";
-  submitLabel: string;
+  items: InvoiceAdjustment[];
+  totalUsdCents: number;
   invoiceId: string;
   returnTo: string;
-  action: AdjustmentFormAction;
+  deleteAction: AdjustmentFormAction;
 }) {
-  const [rateUsd, setRateUsd] = useState("0");
-  const [hours, setHours] = useState("0");
-  const totalUsd = calculatePreviewTotal(rateUsd, hours);
+  if (items.length === 0) {
+    return null;
+  }
 
   return (
-    <form
-      action={action}
-      className="rounded-2xl p-4 space-y-3"
+    <div
+      className="rounded-2xl p-4"
       style={{
         background: "rgba(255,255,255,0.02)",
         border: "1px solid var(--glass-border)",
       }}
     >
-      <input type="hidden" name="invoiceId" value={invoiceId} />
-      <input type="hidden" name="returnTo" value={returnTo} />
-      <input type="hidden" name="type" value={type} />
-
-      <div>
+      <div className="flex items-center justify-between gap-4">
         <h4 className="text-base font-semibold" style={{ color: "var(--text-primary)" }}>
           {title}
         </h4>
+        <p
+          className="text-sm font-semibold"
+          style={{
+            color: "var(--text-primary)",
+            fontFamily: "var(--font-jetbrains-mono), monospace",
+          }}
+        >
+          {formatUsd(totalUsdCents)}
+        </p>
       </div>
 
-      <input name="employeeName" required placeholder="Name" className={inputClass} />
-
-      <div className="grid gap-3 md:grid-cols-3">
-        <input
-          name="rateUsd"
-          required
-          type="number"
-          step="0.01"
-          min="0"
-          placeholder="$/hr"
-          className={inputClass}
-          value={rateUsd}
-          onChange={(event) => setRateUsd(event.target.value)}
-        />
-        <input
-          name="hours"
-          required
-          type="number"
-          step="0.01"
-          min="0"
-          placeholder="No. of hrs"
-          className={inputClass}
-          value={hours}
-          onChange={(event) => setHours(event.target.value)}
-        />
-        <input
-          value={formatPreviewUsd(totalUsd)}
-          readOnly
-          aria-label={`${title} total`}
-          className={inputClass}
-          style={{ color: "var(--text-primary)" }}
-        />
+      <div className="mt-3 space-y-3">
+        {items.map((adjustment) => (
+          <div
+            key={adjustment.id}
+            className="flex items-center justify-between gap-4 rounded-2xl p-3"
+            style={{
+              background: "rgba(255,255,255,0.02)",
+              border: "1px solid var(--glass-border)",
+            }}
+          >
+            <div>
+              <p className="font-medium" style={{ color: "var(--text-primary)" }}>
+                {getTypeLabel(adjustment.type)}
+              </p>
+              <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                {describeAdjustment(adjustment)}
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <p
+                className="font-semibold"
+                style={{
+                  color:
+                    adjustment.type === "offboarding" ? "#fca5a5" : "var(--text-primary)",
+                  fontFamily: "var(--font-jetbrains-mono), monospace",
+                }}
+              >
+                {adjustment.type === "offboarding"
+                  ? `-${formatUsd(Math.abs(adjustment.amountUsdCents))}`
+                  : formatUsd(adjustment.amountUsdCents)}
+              </p>
+              <form action={deleteAction}>
+                <input type="hidden" name="invoiceId" value={invoiceId} />
+                <input type="hidden" name="adjustmentId" value={adjustment.id} />
+                <input type="hidden" name="returnTo" value={returnTo} />
+                <button type="submit" className="btn-outline">
+                  Remove
+                </button>
+              </form>
+            </div>
+          </div>
+        ))}
       </div>
-
-      <button type="submit" className="gradient-btn w-full">
-        {submitLabel}
-      </button>
-    </form>
-  );
-}
-
-function ReimbursementCard({
-  invoiceId,
-  returnTo,
-  action,
-}: {
-  invoiceId: string;
-  returnTo: string;
-  action: AdjustmentFormAction;
-}) {
-  return (
-    <form
-      action={action}
-      className="rounded-2xl p-4 space-y-3"
-      style={{
-        background: "rgba(255,255,255,0.02)",
-        border: "1px solid var(--glass-border)",
-      }}
-    >
-      <input type="hidden" name="invoiceId" value={invoiceId} />
-      <input type="hidden" name="returnTo" value={returnTo} />
-      <input type="hidden" name="type" value="reimbursement" />
-
-      <div>
-        <h4 className="text-base font-semibold" style={{ color: "var(--text-primary)" }}>
-          Reimbursements
-        </h4>
-      </div>
-
-      <input
-        name="label"
-        required
-        placeholder="Type / label"
-        className={inputClass}
-      />
-      <input
-        name="amountUsd"
-        required
-        type="number"
-        step="0.01"
-        min="0"
-        placeholder="Amount"
-        className={inputClass}
-      />
-
-      <button type="submit" className="gradient-btn w-full">
-        Add reimbursement
-      </button>
-    </form>
+    </div>
   );
 }
 
 export function AdjustmentForms({
   invoiceId,
   returnTo,
-  action,
+  adjustments,
+  addAction,
+  deleteAction,
 }: {
   invoiceId: string;
   returnTo: string;
-  action: AdjustmentFormAction;
+  adjustments: InvoiceAdjustment[];
+  addAction: AdjustmentFormAction;
+  deleteAction: AdjustmentFormAction;
 }) {
+  const [form, setForm] = useState<FormState>(INITIAL_FORM);
+  const [error, setError] = useState("");
+  const [isAdding, setIsAdding] = useState(false);
+  const grouped = useMemo(() => groupInvoiceAdjustments(adjustments), [adjustments]);
+
+  const totalPreview =
+    form.type && form.type !== "reimbursement"
+      ? formatUsd(
+          calculatePersonAdjustmentTotalUsdCents({
+            rateUsdCents: centsFromUsd(form.rateUsd),
+            hours: Number.parseFloat(form.hours || "0"),
+          }),
+        )
+      : "";
+
+  const handleTypeChange = (type: AdjustmentTypeOption) => {
+    setError("");
+    setForm({
+      ...INITIAL_FORM,
+      type,
+    });
+  };
+
   return (
     <div className="space-y-4">
-      <PersonAdjustmentCard
-        title="Onboarding advance"
-        type="onboarding"
-        submitLabel="Add onboarding advance"
+      <form
+        action={addAction}
+        className="rounded-2xl p-4 space-y-4"
+        onSubmit={(event) => {
+          if (isAdding) {
+            event.preventDefault();
+            return;
+          }
+
+          try {
+            const candidate = buildClientAdjustmentPayload(form);
+            const signature = buildAdjustmentDuplicateSignature(candidate);
+            const exists = adjustments.some(
+              (adjustment) =>
+                buildAdjustmentDuplicateSignature(adjustment) === signature,
+            );
+
+            if (exists) {
+              event.preventDefault();
+              setError("Duplicate adjustment already added.");
+              return;
+            }
+
+            setIsAdding(true);
+            setError("");
+          } catch (submissionError) {
+            event.preventDefault();
+            setError(
+              submissionError instanceof Error
+                ? submissionError.message
+                : "Unable to add adjustment.",
+            );
+          }
+        }}
+        style={{
+          background: "rgba(255,255,255,0.02)",
+          border: "1px solid var(--glass-border)",
+        }}
+      >
+        <input type="hidden" name="invoiceId" value={invoiceId} />
+        <input type="hidden" name="returnTo" value={returnTo} />
+
+        <div>
+          <h4 className="text-base font-semibold" style={{ color: "var(--text-primary)" }}>
+            Add adjustment
+          </h4>
+        </div>
+
+        <select
+          name="type"
+          className={inputClass}
+          value={form.type}
+          onChange={(event) => handleTypeChange(event.target.value as AdjustmentTypeOption)}
+        >
+          <option value="">Select adjustment type</option>
+          <option value="onboarding">Onboarding Advance</option>
+          <option value="appraisal">Appraisal Advance</option>
+          <option value="reimbursement">Reimbursements / Expenses</option>
+          <option value="offboarding">Offboarding Deductions</option>
+        </select>
+
+        {form.type === "reimbursement" ? (
+          <div className="grid gap-3 md:grid-cols-2">
+            <input
+              name="label"
+              placeholder="Enter reimbursement description"
+              className={inputClass}
+              value={form.label}
+              onChange={(event) => setForm((current) => ({ ...current, label: event.target.value }))}
+            />
+            <input
+              name="amountUsd"
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="Enter reimbursement amount"
+              className={inputClass}
+              value={form.amountUsd}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, amountUsd: event.target.value }))
+              }
+            />
+          </div>
+        ) : form.type ? (
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <input
+              name="employeeName"
+              placeholder={`Enter ${getTypeLabel(form.type).toLowerCase()} name`}
+              className={inputClass}
+              value={form.name}
+              onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+            />
+            <input
+              name="rateUsd"
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder={`Enter ${form.type} $/hour`}
+              className={inputClass}
+              value={form.rateUsd}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, rateUsd: event.target.value }))
+              }
+            />
+            <input
+              name="hours"
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder={`Enter ${form.type} hours`}
+              className={inputClass}
+              value={form.hours}
+              onChange={(event) => setForm((current) => ({ ...current, hours: event.target.value }))}
+            />
+            <input
+              readOnly
+              value={totalPreview}
+              aria-label="Adjustment total"
+              className={inputClass}
+            />
+          </div>
+        ) : null}
+
+        {error ? (
+          <p className="text-sm font-medium" style={{ color: "#fca5a5" }}>
+            {error}
+          </p>
+        ) : null}
+
+        <button
+          type="submit"
+          className="gradient-btn"
+          disabled={isAdding}
+          style={isAdding ? { opacity: 0.6, cursor: "not-allowed" } : undefined}
+        >
+          {isAdding ? "Adding..." : "Add / Update"}
+        </button>
+      </form>
+
+      <AdjustmentGroup
+        title="Onboarding Advance"
+        items={grouped.onboarding.items}
+        totalUsdCents={grouped.onboarding.totalUsdCents}
         invoiceId={invoiceId}
         returnTo={returnTo}
-        action={action}
+        deleteAction={deleteAction}
       />
-      <PersonAdjustmentCard
-        title="Offboarding deduction"
-        type="offboarding"
-        submitLabel="Add offboarding deduction"
+      <AdjustmentGroup
+        title="Appraisal Advance"
+        items={grouped.appraisal.items}
+        totalUsdCents={grouped.appraisal.totalUsdCents}
         invoiceId={invoiceId}
         returnTo={returnTo}
-        action={action}
+        deleteAction={deleteAction}
       />
-      <ReimbursementCard
+      <AdjustmentGroup
+        title="Reimbursements / Expenses"
+        items={grouped.reimbursement.items}
+        totalUsdCents={grouped.reimbursement.totalUsdCents}
         invoiceId={invoiceId}
         returnTo={returnTo}
-        action={action}
+        deleteAction={deleteAction}
       />
-      <PersonAdjustmentCard
-        title="Appraisal advance"
-        type="appraisal"
-        submitLabel="Add appraisal advance"
+      <AdjustmentGroup
+        title="Offboarding Deductions"
+        items={grouped.offboarding.items}
+        totalUsdCents={grouped.offboarding.totalUsdCents}
         invoiceId={invoiceId}
         returnTo={returnTo}
-        action={action}
+        deleteAction={deleteAction}
       />
     </div>
   );

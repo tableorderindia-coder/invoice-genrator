@@ -9,6 +9,7 @@ import {
   addInvoiceAdjustmentAction,
   assignInvoiceMemberAction,
   addInvoiceTeamAction,
+  deleteInvoiceAdjustmentAction,
   deleteInvoiceLineItemAction,
   deleteInvoiceTeamAction,
   updateInvoiceNoteAction,
@@ -24,19 +25,6 @@ import { filterEligibleEmployeesForTeam } from "@/src/features/billing/member-as
 import { formatDate, formatMonthYear, formatUsd } from "@/src/features/billing/utils";
 
 export const dynamic = "force-dynamic";
-
-function formatAdjustmentTypeLabel(type: "onboarding" | "offboarding" | "reimbursement" | "appraisal") {
-  switch (type) {
-    case "onboarding":
-      return "Onboarding advance";
-    case "offboarding":
-      return "Offboarding deduction";
-    case "reimbursement":
-      return "Reimbursement";
-    case "appraisal":
-      return "Appraisal advance";
-  }
-}
 
 export default async function DraftInvoicePage({
   params,
@@ -323,58 +311,6 @@ export default async function DraftInvoicePage({
             </div>
           </GlassPanel>
 
-          <GlassPanel>
-            <h3 className="text-xl font-semibold" style={{ color: "var(--text-primary)" }}>
-              Adjustments
-            </h3>
-            <div className="mt-4 space-y-3">
-              {detail.adjustments.map((adjustment) => (
-                <div
-                  key={adjustment.id}
-                  className="flex items-center justify-between gap-4 rounded-2xl p-4"
-                  style={{
-                    background: "rgba(255,255,255,0.02)",
-                    border: "1px solid var(--glass-border)",
-                  }}
-                >
-                  <div>
-                    <p className="font-medium" style={{ color: "var(--text-primary)" }}>
-                      {formatAdjustmentTypeLabel(adjustment.type)}
-                    </p>
-                    <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-                      {adjustment.type === "reimbursement"
-                        ? adjustment.label
-                        : [
-                            adjustment.employeeName,
-                            adjustment.rateUsdCents !== undefined
-                              ? `${formatUsd(adjustment.rateUsdCents)}/hr`
-                              : undefined,
-                            adjustment.hours !== undefined
-                              ? `${adjustment.hours} hrs`
-                              : undefined,
-                          ]
-                            .filter(Boolean)
-                            .join(" · ")}
-                    </p>
-                  </div>
-                  <p
-                    className="font-semibold"
-                    style={{
-                      fontFamily: "var(--font-jetbrains-mono), monospace",
-                      color: adjustment.amountUsdCents < 0 ? "#f87171" : "var(--text-primary)",
-                    }}
-                  >
-                    {formatUsd(adjustment.amountUsdCents)}
-                  </p>
-                </div>
-              ))}
-              {detail.adjustments.length === 0 && (
-                <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-                  No adjustments added yet.
-                </p>
-              )}
-            </div>
-          </GlassPanel>
         </div>
 
         <div className="space-y-6">
@@ -436,7 +372,9 @@ export default async function DraftInvoicePage({
               <AdjustmentForms
                 invoiceId={detail.invoice.id}
                 returnTo={returnTo}
-                action={addInvoiceAdjustmentAction}
+                adjustments={detail.adjustments}
+                addAction={addInvoiceAdjustmentAction}
+                deleteAction={deleteInvoiceAdjustmentAction}
               />
             </div>
           </GlassPanel>

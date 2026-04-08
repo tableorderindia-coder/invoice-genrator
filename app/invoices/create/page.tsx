@@ -2,6 +2,7 @@ import { Shell } from "../../_components/shell";
 import { GlassPanel } from "../../_components/glass-panel";
 import { createInvoiceDraftAction } from "@/src/features/billing/actions";
 import { CreateInvoiceForm } from "./create-invoice-form";
+import { CreateInvoiceSubmitButton } from "./submit-button";
 import {
   findLatestInvoiceForCompany,
   listAvailableTeamNames,
@@ -51,9 +52,7 @@ export default async function CreateInvoicePage() {
             )}
             availableTeamNamesByCompany={availableTeamNamesByCompany}
           />
-          <button type="submit" className="gradient-btn mt-6">
-            Create draft
-          </button>
+          <CreateInvoiceSubmitButton />
         </form>
       </GlassPanel>
     </Shell>
