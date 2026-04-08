@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 
-import { inputClass } from "@/app/_components/field";
+import { Field, inputClass } from "@/app/_components/field";
 import {
   buildAdjustmentDuplicateSignature,
   buildInvoiceAdjustmentPayload,
@@ -226,7 +226,7 @@ export function AdjustmentForms({
     <div className="space-y-4">
       <form
         action={addAction}
-        className="rounded-2xl p-4 space-y-4"
+        className="rounded-3xl p-6 space-y-5"
         onSubmit={(event) => {
           if (isAdding) {
             event.preventDefault();
@@ -267,83 +267,106 @@ export function AdjustmentForms({
         <input type="hidden" name="returnTo" value={returnTo} />
 
         <div>
-          <h4 className="text-base font-semibold" style={{ color: "var(--text-primary)" }}>
+          <h4 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
             Add adjustment
           </h4>
+          <p className="mt-2 text-sm" style={{ color: "var(--text-muted)" }}>
+            Select one adjustment type and enter the matching details below.
+          </p>
         </div>
 
-        <select
-          name="type"
-          className={inputClass}
-          value={form.type}
-          onChange={(event) => handleTypeChange(event.target.value as AdjustmentTypeOption)}
-        >
-          <option value="">Select adjustment type</option>
-          <option value="onboarding">Onboarding Advance</option>
-          <option value="appraisal">Appraisal Advance</option>
-          <option value="reimbursement">Reimbursements / Expenses</option>
-          <option value="offboarding">Offboarding Deductions</option>
-        </select>
+        <Field label="Adjustment type">
+          <select
+            name="type"
+            className={`${inputClass} min-h-14`}
+            value={form.type}
+            onChange={(event) => handleTypeChange(event.target.value as AdjustmentTypeOption)}
+          >
+            <option value="">Select adjustment type</option>
+            <option value="onboarding">Onboarding Advance</option>
+            <option value="appraisal">Appraisal Advance</option>
+            <option value="reimbursement">Reimbursements / Expenses</option>
+            <option value="offboarding">Offboarding Deductions</option>
+          </select>
+        </Field>
 
         {form.type === "reimbursement" ? (
-          <div className="grid gap-3 md:grid-cols-2">
-            <input
-              name="label"
-              placeholder="Enter reimbursement description"
-              className={inputClass}
-              value={form.label}
-              onChange={(event) => setForm((current) => ({ ...current, label: event.target.value }))}
-            />
-            <input
-              name="amountUsd"
-              type="number"
-              step="0.01"
-              min="0"
-              placeholder="Enter reimbursement amount"
-              className={inputClass}
-              value={form.amountUsd}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, amountUsd: event.target.value }))
-              }
-            />
+          <div className="space-y-4">
+            <Field label="Type / Label">
+              <input
+                name="label"
+                placeholder="Enter expense type (e.g., travel, food)"
+                className={`${inputClass} min-h-14`}
+                value={form.label}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, label: event.target.value }))
+                }
+              />
+            </Field>
+            <Field label="Amount">
+              <input
+                name="amountUsd"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="Enter amount"
+                className={`${inputClass} min-h-14`}
+                value={form.amountUsd}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, amountUsd: event.target.value }))
+                }
+              />
+            </Field>
           </div>
         ) : form.type ? (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <input
-              name="employeeName"
-              placeholder={`Enter ${getTypeLabel(form.type).toLowerCase()} name`}
-              className={inputClass}
-              value={form.name}
-              onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
-            />
-            <input
-              name="rateUsd"
-              type="number"
-              step="0.01"
-              min="0"
-              placeholder={`Enter ${form.type} $/hour`}
-              className={inputClass}
-              value={form.rateUsd}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, rateUsd: event.target.value }))
-              }
-            />
-            <input
-              name="hours"
-              type="number"
-              step="0.01"
-              min="0"
-              placeholder={`Enter ${form.type} hours`}
-              className={inputClass}
-              value={form.hours}
-              onChange={(event) => setForm((current) => ({ ...current, hours: event.target.value }))}
-            />
-            <input
-              readOnly
-              value={totalPreview}
-              aria-label="Adjustment total"
-              className={inputClass}
-            />
+          <div className="space-y-4">
+            <Field label="Name">
+              <input
+                name="employeeName"
+                placeholder="Enter employee name"
+                className={`${inputClass} min-h-14`}
+                value={form.name}
+                onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+              />
+            </Field>
+            <div className="grid gap-4 lg:grid-cols-3">
+              <Field label="Rate ($/hr)">
+                <input
+                  name="rateUsd"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="Enter hourly rate"
+                  className={`${inputClass} min-h-14`}
+                  value={form.rateUsd}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, rateUsd: event.target.value }))
+                  }
+                />
+              </Field>
+              <Field label="Hours">
+                <input
+                  name="hours"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="Enter number of hours"
+                  className={`${inputClass} min-h-14`}
+                  value={form.hours}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, hours: event.target.value }))
+                  }
+                />
+              </Field>
+              <Field label="Total">
+                <input
+                  readOnly
+                  value={totalPreview}
+                  aria-label="Total"
+                  className={`${inputClass} min-h-14`}
+                />
+              </Field>
+            </div>
           </div>
         ) : null}
 

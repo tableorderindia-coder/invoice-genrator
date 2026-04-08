@@ -12,22 +12,34 @@ test("shows inline success feedback on the draft invoice page", async ({ page })
   await page.waitForURL(/\/invoices\/drafts\//);
 
   await page.locator('select[name="type"]').selectOption("onboarding");
-  await page.getByPlaceholder("Enter onboarding advance name").fill("Playwright Member");
-  await page.getByPlaceholder("Enter onboarding $/hour").fill("25");
-  await page.getByPlaceholder("Enter onboarding hours").fill("4");
-  await expect(page.getByLabel("Adjustment total")).toHaveValue("$100.00");
+  await expect(page.getByLabel("Name")).toBeVisible();
+  await expect(page.getByLabel("Rate ($/hr)")).toBeVisible();
+  await expect(page.getByLabel("Hours")).toBeVisible();
+  await expect(page.getByLabel("Total")).toBeVisible();
+  await page.getByLabel("Name").fill("Playwright Member");
+  await page.getByLabel("Rate ($/hr)").fill("25");
+  await page.getByLabel("Hours").fill("4");
+  await expect(page.getByLabel("Total")).toHaveValue("$100.00");
   await page.getByRole("button", { name: "Add / Update" }).click();
 
   await expect(page.getByText("Adjustment added.")).toBeVisible();
   await expect(page.getByText("Playwright Member")).toBeVisible();
 
   await page.locator('select[name="type"]').selectOption("onboarding");
-  await page.getByPlaceholder("Enter onboarding advance name").fill("Playwright Member");
-  await page.getByPlaceholder("Enter onboarding $/hour").fill("25");
-  await page.getByPlaceholder("Enter onboarding hours").fill("4");
+  await page.getByLabel("Name").fill("Playwright Member");
+  await page.getByLabel("Rate ($/hr)").fill("25");
+  await page.getByLabel("Hours").fill("4");
   await page.getByRole("button", { name: "Add / Update" }).click();
 
   await expect(page.getByText("Duplicate adjustment already added.")).toBeVisible();
+
+  await page.locator('select[name="type"]').selectOption("reimbursement");
+  await expect(page.getByLabel("Type / Label")).toBeVisible();
+  await expect(page.getByLabel("Amount")).toBeVisible();
+  await expect(
+    page.getByPlaceholder("Enter expense type (e.g., travel, food)"),
+  ).toBeVisible();
+  await expect(page.getByPlaceholder("Enter amount")).toBeVisible();
 
   await page
     .locator("div")
