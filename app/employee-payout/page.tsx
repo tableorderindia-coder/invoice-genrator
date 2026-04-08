@@ -2,10 +2,15 @@ import { Shell } from "../_components/shell";
 import { GlassPanel } from "../_components/glass-panel";
 import { inputClass } from "../_components/field";
 import {
+  addEmployeePayoutRowAction,
   markEmployeePayoutPaidAction,
   updateEmployeePayoutAction,
 } from "@/src/features/billing/actions";
-import { listInvoices, getEmployeePayoutInvoice } from "@/src/features/billing/store";
+import {
+  listInvoices,
+  getEmployeePayoutInvoice,
+  listEmployees,
+} from "@/src/features/billing/store";
 import { formatInr, formatMonthYear, formatUsd } from "@/src/features/billing/utils";
 
 export const dynamic = "force-dynamic";
@@ -36,6 +41,14 @@ export default async function EmployeePayoutPage({
   const selectedPayoutData = selectedInvoiceId
     ? await getEmployeePayoutInvoice(selectedInvoiceId)
     : undefined;
+  const companyEmployees =
+    selectedPayoutData ? await listEmployees(selectedPayoutData.invoice.companyId) : [];
+  const existingPayoutEmployeeIds = new Set(
+    selectedPayoutData?.rows.map((row) => row.employeeId) ?? [],
+  );
+  const addableEmployees = companyEmployees.filter(
+    (employee) => !existingPayoutEmployeeIds.has(employee.id),
+  );
   const flashStatus = Array.isArray(resolvedSearchParams.flashStatus)
     ? resolvedSearchParams.flashStatus[0]
     : resolvedSearchParams.flashStatus;
@@ -105,7 +118,50 @@ export default async function EmployeePayoutPage({
         ) : null}
 
         {selectedPayoutData ? (
-          <div className="mt-6 overflow-x-auto rounded-2xl" style={{ border: "1px solid var(--glass-border)" }}>
+          <>
+            <div className="mt-6 rounded-2xl p-4" style={{ border: "1px solid var(--glass-border)" }}>
+              <h3 className="text-base font-semibold" style={{ color: "var(--text-primary)" }}>
+                Add non-invoice employee payout
+              </h3>
+              <p className="mt-1 text-sm" style={{ color: "var(--text-secondary)" }}>
+                Add a company employee you are paying now even if this invoice has no inward yet.
+              </p>
+              <form action={addEmployeePayoutRowAction} className="mt-3 flex flex-wrap items-center gap-3">
+                <input type="hidden" name="invoiceId" value={selectedPayoutData.invoice.id} />
+                <input type="hidden" name="returnTo" value={returnTo} />
+                <select
+                  name="employeeId"
+                  className={inputClass}
+                  defaultValue={addableEmployees[0]?.id ?? ""}
+                  disabled={addableEmployees.length === 0}
+                  style={{
+                    minWidth: "18rem",
+                    border: "1px solid var(--glass-border)",
+                    background: "rgba(255,255,255,0.04)",
+                    color: "var(--text-primary)",
+                  }}
+                >
+                  {addableEmployees.length === 0 ? (
+                    <option value="">All company employees are already in payout list</option>
+                  ) : (
+                    addableEmployees.map((employee) => (
+                      <option key={employee.id} value={employee.id}>
+                        {employee.fullName}
+                      </option>
+                    ))
+                  )}
+                </select>
+                <button
+                  type="submit"
+                  className="gradient-btn"
+                  disabled={addableEmployees.length === 0}
+                >
+                  + Add employee
+                </button>
+              </form>
+            </div>
+
+            <div className="mt-6 overflow-x-auto rounded-2xl" style={{ border: "1px solid var(--glass-border)" }}>
             <table className="glass-table">
               <thead>
                 <tr>
@@ -115,6 +171,9 @@ export default async function EmployeePayoutPage({
                     "Employee monthly dollars",
                     "Cashout USD/INR rate",
                     "Paid USD/INR rate",
+                    "PF (INR)",
+                    "TDS (INR)",
+                    "Actual paid (INR)",
                     "FX commission earning (INR)",
                     "Total commission (USD)",
                     "Commission earned (INR)",
@@ -133,7 +192,33 @@ export default async function EmployeePayoutPage({
                         {row.employeeNameSnapshot}
                       </td>
                       <td style={{ fontFamily: "var(--font-jetbrains-mono), monospace" }}>
-                        {formatUsd(row.dollarInwardUsdCents)}
+                        {row.isNonInvoiceEmployee ? (
+                          <input
+                            form={formId}
+                            type="number"
+                            name="dollarInwardUsd"
+                            step="0.01"
+                            min="0"
+                            defaultValue={(row.dollarInwardUsdCents / 100).toFixed(2)}
+                            className={inputClass}
+                            style={{
+                              minWidth: "8rem",
+                              border: "1px solid var(--glass-border)",
+                              background: "rgba(255,255,255,0.04)",
+                              color: "var(--text-primary)",
+                            }}
+                          />
+                        ) : (
+                          <>
+                            {formatUsd(row.dollarInwardUsdCents)}
+                            <input
+                              form={formId}
+                              type="hidden"
+                              name="dollarInwardUsd"
+                              value={(row.dollarInwardUsdCents / 100).toFixed(2)}
+                            />
+                          </>
+                        )}
                       </td>
                       <td>
                         <form id={formId} action={updateEmployeePayoutAction}></form>
@@ -155,7 +240,35 @@ export default async function EmployeePayoutPage({
                           }}
                         />
                       </td>
-                      <td>{row.cashoutUsdInrRate.toFixed(4)}</td>
+                      <td>
+                        {row.isNonInvoiceEmployee ? (
+                          <input
+                            form={formId}
+                            type="number"
+                            name="cashoutUsdInrRate"
+                            step="0.0001"
+                            min="0"
+                            defaultValue={row.cashoutUsdInrRate.toFixed(4)}
+                            className={inputClass}
+                            style={{
+                              minWidth: "8rem",
+                              border: "1px solid var(--glass-border)",
+                              background: "rgba(255,255,255,0.04)",
+                              color: "var(--text-primary)",
+                            }}
+                          />
+                        ) : (
+                          <>
+                            {row.cashoutUsdInrRate.toFixed(4)}
+                            <input
+                              form={formId}
+                              type="hidden"
+                              name="cashoutUsdInrRate"
+                              value={row.cashoutUsdInrRate.toFixed(4)}
+                            />
+                          </>
+                        )}
+                      </td>
                       <td>
                         <input
                           form={formId}
@@ -165,6 +278,57 @@ export default async function EmployeePayoutPage({
                           min="0.0001"
                           defaultValue={row.paidUsdInrRate?.toFixed(4)}
                           placeholder="Enter paid rate"
+                          className={inputClass}
+                          style={{
+                            minWidth: "8rem",
+                            border: "1px solid var(--glass-border)",
+                            background: "rgba(255,255,255,0.04)",
+                            color: "var(--text-primary)",
+                          }}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          form={formId}
+                          type="number"
+                          name="pfInr"
+                          step="0.01"
+                          min="0"
+                          defaultValue={(row.pfInrCents / 100).toFixed(2)}
+                          className={inputClass}
+                          style={{
+                            minWidth: "8rem",
+                            border: "1px solid var(--glass-border)",
+                            background: "rgba(255,255,255,0.04)",
+                            color: "var(--text-primary)",
+                          }}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          form={formId}
+                          type="number"
+                          name="tdsInr"
+                          step="0.01"
+                          min="0"
+                          defaultValue={(row.tdsInrCents / 100).toFixed(2)}
+                          className={inputClass}
+                          style={{
+                            minWidth: "8rem",
+                            border: "1px solid var(--glass-border)",
+                            background: "rgba(255,255,255,0.04)",
+                            color: "var(--text-primary)",
+                          }}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          form={formId}
+                          type="number"
+                          name="actualPaidInr"
+                          step="0.01"
+                          min="0"
+                          defaultValue={(row.actualPaidInrCents / 100).toFixed(2)}
                           className={inputClass}
                           style={{
                             minWidth: "8rem",
@@ -207,7 +371,7 @@ export default async function EmployeePayoutPage({
                 })}
                 {selectedPayoutData.rows.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="py-8 text-center" style={{ color: "var(--text-muted)" }}>
+                    <td colSpan={12} className="py-8 text-center" style={{ color: "var(--text-muted)" }}>
                       No employees found for selected invoice.
                     </td>
                   </tr>
@@ -215,6 +379,7 @@ export default async function EmployeePayoutPage({
               </tbody>
             </table>
           </div>
+          </>
         ) : (
           <p className="mt-6 text-sm" style={{ color: "var(--text-muted)" }}>
             Select a cashed-out invoice to load employee payout rows.

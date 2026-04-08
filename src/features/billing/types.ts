@@ -105,16 +105,21 @@ export type InvoiceRealization = {
 export type EmployeePayout = {
   id: string;
   invoiceId: string;
+  companyId: string;
   employeeId: string;
-  invoiceLineItemId: string;
+  invoiceLineItemId?: string;
   employeeNameSnapshot: string;
   dollarInwardUsdCents: number;
   employeeMonthlyUsdCents: number;
   cashoutUsdInrRate: number;
   paidUsdInrRate?: number;
+  pfInrCents: number;
+  tdsInrCents: number;
+  actualPaidInrCents: number;
   fxCommissionInrCents?: number;
   totalCommissionUsdCents: number;
   commissionEarnedInrCents?: number;
+  isNonInvoiceEmployee: boolean;
   isPaid: boolean;
   paidAt?: string;
   createdAt: string;
