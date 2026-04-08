@@ -22,7 +22,8 @@ export type Employee = {
   designation: string;
   defaultTeam: string;
   billingRateUsdCents: number;
-  payoutRateUsdCents: number;
+  payoutMonthlyUsdCents: number;
+  hrsPerWeek: number;
   activeFrom: string;
   activeTo?: string;
   isActive: boolean;
@@ -63,8 +64,8 @@ export type InvoiceLineItem = {
   designationSnapshot: string;
   teamNameSnapshot: string;
   billingRateUsdCents: number;
-  payoutRateUsdCents: number;
-  hoursBilled: number;
+  payoutMonthlyUsdCentsSnapshot: number;
+  hrsPerWeek: number;
   billedTotalUsdCents: number;
   payoutTotalUsdCents: number;
   profitTotalUsdCents: number;
@@ -83,7 +84,7 @@ export type InvoiceAdjustment = {
   label: string;
   employeeName?: string;
   rateUsdCents?: number;
-  hours?: number;
+  hrsPerWeek?: number;
   amountUsdCents: number;
   sortOrder: number;
 };

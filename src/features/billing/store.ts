@@ -63,7 +63,8 @@ type DbEmployee = {
   designation: string;
   default_team: string;
   billing_rate_usd_cents: number;
-  payout_rate_usd_cents: number;
+  payout_monthly_usd_cents: number;
+  hrs_per_week: number;
   active_from: string;
   active_to: string | null;
   is_active: boolean;
@@ -92,8 +93,8 @@ type DbInvoiceLineItem = {
   designation_snapshot: string;
   team_name_snapshot: string;
   billing_rate_usd_cents: number;
-  payout_rate_usd_cents: number;
-  hours_billed: number;
+  payout_monthly_usd_cents_snapshot: number;
+  hrs_per_week: number;
   billed_total_usd_cents: number;
   payout_total_usd_cents: number;
   profit_total_usd_cents: number;
@@ -106,7 +107,7 @@ type DbInvoiceAdjustment = {
   label: string;
   employee_name: string | null;
   rate_usd_cents: number | null;
-  hours: number | null;
+  hrs_per_week: number | null;
   amount_usd_cents: number;
   sort_order: number;
 };
@@ -188,7 +189,8 @@ function mapEmployee(row: DbEmployee): Employee {
     designation: row.designation,
     defaultTeam: row.default_team,
     billingRateUsdCents: row.billing_rate_usd_cents,
-    payoutRateUsdCents: row.payout_rate_usd_cents,
+    payoutMonthlyUsdCents: row.payout_monthly_usd_cents,
+    hrsPerWeek: Number(row.hrs_per_week),
     activeFrom: row.active_from,
     activeTo: row.active_to ?? undefined,
     isActive: row.is_active,
@@ -244,8 +246,8 @@ function mapInvoiceLineItem(row: DbInvoiceLineItem): InvoiceLineItem {
     designationSnapshot: row.designation_snapshot,
     teamNameSnapshot: row.team_name_snapshot,
     billingRateUsdCents: row.billing_rate_usd_cents,
-    payoutRateUsdCents: row.payout_rate_usd_cents,
-    hoursBilled: Number(row.hours_billed),
+    payoutMonthlyUsdCentsSnapshot: row.payout_monthly_usd_cents_snapshot,
+    hrsPerWeek: Number(row.hrs_per_week),
     billedTotalUsdCents: row.billed_total_usd_cents,
     payoutTotalUsdCents: row.payout_total_usd_cents,
     profitTotalUsdCents: row.profit_total_usd_cents,
@@ -260,7 +262,7 @@ function mapInvoiceAdjustment(row: DbInvoiceAdjustment) {
     label: row.label,
     employeeName: row.employee_name ?? undefined,
     rateUsdCents: row.rate_usd_cents ?? undefined,
-    hours: row.hours ?? undefined,
+    hrsPerWeek: row.hrs_per_week ?? undefined,
     amountUsdCents: row.amount_usd_cents,
     sortOrder: row.sort_order,
   };
@@ -436,7 +438,8 @@ export async function createEmployee(input: {
   designation: string;
   defaultTeam: string;
   billingRateUsdCents: number;
-  payoutRateUsdCents: number;
+  payoutMonthlyUsdCents: number;
+  hrsPerWeek: number;
   activeFrom: string;
   activeTo?: string;
 }) {
@@ -460,7 +463,8 @@ export async function createEmployee(input: {
     designation: input.designation,
     default_team: input.defaultTeam,
     billing_rate_usd_cents: input.billingRateUsdCents,
-    payout_rate_usd_cents: input.payoutRateUsdCents,
+    payout_monthly_usd_cents: input.payoutMonthlyUsdCents,
+    hrs_per_week: input.hrsPerWeek,
     active_from: input.activeFrom,
     active_to: input.activeTo ?? null,
     is_active: true,
@@ -574,9 +578,9 @@ export async function createInvoiceDraft(input: {
           invoiceId,
           invoiceTeamId: insertedTeam.id,
           employeeId: lineItem.employeeId,
-          hoursBilled: lineItem.hoursBilled,
+          hrsPerWeek: lineItem.hrsPerWeek,
           billingRateUsdCents: lineItem.billingRateUsdCents,
-          payoutRateUsdCents: lineItem.payoutRateUsdCents,
+          payoutMonthlyUsdCents: lineItem.payoutMonthlyUsdCentsSnapshot,
         });
       }
     }
@@ -588,7 +592,7 @@ export async function createInvoiceDraft(input: {
         label: adjustment.label,
         employeeName: adjustment.employeeName,
         rateUsdCents: adjustment.rateUsdCents,
-        hours: adjustment.hours,
+        hrsPerWeek: adjustment.hrsPerWeek,
         amountUsdCents: adjustment.amountUsdCents,
       });
     }
@@ -666,9 +670,9 @@ export async function addInvoiceTeam(
         invoiceId,
         invoiceTeamId: mappedTeam.id,
         employeeId: employee.id,
-        hoursBilled: 0,
+        hrsPerWeek: employee.hrsPerWeek,
         billingRateUsdCents: employee.billingRateUsdCents,
-        payoutRateUsdCents: employee.payoutRateUsdCents,
+        payoutMonthlyUsdCents: employee.payoutMonthlyUsdCents,
       });
     }
   }
@@ -693,9 +697,9 @@ export async function addInvoiceLineItem(input: {
   invoiceId: string;
   invoiceTeamId: string;
   employeeId: string;
-  hoursBilled: number;
+  hrsPerWeek: number;
   billingRateUsdCents?: number;
-  payoutRateUsdCents?: number;
+  payoutMonthlyUsdCents?: number;
 }) {
   const supabase = getSupabaseOrThrow();
   const [
@@ -727,12 +731,12 @@ export async function addInvoiceLineItem(input: {
   const team = mapInvoiceTeam(teamRow as DbInvoiceTeam);
   const billingRateUsdCents =
     input.billingRateUsdCents ?? employee.billingRateUsdCents;
-  const payoutRateUsdCents =
-    input.payoutRateUsdCents ?? employee.payoutRateUsdCents;
+  const payoutMonthlyUsdCents =
+    input.payoutMonthlyUsdCents ?? employee.payoutMonthlyUsdCents;
   const calculated = calculateLineItemTotals({
     billingRateUsdCents,
-    payoutRateUsdCents,
-    hoursBilled: input.hoursBilled,
+    payoutMonthlyUsdCents,
+    hrsPerWeek: input.hrsPerWeek,
   });
 
   const payload = {
@@ -743,8 +747,8 @@ export async function addInvoiceLineItem(input: {
     designation_snapshot: employee.designation,
     team_name_snapshot: team.teamName,
     billing_rate_usd_cents: billingRateUsdCents,
-    payout_rate_usd_cents: payoutRateUsdCents,
-    hours_billed: input.hoursBilled,
+    payout_monthly_usd_cents_snapshot: payoutMonthlyUsdCents,
+    hrs_per_week: input.hrsPerWeek,
     billed_total_usd_cents: calculated.billedTotalUsdCents,
     payout_total_usd_cents: calculated.payoutTotalUsdCents,
     profit_total_usd_cents: calculated.profitTotalUsdCents,
@@ -775,7 +779,7 @@ export async function deleteInvoiceLineItem(invoiceId: string, lineItemId: strin
 export async function updateInvoiceLineItem(input: {
   invoiceId: string;
   lineItemId: string;
-  hoursBilled: number;
+  hrsPerWeek: number;
   billingRateUsdCents: number;
 }) {
   const supabase = getSupabaseOrThrow();
@@ -789,15 +793,15 @@ export async function updateInvoiceLineItem(input: {
   const existingLineItem = mapInvoiceLineItem(lineRow as DbInvoiceLineItem);
   const calculated = calculateLineItemTotals({
     billingRateUsdCents: input.billingRateUsdCents,
-    payoutRateUsdCents: existingLineItem.payoutRateUsdCents,
-    hoursBilled: input.hoursBilled,
+    payoutMonthlyUsdCents: existingLineItem.payoutMonthlyUsdCentsSnapshot,
+    hrsPerWeek: input.hrsPerWeek,
   });
 
   const { error: updateError } = await supabase
     .from("invoice_line_items")
     .update({
       billing_rate_usd_cents: input.billingRateUsdCents,
-      hours_billed: input.hoursBilled,
+      hrs_per_week: input.hrsPerWeek,
       billed_total_usd_cents: calculated.billedTotalUsdCents,
       payout_total_usd_cents: calculated.payoutTotalUsdCents,
       profit_total_usd_cents: calculated.profitTotalUsdCents,
@@ -905,9 +909,9 @@ export async function assignEmployeeToInvoiceTeam(input: {
       invoiceId: input.invoiceId,
       invoiceTeamId: targetTeam.id,
       employeeId: employee.id,
-      hoursBilled: 0,
+      hrsPerWeek: employee.hrsPerWeek,
       billingRateUsdCents: employee.billingRateUsdCents,
-      payoutRateUsdCents: employee.payoutRateUsdCents,
+      payoutMonthlyUsdCents: employee.payoutMonthlyUsdCents,
     });
   }
 
@@ -928,7 +932,7 @@ export async function addInvoiceAdjustment(input: {
   label: string;
   employeeName?: string;
   rateUsdCents?: number;
-  hours?: number;
+  hrsPerWeek?: number;
   amountUsdCents: number;
 }) {
   const supabase = getSupabaseOrThrow();
@@ -963,7 +967,7 @@ export async function addInvoiceAdjustment(input: {
     label: input.label,
     employee_name: input.employeeName ?? null,
     rate_usd_cents: input.rateUsdCents ?? null,
-    hours: input.hours ?? null,
+    hrs_per_week: input.hrsPerWeek ?? null,
     amount_usd_cents: input.amountUsdCents,
     sort_order: (count ?? 0) + 1,
   };

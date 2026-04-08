@@ -11,13 +11,13 @@ describe("billing domain", () => {
     expect(
       calculateLineItemTotals({
         billingRateUsdCents: 4500,
-        payoutRateUsdCents: 3000,
-        hoursBilled: 12.5,
+        payoutMonthlyUsdCents: 300000,
+        hrsPerWeek: 12.5,
       }),
     ).toEqual({
-      billedTotalUsdCents: 56250,
-      payoutTotalUsdCents: 37500,
-      profitTotalUsdCents: 18750,
+      billedTotalUsdCents: 243750,
+      payoutTotalUsdCents: 300000,
+      profitTotalUsdCents: -56250,
     });
   });
 
@@ -26,24 +26,24 @@ describe("billing domain", () => {
       calculateInvoiceTotals({
         lineItems: [
           {
-            billedTotalUsdCents: 56250,
-            payoutTotalUsdCents: 37500,
-            profitTotalUsdCents: 18750,
+            billedTotalUsdCents: 243750,
+            payoutTotalUsdCents: 300000,
+            profitTotalUsdCents: -56250,
           },
           {
-            billedTotalUsdCents: 20000,
-            payoutTotalUsdCents: 12000,
-            profitTotalUsdCents: 8000,
+            billedTotalUsdCents: 86667,
+            payoutTotalUsdCents: 100000,
+            profitTotalUsdCents: -13333,
           },
         ],
         adjustments: [5000, -2500, 1000],
       }),
     ).toEqual({
-      subtotalUsdCents: 76250,
+      subtotalUsdCents: 330417,
       adjustmentsUsdCents: 3500,
-      grandTotalUsdCents: 79750,
-      payoutTotalUsdCents: 49500,
-      profitTotalUsdCents: 30250,
+      grandTotalUsdCents: 333917,
+      payoutTotalUsdCents: 400000,
+      profitTotalUsdCents: -66083,
     });
   });
 

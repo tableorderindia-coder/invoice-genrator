@@ -9,7 +9,7 @@ import type { InvoiceAdjustment, InvoiceDetail } from "./types";
 type PdfSectionRow = {
   contractorName: string;
   hourlyRate: string;
-  hours: string;
+  hrsPerWeek: string;
   total: string;
 };
 
@@ -75,7 +75,7 @@ export function buildInvoicePdfModel(detail: InvoiceDetail): PdfModel {
       rows: team.lineItems.map((lineItem) => ({
         contractorName: lineItem.employeeNameSnapshot,
         hourlyRate: formatUsdCompact(lineItem.billingRateUsdCents),
-        hours: formatHours(lineItem.hoursBilled),
+        hrsPerWeek: formatHours(lineItem.hrsPerWeek),
         total: formatUsdCompact(lineItem.billedTotalUsdCents),
       })),
       totalAmount: formatUsdCompact(
@@ -309,14 +309,14 @@ export async function buildInvoicePdf(detail: InvoiceDetail) {
       {
         contractorName: "Contractor Name",
         hourlyRate: "Hourly Rate\n(USD)",
-        hours: "No. of Hours",
+        hrsPerWeek: "Hrs / Week",
         total: "Total (USD) **",
       },
       ...section.rows,
       {
         contractorName: section.totalLabel,
         hourlyRate: "",
-        hours: "",
+        hrsPerWeek: "",
         total: section.totalAmount,
       },
     ];
@@ -359,7 +359,7 @@ export async function buildInvoicePdf(detail: InvoiceDetail) {
       drawCellText(row.hourlyRate, columnX[1], y, columnX[2] - columnX[1], {
         bold: isHeader,
       });
-      drawCellText(row.hours, columnX[2], y, columnX[3] - columnX[2], {
+      drawCellText(row.hrsPerWeek, columnX[2], y, columnX[3] - columnX[2], {
         bold: isHeader,
       });
       drawCellText(row.total, columnX[3], y, columnX[4] - columnX[3], {
@@ -452,7 +452,8 @@ function buildAdjustmentRows(
       adjustment.rateUsdCents !== undefined
         ? formatUsdCompact(adjustment.rateUsdCents)
         : "",
-    hours: adjustment.hours !== undefined ? formatHours(adjustment.hours) : "",
+    hrsPerWeek:
+      adjustment.hrsPerWeek !== undefined ? formatHours(adjustment.hrsPerWeek) : "",
     total: formatUsdCompact(
       isDeduction ? Math.abs(adjustment.amountUsdCents) : adjustment.amountUsdCents,
     ),
@@ -481,8 +482,8 @@ function formatUsdCompact(cents: number) {
   }).format(cents / 100);
 }
 
-function formatHours(hours: number) {
-  return Number.isInteger(hours) ? String(hours) : String(hours);
+function formatHours(hrsPerWeek: number) {
+  return Number.isInteger(hrsPerWeek) ? String(hrsPerWeek) : String(hrsPerWeek);
 }
 
 function formatUsDate(value: string | Date) {

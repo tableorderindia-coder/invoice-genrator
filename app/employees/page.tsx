@@ -42,8 +42,11 @@ export default async function EmployeesPage() {
               <Field label="Billing rate (USD/hr)">
                 <input name="billingRateUsd" type="number" min="0" step="0.01" required className={inputClass} placeholder="0.00" />
               </Field>
-              <Field label="Payout rate (USD/hr)">
-                <input name="payoutRateUsd" type="number" min="0" step="0.01" required className={inputClass} placeholder="0.00" />
+              <Field label="Payout $/month">
+                <input name="payoutMonthlyUsd" type="number" min="0" step="0.01" required className={inputClass} placeholder="0.00" />
+              </Field>
+              <Field label="Hrs per week">
+                <input name="hrsPerWeek" type="number" min="0" step="0.01" required className={inputClass} placeholder="40" />
               </Field>
               <Field label="Active from">
                 <input name="activeFrom" type="date" required className={inputClass} />
@@ -83,7 +86,7 @@ export default async function EmployeesPage() {
                       <span className="text-xs ml-1" style={{ color: "var(--text-muted)" }}>billed</span>
                     </p>
                     <p style={{ color: "#34d399" }}>
-                      {formatUsd(employee.payoutRateUsdCents)}
+                      {formatUsd(employee.payoutMonthlyUsdCents)}
                       <span className="text-xs ml-1" style={{ color: "var(--text-muted)" }}>payout</span>
                     </p>
                   </div>
@@ -98,6 +101,16 @@ export default async function EmployeesPage() {
                     }}
                   >
                     {employee.defaultTeam}
+                  </span>
+                  <span
+                    className="rounded-full px-3 py-1 text-xs font-medium"
+                    style={{
+                      background: "rgba(255,255,255,0.04)",
+                      color: "var(--text-muted)",
+                      border: "1px solid var(--glass-border)",
+                    }}
+                  >
+                    {employee.hrsPerWeek} hrs/week
                   </span>
                   <span
                     className="rounded-full px-3 py-1 text-xs font-medium"

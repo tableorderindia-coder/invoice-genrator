@@ -13,7 +13,8 @@ create table if not exists employees (
   designation text not null,
   default_team text not null,
   billing_rate_usd_cents integer not null,
-  payout_rate_usd_cents integer not null,
+  payout_monthly_usd_cents integer not null,
+  hrs_per_week numeric(8,2) not null,
   active_from date not null,
   active_to date,
   is_active boolean not null default true,
@@ -61,8 +62,8 @@ create table if not exists invoice_line_items (
   designation_snapshot text not null,
   team_name_snapshot text not null,
   billing_rate_usd_cents integer not null,
-  payout_rate_usd_cents integer not null,
-  hours_billed numeric(8,2) not null,
+  payout_monthly_usd_cents_snapshot integer not null,
+  hrs_per_week numeric(8,2) not null,
   billed_total_usd_cents integer not null,
   payout_total_usd_cents integer not null,
   profit_total_usd_cents integer not null
@@ -75,7 +76,7 @@ create table if not exists invoice_adjustments (
   label text not null,
   employee_name text,
   rate_usd_cents integer,
-  hours numeric(8,2),
+  hrs_per_week numeric(8,2),
   amount_usd_cents integer not null,
   sort_order integer not null default 1
 );

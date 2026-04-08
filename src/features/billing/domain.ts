@@ -1,7 +1,7 @@
 type LineItemInput = {
   billingRateUsdCents: number;
-  payoutRateUsdCents: number;
-  hoursBilled: number;
+  payoutMonthlyUsdCents: number;
+  hrsPerWeek: number;
 };
 
 type CalculatedLineItem = {
@@ -24,14 +24,18 @@ type RealizationInput = {
 };
 
 const roundCurrency = (value: number) => Math.round(value);
+const MONTHS_PER_YEAR = 12;
+const WEEKS_PER_YEAR = 52;
 
 export function calculateLineItemTotals({
   billingRateUsdCents,
-  payoutRateUsdCents,
-  hoursBilled,
+  payoutMonthlyUsdCents,
+  hrsPerWeek,
 }: LineItemInput): CalculatedLineItem {
-  const billedTotalUsdCents = roundCurrency(billingRateUsdCents * hoursBilled);
-  const payoutTotalUsdCents = roundCurrency(payoutRateUsdCents * hoursBilled);
+  const billedTotalUsdCents = roundCurrency(
+    (billingRateUsdCents * hrsPerWeek * WEEKS_PER_YEAR) / MONTHS_PER_YEAR,
+  );
+  const payoutTotalUsdCents = roundCurrency(payoutMonthlyUsdCents);
 
   return {
     billedTotalUsdCents,

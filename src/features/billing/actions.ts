@@ -55,7 +55,8 @@ export async function createEmployeeAction(formData: FormData) {
     designation: getString(formData, "designation"),
     defaultTeam: getString(formData, "defaultTeam"),
     billingRateUsdCents: centsFromUsd(getString(formData, "billingRateUsd")),
-    payoutRateUsdCents: centsFromUsd(getString(formData, "payoutRateUsd")),
+    payoutMonthlyUsdCents: centsFromUsd(getString(formData, "payoutMonthlyUsd")),
+    hrsPerWeek: Number.parseFloat(getString(formData, "hrsPerWeek")),
     activeFrom: getString(formData, "activeFrom"),
     activeTo: getString(formData, "activeTo") || undefined,
   });
@@ -139,7 +140,7 @@ export async function addInvoiceLineItemAction(formData: FormData) {
     invoiceId,
     invoiceTeamId,
     employeeId: getString(formData, "employeeId"),
-    hoursBilled: Number.parseFloat(getString(formData, "hoursBilled")),
+    hrsPerWeek: Number.parseFloat(getString(formData, "hrsPerWeek")),
     billingRateUsdCents: getString(formData, "billingRateUsd")
       ? centsFromUsd(getString(formData, "billingRateUsd"))
       : undefined,
@@ -253,7 +254,7 @@ export async function updateInvoiceLineItemAction(formData: FormData) {
     await updateInvoiceLineItem({
       invoiceId,
       lineItemId,
-      hoursBilled: Number.parseFloat(getString(formData, "hoursBilled")),
+      hrsPerWeek: Number.parseFloat(getString(formData, "hrsPerWeek")),
       billingRateUsdCents: centsFromUsd(getString(formData, "billingRateUsd")),
     });
 
@@ -295,7 +296,7 @@ export async function addInvoiceAdjustmentAction(formData: FormData) {
             type,
             employeeName: getString(formData, "employeeName"),
             rateUsdCents: centsFromUsd(getString(formData, "rateUsd")),
-            hours: Number.parseFloat(getString(formData, "hours") || "0"),
+            hrsPerWeek: Number.parseFloat(getString(formData, "hrsPerWeek") || "0"),
           });
 
     await addInvoiceAdjustment({

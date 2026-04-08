@@ -15,7 +15,8 @@ insert into employees (
   designation,
   default_team,
   billing_rate_usd_cents,
-  payout_rate_usd_cents,
+  payout_monthly_usd_cents,
+  hrs_per_week,
   active_from,
   active_to,
   is_active,
@@ -29,7 +30,8 @@ values
     'Senior Data Engineer',
     'Data Engineering',
     5500,
-    3400,
+    520000,
+    40,
     '2025-11-01',
     null,
     true,
@@ -42,7 +44,8 @@ values
     'Finance Analyst',
     'Finance',
     4200,
-    2600,
+    315000,
+    30,
     '2025-12-15',
     null,
     true,
@@ -55,7 +58,8 @@ values
     'Data Engineer',
     'Data Engineering',
     4800,
-    3000,
+    410000,
+    32,
     '2026-01-05',
     null,
     true,
@@ -92,9 +96,9 @@ values
     '2026-05-31',
     'cashed_out',
     'Please process this invoice within the stated due date. Reach out to our team for any clarifications or backup sheets.',
-    2057600,
-    1300,
-    2058900,
+    2164933,
+    13000,
+    2177933,
     null,
     '/api/invoices/invoice_mar_2026/pdf',
     '2026-03-01T09:00:00.000Z',
@@ -110,9 +114,9 @@ values
     '2026-06-30',
     'generated',
     'Please process this invoice within the stated due date. Reach out to our team for any clarifications or backup sheets.',
-    2154000,
-    800,
-    2154800,
+    2280200,
+    80000,
+    2360200,
     'invoice_mar_2026',
     '/api/invoices/invoice_apr_2026/pdf',
     '2026-03-01T09:00:00.000Z',
@@ -136,8 +140,8 @@ insert into invoice_line_items (
   designation_snapshot,
   team_name_snapshot,
   billing_rate_usd_cents,
-  payout_rate_usd_cents,
-  hours_billed,
+  payout_monthly_usd_cents_snapshot,
+  hrs_per_week,
   billed_total_usd_cents,
   payout_total_usd_cents,
   profit_total_usd_cents
@@ -151,11 +155,11 @@ values
     'Senior Data Engineer',
     'Data Engineering',
     5500,
-    3400,
-    152.00,
-    836000,
-    516800,
-    319200
+    520000,
+    40.00,
+    953333,
+    520000,
+    433333
   ),
   (
     'line_mar_priya',
@@ -165,11 +169,11 @@ values
     'Data Engineer',
     'Data Engineering',
     4800,
-    3000,
-    144.00,
-    691200,
-    432000,
-    259200
+    410000,
+    32.00,
+    665600,
+    410000,
+    255600
   ),
   (
     'line_mar_miguel',
@@ -179,11 +183,11 @@ values
     'Finance Analyst',
     'Finance',
     4200,
-    2600,
-    118.00,
-    495600,
-    306800,
-    188800
+    315000,
+    30.00,
+    546000,
+    315000,
+    231000
   ),
   (
     'line_apr_ada',
@@ -193,11 +197,11 @@ values
     'Senior Data Engineer',
     'Data Engineering',
     5500,
-    3400,
-    160.00,
-    880000,
-    544000,
-    336000
+    520000,
+    40.00,
+    953333,
+    520000,
+    433333
   ),
   (
     'line_apr_priya',
@@ -207,11 +211,11 @@ values
     'Data Engineer',
     'Data Engineering',
     4800,
-    3000,
-    150.00,
-    720000,
-    450000,
-    270000
+    410000,
+    35.00,
+    728000,
+    410000,
+    318000
   ),
   (
     'line_apr_miguel',
@@ -221,11 +225,11 @@ values
     'Finance Analyst',
     'Finance',
     4200,
-    2600,
-    120.00,
-    504000,
-    312000,
-    192000
+    315000,
+    33.00,
+    600600,
+    315000,
+    285600
   )
 on conflict (id) do nothing;
 
@@ -235,6 +239,8 @@ insert into invoice_adjustments (
   type,
   label,
   employee_name,
+  rate_usd_cents,
+  hrs_per_week,
   amount_usd_cents,
   sort_order
 )
@@ -246,6 +252,8 @@ values
     'Onboarding support',
     'Priya Nair',
     2500,
+    6,
+    65000,
     1
   ),
   (
@@ -254,7 +262,9 @@ values
     'offboarding',
     'Offboarding adjustment',
     'Former contractor',
-    -1200,
+    3000,
+    4,
+    -52000,
     2
   ),
   (
@@ -262,8 +272,10 @@ values
     'invoice_apr_2026',
     'reimbursement',
     'Tool reimbursement',
-    'Ada Johnson',
-    800,
+    null,
+    null,
+    null,
+    80000,
     1
   )
 on conflict (id) do nothing;
@@ -282,9 +294,9 @@ values (
   'realization_mar_2026',
   'invoice_mar_2026',
   '2026-05-31',
-  2058900,
-  1255600,
-  803300,
+  2177933,
+  1245000,
+  932933,
   null,
   '2026-05-31T16:00:00.000Z'
 )

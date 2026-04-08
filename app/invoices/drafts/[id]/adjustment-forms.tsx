@@ -25,7 +25,7 @@ type FormState = {
   type: AdjustmentTypeOption;
   name: string;
   rateUsd: string;
-  hours: string;
+  hrsPerWeek: string;
   label: string;
   amountUsd: string;
 };
@@ -34,17 +34,17 @@ const INITIAL_FORM: FormState = {
   type: "",
   name: "",
   rateUsd: "",
-  hours: "",
+  hrsPerWeek: "",
   label: "",
   amountUsd: "",
 };
 
-function formatHours(hours: number | undefined) {
-  if (hours === undefined) {
+function formatHours(hoursPerWeek: number | undefined) {
+  if (hoursPerWeek === undefined) {
     return "";
   }
 
-  return Number.isInteger(hours) ? String(hours) : String(hours);
+  return Number.isInteger(hoursPerWeek) ? String(hoursPerWeek) : String(hoursPerWeek);
 }
 
 function buildClientAdjustmentPayload(form: FormState) {
@@ -64,7 +64,7 @@ function buildClientAdjustmentPayload(form: FormState) {
     type: form.type,
     employeeName: form.name,
     rateUsdCents: centsFromUsd(form.rateUsd),
-    hours: Number.parseFloat(form.hours || "0"),
+    hrsPerWeek: Number.parseFloat(form.hrsPerWeek || "0"),
   });
 }
 
@@ -91,7 +91,7 @@ function describeAdjustment(adjustment: InvoiceAdjustment) {
     adjustment.rateUsdCents !== undefined
       ? `${formatUsd(adjustment.rateUsdCents)}/hr`
       : undefined,
-    adjustment.hours !== undefined ? `${formatHours(adjustment.hours)} hrs` : undefined,
+    adjustment.hrsPerWeek !== undefined ? `${formatHours(adjustment.hrsPerWeek)} hrs/week` : undefined,
   ]
     .filter(Boolean)
     .join(" · ");
@@ -209,7 +209,7 @@ export function AdjustmentForms({
       ? formatUsd(
           calculatePersonAdjustmentTotalUsdCents({
             rateUsdCents: centsFromUsd(form.rateUsd),
-            hours: Number.parseFloat(form.hours || "0"),
+            hrsPerWeek: Number.parseFloat(form.hrsPerWeek || "0"),
           }),
         )
       : "";
@@ -343,17 +343,17 @@ export function AdjustmentForms({
                 }
               />
             </Field>
-            <Field label="Hours">
+            <Field label="Hrs per week">
               <input
-                name="hours"
+                name="hrsPerWeek"
                 type="number"
                 step="0.01"
                 min="0"
-                placeholder="Enter number of hours"
+                placeholder="Enter hrs per week"
                 className={`${inputClass} min-h-14`}
-                value={form.hours}
+                value={form.hrsPerWeek}
                 onChange={(event) =>
-                  setForm((current) => ({ ...current, hours: event.target.value }))
+                  setForm((current) => ({ ...current, hrsPerWeek: event.target.value }))
                 }
               />
             </Field>
