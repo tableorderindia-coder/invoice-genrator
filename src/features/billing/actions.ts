@@ -23,7 +23,8 @@ import {
   addEmployeePayoutRow,
   updateEmployeePayout,
   markEmployeePayoutPaid,
-} from "./store";
+  upsertDashboardExpense,
+  } from "./store";
 import { centsFromUsd } from "./utils";
 
 function getString(formData: FormData, key: string) {
@@ -580,4 +581,55 @@ export async function addEmployeePayoutRowAction(formData: FormData) {
   }
 
   redirect(buildFlashRedirect(returnTo, "success", "Employee added to payout list."));
+}
+
+export async function saveDashboardExpenseAction(formData: FormData) {
+  const returnTo = getString(formData, "returnTo") || "/dashboard";
+
+  try {
+    const companyId = getString(formData, "companyId");
+    if (!companyId) {
+      throw new Error("Select a company first.");
+    }
+    const periodType = getString(formData, "periodType") as "monthly" | "yearly";
+    if (periodType !== "monthly" && periodType !== "yearly") {
+      throw new Error("Invalid period type.");
+    }
+
+    const year = Number.parseInt(getString(formData, "year"), 10);
+    if (!Number.isFinite(year) || year <= 0) {
+      throw new Error("Invalid year.");
+    }
+
+    const monthRaw = getString(formData, "month");
+    const month = monthRaw ? Number.parseInt(monthRaw, 10) : undefined;
+    if (periodType === "monthly" && (!month || month < 1 || month > 12)) {
+      throw new Error("Invalid month for monthly expense.");
+    }
+
+    const amountInrCents = centsFromUsd(getString(formData, "amountInr"));
+    if (amountInrCents < 0) {
+      throw new Error("Expenses cannot be negative.");
+    }
+
+    await upsertDashboardExpense({
+      companyId,
+      periodType,
+      year,
+      month,
+      amountInrCents,
+    });
+
+    revalidatePath("/dashboard");
+  } catch (error) {
+    redirect(
+      buildFlashRedirect(
+        returnTo,
+        "error",
+        getErrorMessage(error, "Unable to save expense."),
+      ),
+    );
+  }
+
+  redirect(buildFlashRedirect(returnTo, "success", "Expense saved."));
 }

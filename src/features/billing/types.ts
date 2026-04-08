@@ -157,3 +157,50 @@ export type DashboardMetrics = {
     realizedProfitUsdCents: number;
   }>;
 };
+
+export type PnPeriodType = "monthly" | "yearly";
+
+export type PnEmployeeMonthRow = {
+  year: number;
+  month: number;
+  dollarInwardUsdCents: number;
+  employeeMonthlyUsdCents: number;
+  cashoutUsdInrRate: number;
+  paidUsdInrRate: number;
+  pfInrCents: number;
+  tdsInrCents: number;
+  actualPaidInrCents: number;
+  fxCommissionInrCents: number;
+  totalCommissionUsdCents: number;
+  commissionEarnedInrCents: number;
+  grossEarningsInrCents: number;
+};
+
+export type PnEmployeeSection = {
+  employeeId: string;
+  employeeName: string;
+  rows: PnEmployeeMonthRow[];
+  totalGrossEarningsInrCents: number;
+};
+
+export type PnPeriodRow = {
+  year: number;
+  month?: number;
+  dollarInwardUsdCents: number;
+  employeeMonthlyUsdCents: number;
+  pfInrCents: number;
+  tdsInrCents: number;
+  actualPaidInrCents: number;
+  fxCommissionInrCents: number;
+  totalCommissionUsdCents: number;
+  commissionEarnedInrCents: number;
+  grossEarningsInrCents: number;
+  expensesInrCents: number;
+  netPlInrCents: number;
+};
+
+export type PnDashboardData = {
+  companyId: string;
+  employeeSections: PnEmployeeSection[];
+  periodRows: PnPeriodRow[];
+};

@@ -16,6 +16,11 @@ import {
 } from "./team-catalog";
 import { findExistingLineItemForEmployee } from "./member-assignment";
 import { buildAdjustmentDuplicateSignature } from "./adjustments";
+import {
+  buildPnEmployeeSections,
+  buildPnPeriodRows,
+  type PnSourceRow,
+} from "./pn-dashboard";
 import type {
   AdjustmentType,
   Company,
@@ -30,6 +35,8 @@ import type {
   InvoiceStatus,
   Team,
   InvoiceTeam,
+  PnDashboardData,
+  PnPeriodType,
 } from "./types";
 
 type DbInvoice = {
@@ -152,6 +159,17 @@ type DbEmployeePayout = {
   updated_at: string;
 };
 
+type DbDashboardExpense = {
+  id: string;
+  company_id: string;
+  period_type: PnPeriodType;
+  year: number;
+  month: number | null;
+  amount_inr_cents: number;
+  created_at: string;
+  updated_at: string;
+};
+
 const sortInvoicesDesc = (left: Invoice, right: Invoice) =>
   right.year * 100 + right.month - (left.year * 100 + left.month);
 
@@ -198,6 +216,99 @@ function normalizeInvoiceAdjustmentSchemaError(error: unknown) {
   }
 
   return error;
+}
+
+function getMissingSchemaColumn(
+  error: unknown,
+  tableName: string,
+): string | undefined {
+  if (!error || typeof error !== "object") {
+    return undefined;
+  }
+
+  const code =
+    "code" in error && typeof error.code === "string" ? error.code : undefined;
+  const message =
+    "message" in error && typeof error.message === "string"
+      ? error.message
+      : undefined;
+
+  if (code !== "PGRST204" || !message) {
+    return undefined;
+  }
+
+  const match = message.match(
+    new RegExp(`Could not find the '([^']+)' column of '${tableName}'`),
+  );
+  return match?.[1];
+}
+
+async function insertEmployeePayoutWithSchemaFallback(
+  payload: Record<string, unknown>,
+) {
+  const supabase = getSupabaseOrThrow();
+  const insertPayload = { ...payload };
+  let attemptsRemaining = 8;
+
+  while (attemptsRemaining > 0) {
+    attemptsRemaining -= 1;
+
+    const { data, error } = await supabase
+      .from("employee_payouts")
+      .insert(insertPayload)
+      .select()
+      .single();
+
+    if (!error) {
+      return data as DbEmployeePayout;
+    }
+
+    const missingColumn = getMissingSchemaColumn(error, "employee_payouts");
+    if (!missingColumn || !(missingColumn in insertPayload)) {
+      throw error;
+    }
+
+    delete insertPayload[missingColumn];
+  }
+
+  throw new Error(
+    "Unable to insert employee payout row because schema fallback attempts were exhausted.",
+  );
+}
+
+async function updateEmployeePayoutWithSchemaFallback(
+  payoutId: string,
+  payload: Record<string, unknown>,
+) {
+  const supabase = getSupabaseOrThrow();
+  const updatePayload = { ...payload };
+  let attemptsRemaining = 8;
+
+  while (attemptsRemaining > 0) {
+    attemptsRemaining -= 1;
+
+    const { data, error } = await supabase
+      .from("employee_payouts")
+      .update(updatePayload)
+      .eq("id", payoutId)
+      .select()
+      .single();
+
+    if (!error) {
+      return data as DbEmployeePayout;
+    }
+
+    const missingColumn = getMissingSchemaColumn(error, "employee_payouts");
+    if (!missingColumn || !(missingColumn in updatePayload)) {
+      throw error;
+    }
+
+    delete updatePayload[missingColumn];
+  }
+
+  throw new Error(
+    "Unable to update employee payout row because schema fallback attempts were exhausted.",
+  );
 }
 
 function mapCompany(row: DbCompany): Company {
@@ -1223,10 +1334,7 @@ async function ensureEmployeePayoutRows(invoiceId: string) {
       updated_at: nowIso(),
     };
 
-    const { error: insertError } = await supabase
-      .from("employee_payouts")
-      .insert(payload);
-    if (insertError) throw insertError;
+    await insertEmployeePayoutWithSchemaFallback(payload);
   }
 }
 
@@ -1279,25 +1387,19 @@ export async function updateEmployeePayout(input: {
     paidUsdInrRate: input.paidUsdInrRate,
   });
 
-  const { data: updated, error: updateError } = await supabase
-    .from("employee_payouts")
-    .update({
-      dollar_inward_usd_cents: input.dollarInwardUsdCents,
-      employee_monthly_usd_cents: input.employeeMonthlyUsdCents,
-      cashout_usd_inr_rate: input.cashoutUsdInrRate,
-      paid_usd_inr_rate: input.paidUsdInrRate,
-      pf_inr_cents: input.pfInrCents,
-      tds_inr_cents: input.tdsInrCents,
-      actual_paid_inr_cents: input.actualPaidInrCents,
-      fx_commission_inr_cents: computed.fxCommissionInrCents,
-      total_commission_usd_cents: computed.totalCommissionUsdCents,
-      commission_earned_inr_cents: computed.commissionEarnedInrCents,
-      updated_at: nowIso(),
-    })
-    .eq("id", input.payoutId)
-    .select()
-    .single();
-  if (updateError) throw updateError;
+  const updated = await updateEmployeePayoutWithSchemaFallback(input.payoutId, {
+    dollar_inward_usd_cents: input.dollarInwardUsdCents,
+    employee_monthly_usd_cents: input.employeeMonthlyUsdCents,
+    cashout_usd_inr_rate: input.cashoutUsdInrRate,
+    paid_usd_inr_rate: input.paidUsdInrRate,
+    pf_inr_cents: input.pfInrCents,
+    tds_inr_cents: input.tdsInrCents,
+    actual_paid_inr_cents: input.actualPaidInrCents,
+    fx_commission_inr_cents: computed.fxCommissionInrCents,
+    total_commission_usd_cents: computed.totalCommissionUsdCents,
+    commission_earned_inr_cents: computed.commissionEarnedInrCents,
+    updated_at: nowIso(),
+  });
 
   return mapEmployeePayout(updated as DbEmployeePayout);
 }
@@ -1361,14 +1463,9 @@ export async function addEmployeePayoutRow(input: {
     updated_at: nowIso(),
   };
 
-  const { data, error } = await supabase
-    .from("employee_payouts")
-    .insert(payload)
-    .select()
-    .single();
-  if (error) throw error;
+  const inserted = await insertEmployeePayoutWithSchemaFallback(payload);
 
-  return mapEmployeePayout(data as DbEmployeePayout);
+  return mapEmployeePayout(inserted);
 }
 
 export async function markEmployeePayoutPaid(input: {
@@ -1397,6 +1494,150 @@ export async function markEmployeePayoutPaid(input: {
     })
     .eq("id", input.payoutId);
   if (error) throw error;
+}
+
+export async function upsertDashboardExpense(input: {
+  companyId: string;
+  periodType: PnPeriodType;
+  year: number;
+  month?: number;
+  amountInrCents: number;
+}) {
+  const supabase = getSupabaseOrThrow();
+  if (input.periodType === "monthly" && !input.month) {
+    throw new Error("Month is required for monthly expenses.");
+  }
+  if (input.periodType === "yearly" && input.month) {
+    throw new Error("Month is not allowed for yearly expenses.");
+  }
+
+  const monthValue = input.periodType === "monthly" ? input.month ?? null : null;
+
+  const { data: existingRow, error: existingError } = await supabase
+    .from("dashboard_expenses")
+    .select("id")
+    .eq("company_id", input.companyId)
+    .eq("period_type", input.periodType)
+    .eq("year", input.year)
+    .is("month", monthValue)
+    .maybeSingle();
+  if (existingError) throw existingError;
+
+  if (existingRow?.id) {
+    const { error } = await supabase
+      .from("dashboard_expenses")
+      .update({
+        amount_inr_cents: input.amountInrCents,
+        updated_at: nowIso(),
+      })
+      .eq("id", String(existingRow.id));
+    if (error) throw error;
+    return;
+  }
+
+  const { error } = await supabase.from("dashboard_expenses").insert({
+    id: nextId("dashboard_expense"),
+    company_id: input.companyId,
+    period_type: input.periodType,
+    year: input.year,
+    month: monthValue,
+    amount_inr_cents: input.amountInrCents,
+    created_at: nowIso(),
+    updated_at: nowIso(),
+  });
+  if (error) throw error;
+}
+
+export async function getPnDashboardData(input: {
+  companyId: string;
+  periodType: PnPeriodType;
+  employeeIds?: string[];
+}): Promise<PnDashboardData> {
+  const supabase = getSupabaseOrThrow();
+  let payoutQuery = supabase
+    .from("employee_payouts")
+    .select("*")
+    .eq("company_id", input.companyId);
+
+  if (input.employeeIds && input.employeeIds.length > 0) {
+    payoutQuery = payoutQuery.in("employee_id", input.employeeIds);
+  }
+
+  const { data: payoutRows, error: payoutError } = await payoutQuery;
+  if (payoutError) throw payoutError;
+
+  const payouts = (payoutRows ?? []).map((row) => mapEmployeePayout(row as DbEmployeePayout));
+  if (payouts.length === 0) {
+    return {
+      companyId: input.companyId,
+      employeeSections: [],
+      periodRows: [],
+    };
+  }
+
+  const invoiceIds = [...new Set(payouts.map((row) => row.invoiceId))];
+  const { data: invoiceRows, error: invoiceError } = await supabase
+    .from("invoices")
+    .select("id, month, year")
+    .in("id", invoiceIds);
+  if (invoiceError) throw invoiceError;
+
+  const invoicePeriodMap = new Map<string, { month: number; year: number }>();
+  for (const row of invoiceRows ?? []) {
+    invoicePeriodMap.set(String(row.id), {
+      month: Number(row.month),
+      year: Number(row.year),
+    });
+  }
+
+  const { data: expenseRows, error: expenseError } = await supabase
+    .from("dashboard_expenses")
+    .select("*")
+    .eq("company_id", input.companyId)
+    .eq("period_type", input.periodType);
+  if (expenseError) throw expenseError;
+
+  const expenseByKey = new Map<string, number>();
+  for (const row of (expenseRows ?? []) as DbDashboardExpense[]) {
+    const key =
+      row.period_type === "monthly"
+        ? `${row.year}-${String(row.month).padStart(2, "0")}`
+        : `${row.year}`;
+    expenseByKey.set(key, Number(row.amount_inr_cents));
+  }
+
+  const sourceRows: PnSourceRow[] = payouts
+    .map((row) => {
+      const period = invoicePeriodMap.get(row.invoiceId);
+      if (!period) return undefined;
+      return {
+        employeeId: row.employeeId,
+        employeeName: row.employeeNameSnapshot,
+        year: period.year,
+        month: period.month,
+        dollarInwardUsdCents: row.dollarInwardUsdCents,
+        employeeMonthlyUsdCents: row.employeeMonthlyUsdCents,
+        cashoutUsdInrRate: row.cashoutUsdInrRate,
+        paidUsdInrRate: row.paidUsdInrRate ?? 0,
+        pfInrCents: row.pfInrCents,
+        tdsInrCents: row.tdsInrCents,
+        actualPaidInrCents: row.actualPaidInrCents,
+        fxCommissionInrCents: row.fxCommissionInrCents ?? 0,
+        totalCommissionUsdCents: row.totalCommissionUsdCents,
+        commissionEarnedInrCents: row.commissionEarnedInrCents ?? 0,
+      };
+    })
+    .filter(Boolean) as PnSourceRow[];
+
+  return {
+    companyId: input.companyId,
+    employeeSections: buildPnEmployeeSections(sourceRows),
+    periodRows: buildPnPeriodRows({
+      rows: sourceRows,
+      periodType: input.periodType,
+      expenseByKey,
+    }),
+  };
 }
 
 export async function getInvoiceDetail(
