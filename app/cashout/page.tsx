@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { Shell } from "../_components/shell";
 import { GlassPanel } from "../_components/glass-panel";
+import { PendingSubmitButton } from "../_components/pending-submit-button";
 import { cashOutInvoiceAction } from "@/src/features/billing/actions";
 import { filterCashoutEligibleInvoices } from "@/src/features/billing/invoice-workflow";
 import { listCompanies, listInvoices } from "@/src/features/billing/store";
@@ -162,9 +163,11 @@ export default async function CashoutPage({
                             color: "var(--text-primary)",
                           }}
                         />
-                        <button type="submit" className="gradient-btn">
-                          Mark cashout
-                        </button>
+                        <PendingSubmitButton
+                          className="gradient-btn"
+                          defaultText="Mark cashout"
+                          pendingText="Saving cashout..."
+                        />
                       </form>
                     </div>
                   </td>

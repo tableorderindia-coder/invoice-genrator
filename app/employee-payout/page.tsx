@@ -1,6 +1,8 @@
 import { Shell } from "../_components/shell";
 import { GlassPanel } from "../_components/glass-panel";
 import { inputClass } from "../_components/field";
+import { PendingActionButton } from "../_components/pending-action-button";
+import { PendingSubmitButton } from "../_components/pending-submit-button";
 import {
   addEmployeePayoutRowAction,
   markEmployeePayoutPaidAction,
@@ -92,9 +94,11 @@ export default async function EmployeePayoutPage({
                 )}
               </select>
             </label>
-            <button type="submit" className="btn-outline">
-              Load invoice employees
-            </button>
+            <PendingSubmitButton
+              className="btn-outline"
+              defaultText="Load invoice employees"
+              pendingText="Loading..."
+            />
           </form>
         </div>
 
@@ -151,13 +155,12 @@ export default async function EmployeePayoutPage({
                     ))
                   )}
                 </select>
-                <button
-                  type="submit"
+                <PendingSubmitButton
                   className="gradient-btn"
                   disabled={addableEmployees.length === 0}
-                >
-                  + Add employee
-                </button>
+                  defaultText="+ Add employee"
+                  pendingText="Adding..."
+                />
               </form>
             </div>
 
@@ -353,16 +356,22 @@ export default async function EmployeePayoutPage({
                       </td>
                       <td>
                         <div className="flex flex-wrap gap-2">
-                          <button type="submit" form={formId} className="btn-outline">
-                            Update
-                          </button>
+                          <PendingActionButton
+                            form={formId}
+                            className="btn-outline"
+                            defaultText="Update"
+                            pendingText="Updating..."
+                          />
                           <form action={markEmployeePayoutPaidAction}>
                             <input type="hidden" name="payoutId" value={row.id} />
                             <input type="hidden" name="returnTo" value={returnTo} />
                             <input type="hidden" name="paidAt" value={todayIso()} />
-                            <button type="submit" className="gradient-btn" disabled={row.isPaid}>
-                              {row.isPaid ? "Paid" : "Mark paid"}
-                            </button>
+                            <PendingSubmitButton
+                              className="gradient-btn"
+                              disabled={row.isPaid}
+                              defaultText={row.isPaid ? "Paid" : "Mark paid"}
+                              pendingText="Marking..."
+                            />
                           </form>
                         </div>
                       </td>

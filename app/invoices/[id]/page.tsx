@@ -19,14 +19,10 @@ export default async function LegacyInvoiceRoute({
     redirect("/invoices");
   }
 
-  if (detail.invoice.status === "draft") {
-    const requestedTeamId = Array.isArray(teamId) ? teamId[0] : teamId;
-    redirect(
-      requestedTeamId
-        ? `/invoices/drafts/${id}?teamId=${requestedTeamId}`
-        : `/invoices/drafts/${id}`,
-    );
-  }
-
-  redirect("/invoices");
+  const requestedTeamId = Array.isArray(teamId) ? teamId[0] : teamId;
+  redirect(
+    requestedTeamId
+      ? `/invoices/drafts/${id}?teamId=${requestedTeamId}`
+      : `/invoices/drafts/${id}`,
+  );
 }

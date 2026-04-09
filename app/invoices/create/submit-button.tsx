@@ -1,18 +1,13 @@
 "use client";
 
-import { useFormStatus } from "react-dom";
+import { PendingSubmitButton } from "@/app/_components/pending-submit-button";
 
 export function CreateInvoiceSubmitButton() {
-  const { pending } = useFormStatus();
-
   return (
-    <button
-      type="submit"
+    <PendingSubmitButton
       className="gradient-btn mt-6"
-      disabled={pending}
-      style={pending ? { opacity: 0.6, cursor: "not-allowed" } : undefined}
-    >
-      {pending ? "Creating..." : "Create draft"}
-    </button>
+      defaultText="Create draft"
+      pendingText="Creating..."
+    />
   );
 }

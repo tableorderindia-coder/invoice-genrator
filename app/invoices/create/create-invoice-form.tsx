@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { Field, inputClass } from "../../_components/field";
 
@@ -30,14 +30,14 @@ export function CreateInvoiceForm(props: CreateInvoiceFormProps) {
   );
   const availableTeamNames = props.availableTeamNamesByCompany[companyId] ?? [];
 
-  useEffect(() => {
-    const parsedMonth = Number.parseInt(month, 10);
-    const parsedYear = Number.parseInt(year, 10);
+  const syncBillingDuration = (nextMonth: string, nextYear: string) => {
+    const parsedMonth = Number.parseInt(nextMonth, 10);
+    const parsedYear = Number.parseInt(nextYear, 10);
     const nextBillingDuration = buildDefaultBillingDuration(parsedMonth, parsedYear);
     if (nextBillingDuration) {
       setBillingDuration(nextBillingDuration);
     }
-  }, [month, year]);
+  };
 
   return (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -63,7 +63,11 @@ export function CreateInvoiceForm(props: CreateInvoiceFormProps) {
           min="1"
           max="12"
           value={month}
-          onChange={(event) => setMonth(event.target.value)}
+          onChange={(event) => {
+            const nextMonth = event.target.value;
+            setMonth(nextMonth);
+            syncBillingDuration(nextMonth, year);
+          }}
           required
           className={inputClass}
         />
@@ -73,7 +77,11 @@ export function CreateInvoiceForm(props: CreateInvoiceFormProps) {
           name="year"
           type="number"
           value={year}
-          onChange={(event) => setYear(event.target.value)}
+          onChange={(event) => {
+            const nextYear = event.target.value;
+            setYear(nextYear);
+            syncBillingDuration(month, nextYear);
+          }}
           required
           className={inputClass}
         />

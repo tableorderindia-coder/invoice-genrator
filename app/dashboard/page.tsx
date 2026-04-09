@@ -1,6 +1,8 @@
 import { GlassPanel } from "../_components/glass-panel";
 import { Shell } from "../_components/shell";
 import { inputClass } from "../_components/field";
+import { PendingActionButton } from "../_components/pending-action-button";
+import { PendingSubmitButton } from "../_components/pending-submit-button";
 import {
   saveDashboardExpenseAction,
   updateEmployeePayoutAction,
@@ -125,9 +127,11 @@ export default async function DashboardPage({
           <div className="flex gap-2">
             <input type="hidden" name="periodType" value={periodType} />
             <input type="hidden" name="view" value={view} />
-            <button type="submit" className="gradient-btn">
-              Load company
-            </button>
+            <PendingSubmitButton
+              className="gradient-btn"
+              defaultText="Load company"
+              pendingText="Loading..."
+            />
           </div>
         </form>
         {flashMessage ? (
@@ -158,22 +162,20 @@ export default async function DashboardPage({
             <input key={employeeId} type="hidden" name="employeeIds" value={employeeId} />
           ))}
           {allEmployeesSelected ? <input type="hidden" name="allEmployees" value="1" /> : null}
-          <button
-            type="submit"
+          <PendingSubmitButton
             name="view"
             value="employee"
             className={view === "employee" ? "gradient-btn" : "btn-outline"}
-          >
-            Employee
-          </button>
-          <button
-            type="submit"
+            defaultText="Employee"
+            pendingText="Loading view..."
+          />
+          <PendingSubmitButton
             name="view"
             value="period"
             className={view === "period" ? "gradient-btn" : "btn-outline"}
-          >
-            Monthly / Yearly
-          </button>
+            defaultText="Monthly / Yearly"
+            pendingText="Loading view..."
+          />
         </form>
       </GlassPanel>
 
@@ -208,9 +210,11 @@ export default async function DashboardPage({
               <input type="checkbox" name="allEmployees" value="1" defaultChecked={allEmployeesSelected} />
               Select all employees
             </label>
-            <button type="submit" className="btn-outline">
-              Apply employee filter
-            </button>
+            <PendingSubmitButton
+              className="btn-outline"
+              defaultText="Apply employee filter"
+              pendingText="Applying..."
+            />
           </form>
 
           <div className="space-y-6">
@@ -352,9 +356,12 @@ export default async function DashboardPage({
                           <td>{formatInr(row.commissionEarnedInrCents)}</td>
                           <td>{formatInr(row.grossEarningsInrCents)}</td>
                           <td>
-                            <button type="submit" form={`dashboard-payout-${row.payoutId}`} className="btn-outline">
-                              Update
-                            </button>
+                            <PendingActionButton
+                              form={`dashboard-payout-${row.payoutId}`}
+                              className="btn-outline"
+                              defaultText="Update"
+                              pendingText="Updating..."
+                            />
                           </td>
                         </tr>
                       ))}
@@ -382,22 +389,20 @@ export default async function DashboardPage({
               <input key={employeeId} type="hidden" name="employeeIds" value={employeeId} />
             ))}
             {allEmployeesSelected ? <input type="hidden" name="allEmployees" value="1" /> : null}
-            <button
-              type="submit"
+            <PendingSubmitButton
               name="periodType"
               value="monthly"
               className={periodType === "monthly" ? "gradient-btn" : "btn-outline"}
-            >
-              Monthly
-            </button>
-            <button
-              type="submit"
+              defaultText="Monthly"
+              pendingText="Loading period..."
+            />
+            <PendingSubmitButton
               name="periodType"
               value="yearly"
               className={periodType === "yearly" ? "gradient-btn" : "btn-outline"}
-            >
-              Yearly
-            </button>
+              defaultText="Yearly"
+              pendingText="Loading period..."
+            />
           </form>
 
           <div className="overflow-x-auto rounded-2xl" style={{ border: "1px solid var(--glass-border)" }}>
@@ -459,9 +464,11 @@ export default async function DashboardPage({
                               color: "var(--text-primary)",
                             }}
                           />
-                          <button type="submit" className="btn-outline">
-                            Save
-                          </button>
+                          <PendingSubmitButton
+                            className="btn-outline"
+                            defaultText="Save"
+                            pendingText="Saving..."
+                          />
                         </form>
                       </td>
                       <td>{formatInr(row.netPlInrCents)}</td>

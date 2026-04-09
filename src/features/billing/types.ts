@@ -44,6 +44,7 @@ export type Invoice = {
   subtotalUsdCents: number;
   adjustmentsUsdCents: number;
   grandTotalUsdCents: number;
+  manualGrandTotalUsdCents?: number;
   sourceInvoiceId?: string;
   pdfPath?: string;
   createdAt: string;
@@ -55,6 +56,8 @@ export type InvoiceTeam = {
   invoiceId: string;
   teamName: string;
   sortOrder: number;
+  manualTotalUsdCents?: number;
+  totalUsdCents?: number;
 };
 
 export type InvoiceLineItem = {
@@ -68,6 +71,7 @@ export type InvoiceLineItem = {
   payoutMonthlyUsdCentsSnapshot: number;
   hrsPerWeek: number;
   billedTotalUsdCents: number;
+  manualTotalUsdCents?: number;
   payoutTotalUsdCents: number;
   profitTotalUsdCents: number;
 };

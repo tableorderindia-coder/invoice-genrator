@@ -1,9 +1,11 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 
 import { Shell } from "../../../_components/shell";
 import { GlassPanel } from "../../../_components/glass-panel";
 import { inputClass } from "../../../_components/field";
+import { PendingActionButton } from "../../../_components/pending-action-button";
+import { PendingSubmitButton } from "../../../_components/pending-submit-button";
 import { AdjustmentForms } from "./adjustment-forms";
 import {
   addInvoiceAdjustmentAction,
@@ -12,7 +14,11 @@ import {
   deleteInvoiceAdjustmentAction,
   deleteInvoiceLineItemAction,
   deleteInvoiceTeamAction,
+  updateInvoiceGrandTotalAction,
+  updateInvoiceLineItemTotalAction,
   updateInvoiceNoteAction,
+  updateInvoiceTeamTotalAction,
+  updateInvoiceAdjustmentAmountAction,
   updateInvoiceLineItemAction,
   updateInvoiceStatusAction,
 } from "@/src/features/billing/actions";
@@ -43,10 +49,6 @@ export default async function DraftInvoicePage({
 
   if (!detail) {
     notFound();
-  }
-
-  if (detail.invoice.status !== "draft") {
-    redirect("/invoices");
   }
 
   const availableTeamNames = await listAvailableTeamNames(detail.company.id);
@@ -83,9 +85,9 @@ export default async function DraftInvoicePage({
                 </p>
               </div>
               <div className="text-right">
-                <span className="status-badge status-draft">
+                <span className={`status-badge status-${detail.invoice.status.replace("_", "-")}`}>
                   <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: "currentColor" }} />
-                  draft
+                  {detail.invoice.status}
                 </span>
                 <p
                   className="mt-3 text-3xl font-semibold"
@@ -110,13 +112,35 @@ export default async function DraftInvoicePage({
                 </svg>
                 Open PDF
               </Link>
-              <form action={updateInvoiceStatusAction}>
+              {detail.invoice.status === "draft" ? (
+                <form action={updateInvoiceStatusAction}>
+                  <input type="hidden" name="invoiceId" value={detail.invoice.id} />
+                  <input type="hidden" name="status" value="generated" />
+                  <input type="hidden" name="returnTo" value={returnTo} />
+                  <PendingSubmitButton
+                    className="gradient-btn"
+                    defaultText="Mark generated"
+                    pendingText="Marking..."
+                  />
+                </form>
+              ) : null}
+              <form action={updateInvoiceGrandTotalAction} className="flex items-center gap-2">
                 <input type="hidden" name="invoiceId" value={detail.invoice.id} />
-                <input type="hidden" name="status" value="generated" />
                 <input type="hidden" name="returnTo" value={returnTo} />
-                <button type="submit" className="gradient-btn">
-                  Mark generated
-                </button>
+                <input
+                  name="grandTotalUsd"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  defaultValue={(detail.invoice.grandTotalUsdCents / 100).toFixed(2)}
+                  className={inputClass}
+                  style={{ minWidth: "8rem" }}
+                />
+                <PendingSubmitButton
+                  className="btn-outline"
+                  defaultText="Update grand total"
+                  pendingText="Updating..."
+                />
               </form>
             </div>
           </GlassPanel>
@@ -170,14 +194,35 @@ export default async function DraftInvoicePage({
                       <p className="text-sm" style={{ color: "var(--text-muted)" }}>
                         {team.lineItems.length} members in this invoice snapshot
                       </p>
+                      <form action={updateInvoiceTeamTotalAction} className="mt-2 flex items-center gap-2">
+                        <input type="hidden" name="invoiceId" value={detail.invoice.id} />
+                        <input type="hidden" name="invoiceTeamId" value={team.id} />
+                        <input type="hidden" name="returnTo" value={returnTo} />
+                        <input
+                          name="teamTotalUsd"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          defaultValue={((team.totalUsdCents ?? 0) / 100).toFixed(2)}
+                          className={inputClass}
+                          style={{ minWidth: "8rem" }}
+                        />
+                        <PendingSubmitButton
+                          className="btn-outline"
+                          defaultText="Update team total"
+                          pendingText="Updating..."
+                        />
+                      </form>
                     </div>
                     <form action={deleteInvoiceTeamAction}>
                       <input type="hidden" name="invoiceId" value={detail.invoice.id} />
                       <input type="hidden" name="invoiceTeamId" value={team.id} />
                       <input type="hidden" name="returnTo" value={returnTo} />
-                      <button type="submit" className="btn-outline">
-                        Remove team
-                      </button>
+                      <PendingSubmitButton
+                        className="btn-outline"
+                        defaultText="Remove team"
+                        pendingText="Removing..."
+                      />
                     </form>
                   </div>
 
@@ -224,20 +269,43 @@ export default async function DraftInvoicePage({
                               />
                             </td>
                             <td style={{ fontFamily: "var(--font-jetbrains-mono), monospace" }}>
-                              {formatUsd(lineItem.billedTotalUsdCents)}
+                              <form action={updateInvoiceLineItemTotalAction} className="flex items-center gap-2">
+                                <input type="hidden" name="invoiceId" value={detail.invoice.id} />
+                                <input type="hidden" name="lineItemId" value={lineItem.id} />
+                                <input type="hidden" name="returnTo" value={returnTo} />
+                                <input
+                                  name="billedTotalUsd"
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  defaultValue={(lineItem.billedTotalUsdCents / 100).toFixed(2)}
+                                  className={inputClass}
+                                  style={{ minWidth: "8rem" }}
+                                />
+                                <PendingSubmitButton
+                                  className="btn-outline"
+                                  defaultText="Update total"
+                                  pendingText="Updating..."
+                                />
+                              </form>
                             </td>
                             <td>
                               <div className="flex flex-wrap gap-2">
-                                <button type="submit" form={`line-item-${lineItem.id}`} className="btn-outline">
-                                  Update
-                                </button>
+                                <PendingActionButton
+                                  form={`line-item-${lineItem.id}`}
+                                  className="btn-outline"
+                                  defaultText="Update"
+                                  pendingText="Updating..."
+                                />
                                 <form action={deleteInvoiceLineItemAction}>
                                   <input type="hidden" name="invoiceId" value={detail.invoice.id} />
                                   <input type="hidden" name="lineItemId" value={lineItem.id} />
                                   <input type="hidden" name="returnTo" value={returnTo} />
-                                  <button type="submit" className="btn-outline">
-                                    Remove member
-                                  </button>
+                                  <PendingSubmitButton
+                                    className="btn-outline"
+                                    defaultText="Remove member"
+                                    pendingText="Removing..."
+                                  />
                                 </form>
                               </div>
                             </td>
@@ -283,14 +351,13 @@ export default async function DraftInvoicePage({
                               ))
                             )}
                           </select>
-                          <button
-                            type="submit"
+                          <PendingSubmitButton
                             className="gradient-btn"
                             disabled={eligibleEmployees.length === 0}
                             style={eligibleEmployees.length === 0 ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
-                          >
-                            Add member to {team.teamName}
-                          </button>
+                            defaultText={`Add member to ${team.teamName}`}
+                            pendingText="Adding member..."
+                          />
                         </form>
                       );
                     })()}
@@ -340,14 +407,13 @@ export default async function DraftInvoicePage({
                   ))
                 )}
               </select>
-              <button
-                type="submit"
+              <PendingSubmitButton
                 className="gradient-btn w-full"
                 disabled={remainingTeamNames.length === 0}
                 style={remainingTeamNames.length === 0 ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
-              >
-                Add selected team
-              </button>
+                defaultText="Add selected team"
+                pendingText="Adding team..."
+              />
             </form>
           </GlassPanel>
 
@@ -360,9 +426,11 @@ export default async function DraftInvoicePage({
               <input type="hidden" name="companyId" value={detail.company.id} />
               <input type="hidden" name="returnTo" value={returnTo} />
               <input name="newTeamName" required placeholder="Operations" className={inputClass} />
-              <button type="submit" className="gradient-btn w-full">
-                Create team and add to invoice
-              </button>
+              <PendingSubmitButton
+                className="gradient-btn w-full"
+                defaultText="Create team and add to invoice"
+                pendingText="Creating team..."
+              />
             </form>
           </GlassPanel>
 
@@ -382,6 +450,7 @@ export default async function DraftInvoicePage({
                 adjustments={detail.adjustments}
                 addAction={addInvoiceAdjustmentAction}
                 deleteAction={deleteInvoiceAdjustmentAction}
+                updateAmountAction={updateInvoiceAdjustmentAmountAction}
               />
             </div>
           </GlassPanel>
@@ -394,9 +463,11 @@ export default async function DraftInvoicePage({
               <input type="hidden" name="invoiceId" value={detail.invoice.id} />
               <input type="hidden" name="returnTo" value={returnTo} />
               <textarea name="noteText" defaultValue={detail.invoice.noteText} rows={5} className={inputClass} />
-              <button type="submit" className="btn-outline w-full">
-                Save note
-              </button>
+              <PendingSubmitButton
+                className="btn-outline w-full"
+                defaultText="Save note"
+                pendingText="Saving note..."
+              />
             </form>
           </GlassPanel>
         </div>

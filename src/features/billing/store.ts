@@ -2,9 +2,11 @@ import { createSupabaseServerClient } from "@/src/lib/supabase/server";
 import { getSupabaseMode } from "@/src/lib/supabase/config";
 import {
   calculateEmployeePayoutMetrics,
-  calculateInvoiceTotals,
   calculateLineItemTotals,
   createRealizationRecord,
+  resolveEffectiveLineItemTotalUsdCents,
+  resolveEffectiveTeamTotalUsdCents,
+  sortInvoiceLineItemsByRate,
 } from "./domain";
 import {
   assertNoCaseInsensitiveDuplicate,
@@ -54,6 +56,7 @@ type DbInvoice = {
   subtotal_usd_cents: number;
   adjustments_usd_cents: number;
   grand_total_usd_cents: number;
+  manual_grand_total_usd_cents: number | null;
   source_invoice_id: string | null;
   pdf_path: string | null;
   created_at: string;
@@ -95,6 +98,7 @@ type DbInvoiceTeam = {
   invoice_id: string;
   team_name: string;
   sort_order: number;
+  manual_total_usd_cents: number | null;
 };
 
 type DbInvoiceLineItem = {
@@ -108,6 +112,7 @@ type DbInvoiceLineItem = {
   payout_monthly_usd_cents_snapshot: number;
   hrs_per_week: number;
   billed_total_usd_cents: number;
+  manual_total_usd_cents: number | null;
   payout_total_usd_cents: number;
   profit_total_usd_cents: number;
 };
@@ -426,6 +431,7 @@ function mapInvoice(row: DbInvoice): Invoice {
     subtotalUsdCents: row.subtotal_usd_cents,
     adjustmentsUsdCents: row.adjustments_usd_cents,
     grandTotalUsdCents: row.grand_total_usd_cents,
+    manualGrandTotalUsdCents: row.manual_grand_total_usd_cents ?? undefined,
     sourceInvoiceId: row.source_invoice_id ?? undefined,
     pdfPath: row.pdf_path ?? undefined,
     createdAt: row.created_at,
@@ -439,6 +445,7 @@ function mapInvoiceTeam(row: DbInvoiceTeam): InvoiceTeam {
     invoiceId: row.invoice_id,
     teamName: row.team_name,
     sortOrder: row.sort_order,
+    manualTotalUsdCents: row.manual_total_usd_cents ?? undefined,
   };
 }
 
@@ -454,6 +461,7 @@ function mapInvoiceLineItem(row: DbInvoiceLineItem): InvoiceLineItem {
     payoutMonthlyUsdCentsSnapshot: row.payout_monthly_usd_cents_snapshot,
     hrsPerWeek: Number(row.hrs_per_week),
     billedTotalUsdCents: row.billed_total_usd_cents,
+    manualTotalUsdCents: row.manual_total_usd_cents ?? undefined,
     payoutTotalUsdCents: row.payout_total_usd_cents,
     profitTotalUsdCents: row.profit_total_usd_cents,
   };
@@ -523,15 +531,19 @@ function mapEmployeePayout(row: DbEmployeePayout): EmployeePayout {
   };
 }
 
-async function recomputeSupabaseInvoice(invoiceId: string) {
+async function recomputeSupabaseInvoice(
+  invoiceId: string,
+  options?: { clearTeamManualTotals?: boolean; clearGrandManualTotal?: boolean },
+) {
   const supabase = getSupabaseOrThrow();
   const { data: teamRows, error: teamError } = await supabase
     .from("invoice_teams")
-    .select("id")
+    .select("*")
     .eq("invoice_id", invoiceId);
   if (teamError) throw teamError;
 
-  const teamIds = (teamRows ?? []).map((team) => team.id as string);
+  const mappedTeams = (teamRows ?? []).map((team) => mapInvoiceTeam(team as DbInvoiceTeam));
+  const teamIds = mappedTeams.map((team) => team.id);
 
   const { data: lineRows, error: lineError } = teamIds.length
     ? await supabase
@@ -540,6 +552,9 @@ async function recomputeSupabaseInvoice(invoiceId: string) {
         .in("invoice_team_id", teamIds)
     : { data: [], error: null };
   if (lineError) throw lineError;
+  const mappedLineItems = (lineRows ?? []).map((row) =>
+    mapInvoiceLineItem(row as DbInvoiceLineItem),
+  );
 
   const { data: adjustmentRows, error: adjustmentError } = await supabase
     .from("invoice_adjustments")
@@ -547,21 +562,67 @@ async function recomputeSupabaseInvoice(invoiceId: string) {
     .eq("invoice_id", invoiceId);
   if (adjustmentError) throw adjustmentError;
 
-  const totals = calculateInvoiceTotals({
-    lineItems: (lineRows ?? []).map((row) =>
-      mapInvoiceLineItem(row as DbInvoiceLineItem),
-    ),
-    adjustments: (adjustmentRows ?? []).map((row) =>
-      Number(row.amount_usd_cents),
-    ),
-  });
+  const { data: invoiceRow, error: invoiceError } = await supabase
+    .from("invoices")
+    .select("manual_grand_total_usd_cents")
+    .eq("id", invoiceId)
+    .single();
+  if (invoiceError) throw invoiceError;
+
+  const lineItemsByTeam = new Map<string, InvoiceLineItem[]>();
+  for (const lineItem of mappedLineItems) {
+    const current = lineItemsByTeam.get(lineItem.invoiceTeamId) ?? [];
+    current.push(lineItem);
+    lineItemsByTeam.set(lineItem.invoiceTeamId, current);
+  }
+
+  let subtotalUsdCents = 0;
+  for (const team of mappedTeams) {
+    const lineItems = lineItemsByTeam.get(team.id) ?? [];
+    const effectiveLineTotals = lineItems.map((lineItem) =>
+      resolveEffectiveLineItemTotalUsdCents({
+        formulaTotalUsdCents: lineItem.billedTotalUsdCents,
+        manualTotalUsdCents: lineItem.manualTotalUsdCents,
+      }),
+    );
+    subtotalUsdCents += resolveEffectiveTeamTotalUsdCents({
+      lineItemTotalsUsdCents: effectiveLineTotals,
+      manualTotalUsdCents:
+        options?.clearTeamManualTotals === true ? undefined : team.manualTotalUsdCents,
+    });
+  }
+
+  const adjustmentsUsdCents = (adjustmentRows ?? []).reduce(
+    (sum, row) => sum + Number(row.amount_usd_cents),
+    0,
+  );
+
+  const invoiceManualGrandTotal = Number(invoiceRow.manual_grand_total_usd_cents ?? 0);
+  const useManualGrandTotal =
+    options?.clearGrandManualTotal !== true &&
+    invoiceRow.manual_grand_total_usd_cents !== null;
+  const grandTotalUsdCents = useManualGrandTotal
+    ? invoiceManualGrandTotal
+    : subtotalUsdCents + adjustmentsUsdCents;
+
+  if (options?.clearTeamManualTotals === true) {
+    const { error: clearTeamError } = await supabase
+      .from("invoice_teams")
+      .update({ manual_total_usd_cents: null })
+      .eq("invoice_id", invoiceId);
+    if (clearTeamError) throw clearTeamError;
+  }
 
   const { error: updateError } = await supabase
     .from("invoices")
     .update({
-      subtotal_usd_cents: totals.subtotalUsdCents,
-      adjustments_usd_cents: totals.adjustmentsUsdCents,
-      grand_total_usd_cents: totals.grandTotalUsdCents,
+      subtotal_usd_cents: subtotalUsdCents,
+      adjustments_usd_cents: adjustmentsUsdCents,
+      grand_total_usd_cents: grandTotalUsdCents,
+      manual_grand_total_usd_cents:
+        options?.clearGrandManualTotal === true
+          ? null
+          : invoiceRow.manual_grand_total_usd_cents,
       updated_at: nowIso(),
     })
     .eq("id", invoiceId);
@@ -794,6 +855,7 @@ export async function createInvoiceDraft(input: {
     subtotal_usd_cents: 0,
     adjustments_usd_cents: 0,
     grand_total_usd_cents: 0,
+    manual_grand_total_usd_cents: null,
     source_invoice_id: input.duplicateSourceId ?? null,
     pdf_path: `/api/invoices/${invoiceId}/pdf`,
     created_at: nowIso(),
@@ -1001,6 +1063,7 @@ export async function addInvoiceTeam(
     invoice_id: invoiceId,
     team_name: teamName,
     sort_order: (count ?? 0) + 1,
+    manual_total_usd_cents: null,
   };
 
   const { data, error } = await supabase
@@ -1038,7 +1101,10 @@ export async function addInvoiceTeam(
     }
   }
 
-  await recomputeSupabaseInvoice(invoiceId);
+  await recomputeSupabaseInvoice(invoiceId, {
+    clearTeamManualTotals: true,
+    clearGrandManualTotal: true,
+  });
   return mappedTeam;
 }
 
@@ -1051,7 +1117,10 @@ export async function deleteInvoiceTeam(invoiceId: string, invoiceTeamId: string
     .eq("invoice_id", invoiceId);
   if (error) throw error;
 
-  await recomputeSupabaseInvoice(invoiceId);
+  await recomputeSupabaseInvoice(invoiceId, {
+    clearTeamManualTotals: true,
+    clearGrandManualTotal: true,
+  });
 }
 
 export async function addInvoiceLineItem(input: {
@@ -1111,6 +1180,7 @@ export async function addInvoiceLineItem(input: {
     payout_monthly_usd_cents_snapshot: payoutMonthlyUsdCents,
     hrs_per_week: input.hrsPerWeek,
     billed_total_usd_cents: calculated.billedTotalUsdCents,
+    manual_total_usd_cents: null,
     payout_total_usd_cents: calculated.payoutTotalUsdCents,
     profit_total_usd_cents: calculated.profitTotalUsdCents,
   };
@@ -1122,7 +1192,10 @@ export async function addInvoiceLineItem(input: {
     .single();
   if (error) throw error;
 
-  await recomputeSupabaseInvoice(input.invoiceId);
+  await recomputeSupabaseInvoice(input.invoiceId, {
+    clearTeamManualTotals: true,
+    clearGrandManualTotal: true,
+  });
   return mapInvoiceLineItem(data as DbInvoiceLineItem);
 }
 
@@ -1134,7 +1207,10 @@ export async function deleteInvoiceLineItem(invoiceId: string, lineItemId: strin
     .eq("id", lineItemId);
   if (error) throw error;
 
-  await recomputeSupabaseInvoice(invoiceId);
+  await recomputeSupabaseInvoice(invoiceId, {
+    clearTeamManualTotals: true,
+    clearGrandManualTotal: true,
+  });
 }
 
 export async function updateInvoiceLineItem(input: {
@@ -1164,6 +1240,7 @@ export async function updateInvoiceLineItem(input: {
       billing_rate_usd_cents: input.billingRateUsdCents,
       hrs_per_week: input.hrsPerWeek,
       billed_total_usd_cents: calculated.billedTotalUsdCents,
+      manual_total_usd_cents: null,
       payout_total_usd_cents: calculated.payoutTotalUsdCents,
       profit_total_usd_cents: calculated.profitTotalUsdCents,
     })
@@ -1178,7 +1255,10 @@ export async function updateInvoiceLineItem(input: {
     .eq("id", existingLineItem.employeeId);
   if (employeeUpdateError) throw employeeUpdateError;
 
-  await recomputeSupabaseInvoice(input.invoiceId);
+  await recomputeSupabaseInvoice(input.invoiceId, {
+    clearTeamManualTotals: true,
+    clearGrandManualTotal: true,
+  });
 }
 
 export async function assignEmployeeToInvoiceTeam(input: {
@@ -1284,7 +1364,10 @@ export async function assignEmployeeToInvoiceTeam(input: {
     .eq("id", employee.id);
   if (employeeUpdateError) throw employeeUpdateError;
 
-  await recomputeSupabaseInvoice(input.invoiceId);
+  await recomputeSupabaseInvoice(input.invoiceId, {
+    clearTeamManualTotals: true,
+    clearGrandManualTotal: true,
+  });
 }
 
 export async function addInvoiceAdjustment(input: {
@@ -1393,7 +1476,10 @@ export async function addInvoiceAdjustment(input: {
     });
   }
 
-  await recomputeSupabaseInvoice(input.invoiceId);
+  await recomputeSupabaseInvoice(input.invoiceId, {
+    clearTeamManualTotals: true,
+    clearGrandManualTotal: true,
+  });
   return mapInvoiceAdjustment(data as DbInvoiceAdjustment);
 }
 
@@ -1414,7 +1500,134 @@ export async function deleteInvoiceAdjustment(invoiceId: string, adjustmentId: s
     .eq("invoice_id", invoiceId);
   if (error) throw error;
 
-  await recomputeSupabaseInvoice(invoiceId);
+  await recomputeSupabaseInvoice(invoiceId, {
+    clearTeamManualTotals: true,
+    clearGrandManualTotal: true,
+  });
+}
+
+export async function updateInvoiceLineItemTotal(input: {
+  invoiceId: string;
+  lineItemId: string;
+  billedTotalUsdCents: number;
+}) {
+  const supabase = getSupabaseOrThrow();
+  const { data: lineRow, error: lineError } = await supabase
+    .from("invoice_line_items")
+    .select("*")
+    .eq("id", input.lineItemId)
+    .single();
+  if (lineError) throw lineError;
+
+  const existingLineItem = mapInvoiceLineItem(lineRow as DbInvoiceLineItem);
+  const profitTotalUsdCents =
+    input.billedTotalUsdCents - existingLineItem.payoutTotalUsdCents;
+
+  const { error: updateError } = await supabase
+    .from("invoice_line_items")
+    .update({
+      billed_total_usd_cents: input.billedTotalUsdCents,
+      manual_total_usd_cents: input.billedTotalUsdCents,
+      profit_total_usd_cents: profitTotalUsdCents,
+    })
+    .eq("id", input.lineItemId);
+  if (updateError) throw updateError;
+
+  await recomputeSupabaseInvoice(input.invoiceId, {
+    clearGrandManualTotal: true,
+  });
+}
+
+export async function updateInvoiceTeamTotal(input: {
+  invoiceId: string;
+  invoiceTeamId: string;
+  totalUsdCents: number;
+}) {
+  const supabase = getSupabaseOrThrow();
+  const { error } = await supabase
+    .from("invoice_teams")
+    .update({
+      manual_total_usd_cents: input.totalUsdCents,
+    })
+    .eq("id", input.invoiceTeamId)
+    .eq("invoice_id", input.invoiceId);
+  if (error) throw error;
+
+  await recomputeSupabaseInvoice(input.invoiceId, {
+    clearGrandManualTotal: true,
+  });
+}
+
+export async function updateInvoiceGrandTotal(input: {
+  invoiceId: string;
+  grandTotalUsdCents: number;
+}) {
+  const supabase = getSupabaseOrThrow();
+  const { error } = await supabase
+    .from("invoices")
+    .update({
+      manual_grand_total_usd_cents: input.grandTotalUsdCents,
+      grand_total_usd_cents: input.grandTotalUsdCents,
+      updated_at: nowIso(),
+    })
+    .eq("id", input.invoiceId);
+  if (error) throw error;
+}
+
+export async function updateInvoiceAdjustmentAmount(input: {
+  invoiceId: string;
+  adjustmentId: string;
+  amountUsdCents: number;
+}) {
+  const supabase = getSupabaseOrThrow();
+  const { error } = await supabase
+    .from("invoice_adjustments")
+    .update({ amount_usd_cents: input.amountUsdCents })
+    .eq("id", input.adjustmentId)
+    .eq("invoice_id", input.invoiceId);
+  if (error) throw error;
+
+  await recomputeSupabaseInvoice(input.invoiceId, {
+    clearTeamManualTotals: true,
+    clearGrandManualTotal: true,
+  });
+}
+
+export async function updateEmployee(input: {
+  employeeId: string;
+  companyId: string;
+  fullName: string;
+  designation: string;
+  defaultTeam: string;
+  billingRateUsdCents: number;
+  payoutMonthlyUsdCents: number;
+  hrsPerWeek: number;
+  activeFrom: string;
+  activeTo?: string;
+  isActive: boolean;
+}) {
+  const supabase = getSupabaseOrThrow();
+  const payload = {
+    company_id: input.companyId,
+    full_name: input.fullName,
+    designation: input.designation,
+    default_team: input.defaultTeam,
+    billing_rate_usd_cents: input.billingRateUsdCents,
+    payout_monthly_usd_cents: input.payoutMonthlyUsdCents,
+    hrs_per_week: input.hrsPerWeek,
+    active_from: input.activeFrom,
+    active_to: input.activeTo ?? null,
+    is_active: input.isActive,
+  };
+
+  const { data, error } = await supabase
+    .from("employees")
+    .update(payload)
+    .eq("id", input.employeeId)
+    .select()
+    .single();
+  if (error) throw error;
+  return mapEmployee(data as DbEmployee);
 }
 
 export async function updateInvoiceNote(invoiceId: string, noteText: string) {
@@ -2079,12 +2292,26 @@ export async function getInvoiceDetail(
   return {
     invoice,
     company: mapCompany(companyRow as DbCompany),
-    teams: mappedTeams.map((team) => ({
-      ...team,
-      lineItems: mappedLineItems.filter(
-        (lineItem) => lineItem.invoiceTeamId === team.id,
-      ),
-    })),
+    teams: mappedTeams.map((team) => {
+      const teamLineItems = sortInvoiceLineItemsByRate(
+        mappedLineItems.filter((lineItem) => lineItem.invoiceTeamId === team.id),
+      );
+      const lineItemTotals = teamLineItems.map((lineItem) =>
+        resolveEffectiveLineItemTotalUsdCents({
+          formulaTotalUsdCents: lineItem.billedTotalUsdCents,
+          manualTotalUsdCents: lineItem.manualTotalUsdCents,
+        }),
+      );
+
+      return {
+        ...team,
+        totalUsdCents: resolveEffectiveTeamTotalUsdCents({
+          lineItemTotalsUsdCents: lineItemTotals,
+          manualTotalUsdCents: team.manualTotalUsdCents,
+        }),
+        lineItems: teamLineItems,
+      };
+    }),
     adjustments: (adjustmentRows ?? []).map((row) =>
       mapInvoiceAdjustment(row as DbInvoiceAdjustment),
     ),
