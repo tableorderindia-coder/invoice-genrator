@@ -1898,9 +1898,6 @@ export async function getPnDashboardData(input: {
         employeeName: payout.employeeNameSnapshot,
         rows: [],
         totalGrossEarningsInrCents: 0,
-        totalSecurityDepositInUsdCents: 0,
-        totalSecurityDepositOutUsdCents: 0,
-        totalSecurityDepositNetUsdCents: 0,
       } as PnEmployeeEditableSection);
 
     const fxCommissionInrCents = payout.fxCommissionInrCents ?? 0;
@@ -1911,7 +1908,6 @@ export async function getPnDashboardData(input: {
       inUsdCents: 0,
       outUsdCents: 0,
     };
-    const securityDepositNetUsdCents = security.inUsdCents - security.outUsdCents;
 
     existingSection.rows.push({
       payoutId: payout.id,
@@ -1930,90 +1926,66 @@ export async function getPnDashboardData(input: {
       totalCommissionUsdCents: payout.totalCommissionUsdCents,
       commissionEarnedInrCents,
       grossEarningsInrCents,
-      securityDepositInUsdCents: security.inUsdCents,
-      securityDepositOutUsdCents: security.outUsdCents,
-      securityDepositNetUsdCents,
+      isSecurityDepositMonth: security.inUsdCents > 0,
     });
     existingSection.totalGrossEarningsInrCents += grossEarningsInrCents;
-    existingSection.totalSecurityDepositInUsdCents += security.inUsdCents;
-    existingSection.totalSecurityDepositOutUsdCents += security.outUsdCents;
-    existingSection.totalSecurityDepositNetUsdCents += securityDepositNetUsdCents;
 
     editableSectionsMap.set(payout.employeeId, existingSection);
   }
 
   const employeeEditableSections = [...editableSectionsMap.values()]
-    .map((section) => ({
-      ...section,
-      rows: section.rows.sort((a, b) => {
+    .map((section) => {
+      const sortedRows = section.rows.sort((a, b) => {
         const left = a.year * 100 + a.month;
         const right = b.year * 100 + b.month;
         if (left !== right) return left - right;
         return a.invoiceNumber.localeCompare(b.invoiceNumber);
-      }),
-    }))
-    .sort((a, b) => a.employeeName.localeCompare(b.employeeName));
+      });
 
-  const periodSecurityMap = new Map<
-    string,
-    { inUsdCents: number; outUsdCents: number }
-  >();
-  for (const row of (securityRows ?? []) as Array<{
-    employee_id: string;
-    invoice_id: string;
-    movement_type: "credit" | "debit";
-    amount_usd_cents: number;
-  }>) {
-    if (input.employeeIds && input.employeeIds.length > 0) {
-      if (!input.employeeIds.includes(String(row.employee_id))) {
-        continue;
+      const transformedRows = sortedRows.map((row) => ({ ...row }));
+      const firstSecurityRowIndex = transformedRows.findIndex(
+        (row) => row.isSecurityDepositMonth,
+      );
+
+      if (firstSecurityRowIndex >= 0) {
+        const securityRow = transformedRows[firstSecurityRowIndex];
+        const securityKey = `${section.employeeId}|${securityRow.invoiceId}`;
+        const security = securityByEmployeeInvoice.get(securityKey) ?? {
+          inUsdCents: 0,
+          outUsdCents: 0,
+        };
+
+        securityRow.dollarInwardUsdCents = security.inUsdCents;
+        securityRow.employeeMonthlyUsdCents = 0;
+        securityRow.paidUsdInrRate = 0;
+        securityRow.totalCommissionUsdCents = security.inUsdCents;
+        securityRow.fxCommissionInrCents = 0;
+        securityRow.commissionEarnedInrCents = Math.round(
+          security.inUsdCents * securityRow.cashoutUsdInrRate,
+        );
+        securityRow.grossEarningsInrCents = securityRow.commissionEarnedInrCents;
       }
-    }
 
-    const period = invoicePeriodMap.get(String(row.invoice_id));
-    if (!period) continue;
-    const key =
-      input.periodType === "monthly"
-        ? `${period.year}-${String(period.month).padStart(2, "0")}`
-        : `${period.year}`;
-    const current = periodSecurityMap.get(key) ?? {
-      inUsdCents: 0,
-      outUsdCents: 0,
-    };
-    if (row.movement_type === "credit") {
-      current.inUsdCents += Number(row.amount_usd_cents ?? 0);
-    } else {
-      current.outUsdCents += Number(row.amount_usd_cents ?? 0);
-    }
-    periodSecurityMap.set(key, current);
-  }
-
-  const periodRows = buildPnPeriodRows({
-    rows: sourceRows,
-    periodType: input.periodType,
-    expenseByKey,
-  }).map((row) => {
-    const key =
-      input.periodType === "monthly"
-        ? `${row.year}-${String(row.month ?? 1).padStart(2, "0")}`
-        : `${row.year}`;
-    const security = periodSecurityMap.get(key) ?? {
-      inUsdCents: 0,
-      outUsdCents: 0,
-    };
-    return {
-      ...row,
-      securityDepositInUsdCents: security.inUsdCents,
-      securityDepositOutUsdCents: security.outUsdCents,
-      securityDepositNetUsdCents: security.inUsdCents - security.outUsdCents,
-    };
-  });
+      return {
+        ...section,
+        rows: transformedRows,
+        totalGrossEarningsInrCents: transformedRows.reduce(
+          (sum, row) => sum + row.grossEarningsInrCents,
+          0,
+        ),
+      };
+    })
+    .sort((a, b) => a.employeeName.localeCompare(b.employeeName));
 
   return {
     companyId: input.companyId,
     employeeEditableSections,
     employeeSections: buildPnEmployeeSections(sourceRows),
-    periodRows,
+    periodRows: buildPnPeriodRows({
+      rows: sourceRows,
+      periodType: input.periodType,
+      expenseByKey,
+    }),
   };
 }
 
