@@ -37,6 +37,7 @@ export type Invoice = {
   year: number;
   invoiceNumber: string;
   billingDate: string;
+  billingDuration?: string;
   dueDate: string;
   status: InvoiceStatus;
   noteText: string;

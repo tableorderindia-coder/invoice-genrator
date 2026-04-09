@@ -100,6 +100,7 @@ export async function createInvoiceDraftAction(formData: FormData) {
     year: Number.parseInt(getString(formData, "year"), 10),
     invoiceNumber: getString(formData, "invoiceNumber"),
     billingDate: getString(formData, "billingDate"),
+    billingDuration: getString(formData, "billingDuration") || undefined,
     dueDate: getString(formData, "dueDate"),
     duplicateSourceId: getString(formData, "duplicateSourceId") || undefined,
     selectedTeamNames,

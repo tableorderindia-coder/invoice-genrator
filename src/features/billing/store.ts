@@ -47,6 +47,7 @@ type DbInvoice = {
   year: number;
   invoice_number: string;
   billing_date: string;
+  billing_duration: string | null;
   due_date: string;
   status: InvoiceStatus;
   note_text: string;
@@ -343,6 +344,37 @@ async function updateEmployeePayoutWithSchemaFallback(
   );
 }
 
+async function insertInvoiceWithSchemaFallback(payload: Record<string, unknown>) {
+  const supabase = getSupabaseOrThrow();
+  const insertPayload = { ...payload };
+  let attemptsRemaining = 8;
+
+  while (attemptsRemaining > 0) {
+    attemptsRemaining -= 1;
+
+    const { data, error } = await supabase
+      .from("invoices")
+      .insert(insertPayload)
+      .select()
+      .single();
+
+    if (!error) {
+      return data as DbInvoice;
+    }
+
+    const missingColumn = getMissingSchemaColumn(error, "invoices");
+    if (!missingColumn || !(missingColumn in insertPayload)) {
+      throw error;
+    }
+
+    delete insertPayload[missingColumn];
+  }
+
+  throw new Error(
+    "Unable to insert invoice row because schema fallback attempts were exhausted.",
+  );
+}
+
 function mapCompany(row: DbCompany): Company {
   return {
     id: row.id,
@@ -387,6 +419,7 @@ function mapInvoice(row: DbInvoice): Invoice {
     year: row.year,
     invoiceNumber: row.invoice_number,
     billingDate: row.billing_date,
+    billingDuration: row.billing_duration ?? undefined,
     dueDate: row.due_date,
     status: row.status,
     noteText: row.note_text,
@@ -721,6 +754,7 @@ export async function createInvoiceDraft(input: {
   year: number;
   invoiceNumber: string;
   billingDate: string;
+  billingDuration?: string;
   dueDate: string;
   duplicateSourceId?: string;
   selectedTeamNames?: string[];
@@ -753,6 +787,7 @@ export async function createInvoiceDraft(input: {
     year: input.year,
     invoice_number: input.invoiceNumber,
     billing_date: input.billingDate,
+    billing_duration: input.billingDuration?.trim() || null,
     due_date: input.dueDate,
     status: "draft" as InvoiceStatus,
     note_text: company.defaultNote,
@@ -765,12 +800,7 @@ export async function createInvoiceDraft(input: {
     updated_at: nowIso(),
   };
 
-  const { data, error } = await supabase
-    .from("invoices")
-    .insert(payload)
-    .select()
-    .single();
-  if (error) throw error;
+  const data = await insertInvoiceWithSchemaFallback(payload);
 
   if (input.duplicateSourceId) {
     const sourceDetail = await getInvoiceDetail(input.duplicateSourceId);
@@ -817,7 +847,7 @@ export async function createInvoiceDraft(input: {
     }
   }
 
-  return mapInvoice(data as DbInvoice);
+  return mapInvoice(data);
 }
 
 async function resolveEmployeeForSecurityDeposit(input: {

@@ -146,10 +146,9 @@ export function buildInvoicePdfModel(detail: InvoiceDetail): PdfModel {
     invoiceDetails: {
       invoiceNumber: detail.invoice.invoiceNumber,
       invoiceDate: formatUsDate(detail.invoice.billingDate),
-      billingDuration: buildBillingDuration(
-        detail.invoice.month,
-        detail.invoice.year,
-      ),
+      billingDuration:
+        detail.invoice.billingDuration?.trim() ||
+        buildBillingDuration(detail.invoice.month, detail.invoice.year),
       dueDate: formatUsDate(detail.invoice.dueDate),
     },
     sections,

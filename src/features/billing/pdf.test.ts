@@ -19,6 +19,7 @@ const detail: InvoiceDetail = {
     year: 2026,
     invoiceNumber: "2026/006",
     billingDate: "2026-04-04",
+    billingDuration: "03/15/2026 - 04/14/2026",
     dueDate: "2026-04-15",
     status: "generated",
     noteText:
@@ -134,7 +135,7 @@ describe("branded invoice pdf model", () => {
 
     expect(model.billTo.name).toBe("The Arena Platform, Inc.");
     expect(model.invoiceDetails.invoiceNumber).toBe("2026/006");
-    expect(model.invoiceDetails.billingDuration).toBe("03/01/2026 – 03/31/2026");
+    expect(model.invoiceDetails.billingDuration).toBe("03/15/2026 - 04/14/2026");
 
     expect(model.sections.map((section) => section.title)).toEqual([
       "Data Team :",
