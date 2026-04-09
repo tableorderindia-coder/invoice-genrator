@@ -240,6 +240,9 @@ export default async function DashboardPage({
                         <th>Total commission (USD)</th>
                         <th>Commission earned (INR)</th>
                         <th>Gross earnings (INR)</th>
+                        <th>Deposit in (USD)</th>
+                        <th>Deposit out (USD)</th>
+                        <th>Deposit net (USD)</th>
                         <th>Actions</th>
                       </tr>
                     </thead>
@@ -339,6 +342,9 @@ export default async function DashboardPage({
                           <td>{formatUsd(row.totalCommissionUsdCents)}</td>
                           <td>{formatInr(row.commissionEarnedInrCents)}</td>
                           <td>{formatInr(row.grossEarningsInrCents)}</td>
+                          <td>{formatUsd(row.securityDepositInUsdCents)}</td>
+                          <td>{formatUsd(row.securityDepositOutUsdCents)}</td>
+                          <td>{formatUsd(row.securityDepositNetUsdCents)}</td>
                           <td>
                             <button type="submit" form={`dashboard-payout-${row.payoutId}`} className="btn-outline">
                               Update
@@ -351,6 +357,11 @@ export default async function DashboardPage({
                 </div>
                 <p className="mt-3 text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
                   Total Gross Earning: {formatInr(section.totalGrossEarningsInrCents)}
+                </p>
+                <p className="mt-1 text-sm" style={{ color: "var(--text-secondary)" }}>
+                  Deposit Totals: In {formatUsd(section.totalSecurityDepositInUsdCents)} · Out{" "}
+                  {formatUsd(section.totalSecurityDepositOutUsdCents)} · Net{" "}
+                  {formatUsd(section.totalSecurityDepositNetUsdCents)}
                 </p>
               </div>
             ))}
@@ -402,6 +413,9 @@ export default async function DashboardPage({
                   <th>Total commission (USD)</th>
                   <th>Commission earned (INR)</th>
                   <th>Gross earnings (INR)</th>
+                  <th>Deposit in (USD)</th>
+                  <th>Deposit out (USD)</th>
+                  <th>Deposit net (USD)</th>
                   <th>Expenses (INR)</th>
                   <th>Net P/L (INR)</th>
                 </tr>
@@ -424,6 +438,9 @@ export default async function DashboardPage({
                       <td>{formatUsd(row.totalCommissionUsdCents)}</td>
                       <td>{formatInr(row.commissionEarnedInrCents)}</td>
                       <td>{formatInr(row.grossEarningsInrCents)}</td>
+                      <td>{formatUsd(row.securityDepositInUsdCents)}</td>
+                      <td>{formatUsd(row.securityDepositOutUsdCents)}</td>
+                      <td>{formatUsd(row.securityDepositNetUsdCents)}</td>
                       <td>
                         <form action={saveDashboardExpenseAction} className="flex items-center gap-2">
                           <input type="hidden" name="companyId" value={selectedCompanyId} />
@@ -458,7 +475,7 @@ export default async function DashboardPage({
                 })}
                 {data.periodRows.length === 0 ? (
                   <tr>
-                    <td colSpan={12} className="py-8 text-center" style={{ color: "var(--text-muted)" }}>
+                    <td colSpan={15} className="py-8 text-center" style={{ color: "var(--text-muted)" }}>
                       No period data available for selected filters.
                     </td>
                   </tr>

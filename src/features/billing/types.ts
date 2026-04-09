@@ -200,6 +200,9 @@ export type PnEmployeeEditableRow = {
   totalCommissionUsdCents: number;
   commissionEarnedInrCents: number;
   grossEarningsInrCents: number;
+  securityDepositInUsdCents: number;
+  securityDepositOutUsdCents: number;
+  securityDepositNetUsdCents: number;
 };
 
 export type PnEmployeeEditableSection = {
@@ -207,6 +210,9 @@ export type PnEmployeeEditableSection = {
   employeeName: string;
   rows: PnEmployeeEditableRow[];
   totalGrossEarningsInrCents: number;
+  totalSecurityDepositInUsdCents: number;
+  totalSecurityDepositOutUsdCents: number;
+  totalSecurityDepositNetUsdCents: number;
 };
 
 export type PnPeriodRow = {
@@ -223,6 +229,9 @@ export type PnPeriodRow = {
   grossEarningsInrCents: number;
   expensesInrCents: number;
   netPlInrCents: number;
+  securityDepositInUsdCents: number;
+  securityDepositOutUsdCents: number;
+  securityDepositNetUsdCents: number;
 };
 
 export type PnDashboardData = {

@@ -39,24 +39,24 @@ test("shows inline success feedback on the draft invoice page", async ({ page })
   await page.getByRole("button", { name: "Create draft" }).click();
   await page.waitForURL(/\/invoices\/drafts\//);
 
-  await expect(page.getByText(employeeName)).toBeVisible();
-
   await page.locator('select[name="type"]').selectOption("onboarding");
-  await expect(page.getByLabel("Name")).toBeVisible();
+  await expect(page.getByLabel("Employee")).toBeVisible();
+  await page.getByLabel("Employee").selectOption({ label: employeeName });
   await expect(page.getByLabel("Rate ($/hr)")).toBeVisible();
   await expect(page.getByLabel("Hrs per week")).toBeVisible();
   await expect(page.getByLabel("Total")).toBeVisible();
-  await page.getByLabel("Name").fill("Playwright Member");
   await page.getByLabel("Rate ($/hr)").fill("25");
   await page.getByLabel("Hrs per week").fill("4");
   await expect(page.getByLabel("Total")).toHaveValue("$433.33");
   await page.getByRole("button", { name: "Add / Update" }).click();
 
   await expect(page.getByText("Adjustment added.")).toBeVisible();
-  await expect(page.getByText("Playwright Member")).toBeVisible();
+  await expect(
+    page.getByText(`${employeeName} · $25.00/hr · 4 hrs/week`),
+  ).toBeVisible();
 
   await page.locator('select[name="type"]').selectOption("onboarding");
-  await page.getByLabel("Name").fill("Playwright Member");
+  await page.getByLabel("Employee").selectOption({ label: employeeName });
   await page.getByLabel("Rate ($/hr)").fill("25");
   await page.getByLabel("Hrs per week").fill("4");
   await page.getByRole("button", { name: "Add / Update" }).click();
@@ -73,7 +73,7 @@ test("shows inline success feedback on the draft invoice page", async ({ page })
 
   await page
     .locator("div")
-    .filter({ hasText: "Playwright Member · $25.00/hr · 4 hrs/week" })
+    .filter({ hasText: `${employeeName} · $25.00/hr · 4 hrs/week` })
     .getByRole("button", { name: "Remove", exact: true })
     .click();
   await expect(page.getByText("Adjustment removed.")).toBeVisible();

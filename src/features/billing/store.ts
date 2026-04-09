@@ -171,6 +171,17 @@ type DbDashboardExpense = {
   updated_at: string;
 };
 
+type DbSecurityDepositLedger = {
+  id: string;
+  company_id: string;
+  employee_id: string;
+  invoice_id: string;
+  adjustment_id: string | null;
+  movement_type: "credit" | "debit";
+  amount_usd_cents: number;
+  created_at: string;
+};
+
 const sortInvoicesDesc = (left: Invoice, right: Invoice) =>
   right.year * 100 + right.month - (left.year * 100 + left.month);
 
@@ -217,6 +228,26 @@ function normalizeInvoiceAdjustmentSchemaError(error: unknown) {
   }
 
   return error;
+}
+
+function isMissingRelationError(error: unknown, relationName: string) {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const code =
+    "code" in error && typeof error.code === "string" ? error.code : "";
+  const message =
+    "message" in error && typeof error.message === "string"
+      ? error.message
+      : "";
+
+  return (
+    code === "PGRST205" ||
+    message.includes(`relation "${relationName}" does not exist`) ||
+    message.includes(`Could not find the table 'public.${relationName}'`) ||
+    message.includes(`'${relationName}'`)
+  );
 }
 
 function getMissingSchemaColumn(
@@ -789,6 +820,128 @@ export async function createInvoiceDraft(input: {
   return mapInvoice(data as DbInvoice);
 }
 
+async function resolveEmployeeForSecurityDeposit(input: {
+  companyId: string;
+  employeeName: string;
+}) {
+  const supabase = getSupabaseOrThrow();
+  const normalizedEmployeeName = input.employeeName.trim().replace(/\s+/g, " ");
+  if (!normalizedEmployeeName) {
+    throw new Error("Employee is required for security deposit adjustments.");
+  }
+
+  const { data: employeeRows, error: employeeError } = await supabase
+    .from("employees")
+    .select("id, full_name")
+    .eq("company_id", input.companyId);
+  if (employeeError) throw employeeError;
+
+  const match = (employeeRows ?? []).find(
+    (row) =>
+      String(row.full_name).trim().toLowerCase() ===
+      normalizedEmployeeName.toLowerCase(),
+  );
+  if (!match) {
+    throw new Error("Selected employee was not found in this company.");
+  }
+
+  return {
+    employeeId: String(match.id),
+    employeeName: String(match.full_name),
+  };
+}
+
+async function getSecurityDepositBalanceUsdCents(input: {
+  companyId: string;
+  employeeId: string;
+}) {
+  const supabase = getSupabaseOrThrow();
+  const { data: rows, error } = await supabase
+    .from("security_deposit_ledger")
+    .select("movement_type, amount_usd_cents")
+    .eq("company_id", input.companyId)
+    .eq("employee_id", input.employeeId);
+  if (error) {
+    if (isMissingRelationError(error, "security_deposit_ledger")) {
+      return 0;
+    }
+    throw error;
+  }
+
+  return (rows ?? []).reduce((sum, row) => {
+    const amount = Number(row.amount_usd_cents ?? 0);
+    return row.movement_type === "credit" ? sum + amount : sum - amount;
+  }, 0);
+}
+
+async function recordSecurityDepositMovement(input: {
+  companyId: string;
+  employeeId: string;
+  invoiceId: string;
+  adjustmentId: string;
+  movementType: "credit" | "debit";
+  amountUsdCents: number;
+}) {
+  const supabase = getSupabaseOrThrow();
+  const payload = {
+    id: nextId("deposit_ledger"),
+    company_id: input.companyId,
+    employee_id: input.employeeId,
+    invoice_id: input.invoiceId,
+    adjustment_id: input.adjustmentId,
+    movement_type: input.movementType,
+    amount_usd_cents: Math.abs(input.amountUsdCents),
+    created_at: nowIso(),
+  };
+
+  const { error } = await supabase.from("security_deposit_ledger").insert(payload);
+  if (error) {
+    if (isMissingRelationError(error, "security_deposit_ledger")) {
+      return;
+    }
+    throw error;
+  }
+}
+
+export async function getCompanySecurityDepositBalances(companyId: string) {
+  const employees = await listEmployees(companyId);
+  if (employees.length === 0) {
+    return {} as Record<string, number>;
+  }
+
+  const supabase = getSupabaseOrThrow();
+  const employeeIds = employees.map((employee) => employee.id);
+  const { data: rows, error } = await supabase
+    .from("security_deposit_ledger")
+    .select("*")
+    .eq("company_id", companyId)
+    .in("employee_id", employeeIds);
+
+  if (error) {
+    if (isMissingRelationError(error, "security_deposit_ledger")) {
+      return Object.fromEntries(employees.map((employee) => [employee.fullName, 0]));
+    }
+    throw error;
+  }
+
+  const byEmployeeId = new Map<string, number>();
+  for (const row of (rows ?? []) as DbSecurityDepositLedger[]) {
+    const current = byEmployeeId.get(row.employee_id) ?? 0;
+    const delta =
+      row.movement_type === "credit"
+        ? Number(row.amount_usd_cents)
+        : -Number(row.amount_usd_cents);
+    byEmployeeId.set(row.employee_id, current + delta);
+  }
+
+  return Object.fromEntries(
+    employees.map((employee) => [
+      employee.fullName,
+      byEmployeeId.get(employee.id) ?? 0,
+    ]),
+  );
+}
+
 export async function addInvoiceTeam(
   invoiceId: string,
   teamName: string,
@@ -1114,6 +1267,45 @@ export async function addInvoiceAdjustment(input: {
   amountUsdCents: number;
 }) {
   const supabase = getSupabaseOrThrow();
+  const { data: invoiceRow, error: invoiceError } = await supabase
+    .from("invoices")
+    .select("company_id")
+    .eq("id", input.invoiceId)
+    .single();
+  if (invoiceError) throw invoiceError;
+  const companyId = String(invoiceRow.company_id);
+
+  let depositEmployee:
+    | {
+        employeeId: string;
+        employeeName: string;
+      }
+    | undefined;
+  if (
+    (input.type === "onboarding" || input.type === "offboarding") &&
+    input.employeeName
+  ) {
+    depositEmployee = await resolveEmployeeForSecurityDeposit({
+      companyId,
+      employeeName: input.employeeName,
+    });
+
+    if (input.type === "offboarding") {
+      const currentBalance = await getSecurityDepositBalanceUsdCents({
+        companyId,
+        employeeId: depositEmployee.employeeId,
+      });
+      const requestedDeduction = Math.abs(input.amountUsdCents);
+      if (requestedDeduction > currentBalance) {
+        throw new Error(
+          `Offboarding deduction exceeds security deposit balance (${(
+            currentBalance / 100
+          ).toFixed(2)} USD).`,
+        );
+      }
+    }
+  }
+
   const { data: existingRows, error: existingError } = await supabase
     .from("invoice_adjustments")
     .select("*")
@@ -1157,12 +1349,34 @@ export async function addInvoiceAdjustment(input: {
     .single();
   if (error) throw normalizeInvoiceAdjustmentSchemaError(error);
 
+  if (
+    (input.type === "onboarding" || input.type === "offboarding") &&
+    depositEmployee
+  ) {
+    await recordSecurityDepositMovement({
+      companyId,
+      employeeId: depositEmployee.employeeId,
+      invoiceId: input.invoiceId,
+      adjustmentId: String(data.id),
+      movementType: input.type === "onboarding" ? "credit" : "debit",
+      amountUsdCents: Math.abs(input.amountUsdCents),
+    });
+  }
+
   await recomputeSupabaseInvoice(input.invoiceId);
   return mapInvoiceAdjustment(data as DbInvoiceAdjustment);
 }
 
 export async function deleteInvoiceAdjustment(invoiceId: string, adjustmentId: string) {
   const supabase = getSupabaseOrThrow();
+  const { error: deleteLedgerError } = await supabase
+    .from("security_deposit_ledger")
+    .delete()
+    .eq("adjustment_id", adjustmentId);
+  if (deleteLedgerError && !isMissingRelationError(deleteLedgerError, "security_deposit_ledger")) {
+    throw deleteLedgerError;
+  }
+
   const { error } = await supabase
     .from("invoice_adjustments")
     .delete()
@@ -1568,15 +1782,6 @@ export async function getPnDashboardData(input: {
   if (payoutError) throw payoutError;
 
   const payouts = (payoutRows ?? []).map((row) => mapEmployeePayout(row as DbEmployeePayout));
-  if (payouts.length === 0) {
-    return {
-      companyId: input.companyId,
-      employeeEditableSections: [],
-      employeeSections: [],
-      periodRows: [],
-    };
-  }
-
   const invoiceIds = [...new Set(payouts.map((row) => row.invoiceId))];
   const { data: invoiceRows, error: invoiceError } = await supabase
     .from("invoices")
@@ -1594,6 +1799,43 @@ export async function getPnDashboardData(input: {
       year: Number(row.year),
       invoiceNumber: String(row.invoice_number ?? ""),
     });
+  }
+
+  const { data: securityRows, error: securityError } = await supabase
+    .from("security_deposit_ledger")
+    .select("employee_id, invoice_id, movement_type, amount_usd_cents")
+    .eq("company_id", input.companyId);
+  if (securityError && !isMissingRelationError(securityError, "security_deposit_ledger")) {
+    throw securityError;
+  }
+
+  const securityByEmployeeInvoice = new Map<
+    string,
+    { inUsdCents: number; outUsdCents: number }
+  >();
+  for (const row of (securityRows ?? []) as Array<{
+    employee_id: string;
+    invoice_id: string;
+    movement_type: "credit" | "debit";
+    amount_usd_cents: number;
+  }>) {
+    if (input.employeeIds && input.employeeIds.length > 0) {
+      if (!input.employeeIds.includes(String(row.employee_id))) {
+        continue;
+      }
+    }
+
+    const key = `${row.employee_id}|${row.invoice_id}`;
+    const current = securityByEmployeeInvoice.get(key) ?? {
+      inUsdCents: 0,
+      outUsdCents: 0,
+    };
+    if (row.movement_type === "credit") {
+      current.inUsdCents += Number(row.amount_usd_cents ?? 0);
+    } else {
+      current.outUsdCents += Number(row.amount_usd_cents ?? 0);
+    }
+    securityByEmployeeInvoice.set(key, current);
   }
 
   const { data: expenseRows, error: expenseError } = await supabase
@@ -1635,6 +1877,15 @@ export async function getPnDashboardData(input: {
     })
     .filter(Boolean) as PnSourceRow[];
 
+  if (sourceRows.length === 0) {
+    return {
+      companyId: input.companyId,
+      employeeEditableSections: [],
+      employeeSections: [],
+      periodRows: [],
+    };
+  }
+
   const editableSectionsMap = new Map<string, PnEmployeeEditableSection>();
   for (const payout of payouts) {
     const period = invoicePeriodMap.get(payout.invoiceId);
@@ -1647,11 +1898,20 @@ export async function getPnDashboardData(input: {
         employeeName: payout.employeeNameSnapshot,
         rows: [],
         totalGrossEarningsInrCents: 0,
+        totalSecurityDepositInUsdCents: 0,
+        totalSecurityDepositOutUsdCents: 0,
+        totalSecurityDepositNetUsdCents: 0,
       } as PnEmployeeEditableSection);
 
     const fxCommissionInrCents = payout.fxCommissionInrCents ?? 0;
     const commissionEarnedInrCents = payout.commissionEarnedInrCents ?? 0;
     const grossEarningsInrCents = fxCommissionInrCents + commissionEarnedInrCents;
+    const securityKey = `${payout.employeeId}|${payout.invoiceId}`;
+    const security = securityByEmployeeInvoice.get(securityKey) ?? {
+      inUsdCents: 0,
+      outUsdCents: 0,
+    };
+    const securityDepositNetUsdCents = security.inUsdCents - security.outUsdCents;
 
     existingSection.rows.push({
       payoutId: payout.id,
@@ -1670,8 +1930,14 @@ export async function getPnDashboardData(input: {
       totalCommissionUsdCents: payout.totalCommissionUsdCents,
       commissionEarnedInrCents,
       grossEarningsInrCents,
+      securityDepositInUsdCents: security.inUsdCents,
+      securityDepositOutUsdCents: security.outUsdCents,
+      securityDepositNetUsdCents,
     });
     existingSection.totalGrossEarningsInrCents += grossEarningsInrCents;
+    existingSection.totalSecurityDepositInUsdCents += security.inUsdCents;
+    existingSection.totalSecurityDepositOutUsdCents += security.outUsdCents;
+    existingSection.totalSecurityDepositNetUsdCents += securityDepositNetUsdCents;
 
     editableSectionsMap.set(payout.employeeId, existingSection);
   }
@@ -1688,15 +1954,66 @@ export async function getPnDashboardData(input: {
     }))
     .sort((a, b) => a.employeeName.localeCompare(b.employeeName));
 
+  const periodSecurityMap = new Map<
+    string,
+    { inUsdCents: number; outUsdCents: number }
+  >();
+  for (const row of (securityRows ?? []) as Array<{
+    employee_id: string;
+    invoice_id: string;
+    movement_type: "credit" | "debit";
+    amount_usd_cents: number;
+  }>) {
+    if (input.employeeIds && input.employeeIds.length > 0) {
+      if (!input.employeeIds.includes(String(row.employee_id))) {
+        continue;
+      }
+    }
+
+    const period = invoicePeriodMap.get(String(row.invoice_id));
+    if (!period) continue;
+    const key =
+      input.periodType === "monthly"
+        ? `${period.year}-${String(period.month).padStart(2, "0")}`
+        : `${period.year}`;
+    const current = periodSecurityMap.get(key) ?? {
+      inUsdCents: 0,
+      outUsdCents: 0,
+    };
+    if (row.movement_type === "credit") {
+      current.inUsdCents += Number(row.amount_usd_cents ?? 0);
+    } else {
+      current.outUsdCents += Number(row.amount_usd_cents ?? 0);
+    }
+    periodSecurityMap.set(key, current);
+  }
+
+  const periodRows = buildPnPeriodRows({
+    rows: sourceRows,
+    periodType: input.periodType,
+    expenseByKey,
+  }).map((row) => {
+    const key =
+      input.periodType === "monthly"
+        ? `${row.year}-${String(row.month ?? 1).padStart(2, "0")}`
+        : `${row.year}`;
+    const security = periodSecurityMap.get(key) ?? {
+      inUsdCents: 0,
+      outUsdCents: 0,
+    };
+    return {
+      ...row,
+      securityDepositInUsdCents: security.inUsdCents,
+      securityDepositOutUsdCents: security.outUsdCents,
+      securityDepositNetUsdCents: security.inUsdCents - security.outUsdCents,
+    };
+  });
+
   return {
     companyId: input.companyId,
     employeeEditableSections,
     employeeSections: buildPnEmployeeSections(sourceRows),
-    periodRows: buildPnPeriodRows({
-      rows: sourceRows,
-      periodType: input.periodType,
-      expenseByKey,
-    }),
+    periodRows,
   };
 }
 

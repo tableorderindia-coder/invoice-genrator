@@ -18,6 +18,7 @@ import {
 } from "@/src/features/billing/actions";
 import {
   getInvoiceDetail,
+  getCompanySecurityDepositBalances,
   listEmployees,
   listAvailableTeamNames,
 } from "@/src/features/billing/store";
@@ -50,6 +51,7 @@ export default async function DraftInvoicePage({
 
   const availableTeamNames = await listAvailableTeamNames(detail.company.id);
   const employees = await listEmployees(detail.company.id);
+  const securityDepositBalances = await getCompanySecurityDepositBalances(detail.company.id);
   const selectedTeamNames = new Set(detail.teams.map((team) => team.teamName.toLowerCase()));
   const remainingTeamNames = availableTeamNames.filter(
     (teamName) => !selectedTeamNames.has(teamName.toLowerCase()),
@@ -372,6 +374,11 @@ export default async function DraftInvoicePage({
               <AdjustmentForms
                 invoiceId={detail.invoice.id}
                 returnTo={returnTo}
+                employees={employees.map((employee) => ({
+                  id: employee.id,
+                  fullName: employee.fullName,
+                }))}
+                securityDepositBalances={securityDepositBalances}
                 adjustments={detail.adjustments}
                 addAction={addInvoiceAdjustmentAction}
                 deleteAction={deleteInvoiceAdjustmentAction}

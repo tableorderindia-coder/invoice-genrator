@@ -23,7 +23,7 @@ type AdjustmentTypeOption =
 
 type FormState = {
   type: AdjustmentTypeOption;
-  name: string;
+  employeeName: string;
   rateUsd: string;
   hrsPerWeek: string;
   label: string;
@@ -32,7 +32,7 @@ type FormState = {
 
 const INITIAL_FORM: FormState = {
   type: "",
-  name: "",
+  employeeName: "",
   rateUsd: "",
   hrsPerWeek: "",
   label: "",
@@ -62,7 +62,7 @@ function buildClientAdjustmentPayload(form: FormState) {
 
   return buildInvoiceAdjustmentPayload({
     type: form.type,
-    employeeName: form.name,
+    employeeName: form.employeeName,
     rateUsdCents: centsFromUsd(form.rateUsd),
     hrsPerWeek: Number.parseFloat(form.hrsPerWeek || "0"),
   });
@@ -189,12 +189,16 @@ function AdjustmentGroup({
 export function AdjustmentForms({
   invoiceId,
   returnTo,
+  employees,
+  securityDepositBalances,
   adjustments,
   addAction,
   deleteAction,
 }: {
   invoiceId: string;
   returnTo: string;
+  employees: Array<{ id: string; fullName: string }>;
+  securityDepositBalances: Record<string, number>;
   adjustments: InvoiceAdjustment[];
   addAction: AdjustmentFormAction;
   deleteAction: AdjustmentFormAction;
@@ -216,11 +220,19 @@ export function AdjustmentForms({
 
   const handleTypeChange = (type: AdjustmentTypeOption) => {
     setError("");
+    const defaultEmployeeName =
+      type === "reimbursement" || !type ? "" : employees[0]?.fullName ?? "";
     setForm({
       ...INITIAL_FORM,
       type,
+      employeeName: defaultEmployeeName,
     });
   };
+
+  const selectedEmployeeDepositBalanceUsdCents =
+    form.employeeName && (form.type === "onboarding" || form.type === "offboarding")
+      ? securityDepositBalances[form.employeeName] ?? 0
+      : 0;
 
   return (
     <div className="space-y-4">
@@ -271,7 +283,7 @@ export function AdjustmentForms({
             Add adjustment
           </h4>
           <p className="mt-2 text-sm" style={{ color: "var(--text-muted)" }}>
-            Select one adjustment type and enter the matching details below.
+            Onboarding advance is treated as security deposit paid by the client.
           </p>
         </div>
 
@@ -320,15 +332,43 @@ export function AdjustmentForms({
           </div>
         ) : form.type ? (
           <div className="space-y-4">
-            <Field label="Name">
-              <input
+            <Field label="Employee">
+              <select
                 name="employeeName"
-                placeholder="Enter employee name"
                 className={`${inputClass} min-h-14`}
-                value={form.name}
-                onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
-              />
+                value={form.employeeName}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    employeeName: event.target.value,
+                  }))
+                }
+              >
+                {employees.length === 0 ? (
+                  <option value="">No employees available</option>
+                ) : (
+                  employees.map((employee) => (
+                    <option key={employee.id} value={employee.fullName}>
+                      {employee.fullName}
+                    </option>
+                  ))
+                )}
+              </select>
             </Field>
+            {(form.type === "onboarding" || form.type === "offboarding") &&
+            form.employeeName ? (
+              <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                Current security deposit balance:{" "}
+                <span
+                  style={{
+                    color: "var(--text-primary)",
+                    fontFamily: "var(--font-jetbrains-mono), monospace",
+                  }}
+                >
+                  {formatUsd(selectedEmployeeDepositBalanceUsdCents)}
+                </span>
+              </p>
+            ) : null}
             <Field label="Rate ($/hr)">
               <input
                 name="rateUsd"
