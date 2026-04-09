@@ -10,6 +10,7 @@ import {
   listCompanies,
   listEmployees,
 } from "@/src/features/billing/store";
+import type { PnDashboardData } from "@/src/features/billing/types";
 import { formatInr, formatMonthYear, formatUsd } from "@/src/features/billing/utils";
 
 export const dynamic = "force-dynamic";
@@ -65,13 +66,20 @@ export default async function DashboardPage({
       ? employees.map((employee) => employee.id)
       : selectedEmployeeIds;
 
+  const emptyDashboardData: PnDashboardData = {
+    companyId: "",
+    employeeEditableSections: [],
+    employeeSections: [],
+    periodRows: [],
+  };
+
   const data = selectedCompanyId
     ? await getPnDashboardData({
         companyId: selectedCompanyId,
         periodType,
         employeeIds: effectiveEmployeeIds,
       })
-    : { companyId: "", employeeSections: [], periodRows: [] };
+    : emptyDashboardData;
 
   const flashStatus = Array.isArray(resolved.flashStatus)
     ? resolved.flashStatus[0]
