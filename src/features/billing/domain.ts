@@ -31,6 +31,22 @@ type EmployeePayoutMetricsInput = {
   paidUsdInrRate: number;
 };
 
+type EffectiveLineTotalInput = {
+  formulaTotalUsdCents: number;
+  manualTotalUsdCents?: number;
+};
+
+type EffectiveTeamTotalInput = {
+  lineItemTotalsUsdCents: number[];
+  manualTotalUsdCents?: number;
+};
+
+type SortableInvoiceLineItem = {
+  employeeNameSnapshot: string;
+  billingRateUsdCents: number;
+  billedTotalUsdCents: number;
+};
+
 const roundCurrency = (value: number) => Math.round(value);
 const MONTHS_PER_YEAR = 12;
 const WEEKS_PER_YEAR = 52;
@@ -127,4 +143,38 @@ export function calculateEmployeePayoutMetrics({
     fxCommissionInrCents,
     commissionEarnedInrCents,
   };
+}
+
+export function resolveEffectiveLineItemTotalUsdCents({
+  formulaTotalUsdCents,
+  manualTotalUsdCents,
+}: EffectiveLineTotalInput) {
+  return manualTotalUsdCents ?? formulaTotalUsdCents;
+}
+
+export function resolveEffectiveTeamTotalUsdCents({
+  lineItemTotalsUsdCents,
+  manualTotalUsdCents,
+}: EffectiveTeamTotalInput) {
+  if (manualTotalUsdCents !== undefined) {
+    return manualTotalUsdCents;
+  }
+
+  return lineItemTotalsUsdCents.reduce((sum, lineTotal) => sum + lineTotal, 0);
+}
+
+export function sortInvoiceLineItemsByRate<T extends SortableInvoiceLineItem>(
+  lineItems: T[],
+) {
+  return [...lineItems].sort((left, right) => {
+    if (right.billingRateUsdCents !== left.billingRateUsdCents) {
+      return right.billingRateUsdCents - left.billingRateUsdCents;
+    }
+
+    if (right.billedTotalUsdCents !== left.billedTotalUsdCents) {
+      return right.billedTotalUsdCents - left.billedTotalUsdCents;
+    }
+
+    return left.employeeNameSnapshot.localeCompare(right.employeeNameSnapshot);
+  });
 }

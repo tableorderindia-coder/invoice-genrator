@@ -5,6 +5,9 @@ import {
   calculateInvoiceTotals,
   calculateLineItemTotals,
   createRealizationRecord,
+  resolveEffectiveLineItemTotalUsdCents,
+  resolveEffectiveTeamTotalUsdCents,
+  sortInvoiceLineItemsByRate,
 } from "./domain";
 
 describe("billing domain", () => {
@@ -131,5 +134,65 @@ describe("billing domain", () => {
       fxCommissionInrCents: 345000,
       commissionEarnedInrCents: 16650000,
     });
+  });
+
+  it("prefers manual line and team totals when present", () => {
+    expect(
+      resolveEffectiveLineItemTotalUsdCents({
+        formulaTotalUsdCents: 100000,
+        manualTotalUsdCents: 120000,
+      }),
+    ).toBe(120000);
+
+    expect(
+      resolveEffectiveLineItemTotalUsdCents({
+        formulaTotalUsdCents: 100000,
+      }),
+    ).toBe(100000);
+
+    expect(
+      resolveEffectiveTeamTotalUsdCents({
+        lineItemTotalsUsdCents: [120000, 90000],
+        manualTotalUsdCents: 250000,
+      }),
+    ).toBe(250000);
+
+    expect(
+      resolveEffectiveTeamTotalUsdCents({
+        lineItemTotalsUsdCents: [120000, 90000],
+      }),
+    ).toBe(210000);
+  });
+
+  it("sorts invoice line items by billed rate desc, then total desc, then name asc", () => {
+    const sorted = sortInvoiceLineItemsByRate([
+      {
+        employeeNameSnapshot: "Zelda",
+        billingRateUsdCents: 500000,
+        billedTotalUsdCents: 100000,
+      },
+      {
+        employeeNameSnapshot: "Adam",
+        billingRateUsdCents: 700000,
+        billedTotalUsdCents: 70000,
+      },
+      {
+        employeeNameSnapshot: "Bella",
+        billingRateUsdCents: 700000,
+        billedTotalUsdCents: 60000,
+      },
+      {
+        employeeNameSnapshot: "Ariana",
+        billingRateUsdCents: 700000,
+        billedTotalUsdCents: 60000,
+      },
+    ]);
+
+    expect(sorted.map((item) => item.employeeNameSnapshot)).toEqual([
+      "Adam",
+      "Ariana",
+      "Bella",
+      "Zelda",
+    ]);
   });
 });

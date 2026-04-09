@@ -18,13 +18,18 @@ import {
   deleteInvoiceLineItem,
   deleteInvoiceTeam,
   updateInvoiceLineItem,
+  updateInvoiceLineItemTotal,
+  updateInvoiceTeamTotal,
+  updateInvoiceGrandTotal,
+  updateInvoiceAdjustmentAmount,
   updateInvoiceNote,
   updateInvoiceStatus,
+  updateEmployee,
   addEmployeePayoutRow,
   updateEmployeePayout,
   markEmployeePayoutPaid,
   upsertDashboardExpense,
-  } from "./store";
+} from "./store";
 import { centsFromUsd } from "./utils";
 
 function getString(formData: FormData, key: string) {
@@ -85,6 +90,26 @@ export async function createEmployeeAction(formData: FormData) {
 
   revalidatePath("/");
   revalidatePath("/employees");
+  redirect("/employees");
+}
+
+export async function updateEmployeeAction(formData: FormData) {
+  await updateEmployee({
+    employeeId: getString(formData, "employeeId"),
+    companyId: getString(formData, "companyId"),
+    fullName: getString(formData, "fullName"),
+    designation: getString(formData, "designation"),
+    defaultTeam: getString(formData, "defaultTeam"),
+    billingRateUsdCents: centsFromUsd(getString(formData, "billingRateUsd")),
+    payoutMonthlyUsdCents: centsFromUsd(getString(formData, "payoutMonthlyUsd")),
+    hrsPerWeek: Number.parseFloat(getString(formData, "hrsPerWeek")),
+    activeFrom: getString(formData, "activeFrom"),
+    activeTo: getString(formData, "activeTo") || undefined,
+    isActive: getString(formData, "isActive") === "true",
+  });
+
+  revalidatePath("/employees");
+  revalidatePath("/invoices");
   redirect("/employees");
 }
 
@@ -297,6 +322,99 @@ export async function updateInvoiceLineItemAction(formData: FormData) {
   redirect(buildFlashRedirect(returnTo, "success", "Member details updated."));
 }
 
+export async function updateInvoiceLineItemTotalAction(formData: FormData) {
+  const invoiceId = getString(formData, "invoiceId");
+  const returnTo = getDraftReturnPath(formData, invoiceId);
+
+  try {
+    const lineItemId = getString(formData, "lineItemId");
+    if (!lineItemId) {
+      throw new Error("Select a member before updating total.");
+    }
+
+    await updateInvoiceLineItemTotal({
+      invoiceId,
+      lineItemId,
+      billedTotalUsdCents: centsFromUsd(getString(formData, "billedTotalUsd")),
+    });
+
+    revalidatePath(`/invoices/${invoiceId}`);
+    revalidatePath(`/invoices/drafts/${invoiceId}`);
+    revalidatePath("/invoices");
+    revalidatePath("/cashout");
+  } catch (error) {
+    redirect(
+      buildFlashRedirect(
+        returnTo,
+        "error",
+        error instanceof Error ? error.message : "Unable to update line total.",
+      ),
+    );
+  }
+
+  redirect(buildFlashRedirect(returnTo, "success", "Line total updated."));
+}
+
+export async function updateInvoiceTeamTotalAction(formData: FormData) {
+  const invoiceId = getString(formData, "invoiceId");
+  const returnTo = getDraftReturnPath(formData, invoiceId);
+
+  try {
+    const invoiceTeamId = getString(formData, "invoiceTeamId");
+    if (!invoiceTeamId) {
+      throw new Error("Select a team before updating total.");
+    }
+
+    await updateInvoiceTeamTotal({
+      invoiceId,
+      invoiceTeamId,
+      totalUsdCents: centsFromUsd(getString(formData, "teamTotalUsd")),
+    });
+
+    revalidatePath(`/invoices/${invoiceId}`);
+    revalidatePath(`/invoices/drafts/${invoiceId}`);
+    revalidatePath("/invoices");
+    revalidatePath("/cashout");
+  } catch (error) {
+    redirect(
+      buildFlashRedirect(
+        returnTo,
+        "error",
+        error instanceof Error ? error.message : "Unable to update team total.",
+      ),
+    );
+  }
+
+  redirect(buildFlashRedirect(returnTo, "success", "Team total updated."));
+}
+
+export async function updateInvoiceGrandTotalAction(formData: FormData) {
+  const invoiceId = getString(formData, "invoiceId");
+  const returnTo = getDraftReturnPath(formData, invoiceId);
+
+  try {
+    await updateInvoiceGrandTotal({
+      invoiceId,
+      grandTotalUsdCents: centsFromUsd(getString(formData, "grandTotalUsd")),
+    });
+
+    revalidatePath(`/invoices/${invoiceId}`);
+    revalidatePath(`/invoices/drafts/${invoiceId}`);
+    revalidatePath("/invoices");
+    revalidatePath("/cashout");
+  } catch (error) {
+    redirect(
+      buildFlashRedirect(
+        returnTo,
+        "error",
+        error instanceof Error ? error.message : "Unable to update grand total.",
+      ),
+    );
+  }
+
+  redirect(buildFlashRedirect(returnTo, "success", "Grand total updated."));
+}
+
 export async function addInvoiceAdjustmentAction(formData: FormData) {
   const invoiceId = getString(formData, "invoiceId");
   const returnTo = getDraftReturnPath(formData, invoiceId);
@@ -369,6 +487,39 @@ export async function deleteInvoiceAdjustmentAction(formData: FormData) {
   }
 
   redirect(buildFlashRedirect(returnTo, "success", "Adjustment removed."));
+}
+
+export async function updateInvoiceAdjustmentAmountAction(formData: FormData) {
+  const invoiceId = getString(formData, "invoiceId");
+  const returnTo = getDraftReturnPath(formData, invoiceId);
+
+  try {
+    const adjustmentId = getString(formData, "adjustmentId");
+    if (!adjustmentId) {
+      throw new Error("Select an adjustment before updating amount.");
+    }
+
+    await updateInvoiceAdjustmentAmount({
+      invoiceId,
+      adjustmentId,
+      amountUsdCents: centsFromUsd(getString(formData, "amountUsd")),
+    });
+
+    revalidatePath(`/invoices/${invoiceId}`);
+    revalidatePath(`/invoices/drafts/${invoiceId}`);
+    revalidatePath("/invoices");
+    revalidatePath("/cashout");
+  } catch (error) {
+    redirect(
+      buildFlashRedirect(
+        returnTo,
+        "error",
+        error instanceof Error ? error.message : "Unable to update adjustment amount.",
+      ),
+    );
+  }
+
+  redirect(buildFlashRedirect(returnTo, "success", "Adjustment amount updated."));
 }
 
 export async function updateInvoiceNoteAction(formData: FormData) {

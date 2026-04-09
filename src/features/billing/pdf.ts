@@ -79,10 +79,11 @@ export function buildInvoicePdfModel(detail: InvoiceDetail): PdfModel {
         total: formatUsdCompact(lineItem.billedTotalUsdCents),
       })),
       totalAmount: formatUsdCompact(
-        team.lineItems.reduce(
-          (sum, lineItem) => sum + lineItem.billedTotalUsdCents,
-          0,
-        ),
+        team.totalUsdCents ??
+          team.lineItems.reduce(
+            (sum, lineItem) => sum + lineItem.billedTotalUsdCents,
+            0,
+          ),
       ),
     }));
 

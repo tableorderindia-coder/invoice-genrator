@@ -1,6 +1,7 @@
 import { Shell } from "../_components/shell";
 import { GlassPanel } from "../_components/glass-panel";
 import { Field, inputClass } from "../_components/field";
+import { PendingSubmitButton } from "../_components/pending-submit-button";
 import { StaggerGrid } from "../_components/stagger-grid";
 import { createCompanyAction } from "@/src/features/billing/actions";
 import { listCompanies } from "@/src/features/billing/store";
@@ -29,9 +30,11 @@ export default async function CompaniesPage() {
                 <textarea name="defaultNote" required rows={4} className={inputClass} placeholder="Payment terms and instructions..." />
               </Field>
             </div>
-            <button type="submit" className="gradient-btn mt-5">
-              Save company
-            </button>
+            <PendingSubmitButton
+              className="gradient-btn mt-5"
+              defaultText="Save company"
+              pendingText="Saving..."
+            />
           </form>
         </GlassPanel>
 

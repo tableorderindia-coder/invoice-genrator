@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 
 import { Field, inputClass } from "@/app/_components/field";
+import { PendingSubmitButton } from "@/app/_components/pending-submit-button";
 import {
   buildAdjustmentDuplicateSignature,
   buildInvoiceAdjustmentPayload,
@@ -104,6 +105,7 @@ function AdjustmentGroup({
   invoiceId,
   returnTo,
   deleteAction,
+  updateAmountAction,
 }: {
   title: string;
   items: InvoiceAdjustment[];
@@ -111,6 +113,7 @@ function AdjustmentGroup({
   invoiceId: string;
   returnTo: string;
   deleteAction: AdjustmentFormAction;
+  updateAmountAction: AdjustmentFormAction;
 }) {
   if (items.length === 0) {
     return null;
@@ -158,25 +161,33 @@ function AdjustmentGroup({
               </p>
             </div>
             <div className="flex items-center gap-3">
-              <p
-                className="font-semibold"
-                style={{
-                  color:
-                    adjustment.type === "offboarding" ? "#fca5a5" : "var(--text-primary)",
-                  fontFamily: "var(--font-jetbrains-mono), monospace",
-                }}
-              >
-                {adjustment.type === "offboarding"
-                  ? `-${formatUsd(Math.abs(adjustment.amountUsdCents))}`
-                  : formatUsd(adjustment.amountUsdCents)}
-              </p>
+              <form action={updateAmountAction} className="flex items-center gap-2">
+                <input type="hidden" name="invoiceId" value={invoiceId} />
+                <input type="hidden" name="adjustmentId" value={adjustment.id} />
+                <input type="hidden" name="returnTo" value={returnTo} />
+                <input
+                  name="amountUsd"
+                  type="number"
+                  step="0.01"
+                  className={inputClass}
+                  defaultValue={(adjustment.amountUsdCents / 100).toFixed(2)}
+                  style={{ minWidth: "8rem" }}
+                />
+                <PendingSubmitButton
+                  className="btn-outline"
+                  defaultText="Update amount"
+                  pendingText="Updating..."
+                />
+              </form>
               <form action={deleteAction}>
                 <input type="hidden" name="invoiceId" value={invoiceId} />
                 <input type="hidden" name="adjustmentId" value={adjustment.id} />
                 <input type="hidden" name="returnTo" value={returnTo} />
-                <button type="submit" className="btn-outline">
-                  Remove
-                </button>
+                <PendingSubmitButton
+                  className="btn-outline"
+                  defaultText="Remove"
+                  pendingText="Removing..."
+                />
               </form>
             </div>
           </div>
@@ -194,6 +205,7 @@ export function AdjustmentForms({
   adjustments,
   addAction,
   deleteAction,
+  updateAmountAction,
 }: {
   invoiceId: string;
   returnTo: string;
@@ -202,6 +214,7 @@ export function AdjustmentForms({
   adjustments: InvoiceAdjustment[];
   addAction: AdjustmentFormAction;
   deleteAction: AdjustmentFormAction;
+  updateAmountAction: AdjustmentFormAction;
 }) {
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
   const [error, setError] = useState("");
@@ -431,6 +444,7 @@ export function AdjustmentForms({
         invoiceId={invoiceId}
         returnTo={returnTo}
         deleteAction={deleteAction}
+        updateAmountAction={updateAmountAction}
       />
       <AdjustmentGroup
         title="Appraisal Advance"
@@ -439,6 +453,7 @@ export function AdjustmentForms({
         invoiceId={invoiceId}
         returnTo={returnTo}
         deleteAction={deleteAction}
+        updateAmountAction={updateAmountAction}
       />
       <AdjustmentGroup
         title="Reimbursements / Expenses"
@@ -447,6 +462,7 @@ export function AdjustmentForms({
         invoiceId={invoiceId}
         returnTo={returnTo}
         deleteAction={deleteAction}
+        updateAmountAction={updateAmountAction}
       />
       <AdjustmentGroup
         title="Offboarding Deductions"
@@ -455,6 +471,7 @@ export function AdjustmentForms({
         invoiceId={invoiceId}
         returnTo={returnTo}
         deleteAction={deleteAction}
+        updateAmountAction={updateAmountAction}
       />
     </div>
   );

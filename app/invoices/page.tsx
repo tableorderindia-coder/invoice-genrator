@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { Shell } from "../_components/shell";
 import { GlassPanel } from "../_components/glass-panel";
+import { PendingSubmitButton } from "../_components/pending-submit-button";
 import { updateInvoiceStatusAction } from "@/src/features/billing/actions";
 import { filterIssuedInvoices } from "@/src/features/billing/invoice-workflow";
 import { listCompanies, listInvoices } from "@/src/features/billing/store";
@@ -76,13 +77,18 @@ export default async function InvoicesPage() {
                       >
                         Open PDF
                       </Link>
+                      <Link href={`/invoices/${invoice.id}`} className="btn-outline">
+                        Open editor
+                      </Link>
                       {invoice.status === "generated" ? (
                         <form action={updateInvoiceStatusAction}>
                           <input type="hidden" name="invoiceId" value={invoice.id} />
                           <input type="hidden" name="status" value="sent" />
-                          <button type="submit" className="gradient-btn">
-                            Mark sent
-                          </button>
+                          <PendingSubmitButton
+                            className="gradient-btn"
+                            defaultText="Mark sent"
+                            pendingText="Marking sent..."
+                          />
                         </form>
                       ) : (
                         <span
