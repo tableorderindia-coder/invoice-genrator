@@ -1,7 +1,10 @@
 import { GlassPanel } from "../_components/glass-panel";
 import { Shell } from "../_components/shell";
 import { inputClass } from "../_components/field";
-import { saveDashboardExpenseAction } from "@/src/features/billing/actions";
+import {
+  saveDashboardExpenseAction,
+  updateEmployeePayoutAction,
+} from "@/src/features/billing/actions";
 import {
   getPnDashboardData,
   listCompanies,
@@ -31,6 +34,7 @@ export default async function DashboardPage({
     employeeIds?: string | string[];
     allEmployees?: string | string[];
     periodType?: string | string[];
+    view?: string | string[];
     flashStatus?: string | string[];
     flashMessage?: string | string[];
   }>;
@@ -45,6 +49,10 @@ export default async function DashboardPage({
     ? resolved.periodType[0]
     : resolved.periodType;
   const periodType = selectedPeriodTypeRaw === "yearly" ? "yearly" : "monthly";
+  const selectedViewRaw = Array.isArray(resolved.view)
+    ? resolved.view[0]
+    : resolved.view;
+  const view = selectedViewRaw === "period" ? "period" : "employee";
   const allEmployeesValue = Array.isArray(resolved.allEmployees)
     ? resolved.allEmployees[0]
     : resolved.allEmployees;
@@ -74,6 +82,7 @@ export default async function DashboardPage({
   const filterParams = new URLSearchParams();
   if (selectedCompanyId) filterParams.set("companyId", selectedCompanyId);
   if (periodType) filterParams.set("periodType", periodType);
+  filterParams.set("view", view);
   if (allEmployeesSelected) filterParams.set("allEmployees", "1");
   for (const employeeId of effectiveEmployeeIds) {
     filterParams.append("employeeIds", employeeId);
@@ -107,6 +116,7 @@ export default async function DashboardPage({
           </label>
           <div className="flex gap-2">
             <input type="hidden" name="periodType" value={periodType} />
+            <input type="hidden" name="view" value={view} />
             <button type="submit" className="gradient-btn">
               Load company
             </button>
@@ -132,11 +142,39 @@ export default async function DashboardPage({
         ) : null}
       </GlassPanel>
 
-      <section className="grid gap-6 xl:grid-cols-2">
+      <GlassPanel gradient>
+        <form action="/dashboard" className="mb-2 flex flex-wrap items-center gap-2">
+          <input type="hidden" name="companyId" value={selectedCompanyId} />
+          <input type="hidden" name="periodType" value={periodType} />
+          {effectiveEmployeeIds.map((employeeId) => (
+            <input key={employeeId} type="hidden" name="employeeIds" value={employeeId} />
+          ))}
+          {allEmployeesSelected ? <input type="hidden" name="allEmployees" value="1" /> : null}
+          <button
+            type="submit"
+            name="view"
+            value="employee"
+            className={view === "employee" ? "gradient-btn" : "btn-outline"}
+          >
+            Employee
+          </button>
+          <button
+            type="submit"
+            name="view"
+            value="period"
+            className={view === "period" ? "gradient-btn" : "btn-outline"}
+          >
+            Monthly / Yearly
+          </button>
+        </form>
+      </GlassPanel>
+
+      {view === "employee" ? (
         <GlassPanel title="Employee" gradient>
           <form action="/dashboard" className="mb-4 space-y-3">
             <input type="hidden" name="companyId" value={selectedCompanyId} />
             <input type="hidden" name="periodType" value={periodType} />
+            <input type="hidden" name="view" value={view} />
             <label className="block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
               Employees (select one or more)
             </label>
@@ -168,7 +206,7 @@ export default async function DashboardPage({
           </form>
 
           <div className="space-y-6">
-            {data.employeeSections.map((section) => (
+            {data.employeeEditableSections.map((section) => (
               <div
                 key={section.employeeId}
                 className="rounded-2xl p-4"
@@ -182,6 +220,7 @@ export default async function DashboardPage({
                     <thead>
                       <tr>
                         <th>Month</th>
+                        <th>Invoice</th>
                         <th>Dollar inward</th>
                         <th>Monthly $</th>
                         <th>Cashout rate</th>
@@ -193,23 +232,110 @@ export default async function DashboardPage({
                         <th>Total commission (USD)</th>
                         <th>Commission earned (INR)</th>
                         <th>Gross earnings (INR)</th>
+                        <th>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {section.rows.map((row) => (
-                        <tr key={`${section.employeeId}-${row.year}-${row.month}`}>
+                        <tr key={row.payoutId}>
                           <td>{formatMonthYear(row.month, row.year)}</td>
-                          <td>{formatUsd(row.dollarInwardUsdCents)}</td>
-                          <td>{formatUsd(row.employeeMonthlyUsdCents)}</td>
-                          <td>{row.cashoutUsdInrRate.toFixed(4)}</td>
-                          <td>{row.paidUsdInrRate.toFixed(4)}</td>
-                          <td>{formatInr(row.pfInrCents)}</td>
-                          <td>{formatInr(row.tdsInrCents)}</td>
-                          <td>{formatInr(row.actualPaidInrCents)}</td>
+                          <td>{row.invoiceNumber}</td>
+                          <td>
+                            <form id={`dashboard-payout-${row.payoutId}`} action={updateEmployeePayoutAction}></form>
+                            <input type="hidden" form={`dashboard-payout-${row.payoutId}`} name="payoutId" value={row.payoutId} />
+                            <input type="hidden" form={`dashboard-payout-${row.payoutId}`} name="returnTo" value={returnTo} />
+                            <input
+                              form={`dashboard-payout-${row.payoutId}`}
+                              type="number"
+                              name="dollarInwardUsd"
+                              min="0"
+                              step="0.01"
+                              defaultValue={(row.dollarInwardUsdCents / 100).toFixed(2)}
+                              className={inputClass}
+                              style={{ minWidth: "8rem", border: "1px solid var(--glass-border)", background: "rgba(255,255,255,0.04)", color: "var(--text-primary)" }}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              form={`dashboard-payout-${row.payoutId}`}
+                              type="number"
+                              name="employeeMonthlyUsd"
+                              min="0.01"
+                              step="0.01"
+                              defaultValue={(row.employeeMonthlyUsdCents / 100).toFixed(2)}
+                              className={inputClass}
+                              style={{ minWidth: "8rem", border: "1px solid var(--glass-border)", background: "rgba(255,255,255,0.04)", color: "var(--text-primary)" }}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              form={`dashboard-payout-${row.payoutId}`}
+                              type="number"
+                              name="cashoutUsdInrRate"
+                              min="0"
+                              step="0.0001"
+                              defaultValue={row.cashoutUsdInrRate.toFixed(4)}
+                              className={inputClass}
+                              style={{ minWidth: "7rem", border: "1px solid var(--glass-border)", background: "rgba(255,255,255,0.04)", color: "var(--text-primary)" }}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              form={`dashboard-payout-${row.payoutId}`}
+                              type="number"
+                              name="paidUsdInrRate"
+                              min="0"
+                              step="0.0001"
+                              defaultValue={row.paidUsdInrRate.toFixed(4)}
+                              className={inputClass}
+                              style={{ minWidth: "7rem", border: "1px solid var(--glass-border)", background: "rgba(255,255,255,0.04)", color: "var(--text-primary)" }}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              form={`dashboard-payout-${row.payoutId}`}
+                              type="number"
+                              name="pfInr"
+                              min="0"
+                              step="0.01"
+                              defaultValue={(row.pfInrCents / 100).toFixed(2)}
+                              className={inputClass}
+                              style={{ minWidth: "8rem", border: "1px solid var(--glass-border)", background: "rgba(255,255,255,0.04)", color: "var(--text-primary)" }}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              form={`dashboard-payout-${row.payoutId}`}
+                              type="number"
+                              name="tdsInr"
+                              min="0"
+                              step="0.01"
+                              defaultValue={(row.tdsInrCents / 100).toFixed(2)}
+                              className={inputClass}
+                              style={{ minWidth: "8rem", border: "1px solid var(--glass-border)", background: "rgba(255,255,255,0.04)", color: "var(--text-primary)" }}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              form={`dashboard-payout-${row.payoutId}`}
+                              type="number"
+                              name="actualPaidInr"
+                              min="0"
+                              step="0.01"
+                              defaultValue={(row.actualPaidInrCents / 100).toFixed(2)}
+                              className={inputClass}
+                              style={{ minWidth: "8rem", border: "1px solid var(--glass-border)", background: "rgba(255,255,255,0.04)", color: "var(--text-primary)" }}
+                            />
+                          </td>
                           <td>{formatInr(row.fxCommissionInrCents)}</td>
                           <td>{formatUsd(row.totalCommissionUsdCents)}</td>
                           <td>{formatInr(row.commissionEarnedInrCents)}</td>
                           <td>{formatInr(row.grossEarningsInrCents)}</td>
+                          <td>
+                            <button type="submit" form={`dashboard-payout-${row.payoutId}`} className="btn-outline">
+                              Update
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -220,17 +346,18 @@ export default async function DashboardPage({
                 </p>
               </div>
             ))}
-            {data.employeeSections.length === 0 ? (
+            {data.employeeEditableSections.length === 0 ? (
               <p className="text-sm" style={{ color: "var(--text-muted)" }}>
                 No payout records found for selected filters.
               </p>
             ) : null}
           </div>
         </GlassPanel>
-
+      ) : (
         <GlassPanel title="Monthly / Yearly" gradient>
           <form action="/dashboard" className="mb-4 flex flex-wrap items-center gap-2">
             <input type="hidden" name="companyId" value={selectedCompanyId} />
+            <input type="hidden" name="view" value={view} />
             {effectiveEmployeeIds.map((employeeId) => (
               <input key={employeeId} type="hidden" name="employeeIds" value={employeeId} />
             ))}
@@ -332,7 +459,7 @@ export default async function DashboardPage({
             </table>
           </div>
         </GlassPanel>
-      </section>
+      )}
       <GlassPanel>
         <p className="text-sm" style={{ color: "var(--text-muted)" }}>
           Gross Earnings (INR) = Commission Earned (INR) + FX Commission (INR). Net P/L = Gross Earnings - Expenses.

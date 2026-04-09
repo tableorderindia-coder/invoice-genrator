@@ -183,6 +183,32 @@ export type PnEmployeeSection = {
   totalGrossEarningsInrCents: number;
 };
 
+export type PnEmployeeEditableRow = {
+  payoutId: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  year: number;
+  month: number;
+  dollarInwardUsdCents: number;
+  employeeMonthlyUsdCents: number;
+  cashoutUsdInrRate: number;
+  paidUsdInrRate: number;
+  pfInrCents: number;
+  tdsInrCents: number;
+  actualPaidInrCents: number;
+  fxCommissionInrCents: number;
+  totalCommissionUsdCents: number;
+  commissionEarnedInrCents: number;
+  grossEarningsInrCents: number;
+};
+
+export type PnEmployeeEditableSection = {
+  employeeId: string;
+  employeeName: string;
+  rows: PnEmployeeEditableRow[];
+  totalGrossEarningsInrCents: number;
+};
+
 export type PnPeriodRow = {
   year: number;
   month?: number;
@@ -201,6 +227,7 @@ export type PnPeriodRow = {
 
 export type PnDashboardData = {
   companyId: string;
+  employeeEditableSections: PnEmployeeEditableSection[];
   employeeSections: PnEmployeeSection[];
   periodRows: PnPeriodRow[];
 };

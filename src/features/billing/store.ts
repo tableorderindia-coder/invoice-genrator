@@ -36,6 +36,7 @@ import type {
   Team,
   InvoiceTeam,
   PnDashboardData,
+  PnEmployeeEditableSection,
   PnPeriodType,
 } from "./types";
 
@@ -1570,6 +1571,7 @@ export async function getPnDashboardData(input: {
   if (payouts.length === 0) {
     return {
       companyId: input.companyId,
+      employeeEditableSections: [],
       employeeSections: [],
       periodRows: [],
     };
@@ -1578,15 +1580,19 @@ export async function getPnDashboardData(input: {
   const invoiceIds = [...new Set(payouts.map((row) => row.invoiceId))];
   const { data: invoiceRows, error: invoiceError } = await supabase
     .from("invoices")
-    .select("id, month, year")
+    .select("id, month, year, invoice_number")
     .in("id", invoiceIds);
   if (invoiceError) throw invoiceError;
 
-  const invoicePeriodMap = new Map<string, { month: number; year: number }>();
+  const invoicePeriodMap = new Map<
+    string,
+    { month: number; year: number; invoiceNumber: string }
+  >();
   for (const row of invoiceRows ?? []) {
     invoicePeriodMap.set(String(row.id), {
       month: Number(row.month),
       year: Number(row.year),
+      invoiceNumber: String(row.invoice_number ?? ""),
     });
   }
 
@@ -1629,8 +1635,62 @@ export async function getPnDashboardData(input: {
     })
     .filter(Boolean) as PnSourceRow[];
 
+  const editableSectionsMap = new Map<string, PnEmployeeEditableSection>();
+  for (const payout of payouts) {
+    const period = invoicePeriodMap.get(payout.invoiceId);
+    if (!period) continue;
+
+    const existingSection =
+      editableSectionsMap.get(payout.employeeId) ??
+      ({
+        employeeId: payout.employeeId,
+        employeeName: payout.employeeNameSnapshot,
+        rows: [],
+        totalGrossEarningsInrCents: 0,
+      } as PnEmployeeEditableSection);
+
+    const fxCommissionInrCents = payout.fxCommissionInrCents ?? 0;
+    const commissionEarnedInrCents = payout.commissionEarnedInrCents ?? 0;
+    const grossEarningsInrCents = fxCommissionInrCents + commissionEarnedInrCents;
+
+    existingSection.rows.push({
+      payoutId: payout.id,
+      invoiceId: payout.invoiceId,
+      invoiceNumber: period.invoiceNumber,
+      year: period.year,
+      month: period.month,
+      dollarInwardUsdCents: payout.dollarInwardUsdCents,
+      employeeMonthlyUsdCents: payout.employeeMonthlyUsdCents,
+      cashoutUsdInrRate: payout.cashoutUsdInrRate,
+      paidUsdInrRate: payout.paidUsdInrRate ?? 0,
+      pfInrCents: payout.pfInrCents,
+      tdsInrCents: payout.tdsInrCents,
+      actualPaidInrCents: payout.actualPaidInrCents,
+      fxCommissionInrCents,
+      totalCommissionUsdCents: payout.totalCommissionUsdCents,
+      commissionEarnedInrCents,
+      grossEarningsInrCents,
+    });
+    existingSection.totalGrossEarningsInrCents += grossEarningsInrCents;
+
+    editableSectionsMap.set(payout.employeeId, existingSection);
+  }
+
+  const employeeEditableSections = [...editableSectionsMap.values()]
+    .map((section) => ({
+      ...section,
+      rows: section.rows.sort((a, b) => {
+        const left = a.year * 100 + a.month;
+        const right = b.year * 100 + b.month;
+        if (left !== right) return left - right;
+        return a.invoiceNumber.localeCompare(b.invoiceNumber);
+      }),
+    }))
+    .sort((a, b) => a.employeeName.localeCompare(b.employeeName));
+
   return {
     companyId: input.companyId,
+    employeeEditableSections,
     employeeSections: buildPnEmployeeSections(sourceRows),
     periodRows: buildPnPeriodRows({
       rows: sourceRows,
