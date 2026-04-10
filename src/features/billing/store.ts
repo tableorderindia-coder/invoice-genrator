@@ -23,6 +23,7 @@ import {
   buildPnPeriodRows,
   type PnSourceRow,
 } from "./pn-dashboard";
+import { assertEmployeePayoutRemovable } from "./employee-payout";
 import type {
   AdjustmentType,
   Company,
@@ -1992,6 +1993,25 @@ export async function markEmployeePayoutPaid(input: {
       paid_at: input.paidAt,
       updated_at: nowIso(),
     })
+    .eq("id", input.payoutId);
+  if (error) throw error;
+}
+
+export async function removeEmployeePayoutRow(input: { payoutId: string }) {
+  const supabase = getSupabaseOrThrow();
+  const { data: currentRow, error: currentError } = await supabase
+    .from("employee_payouts")
+    .select("*")
+    .eq("id", input.payoutId)
+    .single();
+  if (currentError) throw currentError;
+
+  const current = mapEmployeePayout(currentRow as DbEmployeePayout);
+  assertEmployeePayoutRemovable({ isPaid: current.isPaid });
+
+  const { error } = await supabase
+    .from("employee_payouts")
+    .delete()
     .eq("id", input.payoutId);
   if (error) throw error;
 }

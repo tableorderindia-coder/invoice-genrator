@@ -6,6 +6,7 @@ import { PendingSubmitButton } from "../_components/pending-submit-button";
 import {
   addEmployeePayoutRowAction,
   markEmployeePayoutPaidAction,
+  removeEmployeePayoutRowAction,
   updateEmployeePayoutAction,
 } from "@/src/features/billing/actions";
 import {
@@ -362,6 +363,17 @@ export default async function EmployeePayoutPage({
                             defaultText="Update"
                             pendingText="Updating..."
                           />
+                          {!row.isPaid ? (
+                            <form action={removeEmployeePayoutRowAction}>
+                              <input type="hidden" name="payoutId" value={row.id} />
+                              <input type="hidden" name="returnTo" value={returnTo} />
+                              <PendingSubmitButton
+                                className="btn-outline"
+                                defaultText="Remove"
+                                pendingText="Removing..."
+                              />
+                            </form>
+                          ) : null}
                           <form action={markEmployeePayoutPaidAction}>
                             <input type="hidden" name="payoutId" value={row.id} />
                             <input type="hidden" name="returnTo" value={returnTo} />

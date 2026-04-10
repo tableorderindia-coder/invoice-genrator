@@ -123,6 +123,12 @@ test("shows inline success feedback on the draft invoice page", async ({ page })
   await page.getByRole("button", { name: "+ Add employee" }).click();
   await expect(page.getByText("Employee added to payout list.")).toBeVisible({ timeout: 15000 });
   await expect(page.locator("tr", { hasText: extraEmployeeName })).toBeVisible({ timeout: 15000 });
+  await page
+    .locator("tr", { hasText: extraEmployeeName })
+    .getByRole("button", { name: "Remove" })
+    .click();
+  await expect(page.getByText("Employee payout removed.")).toBeVisible({ timeout: 15000 });
+  await expect(page.locator("tr", { hasText: extraEmployeeName })).toHaveCount(0);
 
   const payoutRow = page.locator("tr", { hasText: employeeName });
   await payoutRow.getByPlaceholder("Enter paid rate").fill("82.1000");

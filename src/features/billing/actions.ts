@@ -29,6 +29,7 @@ import {
   addEmployeePayoutRow,
   updateEmployeePayout,
   markEmployeePayoutPaid,
+  removeEmployeePayoutRow,
   upsertDashboardExpense,
 } from "./store";
 import { centsFromUsd } from "./utils";
@@ -785,6 +786,28 @@ export async function addEmployeePayoutRowAction(formData: FormData) {
   }
 
   redirect(buildFlashRedirect(returnTo, "success", "Employee added to payout list."));
+}
+
+export async function removeEmployeePayoutRowAction(formData: FormData) {
+  const payoutId = getString(formData, "payoutId");
+  const returnTo = getString(formData, "returnTo") || "/employee-payout";
+
+  try {
+    await removeEmployeePayoutRow({ payoutId });
+
+    revalidatePath("/employee-payout");
+    revalidatePath("/dashboard");
+  } catch (error) {
+    redirect(
+      buildFlashRedirect(
+        returnTo,
+        "error",
+        getErrorMessage(error, "Unable to remove employee payout."),
+      ),
+    );
+  }
+
+  redirect(buildFlashRedirect(returnTo, "success", "Employee payout removed."));
 }
 
 export async function saveDashboardExpenseAction(formData: FormData) {
