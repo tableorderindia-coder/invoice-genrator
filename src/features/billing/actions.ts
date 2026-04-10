@@ -14,6 +14,7 @@ import {
   createEmployee,
   createInvoiceDraft,
   createTeam,
+  deleteInvoice,
   deleteInvoiceAdjustment,
   deleteInvoiceLineItem,
   deleteInvoiceTeam,
@@ -581,6 +582,36 @@ export async function updateInvoiceStatusAction(formData: FormData) {
   }
 
   redirect(buildFlashRedirect(returnTo, "success", "Invoice status updated."));
+}
+
+export async function deleteInvoiceAction(formData: FormData) {
+  const invoiceId = getString(formData, "invoiceId");
+  const returnTo = getString(formData, "returnTo") || "/invoices";
+
+  try {
+    if (!invoiceId) {
+      throw new Error("Invoice id is required.");
+    }
+
+    await deleteInvoice(invoiceId);
+
+    revalidatePath(`/invoices/${invoiceId}`);
+    revalidatePath(`/invoices/drafts/${invoiceId}`);
+    revalidatePath("/invoices");
+    revalidatePath("/cashout");
+    revalidatePath("/employee-payout");
+    revalidatePath("/dashboard");
+  } catch (error) {
+    redirect(
+      buildFlashRedirect(
+        returnTo,
+        "error",
+        getErrorMessage(error, "Unable to delete invoice."),
+      ),
+    );
+  }
+
+  redirect(buildFlashRedirect(returnTo, "success", "Invoice deleted."));
 }
 
 export async function cashOutInvoiceAction(formData: FormData) {

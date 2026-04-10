@@ -1675,6 +1675,33 @@ export async function updateInvoiceStatus(invoiceId: string, status: InvoiceStat
   return mapInvoice(data as DbInvoice);
 }
 
+export async function deleteInvoice(invoiceId: string) {
+  const supabase = getSupabaseOrThrow();
+
+  const { data: invoiceRow, error: invoiceError } = await supabase
+    .from("invoices")
+    .select("id")
+    .eq("id", invoiceId)
+    .maybeSingle();
+  if (invoiceError) throw invoiceError;
+  if (!invoiceRow) {
+    throw new Error("Invoice not found.");
+  }
+
+  // Delete dependent rows that do not cascade from invoice_line_items.
+  const { error: payoutError } = await supabase
+    .from("employee_payouts")
+    .delete()
+    .eq("invoice_id", invoiceId);
+  if (payoutError) throw payoutError;
+
+  const { error: deleteError } = await supabase
+    .from("invoices")
+    .delete()
+    .eq("id", invoiceId);
+  if (deleteError) throw deleteError;
+}
+
 export async function cashOutInvoice(
   invoiceId: string,
   realizedAt: string,

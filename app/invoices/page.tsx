@@ -1,9 +1,13 @@
 import Link from "next/link";
 
+import { ConfirmDeleteInvoiceButton } from "./confirm-delete-invoice-button";
 import { Shell } from "../_components/shell";
 import { GlassPanel } from "../_components/glass-panel";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
-import { updateInvoiceStatusAction } from "@/src/features/billing/actions";
+import {
+  deleteInvoiceAction,
+  updateInvoiceStatusAction,
+} from "@/src/features/billing/actions";
 import { listCompanies, listInvoices } from "@/src/features/billing/store";
 import { formatDate, formatMonthYear, formatUsd } from "@/src/features/billing/utils";
 
@@ -13,9 +17,23 @@ function getStatusClass(status: string) {
   return `status-badge status-${status.replace("_", "-")}`;
 }
 
-export default async function InvoicesPage() {
+export default async function InvoicesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    flashStatus?: string | string[];
+    flashMessage?: string | string[];
+  }>;
+}) {
+  const resolvedSearchParams = await searchParams;
   const [invoices, companies] = await Promise.all([listInvoices(), listCompanies()]);
   const companyMap = new Map(companies.map((company) => [company.id, company.name]));
+  const flashStatus = Array.isArray(resolvedSearchParams.flashStatus)
+    ? resolvedSearchParams.flashStatus[0]
+    : resolvedSearchParams.flashStatus;
+  const flashMessage = Array.isArray(resolvedSearchParams.flashMessage)
+    ? resolvedSearchParams.flashMessage[0]
+    : resolvedSearchParams.flashMessage;
 
   return (
     <Shell title="Invoices" eyebrow="Issued invoices">
@@ -33,6 +51,25 @@ export default async function InvoicesPage() {
             Go to create invoice
           </Link>
         </div>
+
+        {flashMessage ? (
+          <div
+            className="mt-4 rounded-2xl px-4 py-3 text-sm font-medium"
+            style={{
+              background:
+                flashStatus === "error"
+                  ? "rgba(248, 113, 113, 0.08)"
+                  : "rgba(16, 185, 129, 0.08)",
+              border:
+                flashStatus === "error"
+                  ? "1px solid rgba(248, 113, 113, 0.25)"
+                  : "1px solid rgba(16, 185, 129, 0.25)",
+              color: flashStatus === "error" ? "#fca5a5" : "#6ee7b7",
+            }}
+          >
+            {flashMessage}
+          </div>
+        ) : null}
 
         <div className="mt-6 overflow-x-auto rounded-2xl" style={{ border: "1px solid var(--glass-border)" }}>
           <table className="glass-table">
@@ -78,6 +115,14 @@ export default async function InvoicesPage() {
                       <Link href={`/invoices/${invoice.id}`} className="btn-outline">
                         Open editor
                       </Link>
+                      <form action={deleteInvoiceAction}>
+                        <input type="hidden" name="invoiceId" value={invoice.id} />
+                        <input type="hidden" name="returnTo" value="/invoices" />
+                        <ConfirmDeleteInvoiceButton
+                          className="btn-outline"
+                          message={`Delete invoice ${invoice.invoiceNumber}? This permanently removes all linked invoice data.`}
+                        />
+                      </form>
                       {invoice.status === "generated" ? (
                         <form action={updateInvoiceStatusAction}>
                           <input type="hidden" name="invoiceId" value={invoice.id} />
