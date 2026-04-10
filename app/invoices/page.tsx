@@ -4,7 +4,6 @@ import { Shell } from "../_components/shell";
 import { GlassPanel } from "../_components/glass-panel";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
 import { updateInvoiceStatusAction } from "@/src/features/billing/actions";
-import { filterIssuedInvoices } from "@/src/features/billing/invoice-workflow";
 import { listCompanies, listInvoices } from "@/src/features/billing/store";
 import { formatDate, formatMonthYear, formatUsd } from "@/src/features/billing/utils";
 
@@ -15,8 +14,7 @@ function getStatusClass(status: string) {
 }
 
 export default async function InvoicesPage() {
-  const [allInvoices, companies] = await Promise.all([listInvoices(), listCompanies()]);
-  const invoices = filterIssuedInvoices(allInvoices);
+  const [invoices, companies] = await Promise.all([listInvoices(), listCompanies()]);
   const companyMap = new Map(companies.map((company) => [company.id, company.name]));
 
   return (
@@ -28,7 +26,7 @@ export default async function InvoicesPage() {
               Invoice register
             </h2>
             <p className="mt-1 text-sm" style={{ color: "var(--text-secondary)" }}>
-              Generated and sent invoices live here for daily operations.
+              All invoices live here for daily operations.
             </p>
           </div>
           <Link href="/invoices/create" className="btn-outline">
@@ -90,7 +88,7 @@ export default async function InvoicesPage() {
                             pendingText="Marking sent..."
                           />
                         </form>
-                      ) : (
+                      ) : invoice.status === "sent" ? (
                         <span
                           className="rounded-full px-3 py-2 text-xs font-semibold"
                           style={{
@@ -100,6 +98,26 @@ export default async function InvoicesPage() {
                         >
                           Sent
                         </span>
+                      ) : invoice.status === "cashed_out" ? (
+                        <span
+                          className="rounded-full px-3 py-2 text-xs font-semibold"
+                          style={{
+                            border: "1px solid var(--glass-border)",
+                            color: "var(--text-muted)",
+                          }}
+                        >
+                          Cashed out
+                        </span>
+                      ) : (
+                        <span
+                          className="rounded-full px-3 py-2 text-xs font-semibold"
+                          style={{
+                            border: "1px solid var(--glass-border)",
+                            color: "var(--text-muted)",
+                          }}
+                        >
+                          Draft
+                        </span>
                       )}
                     </div>
                   </td>
@@ -108,7 +126,7 @@ export default async function InvoicesPage() {
               {invoices.length === 0 && (
                 <tr>
                   <td colSpan={7} className="text-center py-8" style={{ color: "var(--text-muted)" }}>
-                    No generated or sent invoices yet.
+                    No invoices yet.
                   </td>
                 </tr>
               )}
