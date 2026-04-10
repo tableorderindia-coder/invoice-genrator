@@ -119,22 +119,32 @@ export async function createInvoiceDraftAction(formData: FormData) {
     .map((value) => String(value).trim())
     .filter(Boolean);
 
-  const invoice = await createInvoiceDraft({
-    companyId: getString(formData, "companyId"),
-    month: Number.parseInt(getString(formData, "month"), 10),
-    year: Number.parseInt(getString(formData, "year"), 10),
-    invoiceNumber: getString(formData, "invoiceNumber"),
-    billingDate: getString(formData, "billingDate"),
-    billingDuration: getString(formData, "billingDuration") || undefined,
-    dueDate: getString(formData, "dueDate"),
-    duplicateSourceId: getString(formData, "duplicateSourceId") || undefined,
-    selectedTeamNames,
-  });
+  try {
+    const invoice = await createInvoiceDraft({
+      companyId: getString(formData, "companyId"),
+      month: Number.parseInt(getString(formData, "month"), 10),
+      year: Number.parseInt(getString(formData, "year"), 10),
+      invoiceNumber: getString(formData, "invoiceNumber"),
+      billingDate: getString(formData, "billingDate"),
+      billingDuration: getString(formData, "billingDuration") || undefined,
+      dueDate: getString(formData, "dueDate"),
+      duplicateSourceId: getString(formData, "duplicateSourceId") || undefined,
+      selectedTeamNames,
+    });
 
-  revalidatePath("/");
-  revalidatePath("/invoices");
-  revalidatePath("/invoices/create");
-  redirect(`/invoices/drafts/${invoice.id}`);
+    revalidatePath("/");
+    revalidatePath("/invoices");
+    revalidatePath("/invoices/create");
+    redirect(`/invoices/drafts/${invoice.id}`);
+  } catch (error) {
+    redirect(
+      buildFlashRedirect(
+        "/invoices/create",
+        "error",
+        getErrorMessage(error, "Unable to create draft invoice."),
+      ),
+    );
+  }
 }
 
 export async function addInvoiceTeamAction(formData: FormData) {
