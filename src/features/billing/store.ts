@@ -564,10 +564,18 @@ async function recomputeSupabaseInvoice(
 
   const { data: invoiceRow, error: invoiceError } = await supabase
     .from("invoices")
-    .select("manual_grand_total_usd_cents")
+    .select("*")
     .eq("id", invoiceId)
     .single();
   if (invoiceError) throw invoiceError;
+  const hasManualGrandTotalColumn = Object.prototype.hasOwnProperty.call(
+    invoiceRow,
+    "manual_grand_total_usd_cents",
+  );
+  const manualGrandTotalValue = hasManualGrandTotalColumn
+    ? (invoiceRow as { manual_grand_total_usd_cents?: number | null })
+        .manual_grand_total_usd_cents ?? null
+    : null;
 
   const lineItemsByTeam = new Map<string, InvoiceLineItem[]>();
   for (const lineItem of mappedLineItems) {
@@ -597,10 +605,9 @@ async function recomputeSupabaseInvoice(
     0,
   );
 
-  const invoiceManualGrandTotal = Number(invoiceRow.manual_grand_total_usd_cents ?? 0);
+  const invoiceManualGrandTotal = Number(manualGrandTotalValue ?? 0);
   const useManualGrandTotal =
-    options?.clearGrandManualTotal !== true &&
-    invoiceRow.manual_grand_total_usd_cents !== null;
+    options?.clearGrandManualTotal !== true && manualGrandTotalValue !== null;
   const grandTotalUsdCents = useManualGrandTotal
     ? invoiceManualGrandTotal
     : subtotalUsdCents + adjustmentsUsdCents;
@@ -610,21 +617,31 @@ async function recomputeSupabaseInvoice(
       .from("invoice_teams")
       .update({ manual_total_usd_cents: null })
       .eq("invoice_id", invoiceId);
-    if (clearTeamError) throw clearTeamError;
+    if (clearTeamError) {
+      const missingColumn = getMissingSchemaColumn(
+        clearTeamError,
+        "invoice_teams",
+      );
+      if (missingColumn !== "manual_total_usd_cents") {
+        throw clearTeamError;
+      }
+    }
+  }
+
+  const invoiceUpdatePayload: Record<string, unknown> = {
+    subtotal_usd_cents: subtotalUsdCents,
+    adjustments_usd_cents: adjustmentsUsdCents,
+    grand_total_usd_cents: grandTotalUsdCents,
+    updated_at: nowIso(),
+  };
+  if (hasManualGrandTotalColumn) {
+    invoiceUpdatePayload.manual_grand_total_usd_cents =
+      options?.clearGrandManualTotal === true ? null : manualGrandTotalValue;
   }
 
   const { error: updateError } = await supabase
     .from("invoices")
-    .update({
-      subtotal_usd_cents: subtotalUsdCents,
-      adjustments_usd_cents: adjustmentsUsdCents,
-      grand_total_usd_cents: grandTotalUsdCents,
-      manual_grand_total_usd_cents:
-        options?.clearGrandManualTotal === true
-          ? null
-          : invoiceRow.manual_grand_total_usd_cents,
-      updated_at: nowIso(),
-    })
+    .update(invoiceUpdatePayload)
     .eq("id", invoiceId);
   if (updateError) throw updateError;
 }
@@ -1063,7 +1080,6 @@ export async function addInvoiceTeam(
     invoice_id: invoiceId,
     team_name: teamName,
     sort_order: (count ?? 0) + 1,
-    manual_total_usd_cents: null,
   };
 
   const { data, error } = await supabase
@@ -1180,7 +1196,6 @@ export async function addInvoiceLineItem(input: {
     payout_monthly_usd_cents_snapshot: payoutMonthlyUsdCents,
     hrs_per_week: input.hrsPerWeek,
     billed_total_usd_cents: calculated.billedTotalUsdCents,
-    manual_total_usd_cents: null,
     payout_total_usd_cents: calculated.payoutTotalUsdCents,
     profit_total_usd_cents: calculated.profitTotalUsdCents,
   };
