@@ -25,13 +25,18 @@ export function PendingActionButton({
 
   return (
     <button
-      type="submit"
-      form={form}
+      type="button"
       className={className}
       disabled={effectiveDisabled}
-      onClick={() => {
+      onClick={(event) => {
         if (!effectiveDisabled) {
-          setPending(true);
+          const targetForm = form
+            ? document.getElementById(form)
+            : event.currentTarget.form;
+          if (targetForm instanceof HTMLFormElement) {
+            targetForm.requestSubmit();
+            setPending(true);
+          }
         }
       }}
       style={

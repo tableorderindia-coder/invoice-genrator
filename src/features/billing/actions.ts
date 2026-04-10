@@ -119,6 +119,7 @@ export async function createInvoiceDraftAction(formData: FormData) {
     .map((value) => String(value).trim())
     .filter(Boolean);
 
+  let redirectTo = "/invoices/create";
   try {
     const invoice = await createInvoiceDraft({
       companyId: getString(formData, "companyId"),
@@ -135,16 +136,16 @@ export async function createInvoiceDraftAction(formData: FormData) {
     revalidatePath("/");
     revalidatePath("/invoices");
     revalidatePath("/invoices/create");
-    redirect(`/invoices/drafts/${invoice.id}`);
+    redirectTo = `/invoices/drafts/${invoice.id}`;
   } catch (error) {
-    redirect(
-      buildFlashRedirect(
-        "/invoices/create",
-        "error",
-        getErrorMessage(error, "Unable to create draft invoice."),
-      ),
+    redirectTo = buildFlashRedirect(
+      "/invoices/create",
+      "error",
+      getErrorMessage(error, "Unable to create draft invoice."),
     );
   }
+
+  redirect(redirectTo);
 }
 
 export async function addInvoiceTeamAction(formData: FormData) {
