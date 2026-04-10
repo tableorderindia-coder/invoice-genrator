@@ -15,21 +15,23 @@ export function ConfirmDeleteInvoiceButton({
 
   return (
     <button
-      type="submit"
+      type="button"
       className={className}
       disabled={pending}
       onClick={(event) => {
         if (pending) {
-          event.preventDefault();
           return;
         }
 
         if (!window.confirm(message)) {
-          event.preventDefault();
           return;
         }
 
-        setPending(true);
+        const targetForm = event.currentTarget.form;
+        if (targetForm instanceof HTMLFormElement) {
+          targetForm.requestSubmit();
+          setPending(true);
+        }
       }}
       style={pending ? { opacity: 0.6, cursor: "not-allowed" } : undefined}
     >
@@ -37,4 +39,3 @@ export function ConfirmDeleteInvoiceButton({
     </button>
   );
 }
-
