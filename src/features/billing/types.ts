@@ -70,6 +70,7 @@ export type InvoiceLineItem = {
   billingRateUsdCents: number;
   payoutMonthlyUsdCentsSnapshot: number;
   hrsPerWeek: number;
+  daysWorked: number;
   billedTotalUsdCents: number;
   manualTotalUsdCents?: number;
   payoutTotalUsdCents: number;
@@ -124,6 +125,8 @@ export type EmployeePayout = {
   fxCommissionInrCents?: number;
   totalCommissionUsdCents: number;
   commissionEarnedInrCents?: number;
+  daysWorked?: number;
+  daysInMonth?: number;
   isNonInvoiceEmployee: boolean;
   isPaid: boolean;
   paidAt?: string;
@@ -168,6 +171,8 @@ export type PnPeriodType = "monthly" | "yearly";
 export type PnEmployeeMonthRow = {
   year: number;
   month: number;
+  daysWorked: number;
+  daysInMonth: number;
   dollarInwardUsdCents: number;
   employeeMonthlyUsdCents: number;
   cashoutUsdInrRate: number;
@@ -194,6 +199,8 @@ export type PnEmployeeEditableRow = {
   invoiceNumber: string;
   year: number;
   month: number;
+  daysWorked: number;
+  daysInMonth: number;
   dollarInwardUsdCents: number;
   employeeMonthlyUsdCents: number;
   cashoutUsdInrRate: number;
@@ -218,6 +225,8 @@ export type PnEmployeeEditableSection = {
 export type PnPeriodRow = {
   year: number;
   month?: number;
+  daysWorked: number;
+  daysInMonth: number;
   dollarInwardUsdCents: number;
   employeeMonthlyUsdCents: number;
   pfInrCents: number;

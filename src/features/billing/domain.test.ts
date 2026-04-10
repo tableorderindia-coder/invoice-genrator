@@ -25,6 +25,22 @@ describe("billing domain", () => {
     });
   });
 
+  it("prorates billed totals by days worked in the invoice month", () => {
+    expect(
+      calculateLineItemTotals({
+        billingRateUsdCents: 5000,
+        payoutMonthlyUsdCents: 300000,
+        hrsPerWeek: 10,
+        daysWorked: 15,
+        daysInMonth: 30,
+      }),
+    ).toEqual({
+      billedTotalUsdCents: 108400,
+      payoutTotalUsdCents: 300000,
+      profitTotalUsdCents: -191600,
+    });
+  });
+
   it("calculates invoice totals with positive and negative adjustments", () => {
     expect(
       calculateInvoiceTotals({

@@ -2,6 +2,8 @@ type LineItemInput = {
   billingRateUsdCents: number;
   payoutMonthlyUsdCents: number;
   hrsPerWeek: number;
+  daysWorked?: number;
+  daysInMonth?: number;
 };
 
 type CalculatedLineItem = {
@@ -58,9 +60,23 @@ export function calculateLineItemTotals({
   billingRateUsdCents,
   payoutMonthlyUsdCents,
   hrsPerWeek,
+  daysWorked,
+  daysInMonth,
 }: LineItemInput): CalculatedLineItem {
-  const billedTotalUsdCents = roundToWholeDollarCents(
+  const normalizedDaysInMonth =
+    daysInMonth && Number.isFinite(daysInMonth) && daysInMonth > 0
+      ? daysInMonth
+      : 30;
+  const normalizedDaysWorked =
+    daysWorked === undefined
+      ? normalizedDaysInMonth
+      : Math.max(0, Math.min(daysWorked, normalizedDaysInMonth));
+
+  const monthlyBilledUsdCents = roundToWholeDollarCents(
     (billingRateUsdCents * hrsPerWeek * WEEKS_PER_YEAR) / MONTHS_PER_YEAR,
+  );
+  const billedTotalUsdCents = roundToWholeDollarCents(
+    (monthlyBilledUsdCents * normalizedDaysWorked) / normalizedDaysInMonth,
   );
   const payoutTotalUsdCents = roundToWholeDollarCents(payoutMonthlyUsdCents);
 

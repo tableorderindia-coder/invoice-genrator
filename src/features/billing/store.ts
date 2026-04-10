@@ -24,6 +24,7 @@ import {
   type PnSourceRow,
 } from "./pn-dashboard";
 import { assertEmployeePayoutRemovable } from "./employee-payout";
+import { getDaysInMonth } from "./utils";
 import type {
   AdjustmentType,
   Company,
@@ -112,6 +113,7 @@ type DbInvoiceLineItem = {
   billing_rate_usd_cents: number;
   payout_monthly_usd_cents_snapshot: number;
   hrs_per_week: number;
+  days_worked: number | null;
   billed_total_usd_cents: number;
   manual_total_usd_cents: number | null;
   payout_total_usd_cents: number;
@@ -461,10 +463,116 @@ function mapInvoiceLineItem(row: DbInvoiceLineItem): InvoiceLineItem {
     billingRateUsdCents: row.billing_rate_usd_cents,
     payoutMonthlyUsdCentsSnapshot: row.payout_monthly_usd_cents_snapshot,
     hrsPerWeek: Number(row.hrs_per_week),
+    daysWorked: Number(row.days_worked ?? 0),
     billedTotalUsdCents: row.billed_total_usd_cents,
     manualTotalUsdCents: row.manual_total_usd_cents ?? undefined,
     payoutTotalUsdCents: row.payout_total_usd_cents,
     profitTotalUsdCents: row.profit_total_usd_cents,
+  };
+}
+
+async function insertInvoiceLineItemWithSchemaFallback(
+  payload: Record<string, unknown>,
+) {
+  const supabase = getSupabaseOrThrow();
+  const insertPayload = { ...payload };
+  let attemptsRemaining = 3;
+
+  while (attemptsRemaining > 0) {
+    attemptsRemaining -= 1;
+
+    const { data, error } = await supabase
+      .from("invoice_line_items")
+      .insert(insertPayload)
+      .select()
+      .single();
+
+    if (!error) {
+      return data as DbInvoiceLineItem;
+    }
+
+    const missingColumn = getMissingSchemaColumn(error, "invoice_line_items");
+    if (!missingColumn || !(missingColumn in insertPayload)) {
+      throw error;
+    }
+
+    delete insertPayload[missingColumn];
+  }
+
+  throw new Error(
+    "Unable to insert invoice line item because schema fallback attempts were exhausted.",
+  );
+}
+
+async function updateInvoiceLineItemWithSchemaFallback(
+  lineItemId: string,
+  payload: Record<string, unknown>,
+) {
+  const supabase = getSupabaseOrThrow();
+  const updatePayload = { ...payload };
+  let attemptsRemaining = 3;
+
+  while (attemptsRemaining > 0) {
+    attemptsRemaining -= 1;
+
+    const { data, error } = await supabase
+      .from("invoice_line_items")
+      .update(updatePayload)
+      .eq("id", lineItemId)
+      .select()
+      .single();
+
+    if (!error) {
+      return data as DbInvoiceLineItem;
+    }
+
+    const missingColumn = getMissingSchemaColumn(error, "invoice_line_items");
+    if (!missingColumn || !(missingColumn in updatePayload)) {
+      throw error;
+    }
+
+    delete updatePayload[missingColumn];
+  }
+
+  throw new Error(
+    "Unable to update invoice line item because schema fallback attempts were exhausted.",
+  );
+}
+
+function normalizeLineItemDaysWorked(
+  lineItem: InvoiceLineItem,
+  invoiceMonth: number,
+  invoiceYear: number,
+) {
+  const daysInMonth = getDaysInMonth(invoiceMonth, invoiceYear);
+  const raw = Number(lineItem.daysWorked);
+  if (Number.isFinite(raw) && raw > 0) {
+    return {
+      ...lineItem,
+      daysWorked: Math.max(1, Math.min(daysInMonth, Math.round(raw))),
+    };
+  }
+
+  const fullMonthBilledTotalUsdCents = calculateLineItemTotals({
+    billingRateUsdCents: lineItem.billingRateUsdCents,
+    payoutMonthlyUsdCents: lineItem.payoutMonthlyUsdCentsSnapshot,
+    hrsPerWeek: lineItem.hrsPerWeek,
+    daysWorked: daysInMonth,
+    daysInMonth,
+  }).billedTotalUsdCents;
+
+  const derivedDaysWorked =
+    fullMonthBilledTotalUsdCents > 0
+      ? Math.round(
+          (lineItem.billedTotalUsdCents / fullMonthBilledTotalUsdCents) *
+            daysInMonth,
+        )
+      : daysInMonth;
+  const normalized = Math.max(1, Math.min(daysInMonth, derivedDaysWorked));
+
+  return {
+    ...lineItem,
+    daysWorked: normalized,
   };
 }
 
@@ -898,6 +1006,7 @@ export async function createInvoiceDraft(input: {
           invoiceTeamId: insertedTeam.id,
           employeeId: lineItem.employeeId,
           hrsPerWeek: lineItem.hrsPerWeek,
+          daysWorked: lineItem.daysWorked,
           billingRateUsdCents: lineItem.billingRateUsdCents,
           payoutMonthlyUsdCents: lineItem.payoutMonthlyUsdCentsSnapshot,
         });
@@ -1145,6 +1254,7 @@ export async function addInvoiceLineItem(input: {
   invoiceTeamId: string;
   employeeId: string;
   hrsPerWeek: number;
+  daysWorked?: number;
   billingRateUsdCents?: number;
   payoutMonthlyUsdCents?: number;
 }) {
@@ -1152,6 +1262,7 @@ export async function addInvoiceLineItem(input: {
   const [
     { data: employeeRow, error: employeeError },
     { data: teamRow, error: teamError },
+    { data: invoiceRow, error: invoiceError },
   ] = await Promise.all([
     supabase.from("employees").select("*").eq("id", input.employeeId).single(),
     supabase
@@ -1159,9 +1270,15 @@ export async function addInvoiceLineItem(input: {
       .select("*")
       .eq("id", input.invoiceTeamId)
       .single(),
+    supabase
+      .from("invoices")
+      .select("month, year")
+      .eq("id", input.invoiceId)
+      .single(),
   ]);
   if (employeeError) throw employeeError;
   if (teamError) throw teamError;
+  if (invoiceError) throw invoiceError;
 
   const { data: existingLineRows, error: existingLineError } = await supabase
     .from("invoice_line_items")
@@ -1180,10 +1297,20 @@ export async function addInvoiceLineItem(input: {
     input.billingRateUsdCents ?? employee.billingRateUsdCents;
   const payoutMonthlyUsdCents =
     input.payoutMonthlyUsdCents ?? employee.payoutMonthlyUsdCents;
+  const daysInMonth = getDaysInMonth(
+    Number(invoiceRow.month),
+    Number(invoiceRow.year),
+  );
+  const normalizedDaysWorked =
+    input.daysWorked === undefined
+      ? daysInMonth
+      : Math.max(1, Math.min(daysInMonth, Math.round(input.daysWorked)));
   const calculated = calculateLineItemTotals({
     billingRateUsdCents,
     payoutMonthlyUsdCents,
     hrsPerWeek: input.hrsPerWeek,
+    daysWorked: normalizedDaysWorked,
+    daysInMonth,
   });
 
   const payload = {
@@ -1196,23 +1323,23 @@ export async function addInvoiceLineItem(input: {
     billing_rate_usd_cents: billingRateUsdCents,
     payout_monthly_usd_cents_snapshot: payoutMonthlyUsdCents,
     hrs_per_week: input.hrsPerWeek,
+    days_worked: normalizedDaysWorked,
     billed_total_usd_cents: calculated.billedTotalUsdCents,
     payout_total_usd_cents: calculated.payoutTotalUsdCents,
     profit_total_usd_cents: calculated.profitTotalUsdCents,
   };
 
-  const { data, error } = await supabase
-    .from("invoice_line_items")
-    .insert(payload)
-    .select()
-    .single();
-  if (error) throw error;
+  const data = await insertInvoiceLineItemWithSchemaFallback(payload);
 
   await recomputeSupabaseInvoice(input.invoiceId, {
     clearTeamManualTotals: true,
     clearGrandManualTotal: true,
   });
-  return mapInvoiceLineItem(data as DbInvoiceLineItem);
+  return normalizeLineItemDaysWorked(
+    mapInvoiceLineItem(data as DbInvoiceLineItem),
+    Number(invoiceRow.month),
+    Number(invoiceRow.year),
+  );
 }
 
 export async function deleteInvoiceLineItem(invoiceId: string, lineItemId: string) {
@@ -1233,35 +1360,52 @@ export async function updateInvoiceLineItem(input: {
   invoiceId: string;
   lineItemId: string;
   hrsPerWeek: number;
+  daysWorked: number;
   billingRateUsdCents: number;
 }) {
   const supabase = getSupabaseOrThrow();
-  const { data: lineRow, error: lineError } = await supabase
-    .from("invoice_line_items")
-    .select("*")
-    .eq("id", input.lineItemId)
-    .single();
+  const [{ data: lineRow, error: lineError }, { data: invoiceRow, error: invoiceError }] =
+    await Promise.all([
+      supabase
+        .from("invoice_line_items")
+        .select("*")
+        .eq("id", input.lineItemId)
+        .single(),
+      supabase
+        .from("invoices")
+        .select("month, year")
+        .eq("id", input.invoiceId)
+        .single(),
+    ]);
   if (lineError) throw lineError;
+  if (invoiceError) throw invoiceError;
 
   const existingLineItem = mapInvoiceLineItem(lineRow as DbInvoiceLineItem);
+  const daysInMonth = getDaysInMonth(
+    Number(invoiceRow.month),
+    Number(invoiceRow.year),
+  );
+  const normalizedDaysWorked = Math.max(
+    1,
+    Math.min(daysInMonth, Math.round(input.daysWorked)),
+  );
   const calculated = calculateLineItemTotals({
     billingRateUsdCents: input.billingRateUsdCents,
     payoutMonthlyUsdCents: existingLineItem.payoutMonthlyUsdCentsSnapshot,
     hrsPerWeek: input.hrsPerWeek,
+    daysWorked: normalizedDaysWorked,
+    daysInMonth,
   });
 
-  const { error: updateError } = await supabase
-    .from("invoice_line_items")
-    .update({
-      billing_rate_usd_cents: input.billingRateUsdCents,
-      hrs_per_week: input.hrsPerWeek,
-      billed_total_usd_cents: calculated.billedTotalUsdCents,
-      manual_total_usd_cents: null,
-      payout_total_usd_cents: calculated.payoutTotalUsdCents,
-      profit_total_usd_cents: calculated.profitTotalUsdCents,
-    })
-    .eq("id", input.lineItemId);
-  if (updateError) throw updateError;
+  await updateInvoiceLineItemWithSchemaFallback(input.lineItemId, {
+    billing_rate_usd_cents: input.billingRateUsdCents,
+    hrs_per_week: input.hrsPerWeek,
+    days_worked: normalizedDaysWorked,
+    billed_total_usd_cents: calculated.billedTotalUsdCents,
+    manual_total_usd_cents: null,
+    payout_total_usd_cents: calculated.payoutTotalUsdCents,
+    profit_total_usd_cents: calculated.profitTotalUsdCents,
+  });
 
   const { error: employeeUpdateError } = await supabase
     .from("employees")
@@ -1856,10 +2000,27 @@ export async function getEmployeePayoutInvoice(
     .order("employee_name_snapshot");
   if (error) throw error;
 
+  const lineItemById = new Map(
+    detail.teams
+      .flatMap((team) => team.lineItems)
+      .map((lineItem) => [lineItem.id, lineItem]),
+  );
+  const daysInMonth = getDaysInMonth(detail.invoice.month, detail.invoice.year);
+
   return {
     invoice: detail.invoice,
     realization: detail.realization,
-    rows: (rows ?? []).map((row) => mapEmployeePayout(row as DbEmployeePayout)),
+    rows: (rows ?? []).map((row) => {
+      const payout = mapEmployeePayout(row as DbEmployeePayout);
+      const lineItem = payout.invoiceLineItemId
+        ? lineItemById.get(payout.invoiceLineItemId)
+        : undefined;
+      return {
+        ...payout,
+        daysWorked: lineItem?.daysWorked ?? daysInMonth,
+        daysInMonth,
+      };
+    }),
   };
 }
 
@@ -2106,6 +2267,45 @@ export async function getPnDashboardData(input: {
     });
   }
 
+  const invoiceLineItemIds = payouts
+    .map((row) => row.invoiceLineItemId)
+    .filter((id): id is string => Boolean(id));
+  const { data: lineItemRows, error: lineItemError } = invoiceLineItemIds.length
+    ? await supabase
+        .from("invoice_line_items")
+        .select("id, invoice_team_id, days_worked")
+        .in("id", invoiceLineItemIds)
+    : { data: [], error: null };
+  if (lineItemError) throw lineItemError;
+
+  const { data: invoiceTeamsRows, error: invoiceTeamsError } = await supabase
+    .from("invoice_teams")
+    .select("id, invoice_id")
+    .in("invoice_id", invoiceIds);
+  if (invoiceTeamsError) throw invoiceTeamsError;
+  const invoiceIdByTeamId = new Map<string, string>(
+    (invoiceTeamsRows ?? []).map((row) => [
+      String(row.id),
+      String(row.invoice_id),
+    ]),
+  );
+
+  const lineItemDaysMap = new Map<string, number>();
+  for (const row of (lineItemRows ?? []) as Array<{
+    id: string;
+    invoice_team_id: string;
+    days_worked: number | null;
+  }>) {
+    const invoiceId = invoiceIdByTeamId.get(String(row.invoice_team_id));
+    const period = invoiceId ? invoicePeriodMap.get(invoiceId) : undefined;
+    const daysInMonth = period ? getDaysInMonth(period.month, period.year) : 30;
+    const normalizedDaysWorked =
+      row.days_worked && row.days_worked > 0
+        ? Math.max(1, Math.min(daysInMonth, Math.round(Number(row.days_worked))))
+        : daysInMonth;
+    lineItemDaysMap.set(String(row.id), normalizedDaysWorked);
+  }
+
   const { data: securityRows, error: securityError } = await supabase
     .from("security_deposit_ledger")
     .select("employee_id, invoice_id, movement_type, amount_usd_cents")
@@ -2163,11 +2363,17 @@ export async function getPnDashboardData(input: {
     .map((row) => {
       const period = invoicePeriodMap.get(row.invoiceId);
       if (!period) return undefined;
+      const daysInMonth = getDaysInMonth(period.month, period.year);
+      const daysWorked = row.invoiceLineItemId
+        ? lineItemDaysMap.get(row.invoiceLineItemId) ?? daysInMonth
+        : daysInMonth;
       return {
         employeeId: row.employeeId,
         employeeName: row.employeeNameSnapshot,
         year: period.year,
         month: period.month,
+        daysWorked,
+        daysInMonth,
         dollarInwardUsdCents: row.dollarInwardUsdCents,
         employeeMonthlyUsdCents: row.employeeMonthlyUsdCents,
         cashoutUsdInrRate: row.cashoutUsdInrRate,
@@ -2208,6 +2414,10 @@ export async function getPnDashboardData(input: {
     const fxCommissionInrCents = payout.fxCommissionInrCents ?? 0;
     const commissionEarnedInrCents = payout.commissionEarnedInrCents ?? 0;
     const grossEarningsInrCents = fxCommissionInrCents + commissionEarnedInrCents;
+    const daysInMonth = getDaysInMonth(period.month, period.year);
+    const daysWorked = payout.invoiceLineItemId
+      ? lineItemDaysMap.get(payout.invoiceLineItemId) ?? daysInMonth
+      : daysInMonth;
     const securityKey = `${payout.employeeId}|${payout.invoiceId}`;
     const security = securityByEmployeeInvoice.get(securityKey) ?? {
       inUsdCents: 0,
@@ -2220,6 +2430,8 @@ export async function getPnDashboardData(input: {
       invoiceNumber: period.invoiceNumber,
       year: period.year,
       month: period.month,
+      daysWorked,
+      daysInMonth,
       dollarInwardUsdCents: payout.dollarInwardUsdCents,
       employeeMonthlyUsdCents: payout.employeeMonthlyUsdCents,
       cashoutUsdInrRate: payout.cashoutUsdInrRate,
@@ -2347,9 +2559,11 @@ export async function getInvoiceDetail(
     : { data: [], error: null };
   if (lineError) throw lineError;
 
-  const mappedLineItems = (lineRows ?? []).map((row) =>
-    mapInvoiceLineItem(row as DbInvoiceLineItem),
-  );
+  const mappedLineItems = (lineRows ?? [])
+    .map((row) => mapInvoiceLineItem(row as DbInvoiceLineItem))
+    .map((lineItem) =>
+      normalizeLineItemDaysWorked(lineItem, invoice.month, invoice.year),
+    );
 
   return {
     invoice,

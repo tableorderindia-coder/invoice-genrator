@@ -230,7 +230,15 @@ export default async function DraftInvoicePage({
                     <table className="glass-table">
                       <thead>
                         <tr>
-                          {["Candidate", "Designation", "Rate ($/hr)", "Hrs per week", "Total", "Actions"].map((heading) => (
+                          {[
+                            "Candidate",
+                            "Designation",
+                            "Rate ($/hr)",
+                            "Hrs per week",
+                            "Days worked",
+                            "Total",
+                            "Actions",
+                          ].map((heading) => (
                             <th key={heading}>{heading}</th>
                           ))}
                         </tr>
@@ -264,6 +272,18 @@ export default async function DraftInvoicePage({
                                 step="0.01"
                                 min="0"
                                 defaultValue={lineItem.hrsPerWeek}
+                                className={inputClass}
+                                style={{ minWidth: "6rem" }}
+                              />
+                            </td>
+                            <td>
+                              <input
+                                form={`line-item-${lineItem.id}`}
+                                name="daysWorked"
+                                type="number"
+                                step="1"
+                                min="1"
+                                defaultValue={lineItem.daysWorked}
                                 className={inputClass}
                                 style={{ minWidth: "6rem" }}
                               />

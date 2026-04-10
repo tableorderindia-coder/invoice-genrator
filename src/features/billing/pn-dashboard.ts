@@ -3,6 +3,8 @@ export type PnSourceRow = {
   employeeName: string;
   year: number;
   month: number;
+  daysWorked: number;
+  daysInMonth: number;
   dollarInwardUsdCents: number;
   employeeMonthlyUsdCents: number;
   cashoutUsdInrRate: number;
@@ -18,6 +20,8 @@ export type PnSourceRow = {
 export type PnEmployeeMonthRow = {
   year: number;
   month: number;
+  daysWorked: number;
+  daysInMonth: number;
   dollarInwardUsdCents: number;
   employeeMonthlyUsdCents: number;
   cashoutUsdInrRate: number;
@@ -43,6 +47,8 @@ export type PnPeriodType = "monthly" | "yearly";
 export type PnPeriodRow = {
   year: number;
   month?: number;
+  daysWorked: number;
+  daysInMonth: number;
   dollarInwardUsdCents: number;
   employeeMonthlyUsdCents: number;
   pfInrCents: number;
@@ -76,6 +82,8 @@ const toEmployeeMonthRow = (rows: PnSourceRow[]): PnEmployeeMonthRow => {
   return {
     year: first.year,
     month: first.month,
+    daysWorked: sumBy(rows, "daysWorked"),
+    daysInMonth: sumBy(rows, "daysInMonth"),
     dollarInwardUsdCents: sumBy(rows, "dollarInwardUsdCents"),
     employeeMonthlyUsdCents: sumBy(rows, "employeeMonthlyUsdCents"),
     cashoutUsdInrRate: averageRate(rows, "cashoutUsdInrRate"),
@@ -152,6 +160,8 @@ export function buildPnPeriodRows(input: {
       return {
         year: first.year,
         month,
+        daysWorked: sumBy(bucket, "daysWorked"),
+        daysInMonth: sumBy(bucket, "daysInMonth"),
         dollarInwardUsdCents: sumBy(bucket, "dollarInwardUsdCents"),
         employeeMonthlyUsdCents: sumBy(bucket, "employeeMonthlyUsdCents"),
         pfInrCents: sumBy(bucket, "pfInrCents"),

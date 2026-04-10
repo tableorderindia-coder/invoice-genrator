@@ -233,6 +233,7 @@ export default async function DashboardPage({
                       <tr>
                         <th>Month</th>
                         <th>Invoice</th>
+                        <th>Days worked</th>
                         <th>Dollar inward</th>
                         <th>Monthly $</th>
                         <th>Cashout rate</th>
@@ -252,6 +253,7 @@ export default async function DashboardPage({
                         <tr key={row.payoutId}>
                           <td>{formatMonthYear(row.month, row.year)}</td>
                           <td>{row.invoiceNumber}</td>
+                          <td>{`${row.daysWorked}/${row.daysInMonth}`}</td>
                           <td>
                             <form id={`dashboard-payout-${row.payoutId}`} action={updateEmployeePayoutAction}></form>
                             <input type="hidden" form={`dashboard-payout-${row.payoutId}`} name="payoutId" value={row.payoutId} />
@@ -410,6 +412,7 @@ export default async function DashboardPage({
               <thead>
                 <tr>
                   <th>Period</th>
+                  <th>Days worked</th>
                   <th>Dollar inward</th>
                   <th>Monthly $</th>
                   <th>PF (INR)</th>
@@ -432,6 +435,7 @@ export default async function DashboardPage({
                   return (
                     <tr key={`${row.year}-${row.month ?? 0}`}>
                       <td>{periodLabel}</td>
+                      <td>{`${row.daysWorked}/${row.daysInMonth}`}</td>
                       <td>{formatUsd(row.dollarInwardUsdCents)}</td>
                       <td>{formatUsd(row.employeeMonthlyUsdCents)}</td>
                       <td>{formatInr(row.pfInrCents)}</td>
@@ -477,7 +481,7 @@ export default async function DashboardPage({
                 })}
                 {data.periodRows.length === 0 ? (
                   <tr>
-                    <td colSpan={12} className="py-8 text-center" style={{ color: "var(--text-muted)" }}>
+                    <td colSpan={13} className="py-8 text-center" style={{ color: "var(--text-muted)" }}>
                       No period data available for selected filters.
                     </td>
                   </tr>

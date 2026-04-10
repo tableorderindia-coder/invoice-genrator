@@ -320,11 +320,16 @@ export async function updateInvoiceLineItemAction(formData: FormData) {
     if (!lineItemId) {
       throw new Error("Select a member before updating it.");
     }
+    const daysWorked = Number.parseFloat(getString(formData, "daysWorked"));
+    if (!Number.isFinite(daysWorked) || daysWorked <= 0) {
+      throw new Error("Days worked must be greater than 0.");
+    }
 
     await updateInvoiceLineItem({
       invoiceId,
       lineItemId,
       hrsPerWeek: Number.parseFloat(getString(formData, "hrsPerWeek")),
+      daysWorked,
       billingRateUsdCents: centsFromUsd(getString(formData, "billingRateUsd")),
     });
 

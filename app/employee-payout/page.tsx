@@ -172,6 +172,7 @@ export default async function EmployeePayoutPage({
                   {[
                     "Employee name",
                     "Dollars inward",
+                    "Days worked",
                     "Employee monthly dollars",
                     "Cashout USD/INR rate",
                     "Paid USD/INR rate",
@@ -223,6 +224,11 @@ export default async function EmployeePayoutPage({
                             />
                           </>
                         )}
+                      </td>
+                      <td style={{ fontFamily: "var(--font-jetbrains-mono), monospace" }}>
+                        {row.daysWorked !== undefined && row.daysInMonth !== undefined
+                          ? `${row.daysWorked}/${row.daysInMonth}`
+                          : "-"}
                       </td>
                       <td>
                         <form id={formId} action={updateEmployeePayoutAction}></form>
@@ -392,7 +398,7 @@ export default async function EmployeePayoutPage({
                 })}
                 {selectedPayoutData.rows.length === 0 ? (
                   <tr>
-                    <td colSpan={12} className="py-8 text-center" style={{ color: "var(--text-muted)" }}>
+                    <td colSpan={13} className="py-8 text-center" style={{ color: "var(--text-muted)" }}>
                       No employees found for selected invoice.
                     </td>
                   </tr>

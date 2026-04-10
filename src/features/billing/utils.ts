@@ -38,3 +38,14 @@ export function formatDate(value: string) {
     year: "numeric",
   }).format(new Date(value));
 }
+
+export function getDaysInMonth(month: number, year: number) {
+  if (!Number.isInteger(month) || month < 1 || month > 12) {
+    throw new Error("Month must be between 1 and 12.");
+  }
+  if (!Number.isInteger(year) || year <= 0) {
+    throw new Error("Year must be a positive integer.");
+  }
+
+  return new Date(year, month, 0).getDate();
+}
