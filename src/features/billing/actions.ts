@@ -54,6 +54,15 @@ function getPositiveNumberOrThrow(rawValue: string, fieldLabel: string) {
   return value;
 }
 
+function wholeUsdCentsFromInput(input: string) {
+  const normalized = Number.parseFloat(input || "0");
+  if (Number.isNaN(normalized)) {
+    return 0;
+  }
+
+  return Math.round(normalized) * 100;
+}
+
 function getErrorMessage(error: unknown, fallback: string) {
   if (error instanceof Error) {
     return error.message;
@@ -347,7 +356,7 @@ export async function updateInvoiceLineItemTotalAction(formData: FormData) {
     await updateInvoiceLineItemTotal({
       invoiceId,
       lineItemId,
-      billedTotalUsdCents: centsFromUsd(getString(formData, "billedTotalUsd")),
+      billedTotalUsdCents: wholeUsdCentsFromInput(getString(formData, "billedTotalUsd")),
     });
 
     revalidatePath(`/invoices/${invoiceId}`);
@@ -380,7 +389,7 @@ export async function updateInvoiceTeamTotalAction(formData: FormData) {
     await updateInvoiceTeamTotal({
       invoiceId,
       invoiceTeamId,
-      totalUsdCents: centsFromUsd(getString(formData, "teamTotalUsd")),
+      totalUsdCents: wholeUsdCentsFromInput(getString(formData, "teamTotalUsd")),
     });
 
     revalidatePath(`/invoices/${invoiceId}`);
@@ -407,7 +416,7 @@ export async function updateInvoiceGrandTotalAction(formData: FormData) {
   try {
     await updateInvoiceGrandTotal({
       invoiceId,
-      grandTotalUsdCents: centsFromUsd(getString(formData, "grandTotalUsd")),
+      grandTotalUsdCents: wholeUsdCentsFromInput(getString(formData, "grandTotalUsd")),
     });
 
     revalidatePath(`/invoices/${invoiceId}`);
@@ -443,13 +452,14 @@ export async function addInvoiceAdjustmentAction(formData: FormData) {
         ? buildInvoiceAdjustmentPayload({
             type,
             label: getString(formData, "label"),
-            amountUsdCents: centsFromUsd(getString(formData, "amountUsd")),
+            amountUsdCents: wholeUsdCentsFromInput(getString(formData, "amountUsd")),
           })
         : buildInvoiceAdjustmentPayload({
             type,
             employeeName: getString(formData, "employeeName"),
             rateUsdCents: centsFromUsd(getString(formData, "rateUsd")),
             hrsPerWeek: Number.parseFloat(getString(formData, "hrsPerWeek") || "0"),
+            amountUsdCents: wholeUsdCentsFromInput(getString(formData, "amountUsd")),
           });
 
     await addInvoiceAdjustment({
@@ -514,7 +524,7 @@ export async function updateInvoiceAdjustmentAmountAction(formData: FormData) {
     await updateInvoiceAdjustmentAmount({
       invoiceId,
       adjustmentId,
-      amountUsdCents: centsFromUsd(getString(formData, "amountUsd")),
+      amountUsdCents: wholeUsdCentsFromInput(getString(formData, "amountUsd")),
     });
 
     revalidatePath(`/invoices/${invoiceId}`);

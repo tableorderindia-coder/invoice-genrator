@@ -45,9 +45,12 @@ type SortableInvoiceLineItem = {
   employeeNameSnapshot: string;
   billingRateUsdCents: number;
   billedTotalUsdCents: number;
+  manualTotalUsdCents?: number;
 };
 
 const roundCurrency = (value: number) => Math.round(value);
+const roundToWholeDollarCents = (valueInCents: number) =>
+  roundCurrency(valueInCents / 100) * 100;
 const MONTHS_PER_YEAR = 12;
 const WEEKS_PER_YEAR = 52;
 
@@ -56,10 +59,10 @@ export function calculateLineItemTotals({
   payoutMonthlyUsdCents,
   hrsPerWeek,
 }: LineItemInput): CalculatedLineItem {
-  const billedTotalUsdCents = roundCurrency(
+  const billedTotalUsdCents = roundToWholeDollarCents(
     (billingRateUsdCents * hrsPerWeek * WEEKS_PER_YEAR) / MONTHS_PER_YEAR,
   );
-  const payoutTotalUsdCents = roundCurrency(payoutMonthlyUsdCents);
+  const payoutTotalUsdCents = roundToWholeDollarCents(payoutMonthlyUsdCents);
 
   return {
     billedTotalUsdCents,
@@ -166,13 +169,16 @@ export function resolveEffectiveTeamTotalUsdCents({
 export function sortInvoiceLineItemsByRate<T extends SortableInvoiceLineItem>(
   lineItems: T[],
 ) {
+  const effectiveTotal = (lineItem: SortableInvoiceLineItem) =>
+    lineItem.manualTotalUsdCents ?? lineItem.billedTotalUsdCents;
+
   return [...lineItems].sort((left, right) => {
-    if (right.billingRateUsdCents !== left.billingRateUsdCents) {
-      return right.billingRateUsdCents - left.billingRateUsdCents;
+    if (effectiveTotal(right) !== effectiveTotal(left)) {
+      return effectiveTotal(right) - effectiveTotal(left);
     }
 
-    if (right.billedTotalUsdCents !== left.billedTotalUsdCents) {
-      return right.billedTotalUsdCents - left.billedTotalUsdCents;
+    if (right.billingRateUsdCents !== left.billingRateUsdCents) {
+      return right.billingRateUsdCents - left.billingRateUsdCents;
     }
 
     return left.employeeNameSnapshot.localeCompare(right.employeeNameSnapshot);

@@ -1948,7 +1948,7 @@ export async function addEmployeePayoutRow(input: {
     employee_name_snapshot: employee.fullName,
     dollar_inward_usd_cents: 0,
     employee_monthly_usd_cents: employee.payoutMonthlyUsdCents,
-    cashout_usd_inr_rate: 0,
+    cashout_usd_inr_rate: detail.realization.usdInrRate,
     paid_usd_inr_rate: null,
     pf_inr_cents: 0,
     tds_inr_cents: 0,

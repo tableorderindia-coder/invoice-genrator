@@ -6,6 +6,7 @@ test("shows inline success feedback on the draft invoice page", async ({ page })
   const companyName = `Playwright Co ${stamp}`;
   const teamName = `Data Team ${stamp}`;
   const employeeName = `Playwright Employee ${stamp}`;
+  const extraEmployeeName = `Playwright Extra Employee ${stamp}`;
   const invoiceNumber = `AUTO-${stamp}`;
 
   await page.goto("http://localhost:3000/companies");
@@ -29,6 +30,17 @@ test("shows inline success feedback on the draft invoice page", async ({ page })
   await page.getByRole("button", { name: "Save employee" }).click();
   await expect(page.getByText(employeeName)).toBeVisible();
 
+  await page.getByLabel("Company").selectOption({ label: companyName });
+  await page.getByLabel("Name").fill(extraEmployeeName);
+  await page.getByLabel("Designation").fill("Account Specialist");
+  await page.getByLabel("Default team").fill(`Finance Team ${stamp}`);
+  await page.getByLabel("Billing rate (USD/hr)").fill("35");
+  await page.getByLabel("Payout $/month").fill("2600");
+  await page.getByLabel("Hrs per week").fill("35");
+  await page.getByLabel("Active from").fill("2026-04-01");
+  await page.getByRole("button", { name: "Save employee" }).click();
+  await expect(page.getByText(extraEmployeeName)).toBeVisible();
+
   await page.goto("http://localhost:3000/invoices/create");
   await page.getByLabel("Company").selectOption({ label: companyName });
   await page.getByLabel("Invoice number").fill(invoiceNumber);
@@ -47,14 +59,14 @@ test("shows inline success feedback on the draft invoice page", async ({ page })
   await expect(page.getByLabel("Total")).toBeVisible();
   await page.getByLabel("Rate ($/hr)").fill("25");
   await page.getByLabel("Hrs per week").fill("4");
-  await expect(page.getByLabel("Total")).toHaveValue("$433.33");
+  await expect(page.getByLabel("Total")).toHaveValue("433");
   await page.getByRole("button", { name: "Add / Update" }).click();
   await page.waitForURL(/flashStatus=success/, { timeout: 15000 });
 
   await expect(page.getByText("Adjustment added.")).toBeVisible({ timeout: 15000 });
-  await expect(
-    page.getByText(`${employeeName} · $25.00/hr · 4 hrs/week`),
-  ).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText(`${employeeName} · $25/hr · 4 hrs/week`)).toBeVisible({
+    timeout: 15000,
+  });
 
   await page.locator('select[name="type"]').selectOption("onboarding");
   await page.getByLabel("Employee").selectOption({ label: employeeName });
@@ -76,7 +88,7 @@ test("shows inline success feedback on the draft invoice page", async ({ page })
 
   await page
     .locator("div")
-    .filter({ hasText: `${employeeName} · $25.00/hr · 4 hrs/week` })
+    .filter({ hasText: `${employeeName} · $25/hr · 4 hrs/week` })
     .getByRole("button", { name: "Remove", exact: true })
     .click();
   await page.waitForURL(/flashStatus=success/, { timeout: 15000 });
@@ -106,6 +118,11 @@ test("shows inline success feedback on the draft invoice page", async ({ page })
   await page.getByLabel("Select cashed-out invoice").selectOption(String(payoutInvoiceValue));
   await page.getByRole("button", { name: "Load invoice employees" }).click();
   await expect(page.locator("tr", { hasText: employeeName })).toBeVisible();
+
+  await page.locator('select[name="employeeId"]').selectOption({ label: extraEmployeeName });
+  await page.getByRole("button", { name: "+ Add employee" }).click();
+  await expect(page.getByText("Employee added to payout list.")).toBeVisible({ timeout: 15000 });
+  await expect(page.locator("tr", { hasText: extraEmployeeName })).toBeVisible({ timeout: 15000 });
 
   const payoutRow = page.locator("tr", { hasText: employeeName });
   await payoutRow.getByPlaceholder("Enter paid rate").fill("82.1000");

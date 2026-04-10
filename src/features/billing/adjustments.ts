@@ -19,7 +19,7 @@ export function calculatePersonAdjustmentTotalUsdCents(input: {
     throw new Error("Rate and hrs per week must be non-negative.");
   }
 
-  return Math.round((input.rateUsdCents * input.hrsPerWeek * 52) / 12);
+  return Math.round((input.rateUsdCents * input.hrsPerWeek * 52) / 12 / 100) * 100;
 }
 
 function getPersonAdjustmentLabel(type: PersonAdjustmentType) {
@@ -40,6 +40,7 @@ export function buildInvoiceAdjustmentPayload(
         employeeName: string;
         rateUsdCents: number;
         hrsPerWeek: number;
+        amountUsdCents?: number;
       }
     | {
         type: "reimbursement";
@@ -68,10 +69,12 @@ export function buildInvoiceAdjustmentPayload(
     throw new Error("Name is required for this adjustment.");
   }
 
-  const amountUsdCents = calculatePersonAdjustmentTotalUsdCents({
-    rateUsdCents: input.rateUsdCents,
-    hrsPerWeek: input.hrsPerWeek,
-  });
+  const amountUsdCents =
+    input.amountUsdCents ??
+    calculatePersonAdjustmentTotalUsdCents({
+      rateUsdCents: input.rateUsdCents,
+      hrsPerWeek: input.hrsPerWeek,
+    });
 
   return {
     type: input.type,

@@ -130,9 +130,9 @@ export default async function DraftInvoicePage({
                 <input
                   name="grandTotalUsd"
                   type="number"
-                  step="0.01"
+                  step="1"
                   min="0"
-                  defaultValue={(detail.invoice.grandTotalUsdCents / 100).toFixed(2)}
+                  defaultValue={Math.round(detail.invoice.grandTotalUsdCents / 100)}
                   className={inputClass}
                   style={{ minWidth: "8rem" }}
                 />
@@ -202,8 +202,8 @@ export default async function DraftInvoicePage({
                           name="teamTotalUsd"
                           type="number"
                           min="0"
-                          step="0.01"
-                          defaultValue={((team.totalUsdCents ?? 0) / 100).toFixed(2)}
+                          step="1"
+                          defaultValue={Math.round((team.totalUsdCents ?? 0) / 100)}
                           className={inputClass}
                           style={{ minWidth: "8rem" }}
                         />
@@ -277,8 +277,8 @@ export default async function DraftInvoicePage({
                                   name="billedTotalUsd"
                                   type="number"
                                   min="0"
-                                  step="0.01"
-                                  defaultValue={(lineItem.billedTotalUsdCents / 100).toFixed(2)}
+                                  step="1"
+                                  defaultValue={Math.round(lineItem.billedTotalUsdCents / 100)}
                                   className={inputClass}
                                   style={{ minWidth: "8rem" }}
                                 />

@@ -15,7 +15,7 @@ describe("invoice adjustments", () => {
         rateUsdCents: 2500,
         hrsPerWeek: 6.5,
       }),
-    ).toBe(70417);
+    ).toBe(70400);
   });
 
   it("builds onboarding and appraisal adjustments as positive amounts", () => {
@@ -49,6 +49,25 @@ describe("invoice adjustments", () => {
       rateUsdCents: 4200,
       hrsPerWeek: 2.5,
       amountUsdCents: 45500,
+    });
+  });
+
+  it("allows overriding person-based adjustment totals with editable amounts", () => {
+    expect(
+      buildInvoiceAdjustmentPayload({
+        type: "onboarding",
+        employeeName: "Pawan",
+        rateUsdCents: 3000,
+        hrsPerWeek: 4,
+        amountUsdCents: 61000,
+      }),
+    ).toEqual({
+      type: "onboarding",
+      label: "Onboarding advance",
+      employeeName: "Pawan",
+      rateUsdCents: 3000,
+      hrsPerWeek: 4,
+      amountUsdCents: 61000,
     });
   });
 

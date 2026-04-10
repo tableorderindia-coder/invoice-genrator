@@ -40,6 +40,23 @@ const INITIAL_FORM: FormState = {
   amountUsd: "",
 };
 
+function wholeUsdCentsFromInput(input: string) {
+  const normalized = Number.parseFloat(input || "0");
+  if (Number.isNaN(normalized)) {
+    return 0;
+  }
+
+  return Math.round(normalized) * 100;
+}
+
+function personTotalUsdInputValue(rateUsd: string, hrsPerWeek: string) {
+  const cents = calculatePersonAdjustmentTotalUsdCents({
+    rateUsdCents: centsFromUsd(rateUsd),
+    hrsPerWeek: Number.parseFloat(hrsPerWeek || "0"),
+  });
+  return String(Math.round(cents / 100));
+}
+
 function formatHours(hoursPerWeek: number | undefined) {
   if (hoursPerWeek === undefined) {
     return "";
@@ -57,7 +74,7 @@ function buildClientAdjustmentPayload(form: FormState) {
     return buildInvoiceAdjustmentPayload({
       type: "reimbursement",
       label: form.label,
-      amountUsdCents: centsFromUsd(form.amountUsd),
+      amountUsdCents: wholeUsdCentsFromInput(form.amountUsd),
     });
   }
 
@@ -66,6 +83,7 @@ function buildClientAdjustmentPayload(form: FormState) {
     employeeName: form.employeeName,
     rateUsdCents: centsFromUsd(form.rateUsd),
     hrsPerWeek: Number.parseFloat(form.hrsPerWeek || "0"),
+    amountUsdCents: wholeUsdCentsFromInput(form.amountUsd),
   });
 }
 
@@ -168,9 +186,9 @@ function AdjustmentGroup({
                 <input
                   name="amountUsd"
                   type="number"
-                  step="0.01"
+                  step="1"
                   className={inputClass}
-                  defaultValue={(adjustment.amountUsdCents / 100).toFixed(2)}
+                  defaultValue={Math.round(adjustment.amountUsdCents / 100)}
                   style={{ minWidth: "8rem" }}
                 />
                 <PendingSubmitButton
@@ -221,16 +239,6 @@ export function AdjustmentForms({
   const [isAdding, setIsAdding] = useState(false);
   const grouped = useMemo(() => groupInvoiceAdjustments(adjustments), [adjustments]);
 
-  const totalPreview =
-    form.type && form.type !== "reimbursement"
-      ? formatUsd(
-          calculatePersonAdjustmentTotalUsdCents({
-            rateUsdCents: centsFromUsd(form.rateUsd),
-            hrsPerWeek: Number.parseFloat(form.hrsPerWeek || "0"),
-          }),
-        )
-      : "";
-
   const handleTypeChange = (type: AdjustmentTypeOption) => {
     setError("");
     const defaultEmployeeName =
@@ -239,6 +247,10 @@ export function AdjustmentForms({
       ...INITIAL_FORM,
       type,
       employeeName: defaultEmployeeName,
+      amountUsd:
+        type === "reimbursement" || !type
+          ? ""
+          : personTotalUsdInputValue(INITIAL_FORM.rateUsd, INITIAL_FORM.hrsPerWeek),
     });
   };
 
@@ -332,7 +344,7 @@ export function AdjustmentForms({
               <input
                 name="amountUsd"
                 type="number"
-                step="0.01"
+                step="1"
                 min="0"
                 placeholder="Enter amount"
                 className={`${inputClass} min-h-14`}
@@ -392,7 +404,14 @@ export function AdjustmentForms({
                 className={`${inputClass} min-h-14`}
                 value={form.rateUsd}
                 onChange={(event) =>
-                  setForm((current) => ({ ...current, rateUsd: event.target.value }))
+                  setForm((current) => {
+                    const nextRateUsd = event.target.value;
+                    return {
+                      ...current,
+                      rateUsd: nextRateUsd,
+                      amountUsd: personTotalUsdInputValue(nextRateUsd, current.hrsPerWeek),
+                    };
+                  })
                 }
               />
             </Field>
@@ -406,16 +425,29 @@ export function AdjustmentForms({
                 className={`${inputClass} min-h-14`}
                 value={form.hrsPerWeek}
                 onChange={(event) =>
-                  setForm((current) => ({ ...current, hrsPerWeek: event.target.value }))
+                  setForm((current) => {
+                    const nextHours = event.target.value;
+                    return {
+                      ...current,
+                      hrsPerWeek: nextHours,
+                      amountUsd: personTotalUsdInputValue(current.rateUsd, nextHours),
+                    };
+                  })
                 }
               />
             </Field>
             <Field label="Total">
               <input
-                readOnly
-                value={totalPreview}
+                name="amountUsd"
+                type="number"
+                step="1"
+                min="0"
+                value={form.amountUsd}
                 aria-label="Total"
                 className={`${inputClass} min-h-14`}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, amountUsd: event.target.value }))
+                }
               />
             </Field>
           </div>

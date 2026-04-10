@@ -19,9 +19,9 @@ describe("billing domain", () => {
         hrsPerWeek: 12.5,
       }),
     ).toEqual({
-      billedTotalUsdCents: 243750,
+      billedTotalUsdCents: 243800,
       payoutTotalUsdCents: 300000,
-      profitTotalUsdCents: -56250,
+      profitTotalUsdCents: -56200,
     });
   });
 
@@ -30,24 +30,24 @@ describe("billing domain", () => {
       calculateInvoiceTotals({
         lineItems: [
           {
-            billedTotalUsdCents: 243750,
+            billedTotalUsdCents: 243800,
             payoutTotalUsdCents: 300000,
-            profitTotalUsdCents: -56250,
+            profitTotalUsdCents: -56200,
           },
           {
-            billedTotalUsdCents: 86667,
+            billedTotalUsdCents: 86700,
             payoutTotalUsdCents: 100000,
-            profitTotalUsdCents: -13333,
+            profitTotalUsdCents: -13300,
           },
         ],
         adjustments: [5000, -2500, 1000],
       }),
     ).toEqual({
-      subtotalUsdCents: 330417,
+      subtotalUsdCents: 330500,
       adjustmentsUsdCents: 3500,
-      grandTotalUsdCents: 333917,
+      grandTotalUsdCents: 334000,
       payoutTotalUsdCents: 400000,
-      profitTotalUsdCents: -66083,
+      profitTotalUsdCents: -66000,
     });
   });
 
@@ -164,7 +164,7 @@ describe("billing domain", () => {
     ).toBe(210000);
   });
 
-  it("sorts invoice line items by billed rate desc, then total desc, then name asc", () => {
+  it("sorts invoice line items by total desc, then billed rate desc, then name asc", () => {
     const sorted = sortInvoiceLineItemsByRate([
       {
         employeeNameSnapshot: "Zelda",
@@ -189,10 +189,10 @@ describe("billing domain", () => {
     ]);
 
     expect(sorted.map((item) => item.employeeNameSnapshot)).toEqual([
+      "Zelda",
       "Adam",
       "Ariana",
       "Bella",
-      "Zelda",
     ]);
   });
 });
