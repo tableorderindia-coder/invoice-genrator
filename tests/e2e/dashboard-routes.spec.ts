@@ -14,8 +14,8 @@ test("loads dashboard and employee cash flow routes", async ({ page }) => {
 
   await page.goto("/employee-cash-flow");
   await expect(
-    page.getByRole("heading", { name: "Employee Cash Flow" }),
+    page.getByRole("heading", { name: "Employee Cash Flow", exact: true }),
   ).toBeVisible();
   await expect(page.getByText("Cash reality dashboard")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Load month" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Load" })).toBeVisible();
 });

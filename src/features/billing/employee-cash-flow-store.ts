@@ -56,6 +56,13 @@ type DbInvoiceRealization = {
   usd_inr_rate: number | null;
 };
 
+type DbInvoicePayment = {
+  id: string;
+  payment_date: string;
+  payment_month: string;
+  usd_inr_rate: number;
+};
+
 type DbInvoiceAdjustment = {
   invoice_id: string;
   type: "onboarding" | "offboarding" | "reimbursement" | "appraisal";
@@ -92,8 +99,10 @@ type DbInvoiceLineItem = {
 };
 
 type DbCashFlowEntry = {
+  id: string;
   employee_id: string;
   payment_month: string;
+  invoice_line_item_id: string | null;
   employee_name_snapshot: string;
   company_id: string;
   monthly_paid_usd_cents: number;
@@ -104,6 +113,17 @@ type DbCashFlowEntry = {
   cashout_usd_inr_rate: number;
   paid_usd_inr_rate: number;
   cash_in_inr_cents: number;
+  pf_inr_cents: number;
+  tds_inr_cents: number;
+  actual_paid_inr_cents: number;
+  fx_commission_inr_cents: number;
+  total_commission_usd_cents: number;
+  commission_earned_inr_cents: number;
+  gross_earnings_inr_cents: number;
+  is_non_invoice_employee: boolean;
+  is_paid: boolean;
+  paid_at: string | null;
+  notes: string | null;
   days_worked: number;
   days_in_month: number;
   invoice_id: string;
@@ -360,7 +380,13 @@ export async function getInvoicePaymentPrefillData(input: {
   const invoice = invoiceRow as DbInvoice;
   const payouts = (payoutRows ?? []) as DbEmployeePayout[];
 
-  const [realizationResult, lineItemResult, adjustmentResult, employeesResult] =
+  const [
+    realizationResult,
+    lineItemResult,
+    adjustmentResult,
+    employeesResult,
+    invoicePaymentResult,
+  ] =
     await Promise.all([
       supabase
         .from("invoice_realizations")
@@ -382,17 +408,40 @@ export async function getInvoicePaymentPrefillData(input: {
         .select("id, full_name, company_id, payout_monthly_usd_cents")
         .eq("company_id", invoice.company_id)
         .order("full_name"),
+      supabase
+        .from("invoice_payments")
+        .select("id, payment_date, payment_month, usd_inr_rate")
+        .eq("invoice_id", input.invoiceId)
+        .eq("payment_month", input.paymentMonth)
+        .order("payment_date", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
     ]);
 
   if (realizationResult.error) throw realizationResult.error;
   if (adjustmentResult.error) throw adjustmentResult.error;
   if (employeesResult.error) throw employeesResult.error;
+  if (invoicePaymentResult.error) throw invoicePaymentResult.error;
 
   const lineItems = new Map<string, DbInvoiceLineItem>(
     (lineItemResult as DbInvoiceLineItem[]).map((row) => [row.id, row]),
   );
   const adjustments = (adjustmentResult.data ?? []) as DbInvoiceAdjustment[];
   const realization = (realizationResult.data ?? null) as DbInvoiceRealization | null;
+  const invoicePayment = (invoicePaymentResult.data ?? null) as DbInvoicePayment | null;
+
+  let savedEntries: DbCashFlowEntry[] = [];
+  if (invoicePayment?.id) {
+    const savedEntriesResult = await supabase
+      .from("invoice_payment_employee_entries")
+      .select(
+        "id, employee_id, payment_month, invoice_line_item_id, employee_name_snapshot, company_id, monthly_paid_usd_cents, base_dollar_inward_usd_cents, onboarding_advance_usd_cents, offboarding_deduction_usd_cents, effective_dollar_inward_usd_cents, cashout_usd_inr_rate, paid_usd_inr_rate, cash_in_inr_cents, pf_inr_cents, tds_inr_cents, actual_paid_inr_cents, fx_commission_inr_cents, total_commission_usd_cents, commission_earned_inr_cents, gross_earnings_inr_cents, is_non_invoice_employee, is_paid, paid_at, notes, days_worked, days_in_month, invoice_id",
+      )
+      .eq("invoice_payment_id", invoicePayment.id)
+      .order("employee_name_snapshot");
+    if (savedEntriesResult.error) throw savedEntriesResult.error;
+    savedEntries = (savedEntriesResult.data ?? []) as DbCashFlowEntry[];
+  }
 
   const onboardingByEmployeeName = new Map<string, number>();
   const offboardingByEmployeeName = new Map<string, number>();
@@ -420,56 +469,86 @@ export async function getInvoicePaymentPrefillData(input: {
     return new Date(year, month, 0).getDate();
   })();
 
-  const entries = payouts.map((row) => {
-    const lineItem = row.invoice_line_item_id
-      ? lineItems.get(row.invoice_line_item_id)
-      : undefined;
-    const onboardingAdvanceUsdCents =
-      onboardingByEmployeeName.get(row.employee_name_snapshot) ?? 0;
-    const offboardingDeductionUsdCents =
-      offboardingByEmployeeName.get(row.employee_name_snapshot) ?? 0;
-    const effectiveDollarInwardUsdCents = calculateEffectiveDollarInwardUsdCents({
-      baseDollarInwardUsdCents: row.dollar_inward_usd_cents,
-      onboardingAdvanceUsdCents,
-      offboardingDeductionUsdCents,
-    });
-    const cashoutUsdInrRate =
-      realization?.usd_inr_rate ?? row.cashout_usd_inr_rate ?? 0;
+  const entries =
+    savedEntries.length > 0
+      ? savedEntries.map((row) => ({
+          id: row.id,
+          employeeId: row.employee_id,
+          employeeNameSnapshot: row.employee_name_snapshot,
+          invoiceLineItemId: row.invoice_line_item_id ?? undefined,
+          daysWorked: row.days_worked ?? daysInMonth,
+          daysInMonth: row.days_in_month ?? daysInMonth,
+          monthlyPaidUsdCents: row.monthly_paid_usd_cents,
+          baseDollarInwardUsdCents: row.base_dollar_inward_usd_cents,
+          onboardingAdvanceUsdCents: row.onboarding_advance_usd_cents,
+          offboardingDeductionUsdCents: row.offboarding_deduction_usd_cents,
+          effectiveDollarInwardUsdCents: row.effective_dollar_inward_usd_cents,
+          cashoutUsdInrRate: row.cashout_usd_inr_rate,
+          paidUsdInrRate: row.paid_usd_inr_rate,
+          cashInInrCents: row.cash_in_inr_cents,
+          pfInrCents: row.pf_inr_cents,
+          tdsInrCents: row.tds_inr_cents,
+          actualPaidInrCents: row.actual_paid_inr_cents,
+          fxCommissionInrCents: row.fx_commission_inr_cents,
+          totalCommissionUsdCents: row.total_commission_usd_cents,
+          commissionEarnedInrCents: row.commission_earned_inr_cents,
+          grossEarningsInrCents: row.gross_earnings_inr_cents,
+          isNonInvoiceEmployee: row.is_non_invoice_employee,
+          isPaid: row.is_paid,
+          paidAt: row.paid_at ?? undefined,
+          notes: row.notes ?? "",
+        }))
+      : payouts.map((row) => {
+          const lineItem = row.invoice_line_item_id
+            ? lineItems.get(row.invoice_line_item_id)
+            : undefined;
+          const onboardingAdvanceUsdCents =
+            onboardingByEmployeeName.get(row.employee_name_snapshot) ?? 0;
+          const offboardingDeductionUsdCents =
+            offboardingByEmployeeName.get(row.employee_name_snapshot) ?? 0;
+          const effectiveDollarInwardUsdCents = calculateEffectiveDollarInwardUsdCents({
+            baseDollarInwardUsdCents: row.dollar_inward_usd_cents,
+            onboardingAdvanceUsdCents,
+            offboardingDeductionUsdCents,
+          });
+          const cashoutUsdInrRate =
+            realization?.usd_inr_rate ?? row.cashout_usd_inr_rate ?? 0;
 
-    return {
-      id: nextCashFlowId("cash_entry"),
-      employeeId: row.employee_id,
-      employeeNameSnapshot: row.employee_name_snapshot,
-      invoiceLineItemId: row.invoice_line_item_id ?? undefined,
-      daysWorked: lineItem?.days_worked ?? daysInMonth,
-      daysInMonth,
-      monthlyPaidUsdCents: row.employee_monthly_usd_cents,
-      baseDollarInwardUsdCents: row.dollar_inward_usd_cents,
-      onboardingAdvanceUsdCents,
-      offboardingDeductionUsdCents,
-      effectiveDollarInwardUsdCents,
-      cashoutUsdInrRate,
-      paidUsdInrRate: row.paid_usd_inr_rate ?? 0,
-      cashInInrCents: calculateCashInInrCents({
-        effectiveDollarInwardUsdCents,
-        cashoutUsdInrRate,
-      }),
-      pfInrCents: row.pf_inr_cents ?? 0,
-      tdsInrCents: row.tds_inr_cents ?? 0,
-      actualPaidInrCents: row.actual_paid_inr_cents ?? 0,
-      fxCommissionInrCents: row.fx_commission_inr_cents ?? 0,
-      totalCommissionUsdCents: row.total_commission_usd_cents ?? 0,
-      commissionEarnedInrCents: row.commission_earned_inr_cents ?? 0,
-      grossEarningsInrCents:
-        (row.fx_commission_inr_cents ?? 0) + (row.commission_earned_inr_cents ?? 0),
-      isNonInvoiceEmployee: row.is_non_invoice_employee ?? false,
-      isPaid: row.is_paid,
-      paidAt: row.paid_at ?? undefined,
-      notes: "",
-    };
-  });
+          return {
+            id: nextCashFlowId("cash_entry"),
+            employeeId: row.employee_id,
+            employeeNameSnapshot: row.employee_name_snapshot,
+            invoiceLineItemId: row.invoice_line_item_id ?? undefined,
+            daysWorked: lineItem?.days_worked ?? daysInMonth,
+            daysInMonth,
+            monthlyPaidUsdCents: row.employee_monthly_usd_cents,
+            baseDollarInwardUsdCents: row.dollar_inward_usd_cents,
+            onboardingAdvanceUsdCents,
+            offboardingDeductionUsdCents,
+            effectiveDollarInwardUsdCents,
+            cashoutUsdInrRate,
+            paidUsdInrRate: row.paid_usd_inr_rate ?? 0,
+            cashInInrCents: calculateCashInInrCents({
+              effectiveDollarInwardUsdCents,
+              cashoutUsdInrRate,
+            }),
+            pfInrCents: row.pf_inr_cents ?? 0,
+            tdsInrCents: row.tds_inr_cents ?? 0,
+            actualPaidInrCents: row.actual_paid_inr_cents ?? 0,
+            fxCommissionInrCents: row.fx_commission_inr_cents ?? 0,
+            totalCommissionUsdCents: row.total_commission_usd_cents ?? 0,
+            commissionEarnedInrCents: row.commission_earned_inr_cents ?? 0,
+            grossEarningsInrCents:
+              (row.fx_commission_inr_cents ?? 0) + (row.commission_earned_inr_cents ?? 0),
+            isNonInvoiceEmployee: row.is_non_invoice_employee ?? false,
+            isPaid: row.is_paid,
+            paidAt: row.paid_at ?? undefined,
+            notes: "",
+          };
+        });
 
   return {
+    invoicePaymentId: invoicePayment?.id ?? "",
     invoice: {
       id: invoice.id,
       invoiceNumber: invoice.invoice_number,

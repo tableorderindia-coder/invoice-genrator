@@ -3,32 +3,41 @@ import { inputClass } from "../_components/field";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
 import { Shell } from "../_components/shell";
 import {
-  saveInvoicePaymentAction,
-  saveEmployeeSalaryPaymentAction,
-} from "@/src/features/billing/actions";
-import {
-  getEmployeeCashFlowDashboardData,
   getInvoicePaymentPrefillData,
   listCashFlowInvoiceOptions,
 } from "@/src/features/billing/employee-cash-flow-store";
 import { listCompanies } from "@/src/features/billing/store";
-import type { EmployeeCashFlowMonthRow } from "@/src/features/billing/employee-cash-flow-types";
-import { formatInr, formatUsd } from "@/src/features/billing/utils";
+import {
+  aggregateEmployeeCashFlowEditableEntries,
+  type EmployeeCashFlowEditableEntry,
+} from "@/src/features/billing/employee-cash-flow-entry-aggregation";
 
-import EmployeeCashFlowDetailPanel from "./_components/employee-cash-flow-detail-panel";
 import EmployeeCashFlowEntryForm from "./_components/employee-cash-flow-entry-form";
-import EmployeeCashFlowSummaryTable from "./_components/employee-cash-flow-summary-table";
 
 export const dynamic = "force-dynamic";
 
-function getTodayMonthParts() {
+function getTodayMonthKey() {
   const now = new Date();
-  return {
-    month: now.getMonth() + 1,
-    year: now.getFullYear(),
-    isoMonth: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`,
-    isoDate: now.toISOString().slice(0, 10),
-  };
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function resolveMonthKey(input?: string | string[], legacyYear?: string | string[]) {
+  const monthValue = Array.isArray(input) ? input[0] : input;
+  if (monthValue && /^\d{4}-\d{2}$/.test(monthValue)) {
+    return monthValue;
+  }
+
+  const legacyMonth = Array.isArray(input) ? input[0] : input;
+  const yearValue = Array.isArray(legacyYear) ? legacyYear[0] : legacyYear;
+  if (legacyMonth && yearValue) {
+    const monthNumber = Number.parseInt(legacyMonth, 10);
+    const yearNumber = Number.parseInt(yearValue, 10);
+    if (Number.isFinite(monthNumber) && Number.isFinite(yearNumber)) {
+      return `${yearNumber}-${String(monthNumber).padStart(2, "0")}`;
+    }
+  }
+
+  return getTodayMonthKey();
 }
 
 export default async function EmployeeCashFlowPage({
@@ -39,13 +48,10 @@ export default async function EmployeeCashFlowPage({
     month?: string | string[];
     year?: string | string[];
     invoiceId?: string | string[];
-    invoicePaymentId?: string | string[];
-    employeeId?: string | string[];
     flashStatus?: string | string[];
     flashMessage?: string | string[];
   }>;
 }) {
-  const today = getTodayMonthParts();
   const resolved = await searchParams;
   const companies = await listCompanies();
 
@@ -54,11 +60,8 @@ export default async function EmployeeCashFlowPage({
     : resolved.companyId;
   const selectedCompanyId = selectedCompanyIdRaw || companies[0]?.id || "";
 
-  const selectedMonthRaw = Array.isArray(resolved.month) ? resolved.month[0] : resolved.month;
-  const selectedYearRaw = Array.isArray(resolved.year) ? resolved.year[0] : resolved.year;
-  const selectedMonth = Number.parseInt(selectedMonthRaw || String(today.month), 10);
-  const selectedYear = Number.parseInt(selectedYearRaw || String(today.year), 10);
-  const paymentMonth = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
+  const monthKey = resolveMonthKey(resolved.month, resolved.year);
+  const [selectedYear, selectedMonth] = monthKey.split("-").map((value) => Number(value));
 
   const invoiceOptions = selectedCompanyId
     ? await listCashFlowInvoiceOptions({
@@ -73,36 +76,11 @@ export default async function EmployeeCashFlowPage({
     : resolved.invoiceId;
   const selectedInvoiceId = selectedInvoiceIdRaw || invoiceOptions[0]?.id || "";
 
-  const selectedInvoicePaymentIdRaw = Array.isArray(resolved.invoicePaymentId)
-    ? resolved.invoicePaymentId[0]
-    : resolved.invoicePaymentId;
-  const selectedInvoicePaymentId = selectedInvoicePaymentIdRaw || "";
-
-  const dashboardData = selectedCompanyId
-    ? await getEmployeeCashFlowDashboardData({
-        companyId: selectedCompanyId,
-        month: paymentMonth,
-      })
-    : { rows: [], salaryPayments: [] };
-
   const prefillData = selectedInvoiceId
     ? await getInvoicePaymentPrefillData({
         invoiceId: selectedInvoiceId,
-        paymentMonth,
+        paymentMonth: monthKey,
       })
-    : undefined;
-
-  const selectedEmployeeIdRaw = Array.isArray(resolved.employeeId)
-    ? resolved.employeeId[0]
-    : resolved.employeeId;
-  const selectedRow =
-    dashboardData.rows.find((row) => row.employeeId === selectedEmployeeIdRaw) ??
-    dashboardData.rows[0];
-  const selectedSalaryPayment = selectedRow
-    ? dashboardData.salaryPayments.find(
-        (row) =>
-          row.employeeId === selectedRow.employeeId && row.month === selectedRow.paymentMonth,
-      )
     : undefined;
 
   const flashStatus = Array.isArray(resolved.flashStatus)
@@ -112,15 +90,17 @@ export default async function EmployeeCashFlowPage({
     ? resolved.flashMessage[0]
     : resolved.flashMessage;
 
-  const returnTo = `/employee-cash-flow?companyId=${encodeURIComponent(selectedCompanyId)}&month=${selectedMonth}&year=${selectedYear}${selectedInvoiceId ? `&invoiceId=${encodeURIComponent(selectedInvoiceId)}` : ""}${selectedEmployeeIdRaw ? `&employeeId=${encodeURIComponent(selectedEmployeeIdRaw)}` : ""}${selectedInvoicePaymentId ? `&invoicePaymentId=${encodeURIComponent(selectedInvoicePaymentId)}` : ""}`;
-  const baseQuery = `/employee-cash-flow?companyId=${encodeURIComponent(selectedCompanyId)}&month=${selectedMonth}&year=${selectedYear}${selectedInvoiceId ? `&invoiceId=${encodeURIComponent(selectedInvoiceId)}` : ""}${selectedInvoicePaymentId ? `&invoicePaymentId=${encodeURIComponent(selectedInvoicePaymentId)}` : ""}`;
+  const returnTo = `/employee-cash-flow?companyId=${encodeURIComponent(selectedCompanyId)}&month=${monthKey}${selectedInvoiceId ? `&invoiceId=${encodeURIComponent(selectedInvoiceId)}` : ""}`;
+  const initialEntries: EmployeeCashFlowEditableEntry[] = prefillData
+    ? aggregateEmployeeCashFlowEditableEntries(prefillData.entries)
+    : [];
 
   return (
     <Shell title="Employee Cash Flow" eyebrow="Cash reality dashboard">
       <GlassPanel gradient>
         <form
           action="/employee-cash-flow"
-          className="grid gap-3 md:grid-cols-[1.2fr_140px_140px_1.2fr_auto] md:items-end"
+          className="grid gap-3 md:grid-cols-[1.2fr_180px_1.2fr_auto] md:items-end"
         >
           <label className="block">
             <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
@@ -138,13 +118,7 @@ export default async function EmployeeCashFlowPage({
             <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
               Month
             </span>
-            <input name="month" type="number" min="1" max="12" defaultValue={selectedMonth} className={inputClass} />
-          </label>
-          <label className="block">
-            <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
-              Year
-            </span>
-            <input name="year" type="number" min="2024" defaultValue={selectedYear} className={inputClass} />
+            <input name="month" type="month" defaultValue={monthKey} className={inputClass} />
           </label>
           <label className="block">
             <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
@@ -164,7 +138,7 @@ export default async function EmployeeCashFlowPage({
           </label>
           <PendingSubmitButton
             className="gradient-btn"
-            defaultText="Load month"
+            defaultText="Load"
             pendingText="Loading..."
           />
         </form>
@@ -189,148 +163,24 @@ export default async function EmployeeCashFlowPage({
         ) : null}
       </GlassPanel>
 
-      <GlassPanel title="Invoice Cash Event" gradient>
-        {prefillData ? (
-          <form action={saveInvoicePaymentAction} className="grid gap-3 md:grid-cols-5 md:items-end">
-            <input type="hidden" name="invoicePaymentId" value={selectedInvoicePaymentId} />
-            <input type="hidden" name="invoiceId" value={prefillData.invoice.id} />
-            <input type="hidden" name="companyId" value={prefillData.invoice.companyId} />
-            <input type="hidden" name="paymentMonth" value={paymentMonth} />
-            <input type="hidden" name="returnTo" value={returnTo} />
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
-                Payment month
-              </span>
-              <input value={paymentMonth} readOnly className={inputClass} />
-            </label>
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
-                Payment date
-              </span>
-              <input name="paymentDate" type="date" defaultValue={today.isoDate} className={inputClass} />
-            </label>
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
-                Dollar inward from invoice
-              </span>
-              <input value={formatUsd(prefillData.invoice.dollarInboundUsdCents)} readOnly className={inputClass} />
-            </label>
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
-                Cashout USD/INR rate
-              </span>
-              <input
-                name="usdInrRate"
-                type="number"
-                step="0.0001"
-                min="0"
-                defaultValue={prefillData.invoice.usdInrRate}
-                className={inputClass}
-              />
-            </label>
-            <PendingSubmitButton
-              className="btn-outline"
-              defaultText="Save payment header"
-              pendingText="Saving..."
-            />
-          </form>
-        ) : (
-          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-            Select a company, month, year, and cashed-out invoice to preload cash flow rows.
-          </p>
-        )}
-      </GlassPanel>
-
-      <GlassPanel title="Editable Cash Flow Rows" gradient>
+      <GlassPanel title="Editable Employee Cash Flow Rows" gradient>
         {prefillData ? (
           <EmployeeCashFlowEntryForm
-            invoicePaymentId={selectedInvoicePaymentId}
+            invoicePaymentId={prefillData.invoicePaymentId}
             invoiceId={prefillData.invoice.id}
             companyId={prefillData.invoice.companyId}
-            paymentMonth={paymentMonth}
+            paymentMonth={monthKey}
             returnTo={returnTo}
-            initialEntries={prefillData.entries}
+            invoiceNumber={prefillData.invoice.invoiceNumber}
+            initialEntries={initialEntries}
             availableEmployees={prefillData.availableEmployees}
           />
         ) : (
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-            Employee rows will appear here after you load a cashed-out invoice.
+            Select a company, month, and cashed-out invoice to load aggregated employee cash flow cards.
           </p>
         )}
       </GlassPanel>
-
-      <GlassPanel title="Monthly Employee Cash View" gradient>
-        <EmployeeCashFlowSummaryTable
-          rows={dashboardData.rows}
-          selectedEmployeeId={selectedEmployeeIdRaw}
-          baseQuery={baseQuery}
-        />
-      </GlassPanel>
-
-      <GlassPanel title="Employee Monthly View" gradient>
-        <EmployeeCashFlowDetailPanel row={selectedRow} salaryPayment={selectedSalaryPayment} />
-      </GlassPanel>
-
-      {selectedRow ? (
-        <GlassPanel title="Quick Salary Snapshot Save">
-          <form action={saveEmployeeSalaryPaymentAction} className="grid gap-3 md:grid-cols-6 md:items-end">
-            <input type="hidden" name="employeeId" value={selectedRow.employeeId} />
-            <input type="hidden" name="companyId" value={selectedRow.companyId} />
-            <input type="hidden" name="month" value={selectedRow.paymentMonth} />
-            <input type="hidden" name="returnTo" value={returnTo} />
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
-                Employee
-              </span>
-              <input value={selectedRow.employeeName} readOnly className={inputClass} />
-            </label>
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
-                Monthly Paid $
-              </span>
-              <input
-                name="salaryUsd"
-                type="number"
-                step="0.01"
-                min="0"
-                defaultValue={(selectedRow.monthlyPaidUsdCents / 100).toFixed(2)}
-                className={inputClass}
-              />
-            </label>
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
-                Paid USD/INR
-              </span>
-              <input
-                name="paidUsdInrRate"
-                type="number"
-                step="0.0001"
-                min="0"
-                defaultValue={selectedRow.paidUsdInrRate}
-                className={inputClass}
-              />
-            </label>
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
-                Paid date
-              </span>
-              <input name="paidDate" type="date" defaultValue={today.isoDate} className={inputClass} />
-            </label>
-            <label className="inline-flex items-center gap-2">
-              <input name="paidStatus" type="checkbox" value="true" defaultChecked />
-              <span style={{ color: "var(--text-secondary)" }}>Paid this month</span>
-            </label>
-            <PendingSubmitButton
-              className="btn-outline"
-              defaultText="Save salary snapshot"
-              pendingText="Saving..."
-            />
-          </form>
-          <p className="mt-3 text-sm" style={{ color: "var(--text-muted)" }}>
-            Current row cash in: {formatInr(selectedRow.cashInInrCents)}. Current salary paid snapshot: {formatInr(selectedRow.salaryPaidInrCents)}.
-          </p>
-        </GlassPanel>
-      ) : null}
     </Shell>
   );
 }

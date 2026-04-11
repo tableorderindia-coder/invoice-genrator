@@ -961,11 +961,6 @@ export async function saveInvoicePaymentEmployeeEntriesAction(formData: FormData
   const returnTo = getString(formData, "returnTo") || "/employee-cash-flow";
 
   try {
-    const invoicePaymentId = getString(formData, "invoicePaymentId");
-    if (!invoicePaymentId) {
-      throw new Error("Save the invoice payment header first.");
-    }
-
     const invoiceId = getString(formData, "invoiceId");
     if (!invoiceId) {
       throw new Error("Invoice is required.");
@@ -982,6 +977,16 @@ export async function saveInvoicePaymentEmployeeEntriesAction(formData: FormData
     }
 
     const entries = parseEmployeeCashFlowEntriesJson(getString(formData, "entriesJson"));
+
+    const invoicePaymentId =
+      getString(formData, "invoicePaymentId") ||
+      (await upsertInvoicePayment({
+        invoiceId,
+        companyId,
+        paymentDate: `${paymentMonth}-01`,
+        paymentMonth,
+        usdInrRate: entries[0]?.cashoutUsdInrRate ?? 0,
+      }));
 
     await replaceInvoicePaymentEmployeeEntries({
       invoicePaymentId,
