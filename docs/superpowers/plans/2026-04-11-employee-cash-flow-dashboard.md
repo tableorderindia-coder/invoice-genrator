@@ -69,7 +69,9 @@ create table if not exists employee_salary_payments (
   employee_id text not null,
   company_id text not null,
   month text not null check (month ~ '^\d{4}-\d{2}$'),
-  salary_inr bigint not null default 0,
+  salary_usd_cents bigint not null default 0,
+  paid_usd_inr_rate numeric(12,4) not null default 0,
+  salary_paid_inr_cents bigint not null default 0,
   paid_status boolean not null default false,
   paid_date date,
   notes text,
@@ -385,7 +387,7 @@ describe("employee cash flow store shaping", () => {
         { employeeId: "emp_1", paymentMonth: "2026-04", cashInInrCents: 1000, effectiveDollarInwardUsdCents: 1000, onboardingAdvanceUsdCents: 0, offboardingDeductionUsdCents: 0, monthlyPaidUsdCents: 1000, daysWorked: 10, daysInMonth: 30, cashoutUsdInrRate: 85, paidUsdInrRate: 84, employeeName: "A", companyId: "comp_1", invoiceNumber: "INV-1" },
         { employeeId: "emp_1", paymentMonth: "2026-04", cashInInrCents: 2000, effectiveDollarInwardUsdCents: 2000, onboardingAdvanceUsdCents: 500, offboardingDeductionUsdCents: 0, monthlyPaidUsdCents: 1000, daysWorked: 12, daysInMonth: 30, cashoutUsdInrRate: 85, paidUsdInrRate: 84, employeeName: "A", companyId: "comp_1", invoiceNumber: "INV-2" },
       ],
-      salaryPayments: [{ employeeId: "emp_1", month: "2026-04", salaryInrCents: 2500 }],
+      salaryPayments: [{ employeeId: "emp_1", month: "2026-04", salaryPaidInrCents: 2500 }],
       accrualByEmployeeMonth: [{ employeeId: "emp_1", month: "2026-04", accrualInrCents: 5000 }],
     });
 
@@ -424,7 +426,7 @@ export function buildEmployeeCashFlowMonthRows(input: {
   salaryPayments: Array<{
     employeeId: string;
     month: string;
-    salaryInrCents: number;
+    salaryPaidInrCents: number;
   }>;
   accrualByEmployeeMonth: Array<{
     employeeId: string;
@@ -506,6 +508,7 @@ Implementation rules:
 - do not change `saveDashboardExpenseAction`
 - keep parsing, validation, and redirects isolated to the new route
 - compute `effective_dollar_inward_usd_cents` and `cash_in_inr_cents` before persisting
+- compute `salary_paid_inr_cents` from `salary_usd_cents` and `paid_usd_inr_rate` before persisting salary rows
 
 - [ ] **Step 4: Re-run tests**
 
@@ -709,4 +712,3 @@ git commit -m "chore: finalize employee cash flow dashboard verification"
 - INR values use `*_inr_cents`.
 - Month keys use `YYYY-MM`.
 - New route is fixed as `/employee-cash-flow`.
-

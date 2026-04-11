@@ -100,7 +100,9 @@ Columns:
 - `employee_id` text not null references existing employee id
 - `company_id` text not null references existing company id
 - `month` text not null
-- `salary_inr` bigint not null
+- `salary_usd_cents` bigint not null
+- `paid_usd_inr_rate` numeric(12,4) not null
+- `salary_paid_inr_cents` bigint not null
 - `paid_status` boolean not null default false
 - `paid_date` date null
 - `notes` text null
@@ -117,6 +119,7 @@ Notes:
 
 - `month` should use `YYYY-MM`
 - this table is independent from existing payout or employee payout records
+- salary is stored as USD source amount plus locked paid conversion snapshot for historical stability
 
 ### 2. `invoice_payments`
 
@@ -249,7 +252,7 @@ the row must still be saved and displayed, and the monthly net must show as nega
 For each employee per selected month:
 
 - cash in comes from summed `invoice_payment_employee_entries.cash_in_inr_cents`
-- salary out comes from `employee_salary_payments.salary_inr`
+- salary out comes from `employee_salary_payments.salary_paid_inr_cents`
 - net cash = cash in - salary out
 
 Additional cash view columns come from the saved employee payment entry rows:
