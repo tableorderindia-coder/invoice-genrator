@@ -176,6 +176,13 @@ function normalizeInvoiceNumber(invoiceNumber: string, invoiceNumbers: Set<strin
   return [...invoiceNumbers].sort().join(", ");
 }
 
+export function normalizeEmployeeNameForMatch(name: string | null | undefined) {
+  return String(name ?? "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
 async function listInvoiceLineItemsForCashFlow(
   supabase: ReturnType<typeof createSupabaseServerClient>,
   invoiceLineItemIds: string[],
@@ -446,7 +453,7 @@ export async function getInvoicePaymentPrefillData(input: {
   const onboardingByEmployeeName = new Map<string, number>();
   const offboardingByEmployeeName = new Map<string, number>();
   for (const adjustment of adjustments) {
-    const employeeName = adjustment.employee_name?.trim();
+    const employeeName = normalizeEmployeeNameForMatch(adjustment.employee_name);
     if (!employeeName) continue;
 
     if (adjustment.type === "onboarding") {
@@ -502,10 +509,11 @@ export async function getInvoicePaymentPrefillData(input: {
           const lineItem = row.invoice_line_item_id
             ? lineItems.get(row.invoice_line_item_id)
             : undefined;
+          const employeeNameKey = normalizeEmployeeNameForMatch(row.employee_name_snapshot);
           const onboardingAdvanceUsdCents =
-            onboardingByEmployeeName.get(row.employee_name_snapshot) ?? 0;
+            onboardingByEmployeeName.get(employeeNameKey) ?? 0;
           const offboardingDeductionUsdCents =
-            offboardingByEmployeeName.get(row.employee_name_snapshot) ?? 0;
+            offboardingByEmployeeName.get(employeeNameKey) ?? 0;
           const effectiveDollarInwardUsdCents = calculateEffectiveDollarInwardUsdCents({
             baseDollarInwardUsdCents: row.dollar_inward_usd_cents,
             onboardingAdvanceUsdCents,

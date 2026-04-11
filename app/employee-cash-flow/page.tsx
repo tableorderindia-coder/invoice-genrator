@@ -6,6 +6,10 @@ import {
   getInvoicePaymentPrefillData,
   listCashFlowInvoiceOptions,
 } from "@/src/features/billing/employee-cash-flow-store";
+import {
+  buildEmployeeCashFlowInvoiceOptionsInput,
+  resolveEmployeeCashFlowMonthKey,
+} from "@/src/features/billing/employee-cash-flow-page-state";
 import { listCompanies } from "@/src/features/billing/store";
 import {
   aggregateEmployeeCashFlowEditableEntries,
@@ -15,30 +19,6 @@ import {
 import EmployeeCashFlowEntryForm from "./_components/employee-cash-flow-entry-form";
 
 export const dynamic = "force-dynamic";
-
-function getTodayMonthKey() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-}
-
-function resolveMonthKey(input?: string | string[], legacyYear?: string | string[]) {
-  const monthValue = Array.isArray(input) ? input[0] : input;
-  if (monthValue && /^\d{4}-\d{2}$/.test(monthValue)) {
-    return monthValue;
-  }
-
-  const legacyMonth = Array.isArray(input) ? input[0] : input;
-  const yearValue = Array.isArray(legacyYear) ? legacyYear[0] : legacyYear;
-  if (legacyMonth && yearValue) {
-    const monthNumber = Number.parseInt(legacyMonth, 10);
-    const yearNumber = Number.parseInt(yearValue, 10);
-    if (Number.isFinite(monthNumber) && Number.isFinite(yearNumber)) {
-      return `${yearNumber}-${String(monthNumber).padStart(2, "0")}`;
-    }
-  }
-
-  return getTodayMonthKey();
-}
 
 export default async function EmployeeCashFlowPage({
   searchParams,
@@ -60,15 +40,11 @@ export default async function EmployeeCashFlowPage({
     : resolved.companyId;
   const selectedCompanyId = selectedCompanyIdRaw || companies[0]?.id || "";
 
-  const monthKey = resolveMonthKey(resolved.month, resolved.year);
-  const [selectedYear, selectedMonth] = monthKey.split("-").map((value) => Number(value));
+  const monthKey = resolveEmployeeCashFlowMonthKey(resolved.month, resolved.year);
 
-  const invoiceOptions = selectedCompanyId
-    ? await listCashFlowInvoiceOptions({
-        companyId: selectedCompanyId,
-        month: selectedMonth,
-        year: selectedYear,
-      })
+  const invoiceOptionsInput = buildEmployeeCashFlowInvoiceOptionsInput(selectedCompanyId);
+  const invoiceOptions = invoiceOptionsInput
+    ? await listCashFlowInvoiceOptions(invoiceOptionsInput)
     : [];
 
   const selectedInvoiceIdRaw = Array.isArray(resolved.invoiceId)
@@ -126,11 +102,11 @@ export default async function EmployeeCashFlowPage({
             </span>
             <select name="invoiceId" defaultValue={selectedInvoiceId} className={inputClass}>
               {invoiceOptions.length === 0 ? (
-                <option value="">No cashed-out invoices for this month</option>
+                <option value="">No cashed-out invoices available</option>
               ) : (
                 invoiceOptions.map((invoice) => (
                   <option key={invoice.id} value={invoice.id}>
-                    {invoice.invoiceNumber}
+                    {invoice.invoiceNumber} ({invoice.year}-{String(invoice.month).padStart(2, "0")})
                   </option>
                 ))
               )}

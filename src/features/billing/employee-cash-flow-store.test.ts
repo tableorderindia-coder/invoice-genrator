@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { buildEmployeeCashFlowMonthRows } from "./employee-cash-flow-store";
+import {
+  buildEmployeeCashFlowMonthRows,
+  normalizeEmployeeNameForMatch,
+} from "./employee-cash-flow-store";
+import { calculateEffectiveDollarInwardUsdCents } from "./employee-cash-flow";
 
 describe("employee cash flow store shaping", () => {
   it("aggregates multiple payment rows in the same month", () => {
@@ -94,5 +98,52 @@ describe("employee cash flow store shaping", () => {
 
     expect(rows[0]?.status).toBe("waiting_for_payment");
     expect(rows[0]?.netInrCents).toBe(-2_500);
+  });
+
+  it("treats normalized onboarding advances as part of invoice inward", () => {
+    const onboardingAdvanceUsdCents = 4_493_400;
+    const effectiveDollarInwardUsdCents = calculateEffectiveDollarInwardUsdCents({
+      baseDollarInwardUsdCents: 0,
+      onboardingAdvanceUsdCents,
+      offboardingDeductionUsdCents: 0,
+    });
+
+    const rows = buildEmployeeCashFlowMonthRows({
+      paymentEntries: [
+        {
+          employeeId: "emp_1",
+          paymentMonth: "2026-04",
+          cashInInrCents: 100,
+          effectiveDollarInwardUsdCents,
+          onboardingAdvanceUsdCents,
+          offboardingDeductionUsdCents: 0,
+          monthlyPaidUsdCents: 1_000,
+          daysWorked: 0,
+          daysInMonth: 30,
+          cashoutUsdInrRate: 85,
+          paidUsdInrRate: 84,
+          employeeName: "Pawan Kumar Beesetti",
+          companyId: "comp_1",
+          invoiceNumber: "INV-ONBOARD",
+        },
+      ],
+      salaryPayments: [],
+      accrualByEmployeeMonth: [],
+    });
+
+    expect(rows[0]).toMatchObject({
+      onboardingAdvanceUsdCents,
+      baseDollarInwardUsdCents: 0,
+      effectiveDollarInwardUsdCents,
+    });
+  });
+
+  it("normalizes employee names before matching invoice adjustments", () => {
+    expect(normalizeEmployeeNameForMatch("  Pawan   Kumar Beesetti  ")).toBe(
+      "pawan kumar beesetti",
+    );
+    expect(normalizeEmployeeNameForMatch("PAWAN KUMAR BEESETTI")).toBe(
+      "pawan kumar beesetti",
+    );
   });
 });
