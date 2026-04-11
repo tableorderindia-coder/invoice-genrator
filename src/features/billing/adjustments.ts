@@ -26,6 +26,20 @@ export function getAdjustmentDaysFieldCopy(type: AdjustmentType | "") {
   };
 }
 
+export function buildAdjustmentFormEmployeeDefaults(input: {
+  fullName: string;
+  billingRateUsdCents: number;
+  hrsPerWeek: number;
+}) {
+  return {
+    employeeName: input.fullName,
+    rateUsd: (input.billingRateUsdCents / 100).toFixed(2),
+    hrsPerWeek: Number.isInteger(input.hrsPerWeek)
+      ? String(input.hrsPerWeek)
+      : String(input.hrsPerWeek),
+  };
+}
+
 function normalizeText(value: string | undefined) {
   return (value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
 }

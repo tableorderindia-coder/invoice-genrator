@@ -5,6 +5,7 @@ import {
   buildInvoiceAdjustmentPayload,
   calculatePersonAdjustmentTotalUsdCents,
   buildAdjustmentDuplicateSignature,
+  buildAdjustmentFormEmployeeDefaults,
   getAdjustmentDaysFieldCopy,
   groupInvoiceAdjustments,
 } from "./adjustments";
@@ -142,6 +143,20 @@ describe("invoice adjustments", () => {
       label: "Days worked",
       placeholder: "Enter days worked",
       helperText: undefined,
+    });
+  });
+
+  it("builds employee defaults for adjustment form prefill", () => {
+    expect(
+      buildAdjustmentFormEmployeeDefaults({
+        fullName: "Asha",
+        billingRateUsdCents: 4_500,
+        hrsPerWeek: 37.5,
+      }),
+    ).toEqual({
+      employeeName: "Asha",
+      rateUsd: "45.00",
+      hrsPerWeek: "37.5",
     });
   });
 

@@ -6,6 +6,7 @@ import { Field, inputClass } from "@/app/_components/field";
 import { PendingSubmitButton } from "@/app/_components/pending-submit-button";
 import {
   buildAdjustmentDuplicateSignature,
+  buildAdjustmentFormEmployeeDefaults,
   buildInvoiceAdjustmentPayload,
   calculatePersonAdjustmentTotalUsdCents,
   getAdjustmentDaysFieldCopy,
@@ -240,7 +241,12 @@ export function AdjustmentForms({
 }: {
   invoiceId: string;
   returnTo: string;
-  employees: Array<{ id: string; fullName: string }>;
+  employees: Array<{
+    id: string;
+    fullName: string;
+    billingRateUsdCents: number;
+    hrsPerWeek: number;
+  }>;
   securityDepositBalances: Record<string, number>;
   adjustments: InvoiceAdjustment[];
   addAction: AdjustmentFormAction;
@@ -252,20 +258,39 @@ export function AdjustmentForms({
   const [isAdding, setIsAdding] = useState(false);
   const grouped = useMemo(() => groupInvoiceAdjustments(adjustments), [adjustments]);
 
+  const getEmployeeDefaults = (employeeName: string) => {
+    const employee = employees.find((candidate) => candidate.fullName === employeeName);
+    if (!employee) {
+      return {
+        employeeName,
+        rateUsd: "",
+        hrsPerWeek: "",
+      };
+    }
+
+    return buildAdjustmentFormEmployeeDefaults(employee);
+  };
+
   const handleTypeChange = (type: AdjustmentTypeOption) => {
     setError("");
     const defaultEmployeeName =
       type === "reimbursement" || !type ? "" : employees[0]?.fullName ?? "";
+    const defaults =
+      type === "reimbursement" || !type
+        ? { rateUsd: "", hrsPerWeek: "" }
+        : getEmployeeDefaults(defaultEmployeeName);
     setForm({
       ...INITIAL_FORM,
       type,
       employeeName: defaultEmployeeName,
+      rateUsd: defaults.rateUsd,
+      hrsPerWeek: defaults.hrsPerWeek,
       amountUsd:
         type === "reimbursement" || !type
           ? ""
           : personTotalUsdInputValue(
-              INITIAL_FORM.rateUsd,
-              INITIAL_FORM.hrsPerWeek,
+              defaults.rateUsd,
+              defaults.hrsPerWeek,
               INITIAL_FORM.daysWorked,
             ),
     });
@@ -366,10 +391,20 @@ export function AdjustmentForms({
                   className={`${inputClass} min-h-14`}
                   value={form.employeeName}
                   onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      employeeName: event.target.value,
-                    }))
+                    setForm((current) => {
+                      const defaults = getEmployeeDefaults(event.target.value);
+                      return {
+                        ...current,
+                        employeeName: defaults.employeeName,
+                        rateUsd: defaults.rateUsd,
+                        hrsPerWeek: defaults.hrsPerWeek,
+                        amountUsd: personTotalUsdInputValue(
+                          defaults.rateUsd,
+                          defaults.hrsPerWeek,
+                          current.daysWorked,
+                        ),
+                      };
+                    })
                   }
                 >
                   {employees.length === 0 ? (

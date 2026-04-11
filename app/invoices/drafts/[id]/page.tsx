@@ -465,6 +465,8 @@ export default async function DraftInvoicePage({
                 employees={employees.map((employee) => ({
                   id: employee.id,
                   fullName: employee.fullName,
+                  billingRateUsdCents: employee.billingRateUsdCents,
+                  hrsPerWeek: employee.hrsPerWeek,
                 }))}
                 securityDepositBalances={securityDepositBalances}
                 adjustments={detail.adjustments}
