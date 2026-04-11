@@ -83,7 +83,6 @@ export default function EmployeeCashFlowEntryForm({
   paymentMonth,
   returnTo,
   invoiceNumber,
-  invoiceDollarInboundUsdCents,
   invoiceUsdInrRate,
   initialEntries,
   availableEmployees,
@@ -94,7 +93,6 @@ export default function EmployeeCashFlowEntryForm({
   paymentMonth: string;
   returnTo: string;
   invoiceNumber: string;
-  invoiceDollarInboundUsdCents: number;
   invoiceUsdInrRate: number;
   initialEntries: EmployeeCashFlowEditableEntry[];
   availableEmployees: AvailableEmployee[];
@@ -136,7 +134,6 @@ export default function EmployeeCashFlowEntryForm({
       ...buildAddedEmployeeCashFlowEntry({
         employee,
         paymentMonth,
-        invoiceDollarInboundUsdCents,
         invoiceUsdInrRate,
       }),
     };

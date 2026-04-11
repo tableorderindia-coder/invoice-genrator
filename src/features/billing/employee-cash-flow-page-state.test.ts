@@ -41,7 +41,6 @@ describe("employee cash flow page state", () => {
           payoutMonthlyUsdCents: 2_000_00,
         },
         paymentMonth: "2026-05",
-        invoiceDollarInboundUsdCents: 7_500_00,
         invoiceUsdInrRate: 84.25,
       }),
     ).toMatchObject({
@@ -50,13 +49,13 @@ describe("employee cash flow page state", () => {
       daysWorked: 0,
       daysInMonth: 31,
       monthlyPaidUsdCents: 2_000_00,
-      baseDollarInwardUsdCents: 7_500_00,
+      baseDollarInwardUsdCents: 0,
       cashoutUsdInrRate: 84.25,
       isNonInvoiceEmployee: true,
     });
   });
 
-  it("carries onboarding and offboarding defaults into added employee rows", () => {
+  it("keeps onboarding and offboarding separate from base inward on added rows", () => {
     expect(
       buildAddedEmployeeCashFlowEntry({
         employee: {
@@ -67,10 +66,10 @@ describe("employee cash flow page state", () => {
           offboardingDeductionUsdCents: 200_00,
         },
         paymentMonth: "2026-05",
-        invoiceDollarInboundUsdCents: 7_500_00,
         invoiceUsdInrRate: 84.25,
       }),
     ).toMatchObject({
+      baseDollarInwardUsdCents: 0,
       onboardingAdvanceUsdCents: 900_00,
       offboardingDeductionUsdCents: 200_00,
     });
