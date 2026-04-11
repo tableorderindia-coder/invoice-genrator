@@ -83,6 +83,16 @@ const links = [
     ),
   },
   {
+    href: "/employee-cash-flow",
+    label: "Employee Cash Flow",
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 17h4l3-8 4 10 3-6h4" />
+        <path d="M3 7h18" />
+      </svg>
+    ),
+  },
+  {
     href: "/dashboard",
     label: "Dashboard",
     icon: (

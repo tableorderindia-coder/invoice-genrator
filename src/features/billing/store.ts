@@ -25,6 +25,7 @@ import {
 } from "./pn-dashboard";
 import { assertEmployeePayoutRemovable } from "./employee-payout";
 import { getDaysInMonth } from "./utils";
+import { hasMissingSchemaColumn } from "./schema-fallback";
 import type {
   AdjustmentType,
   Company,
@@ -282,6 +283,50 @@ function getMissingSchemaColumn(
     new RegExp(`Could not find the '([^']+)' column of '${tableName}'`),
   );
   return match?.[1];
+}
+
+async function listInvoiceLineItemDaysForDashboard(
+  supabase: ReturnType<typeof createSupabaseServerClient>,
+  invoiceLineItemIds: string[],
+) {
+  if (!supabase || invoiceLineItemIds.length === 0) {
+    return [] as Array<{
+      id: string;
+      invoice_team_id: string;
+      days_worked?: number | null;
+    }>;
+  }
+
+  const result = await supabase
+    .from("invoice_line_items")
+    .select("id, invoice_team_id, days_worked")
+    .in("id", invoiceLineItemIds);
+
+  if (!result.error) {
+    return (result.data ?? []) as Array<{
+      id: string;
+      invoice_team_id: string;
+      days_worked?: number | null;
+    }>;
+  }
+
+  if (
+    !hasMissingSchemaColumn(result.error, "invoice_line_items", "days_worked")
+  ) {
+    throw result.error;
+  }
+
+  const fallbackResult = await supabase
+    .from("invoice_line_items")
+    .select("id, invoice_team_id")
+    .in("id", invoiceLineItemIds);
+  if (fallbackResult.error) throw fallbackResult.error;
+
+  return (fallbackResult.data ?? []) as Array<{
+    id: string;
+    invoice_team_id: string;
+    days_worked?: number | null;
+  }>;
 }
 
 async function insertEmployeePayoutWithSchemaFallback(
@@ -2270,13 +2315,10 @@ export async function getPnDashboardData(input: {
   const invoiceLineItemIds = payouts
     .map((row) => row.invoiceLineItemId)
     .filter((id): id is string => Boolean(id));
-  const { data: lineItemRows, error: lineItemError } = invoiceLineItemIds.length
-    ? await supabase
-        .from("invoice_line_items")
-        .select("id, invoice_team_id, days_worked")
-        .in("id", invoiceLineItemIds)
-    : { data: [], error: null };
-  if (lineItemError) throw lineItemError;
+  const lineItemRows = await listInvoiceLineItemDaysForDashboard(
+    supabase,
+    invoiceLineItemIds,
+  );
 
   const { data: invoiceTeamsRows, error: invoiceTeamsError } = await supabase
     .from("invoice_teams")
@@ -2291,10 +2333,10 @@ export async function getPnDashboardData(input: {
   );
 
   const lineItemDaysMap = new Map<string, number>();
-  for (const row of (lineItemRows ?? []) as Array<{
+  for (const row of lineItemRows as Array<{
     id: string;
     invoice_team_id: string;
-    days_worked: number | null;
+    days_worked?: number | null;
   }>) {
     const invoiceId = invoiceIdByTeamId.get(String(row.invoice_team_id));
     const period = invoiceId ? invoicePeriodMap.get(invoiceId) : undefined;

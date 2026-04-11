@@ -7,6 +7,7 @@ import {
   calculateEmployeeMonthNetInrCents,
   resolveEmployeeCashFlowStatus,
 } from "./employee-cash-flow";
+import { hasMissingSchemaColumn } from "./schema-fallback";
 import type {
   EmployeeCashFlowEntryWriteInput,
   EmployeeCashFlowInvoiceOption,
@@ -87,7 +88,7 @@ type DbEmployeePayout = {
 type DbInvoiceLineItem = {
   id: string;
   employee_id: string;
-  days_worked: number | null;
+  days_worked?: number | null;
 };
 
 type DbCashFlowEntry = {
@@ -153,6 +154,38 @@ function normalizeInvoiceNumber(invoiceNumber: string, invoiceNumbers: Set<strin
   }
 
   return [...invoiceNumbers].sort().join(", ");
+}
+
+async function listInvoiceLineItemsForCashFlow(
+  supabase: ReturnType<typeof createSupabaseServerClient>,
+  invoiceLineItemIds: string[],
+) {
+  if (!supabase || invoiceLineItemIds.length === 0) {
+    return [] as DbInvoiceLineItem[];
+  }
+
+  const result = await supabase
+    .from("invoice_line_items")
+    .select("id, employee_id, days_worked")
+    .in("id", invoiceLineItemIds);
+
+  if (!result.error) {
+    return (result.data ?? []) as DbInvoiceLineItem[];
+  }
+
+  if (
+    !hasMissingSchemaColumn(result.error, "invoice_line_items", "days_worked")
+  ) {
+    throw result.error;
+  }
+
+  const fallbackResult = await supabase
+    .from("invoice_line_items")
+    .select("id, employee_id")
+    .in("id", invoiceLineItemIds);
+  if (fallbackResult.error) throw fallbackResult.error;
+
+  return (fallbackResult.data ?? []) as DbInvoiceLineItem[];
 }
 
 export function buildEmployeeCashFlowMonthRows(input: {
@@ -334,15 +367,12 @@ export async function getInvoicePaymentPrefillData(input: {
         .select("invoice_id, dollar_inbound_usd_cents, usd_inr_rate")
         .eq("invoice_id", input.invoiceId)
         .maybeSingle(),
-      supabase
-        .from("invoice_line_items")
-        .select("id, employee_id, days_worked")
-        .in(
-          "id",
-          payouts
-            .map((row) => row.invoice_line_item_id)
-            .filter((value): value is string => Boolean(value)),
-        ),
+      listInvoiceLineItemsForCashFlow(
+        supabase,
+        payouts
+          .map((row) => row.invoice_line_item_id)
+          .filter((value): value is string => Boolean(value)),
+      ),
       supabase
         .from("invoice_adjustments")
         .select("invoice_id, type, employee_name, amount_usd_cents")
@@ -355,12 +385,11 @@ export async function getInvoicePaymentPrefillData(input: {
     ]);
 
   if (realizationResult.error) throw realizationResult.error;
-  if (lineItemResult.error) throw lineItemResult.error;
   if (adjustmentResult.error) throw adjustmentResult.error;
   if (employeesResult.error) throw employeesResult.error;
 
   const lineItems = new Map<string, DbInvoiceLineItem>(
-    ((lineItemResult.data ?? []) as DbInvoiceLineItem[]).map((row) => [row.id, row]),
+    (lineItemResult as DbInvoiceLineItem[]).map((row) => [row.id, row]),
   );
   const adjustments = (adjustmentResult.data ?? []) as DbInvoiceAdjustment[];
   const realization = (realizationResult.data ?? null) as DbInvoiceRealization | null;
