@@ -2341,6 +2341,12 @@ export async function getPnDashboardData(input: {
         fxCommissionInrCents: row.fx_commission_inr_cents,
         totalCommissionUsdCents: row.total_commission_usd_cents,
         commissionEarnedInrCents: row.commission_earned_inr_cents,
+        cashInInrCents: row.cash_in_inr_cents,
+        salaryPaidInrCents: Math.round(row.monthly_paid_usd_cents * row.paid_usd_inr_rate),
+        netProfitInrCents: calculateEmployeeMonthNetInrCents({
+          cashInInrCents: row.cash_in_inr_cents,
+          salaryPaidInrCents: Math.round(row.monthly_paid_usd_cents * row.paid_usd_inr_rate),
+        }),
       };
     })
     .filter(Boolean) as PnSourceRow[];

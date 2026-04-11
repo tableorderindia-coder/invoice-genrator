@@ -15,6 +15,9 @@ export type PnSourceRow = {
   fxCommissionInrCents: number;
   totalCommissionUsdCents: number;
   commissionEarnedInrCents: number;
+  cashInInrCents: number;
+  salaryPaidInrCents: number;
+  netProfitInrCents: number;
 };
 
 export type PnEditableSourceRow = PnSourceRow & {
@@ -271,6 +274,7 @@ export function buildPnPeriodRows(input: {
       const commissionEarnedInrCents = sumBy(bucket, "commissionEarnedInrCents");
       const grossEarningsInrCents = fxCommissionInrCents + commissionEarnedInrCents;
       const expensesInrCents = input.expenseByKey.get(key) ?? 0;
+      const netProfitInrCents = sumBy(bucket, "netProfitInrCents");
 
       return {
         year: first.year,
@@ -287,7 +291,7 @@ export function buildPnPeriodRows(input: {
         commissionEarnedInrCents,
         grossEarningsInrCents,
         expensesInrCents,
-        netPlInrCents: grossEarningsInrCents - expensesInrCents,
+        netPlInrCents: netProfitInrCents - expensesInrCents,
       };
     })
     .sort((a, b) => {

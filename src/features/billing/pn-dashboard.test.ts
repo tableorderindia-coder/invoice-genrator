@@ -26,6 +26,9 @@ const sampleRows: PnSourceRow[] = [
     fxCommissionInrCents: 50000,
     totalCommissionUsdCents: 30000,
     commissionEarnedInrCents: 150000,
+    cashInInrCents: 8320000,
+    salaryPaidInrCents: 5747000,
+    netProfitInrCents: 2573000,
   },
   {
     employeeId: "emp_1",
@@ -44,6 +47,9 @@ const sampleRows: PnSourceRow[] = [
     fxCommissionInrCents: 52000,
     totalCommissionUsdCents: 50000,
     commissionEarnedInrCents: 170000,
+    cashInInrCents: 10020000,
+    salaryPaidInrCents: 5768000,
+    netProfitInrCents: 4252000,
   },
   {
     employeeId: "emp_2",
@@ -62,6 +68,9 @@ const sampleRows: PnSourceRow[] = [
     fxCommissionInrCents: 30000,
     totalCommissionUsdCents: 15000,
     commissionEarnedInrCents: 110000,
+    cashInInrCents: 7515000,
+    salaryPaidInrCents: 6210000,
+    netProfitInrCents: 1305000,
   },
 ];
 
@@ -149,11 +158,39 @@ describe("pn dashboard aggregations", () => {
     expect(monthly).toHaveLength(2);
     expect(monthly[0].month).toBe(1);
     expect(monthly[0].grossEarningsInrCents).toBe(200000);
-    expect(monthly[0].netPlInrCents).toBe(150000);
+    expect(monthly[0].netPlInrCents).toBe(2523000);
 
     expect(monthly[1].month).toBe(2);
     expect(monthly[1].grossEarningsInrCents).toBe(362000);
-    expect(monthly[1].netPlInrCents).toBe(272000);
+    expect(monthly[1].netPlInrCents).toBe(5467000);
+  });
+
+  it("builds yearly period rows from cash-flow net profit even without outflow", () => {
+    const yearly = buildPnPeriodRows({
+      rows: [
+        {
+          ...sampleRows[0],
+          year: 2027,
+          month: 1,
+          cashInInrCents: 900000,
+          salaryPaidInrCents: 0,
+          netProfitInrCents: 900000,
+          fxCommissionInrCents: 0,
+          totalCommissionUsdCents: 0,
+          commissionEarnedInrCents: 0,
+        },
+      ],
+      periodType: "yearly",
+      expenseByKey: new Map(),
+    });
+
+    expect(yearly).toHaveLength(1);
+    expect(yearly[0]).toMatchObject({
+      year: 2027,
+      month: undefined,
+      grossEarningsInrCents: 0,
+      netPlInrCents: 900000,
+    });
   });
 
   it("builds editable employee sections from cash flow rows", () => {

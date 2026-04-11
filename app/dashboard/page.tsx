@@ -528,10 +528,10 @@ export default async function DashboardPage({
         </GlassPanel>
       )}
       <GlassPanel>
-        <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-          Gross Earnings (INR) = Commission Earned (INR) + FX Commission (INR). Net P/L = Gross Earnings - Expenses.
-        </p>
-      </GlassPanel>
+          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+            Gross Earnings (INR) = Commission Earned (INR) + FX Commission (INR). Net P/L in Monthly / Yearly view uses Employee Cash Flow net profit minus dashboard expenses.
+          </p>
+        </GlassPanel>
     </Shell>
   );
 }
