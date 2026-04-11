@@ -462,7 +462,8 @@ function buildAdjustmentRows(
         : "",
     hrsPerWeek:
       adjustment.hrsPerWeek !== undefined ? formatHours(adjustment.hrsPerWeek) : "",
-    daysWorked: "",
+    daysWorked:
+      adjustment.daysWorked !== undefined ? formatDays(adjustment.daysWorked) : "",
     total: formatUsdCompact(
       isDeduction ? Math.abs(adjustment.amountUsdCents) : adjustment.amountUsdCents,
     ),

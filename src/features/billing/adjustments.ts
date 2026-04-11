@@ -14,12 +14,20 @@ function normalizeHours(hours: number | undefined) {
 export function calculatePersonAdjustmentTotalUsdCents(input: {
   rateUsdCents: number;
   hrsPerWeek: number;
+  daysWorked?: number;
 }) {
   if (input.rateUsdCents < 0 || input.hrsPerWeek < 0) {
     throw new Error("Rate and hrs per week must be non-negative.");
   }
 
-  return Math.round((input.rateUsdCents * input.hrsPerWeek * 52) / 12 / 100) * 100;
+  const normalizedDaysWorked =
+    input.daysWorked === undefined ? 30 : Math.max(0, Math.round(input.daysWorked));
+
+  return (
+    Math.round(
+      ((input.rateUsdCents * input.hrsPerWeek * 52) / 12 / 30) * normalizedDaysWorked / 100,
+    ) * 100
+  );
 }
 
 function getPersonAdjustmentLabel(type: PersonAdjustmentType) {
@@ -40,12 +48,16 @@ export function buildInvoiceAdjustmentPayload(
         employeeName: string;
         rateUsdCents: number;
         hrsPerWeek: number;
+        daysWorked?: number;
         amountUsdCents?: number;
       }
     | {
         type: "reimbursement";
         label: string;
-        amountUsdCents: number;
+        rateUsdCents: number;
+        hrsPerWeek: number;
+        daysWorked?: number;
+        amountUsdCents?: number;
       },
 ) {
   if (input.type === "reimbursement") {
@@ -53,14 +65,26 @@ export function buildInvoiceAdjustmentPayload(
     if (!label) {
       throw new Error("Reimbursement label is required.");
     }
-    if (input.amountUsdCents < 0) {
+
+    const amountUsdCents =
+      input.amountUsdCents ??
+      calculatePersonAdjustmentTotalUsdCents({
+        rateUsdCents: input.rateUsdCents,
+        hrsPerWeek: input.hrsPerWeek,
+        daysWorked: input.daysWorked,
+      });
+
+    if (amountUsdCents < 0) {
       throw new Error("Reimbursement amount must be non-negative.");
     }
 
     return {
       type: input.type,
       label,
-      amountUsdCents: Math.abs(input.amountUsdCents),
+      rateUsdCents: input.rateUsdCents,
+      hrsPerWeek: input.hrsPerWeek,
+      daysWorked: input.daysWorked,
+      amountUsdCents: Math.abs(amountUsdCents),
     };
   }
 
@@ -74,6 +98,7 @@ export function buildInvoiceAdjustmentPayload(
     calculatePersonAdjustmentTotalUsdCents({
       rateUsdCents: input.rateUsdCents,
       hrsPerWeek: input.hrsPerWeek,
+      daysWorked: input.daysWorked,
     });
 
   return {
@@ -82,6 +107,7 @@ export function buildInvoiceAdjustmentPayload(
     employeeName,
     rateUsdCents: input.rateUsdCents,
     hrsPerWeek: input.hrsPerWeek,
+    daysWorked: input.daysWorked,
     amountUsdCents:
       input.type === "offboarding" ? -Math.abs(amountUsdCents) : amountUsdCents,
   };
@@ -91,7 +117,13 @@ export function buildAdjustmentDuplicateSignature(
   adjustment:
     | Pick<
         InvoiceAdjustment,
-        "type" | "amountUsdCents" | "label" | "employeeName" | "rateUsdCents" | "hrsPerWeek"
+        | "type"
+        | "amountUsdCents"
+        | "label"
+        | "employeeName"
+        | "rateUsdCents"
+        | "hrsPerWeek"
+        | "daysWorked"
       >
     | {
         type: AdjustmentType;
@@ -100,6 +132,7 @@ export function buildAdjustmentDuplicateSignature(
         employeeName?: string;
         rateUsdCents?: number;
         hrsPerWeek?: number;
+        daysWorked?: number;
       },
 ) {
   if (adjustment.type === "reimbursement") {
@@ -107,6 +140,9 @@ export function buildAdjustmentDuplicateSignature(
       adjustment.type,
       adjustment.amountUsdCents,
       normalizeText(adjustment.label),
+      adjustment.rateUsdCents ?? "",
+      normalizeHours(adjustment.hrsPerWeek),
+      adjustment.daysWorked ?? "",
     ].join("|");
   }
 
@@ -116,6 +152,7 @@ export function buildAdjustmentDuplicateSignature(
     normalizeText(adjustment.employeeName),
     adjustment.rateUsdCents ?? "",
     normalizeHours(adjustment.hrsPerWeek),
+    adjustment.daysWorked ?? "",
   ].join("|");
 }
 

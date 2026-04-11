@@ -70,7 +70,7 @@ export function calculateLineItemTotals({
   const normalizedDaysWorked =
     daysWorked === undefined
       ? normalizedDaysInMonth
-      : Math.max(0, Math.min(daysWorked, normalizedDaysInMonth));
+      : Math.max(0, Math.round(daysWorked));
 
   const monthlyBilledUsdCents = roundToWholeDollarCents(
     (billingRateUsdCents * hrsPerWeek * WEEKS_PER_YEAR) / MONTHS_PER_YEAR,

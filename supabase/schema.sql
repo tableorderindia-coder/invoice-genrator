@@ -77,6 +77,7 @@ create table if not exists invoice_adjustments (
   employee_name text,
   rate_usd_cents integer,
   hrs_per_week numeric(8,2),
+  days_worked integer,
   amount_usd_cents integer not null,
   sort_order integer not null default 1
 );

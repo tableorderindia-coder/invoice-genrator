@@ -27,6 +27,7 @@ type FormState = {
   employeeName: string;
   rateUsd: string;
   hrsPerWeek: string;
+  daysWorked: string;
   label: string;
   amountUsd: string;
 };
@@ -36,6 +37,7 @@ const INITIAL_FORM: FormState = {
   employeeName: "",
   rateUsd: "",
   hrsPerWeek: "",
+  daysWorked: "",
   label: "",
   amountUsd: "",
 };
@@ -49,10 +51,15 @@ function wholeUsdCentsFromInput(input: string) {
   return Math.round(normalized) * 100;
 }
 
-function personTotalUsdInputValue(rateUsd: string, hrsPerWeek: string) {
+function personTotalUsdInputValue(
+  rateUsd: string,
+  hrsPerWeek: string,
+  daysWorked: string,
+) {
   const cents = calculatePersonAdjustmentTotalUsdCents({
     rateUsdCents: centsFromUsd(rateUsd),
     hrsPerWeek: Number.parseFloat(hrsPerWeek || "0"),
+    daysWorked: Number.parseInt(daysWorked || "0", 10),
   });
   return String(Math.round(cents / 100));
 }
@@ -74,6 +81,9 @@ function buildClientAdjustmentPayload(form: FormState) {
     return buildInvoiceAdjustmentPayload({
       type: "reimbursement",
       label: form.label,
+      rateUsdCents: centsFromUsd(form.rateUsd),
+      hrsPerWeek: Number.parseFloat(form.hrsPerWeek || "0"),
+      daysWorked: Number.parseInt(form.daysWorked || "0", 10),
       amountUsdCents: wholeUsdCentsFromInput(form.amountUsd),
     });
   }
@@ -83,6 +93,7 @@ function buildClientAdjustmentPayload(form: FormState) {
     employeeName: form.employeeName,
     rateUsdCents: centsFromUsd(form.rateUsd),
     hrsPerWeek: Number.parseFloat(form.hrsPerWeek || "0"),
+    daysWorked: Number.parseInt(form.daysWorked || "0", 10),
     amountUsdCents: wholeUsdCentsFromInput(form.amountUsd),
   });
 }
@@ -111,6 +122,7 @@ function describeAdjustment(adjustment: InvoiceAdjustment) {
       ? `${formatUsd(adjustment.rateUsdCents)}/hr`
       : undefined,
     adjustment.hrsPerWeek !== undefined ? `${formatHours(adjustment.hrsPerWeek)} hrs/week` : undefined,
+    adjustment.daysWorked !== undefined ? `${adjustment.daysWorked} days` : undefined,
   ]
     .filter(Boolean)
     .join(" · ");
@@ -250,7 +262,11 @@ export function AdjustmentForms({
       amountUsd:
         type === "reimbursement" || !type
           ? ""
-          : personTotalUsdInputValue(INITIAL_FORM.rateUsd, INITIAL_FORM.hrsPerWeek),
+          : personTotalUsdInputValue(
+              INITIAL_FORM.rateUsd,
+              INITIAL_FORM.hrsPerWeek,
+              INITIAL_FORM.daysWorked,
+            ),
     });
   };
 
@@ -327,59 +343,45 @@ export function AdjustmentForms({
           </select>
         </Field>
 
-        {form.type === "reimbursement" ? (
+        {form.type ? (
           <div className="space-y-4">
-            <Field label="Type / Label">
-              <input
-                name="label"
-                placeholder="Enter expense type (e.g., travel, food)"
-                className={`${inputClass} min-h-14`}
-                value={form.label}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, label: event.target.value }))
-                }
-              />
-            </Field>
-            <Field label="Amount">
-              <input
-                name="amountUsd"
-                type="number"
-                step="1"
-                min="0"
-                placeholder="Enter amount"
-                className={`${inputClass} min-h-14`}
-                value={form.amountUsd}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, amountUsd: event.target.value }))
-                }
-              />
-            </Field>
-          </div>
-        ) : form.type ? (
-          <div className="space-y-4">
-            <Field label="Employee">
-              <select
-                name="employeeName"
-                className={`${inputClass} min-h-14`}
-                value={form.employeeName}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    employeeName: event.target.value,
-                  }))
-                }
-              >
-                {employees.length === 0 ? (
-                  <option value="">No employees available</option>
-                ) : (
-                  employees.map((employee) => (
-                    <option key={employee.id} value={employee.fullName}>
-                      {employee.fullName}
-                    </option>
-                  ))
-                )}
-              </select>
-            </Field>
+            {form.type === "reimbursement" ? (
+              <Field label="Type / Label">
+                <input
+                  name="label"
+                  placeholder="Enter expense type (e.g., travel, food)"
+                  className={`${inputClass} min-h-14`}
+                  value={form.label}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, label: event.target.value }))
+                  }
+                />
+              </Field>
+            ) : (
+              <Field label="Employee">
+                <select
+                  name="employeeName"
+                  className={`${inputClass} min-h-14`}
+                  value={form.employeeName}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      employeeName: event.target.value,
+                    }))
+                  }
+                >
+                  {employees.length === 0 ? (
+                    <option value="">No employees available</option>
+                  ) : (
+                    employees.map((employee) => (
+                      <option key={employee.id} value={employee.fullName}>
+                        {employee.fullName}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </Field>
+            )}
             {(form.type === "onboarding" || form.type === "offboarding") &&
             form.employeeName ? (
               <p className="text-sm" style={{ color: "var(--text-muted)" }}>
@@ -409,7 +411,11 @@ export function AdjustmentForms({
                     return {
                       ...current,
                       rateUsd: nextRateUsd,
-                      amountUsd: personTotalUsdInputValue(nextRateUsd, current.hrsPerWeek),
+                      amountUsd: personTotalUsdInputValue(
+                        nextRateUsd,
+                        current.hrsPerWeek,
+                        current.daysWorked,
+                      ),
                     };
                   })
                 }
@@ -430,7 +436,36 @@ export function AdjustmentForms({
                     return {
                       ...current,
                       hrsPerWeek: nextHours,
-                      amountUsd: personTotalUsdInputValue(current.rateUsd, nextHours),
+                      amountUsd: personTotalUsdInputValue(
+                        current.rateUsd,
+                        nextHours,
+                        current.daysWorked,
+                      ),
+                    };
+                  })
+                }
+              />
+            </Field>
+            <Field label="Days worked">
+              <input
+                name="daysWorked"
+                type="number"
+                step="1"
+                min="1"
+                placeholder="Enter days worked"
+                className={`${inputClass} min-h-14`}
+                value={form.daysWorked}
+                onChange={(event) =>
+                  setForm((current) => {
+                    const nextDaysWorked = event.target.value;
+                    return {
+                      ...current,
+                      daysWorked: nextDaysWorked,
+                      amountUsd: personTotalUsdInputValue(
+                        current.rateUsd,
+                        current.hrsPerWeek,
+                        nextDaysWorked,
+                      ),
                     };
                   })
                 }

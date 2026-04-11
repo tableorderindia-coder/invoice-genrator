@@ -129,6 +129,7 @@ type DbInvoiceAdjustment = {
   employee_name: string | null;
   rate_usd_cents: number | null;
   hrs_per_week: number | null;
+  days_worked: number | null;
   amount_usd_cents: number;
   sort_order: number;
 };
@@ -594,7 +595,7 @@ function normalizeLineItemDaysWorked(
   if (Number.isFinite(raw) && raw > 0) {
     return {
       ...lineItem,
-      daysWorked: Math.max(1, Math.min(daysInMonth, Math.round(raw))),
+      daysWorked: Math.max(1, Math.round(raw)),
     };
   }
 
@@ -630,6 +631,7 @@ function mapInvoiceAdjustment(row: DbInvoiceAdjustment) {
     employeeName: row.employee_name ?? undefined,
     rateUsdCents: row.rate_usd_cents ?? undefined,
     hrsPerWeek: row.hrs_per_week ?? undefined,
+    daysWorked: row.days_worked ?? undefined,
     amountUsdCents: row.amount_usd_cents,
     sortOrder: row.sort_order,
   };
@@ -1349,7 +1351,7 @@ export async function addInvoiceLineItem(input: {
   const normalizedDaysWorked =
     input.daysWorked === undefined
       ? daysInMonth
-      : Math.max(1, Math.min(daysInMonth, Math.round(input.daysWorked)));
+      : Math.max(1, Math.round(input.daysWorked));
   const calculated = calculateLineItemTotals({
     billingRateUsdCents,
     payoutMonthlyUsdCents,
@@ -1432,7 +1434,7 @@ export async function updateInvoiceLineItem(input: {
   );
   const normalizedDaysWorked = Math.max(
     1,
-    Math.min(daysInMonth, Math.round(input.daysWorked)),
+    Math.round(input.daysWorked),
   );
   const calculated = calculateLineItemTotals({
     billingRateUsdCents: input.billingRateUsdCents,
@@ -1582,6 +1584,7 @@ export async function addInvoiceAdjustment(input: {
   employeeName?: string;
   rateUsdCents?: number;
   hrsPerWeek?: number;
+  daysWorked?: number;
   amountUsdCents: number;
 }) {
   const supabase = getSupabaseOrThrow();
@@ -1656,6 +1659,7 @@ export async function addInvoiceAdjustment(input: {
     employee_name: input.employeeName ?? null,
     rate_usd_cents: input.rateUsdCents ?? null,
     hrs_per_week: input.hrsPerWeek ?? null,
+    days_worked: input.daysWorked ?? null,
     amount_usd_cents: input.amountUsdCents,
     sort_order: (count ?? 0) + 1,
   };
@@ -2343,7 +2347,7 @@ export async function getPnDashboardData(input: {
     const daysInMonth = period ? getDaysInMonth(period.month, period.year) : 30;
     const normalizedDaysWorked =
       row.days_worked && row.days_worked > 0
-        ? Math.max(1, Math.min(daysInMonth, Math.round(Number(row.days_worked))))
+        ? Math.max(1, Math.round(Number(row.days_worked)))
         : daysInMonth;
     lineItemDaysMap.set(String(row.id), normalizedDaysWorked);
   }

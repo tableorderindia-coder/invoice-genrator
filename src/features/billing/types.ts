@@ -91,6 +91,7 @@ export type InvoiceAdjustment = {
   employeeName?: string;
   rateUsdCents?: number;
   hrsPerWeek?: number;
+  daysWorked?: number;
   amountUsdCents: number;
   sortOrder: number;
 };

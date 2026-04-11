@@ -491,6 +491,9 @@ export async function addInvoiceAdjustmentAction(formData: FormData) {
         ? buildInvoiceAdjustmentPayload({
             type,
             label: getString(formData, "label"),
+            rateUsdCents: centsFromUsd(getString(formData, "rateUsd")),
+            hrsPerWeek: Number.parseFloat(getString(formData, "hrsPerWeek") || "0"),
+            daysWorked: Number.parseInt(getString(formData, "daysWorked") || "0", 10),
             amountUsdCents: wholeUsdCentsFromInput(getString(formData, "amountUsd")),
           })
         : buildInvoiceAdjustmentPayload({
@@ -498,6 +501,7 @@ export async function addInvoiceAdjustmentAction(formData: FormData) {
             employeeName: getString(formData, "employeeName"),
             rateUsdCents: centsFromUsd(getString(formData, "rateUsd")),
             hrsPerWeek: Number.parseFloat(getString(formData, "hrsPerWeek") || "0"),
+            daysWorked: Number.parseInt(getString(formData, "daysWorked") || "0", 10),
             amountUsdCents: wholeUsdCentsFromInput(getString(formData, "amountUsd")),
           });
 

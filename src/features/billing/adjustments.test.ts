@@ -18,6 +18,33 @@ describe("invoice adjustments", () => {
     ).toBe(70400);
   });
 
+  it("uses days worked for person-based adjustments, including reimbursements", () => {
+    expect(
+      calculatePersonAdjustmentTotalUsdCents({
+        rateUsdCents: 3000,
+        hrsPerWeek: 4,
+        daysWorked: 60,
+      }),
+    ).toBe(104000);
+
+    expect(
+      buildInvoiceAdjustmentPayload({
+        type: "reimbursement",
+        label: "Laptop courier",
+        rateUsdCents: 3000,
+        hrsPerWeek: 4,
+        daysWorked: 90,
+      }),
+    ).toEqual({
+      type: "reimbursement",
+      label: "Laptop courier",
+      rateUsdCents: 3000,
+      hrsPerWeek: 4,
+      daysWorked: 90,
+      amountUsdCents: 156000,
+    });
+  });
+
   it("builds onboarding and appraisal adjustments as positive amounts", () => {
     expect(
       buildInvoiceAdjustmentPayload({
@@ -25,6 +52,7 @@ describe("invoice adjustments", () => {
         employeeName: "Pawan",
         rateUsdCents: 3000,
         hrsPerWeek: 4,
+        daysWorked: 60,
       }),
     ).toEqual({
       type: "onboarding",
@@ -32,7 +60,8 @@ describe("invoice adjustments", () => {
       employeeName: "Pawan",
       rateUsdCents: 3000,
       hrsPerWeek: 4,
-      amountUsdCents: 52000,
+      daysWorked: 60,
+      amountUsdCents: 104000,
     });
 
     expect(
@@ -41,6 +70,7 @@ describe("invoice adjustments", () => {
         employeeName: "Riya",
         rateUsdCents: 4200,
         hrsPerWeek: 2.5,
+        daysWorked: 90,
       }),
     ).toEqual({
       type: "appraisal",
@@ -48,7 +78,8 @@ describe("invoice adjustments", () => {
       employeeName: "Riya",
       rateUsdCents: 4200,
       hrsPerWeek: 2.5,
-      amountUsdCents: 45500,
+      daysWorked: 90,
+      amountUsdCents: 136500,
     });
   });
 
@@ -59,6 +90,7 @@ describe("invoice adjustments", () => {
         employeeName: "Pawan",
         rateUsdCents: 3000,
         hrsPerWeek: 4,
+        daysWorked: 60,
         amountUsdCents: 61000,
       }),
     ).toEqual({
@@ -67,6 +99,7 @@ describe("invoice adjustments", () => {
       employeeName: "Pawan",
       rateUsdCents: 3000,
       hrsPerWeek: 4,
+      daysWorked: 60,
       amountUsdCents: 61000,
     });
   });
@@ -78,6 +111,7 @@ describe("invoice adjustments", () => {
         employeeName: "Asha",
         rateUsdCents: 5000,
         hrsPerWeek: 3,
+        daysWorked: 90,
       }),
     ).toEqual({
       type: "offboarding",
@@ -85,21 +119,8 @@ describe("invoice adjustments", () => {
       employeeName: "Asha",
       rateUsdCents: 5000,
       hrsPerWeek: 3,
-      amountUsdCents: -65000,
-    });
-  });
-
-  it("keeps reimbursement adjustments as direct positive amounts", () => {
-    expect(
-      buildInvoiceAdjustmentPayload({
-        type: "reimbursement",
-        label: "Laptop courier",
-        amountUsdCents: 7500,
-      }),
-    ).toEqual({
-      type: "reimbursement",
-      label: "Laptop courier",
-      amountUsdCents: 7500,
+      daysWorked: 90,
+      amountUsdCents: -195000,
     });
   });
 
@@ -110,7 +131,7 @@ describe("invoice adjustments", () => {
         amountUsdCents: 7500,
         label: " Laptop Courier ",
       }),
-    ).toBe("reimbursement|7500|laptop courier");
+    ).toBe("reimbursement|7500|laptop courier|||");
 
     expect(
       buildAdjustmentDuplicateSignature({
@@ -119,8 +140,9 @@ describe("invoice adjustments", () => {
         employeeName: " Pawan ",
         rateUsdCents: 3000,
         hrsPerWeek: 4,
+        daysWorked: 60,
       }),
-    ).toBe("onboarding|12000|pawan|3000|4");
+    ).toBe("onboarding|12000|pawan|3000|4|60");
   });
 
   it("groups adjustments into separate category totals", () => {
@@ -133,7 +155,8 @@ describe("invoice adjustments", () => {
         employeeName: "Pawan",
         rateUsdCents: 3000,
         hrsPerWeek: 4,
-        amountUsdCents: 52000,
+        daysWorked: 60,
+        amountUsdCents: 104000,
         sortOrder: 1,
       },
       {
@@ -144,7 +167,8 @@ describe("invoice adjustments", () => {
         employeeName: "Riya",
         rateUsdCents: 5000,
         hrsPerWeek: 2,
-        amountUsdCents: 43333,
+        daysWorked: 90,
+        amountUsdCents: 130000,
         sortOrder: 2,
       },
       {
@@ -152,7 +176,10 @@ describe("invoice adjustments", () => {
         invoiceId: "inv_1",
         type: "reimbursement",
         label: "Laptop courier",
-        amountUsdCents: 2500,
+        rateUsdCents: 3000,
+        hrsPerWeek: 4,
+        daysWorked: 30,
+        amountUsdCents: 52000,
         sortOrder: 3,
       },
       {
@@ -163,15 +190,16 @@ describe("invoice adjustments", () => {
         employeeName: "Asha",
         rateUsdCents: 4000,
         hrsPerWeek: 3,
-        amountUsdCents: -52000,
+        daysWorked: 90,
+        amountUsdCents: -156000,
         sortOrder: 4,
       },
     ] satisfies InvoiceAdjustment[]);
 
-    expect(grouped.onboarding.totalUsdCents).toBe(52000);
-    expect(grouped.appraisal.totalUsdCents).toBe(43333);
-    expect(grouped.reimbursement.totalUsdCents).toBe(2500);
-    expect(grouped.offboarding.totalUsdCents).toBe(52000);
-    expect(grouped.offboarding.items[0]?.amountUsdCents).toBe(-52000);
+    expect(grouped.onboarding.totalUsdCents).toBe(104000);
+    expect(grouped.appraisal.totalUsdCents).toBe(130000);
+    expect(grouped.reimbursement.totalUsdCents).toBe(52000);
+    expect(grouped.offboarding.totalUsdCents).toBe(156000);
+    expect(grouped.offboarding.items[0]?.amountUsdCents).toBe(-156000);
   });
 });
