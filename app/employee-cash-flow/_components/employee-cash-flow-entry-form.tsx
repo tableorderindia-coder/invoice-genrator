@@ -15,6 +15,7 @@ import {
   aggregateEmployeeCashFlowEditableEntries,
   type EmployeeCashFlowEditableEntry,
 } from "@/src/features/billing/employee-cash-flow-entry-aggregation";
+import { getDaysInMonthFromMonthKey } from "@/src/features/billing/employee-cash-flow-page-state";
 import { formatInr, formatUsd } from "@/src/features/billing/utils";
 
 type AvailableEmployee = {
@@ -98,6 +99,7 @@ export default function EmployeeCashFlowEntryForm({
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>(
     aggregateEmployeeCashFlowEditableEntries(initialEntries).map((entry) => entry.employeeId),
   );
+  const daysInSelectedMonth = getDaysInMonthFromMonthKey(paymentMonth);
 
   const usedEmployeeIds = useMemo(
     () => new Set(entries.map((entry) => entry.employeeId)),
@@ -127,7 +129,7 @@ export default function EmployeeCashFlowEntryForm({
       employeeId: employee.id,
       employeeNameSnapshot: employee.fullName,
       daysWorked: 0,
-      daysInMonth: 30,
+      daysInMonth: daysInSelectedMonth,
       monthlyPaidUsdCents: employee.payoutMonthlyUsdCents,
       baseDollarInwardUsdCents: 0,
       onboardingAdvanceUsdCents: 0,

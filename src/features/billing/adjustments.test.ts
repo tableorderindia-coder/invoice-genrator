@@ -5,6 +5,7 @@ import {
   buildInvoiceAdjustmentPayload,
   calculatePersonAdjustmentTotalUsdCents,
   buildAdjustmentDuplicateSignature,
+  getAdjustmentDaysFieldCopy,
   groupInvoiceAdjustments,
 } from "./adjustments";
 
@@ -121,6 +122,26 @@ describe("invoice adjustments", () => {
       hrsPerWeek: 3,
       daysWorked: 90,
       amountUsdCents: -195000,
+    });
+  });
+
+  it("uses adjustment-specific day-field copy for onboarding and offboarding", () => {
+    expect(getAdjustmentDaysFieldCopy("onboarding")).toEqual({
+      label: "Number of days to advance",
+      placeholder: "Enter number of days to advance",
+      helperText: "Can be higher than the selected month days.",
+    });
+
+    expect(getAdjustmentDaysFieldCopy("offboarding")).toEqual({
+      label: "Number of days to deduct",
+      placeholder: "Enter number of days to deduct",
+      helperText: "Can be higher than the selected month days.",
+    });
+
+    expect(getAdjustmentDaysFieldCopy("appraisal")).toEqual({
+      label: "Days worked",
+      placeholder: "Enter days worked",
+      helperText: undefined,
     });
   });
 

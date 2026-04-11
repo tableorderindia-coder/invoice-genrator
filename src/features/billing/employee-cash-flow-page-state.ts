@@ -4,6 +4,21 @@ function getTodayMonthKey(now = new Date()) {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
 
+export function getDaysInMonthFromMonthKey(monthKey: string) {
+  const match = /^(\d{4})-(\d{2})$/.exec(monthKey);
+  if (!match) {
+    return 30;
+  }
+
+  const year = Number.parseInt(match[1] ?? "", 10);
+  const month = Number.parseInt(match[2] ?? "", 10);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) {
+    return 30;
+  }
+
+  return new Date(year, month, 0).getDate();
+}
+
 export function resolveEmployeeCashFlowMonthKey(
   input?: SearchValue,
   legacyYear?: SearchValue,

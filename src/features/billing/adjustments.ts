@@ -2,6 +2,30 @@ import type { AdjustmentType, InvoiceAdjustment } from "./types";
 
 type PersonAdjustmentType = Exclude<AdjustmentType, "reimbursement">;
 
+export function getAdjustmentDaysFieldCopy(type: AdjustmentType | "") {
+  if (type === "onboarding") {
+    return {
+      label: "Number of days to advance",
+      placeholder: "Enter number of days to advance",
+      helperText: "Can be higher than the selected month days.",
+    };
+  }
+
+  if (type === "offboarding") {
+    return {
+      label: "Number of days to deduct",
+      placeholder: "Enter number of days to deduct",
+      helperText: "Can be higher than the selected month days.",
+    };
+  }
+
+  return {
+    label: "Days worked",
+    placeholder: "Enter days worked",
+    helperText: undefined,
+  };
+}
+
 function normalizeText(value: string | undefined) {
   return (value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
 }

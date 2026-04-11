@@ -8,6 +8,7 @@ import {
   buildAdjustmentDuplicateSignature,
   buildInvoiceAdjustmentPayload,
   calculatePersonAdjustmentTotalUsdCents,
+  getAdjustmentDaysFieldCopy,
   groupInvoiceAdjustments,
 } from "@/src/features/billing/adjustments";
 import type { InvoiceAdjustment } from "@/src/features/billing/types";
@@ -274,6 +275,7 @@ export function AdjustmentForms({
     form.employeeName && (form.type === "onboarding" || form.type === "offboarding")
       ? securityDepositBalances[form.employeeName] ?? 0
       : 0;
+  const daysFieldCopy = getAdjustmentDaysFieldCopy(form.type);
 
   return (
     <div className="space-y-4">
@@ -446,13 +448,13 @@ export function AdjustmentForms({
                 }
               />
             </Field>
-            <Field label="Days worked">
+            <Field label={daysFieldCopy.label}>
               <input
                 name="daysWorked"
                 type="number"
                 step="1"
                 min="1"
-                placeholder="Enter days worked"
+                placeholder={daysFieldCopy.placeholder}
                 className={`${inputClass} min-h-14`}
                 value={form.daysWorked}
                 onChange={(event) =>
@@ -471,6 +473,11 @@ export function AdjustmentForms({
                 }
               />
             </Field>
+            {daysFieldCopy.helperText ? (
+              <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                {daysFieldCopy.helperText}
+              </p>
+            ) : null}
             <Field label="Total">
               <input
                 name="amountUsd"
