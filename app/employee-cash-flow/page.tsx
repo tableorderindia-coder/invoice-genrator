@@ -148,6 +148,8 @@ export default async function EmployeeCashFlowPage({
             paymentMonth={monthKey}
             returnTo={returnTo}
             invoiceNumber={prefillData.invoice.invoiceNumber}
+            invoiceDollarInboundUsdCents={prefillData.invoice.dollarInboundUsdCents}
+            invoiceUsdInrRate={prefillData.invoice.usdInrRate}
             initialEntries={initialEntries}
             availableEmployees={prefillData.availableEmployees}
           />

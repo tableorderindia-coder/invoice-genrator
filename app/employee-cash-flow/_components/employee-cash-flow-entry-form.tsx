@@ -15,7 +15,9 @@ import {
   aggregateEmployeeCashFlowEditableEntries,
   type EmployeeCashFlowEditableEntry,
 } from "@/src/features/billing/employee-cash-flow-entry-aggregation";
-import { getDaysInMonthFromMonthKey } from "@/src/features/billing/employee-cash-flow-page-state";
+import {
+  buildAddedEmployeeCashFlowEntry,
+} from "@/src/features/billing/employee-cash-flow-page-state";
 import { formatInr, formatUsd } from "@/src/features/billing/utils";
 
 type AvailableEmployee = {
@@ -79,6 +81,8 @@ export default function EmployeeCashFlowEntryForm({
   paymentMonth,
   returnTo,
   invoiceNumber,
+  invoiceDollarInboundUsdCents,
+  invoiceUsdInrRate,
   initialEntries,
   availableEmployees,
 }: {
@@ -88,6 +92,8 @@ export default function EmployeeCashFlowEntryForm({
   paymentMonth: string;
   returnTo: string;
   invoiceNumber: string;
+  invoiceDollarInboundUsdCents: number;
+  invoiceUsdInrRate: number;
   initialEntries: EmployeeCashFlowEditableEntry[];
   availableEmployees: AvailableEmployee[];
 }) {
@@ -99,7 +105,6 @@ export default function EmployeeCashFlowEntryForm({
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>(
     aggregateEmployeeCashFlowEditableEntries(initialEntries).map((entry) => entry.employeeId),
   );
-  const daysInSelectedMonth = getDaysInMonthFromMonthKey(paymentMonth);
 
   const usedEmployeeIds = useMemo(
     () => new Set(entries.map((entry) => entry.employeeId)),
@@ -126,26 +131,12 @@ export default function EmployeeCashFlowEntryForm({
 
     const nextEntry: EmployeeCashFlowEditableEntry = {
       id: `manual_${employee.id}`,
-      employeeId: employee.id,
-      employeeNameSnapshot: employee.fullName,
-      daysWorked: 0,
-      daysInMonth: daysInSelectedMonth,
-      monthlyPaidUsdCents: employee.payoutMonthlyUsdCents,
-      baseDollarInwardUsdCents: 0,
-      onboardingAdvanceUsdCents: 0,
-      offboardingDeductionUsdCents: 0,
-      cashoutUsdInrRate: 0,
-      paidUsdInrRate: 0,
-      pfInrCents: 0,
-      tdsInrCents: 0,
-      actualPaidInrCents: 0,
-      fxCommissionInrCents: 0,
-      totalCommissionUsdCents: 0,
-      commissionEarnedInrCents: 0,
-      grossEarningsInrCents: 0,
-      isNonInvoiceEmployee: true,
-      isPaid: false,
-      notes: "",
+      ...buildAddedEmployeeCashFlowEntry({
+        employee,
+        paymentMonth,
+        invoiceDollarInboundUsdCents,
+        invoiceUsdInrRate,
+      }),
     };
 
     setEntries((current) => [...current, nextEntry]);

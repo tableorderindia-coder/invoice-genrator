@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildAddedEmployeeCashFlowEntry,
   buildEmployeeCashFlowInvoiceOptionsInput,
   getDaysInMonthFromMonthKey,
   resolveEmployeeCashFlowMonthKey,
@@ -29,5 +30,29 @@ describe("employee cash flow page state", () => {
     expect(getDaysInMonthFromMonthKey("2026-02")).toBe(28);
     expect(getDaysInMonthFromMonthKey("2026-04")).toBe(30);
     expect(getDaysInMonthFromMonthKey("2026-05")).toBe(31);
+  });
+
+  it("prefills added employee rows from the selected cashed-out invoice", () => {
+    expect(
+      buildAddedEmployeeCashFlowEntry({
+        employee: {
+          id: "emp_1",
+          fullName: "Asha",
+          payoutMonthlyUsdCents: 2_000_00,
+        },
+        paymentMonth: "2026-05",
+        invoiceDollarInboundUsdCents: 7_500_00,
+        invoiceUsdInrRate: 84.25,
+      }),
+    ).toMatchObject({
+      employeeId: "emp_1",
+      employeeNameSnapshot: "Asha",
+      daysWorked: 0,
+      daysInMonth: 31,
+      monthlyPaidUsdCents: 2_000_00,
+      baseDollarInwardUsdCents: 7_500_00,
+      cashoutUsdInrRate: 84.25,
+      isNonInvoiceEmployee: true,
+    });
   });
 });
