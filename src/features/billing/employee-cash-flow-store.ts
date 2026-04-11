@@ -573,6 +573,15 @@ export async function getInvoicePaymentPrefillData(input: {
       fullName: String(row.full_name),
       companyId: String(row.company_id),
       payoutMonthlyUsdCents: Number(row.payout_monthly_usd_cents ?? 0),
+      onboardingAdvanceUsdCents:
+        onboardingByEmployeeName.get(
+          normalizeEmployeeNameForMatch(String(row.full_name)),
+        ) ?? 0,
+      offboardingDeductionUsdCents: Math.abs(
+        offboardingByEmployeeName.get(
+          normalizeEmployeeNameForMatch(String(row.full_name)),
+        ) ?? 0,
+      ),
     })),
   };
 }

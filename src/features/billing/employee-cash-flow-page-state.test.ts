@@ -55,4 +55,24 @@ describe("employee cash flow page state", () => {
       isNonInvoiceEmployee: true,
     });
   });
+
+  it("carries onboarding and offboarding defaults into added employee rows", () => {
+    expect(
+      buildAddedEmployeeCashFlowEntry({
+        employee: {
+          id: "emp_1",
+          fullName: "Asha",
+          payoutMonthlyUsdCents: 2_000_00,
+          onboardingAdvanceUsdCents: 900_00,
+          offboardingDeductionUsdCents: 200_00,
+        },
+        paymentMonth: "2026-05",
+        invoiceDollarInboundUsdCents: 7_500_00,
+        invoiceUsdInrRate: 84.25,
+      }),
+    ).toMatchObject({
+      onboardingAdvanceUsdCents: 900_00,
+      offboardingDeductionUsdCents: 200_00,
+    });
+  });
 });

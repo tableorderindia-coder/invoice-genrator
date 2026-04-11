@@ -25,6 +25,8 @@ type AvailableEmployee = {
   fullName: string;
   companyId: string;
   payoutMonthlyUsdCents: number;
+  onboardingAdvanceUsdCents: number;
+  offboardingDeductionUsdCents: number;
 };
 
 function toCurrencyInput(value: number) {

@@ -53,6 +53,8 @@ export function buildAddedEmployeeCashFlowEntry(input: {
     id: string;
     fullName: string;
     payoutMonthlyUsdCents: number;
+    onboardingAdvanceUsdCents?: number;
+    offboardingDeductionUsdCents?: number;
   };
   paymentMonth: string;
   invoiceDollarInboundUsdCents: number;
@@ -65,8 +67,8 @@ export function buildAddedEmployeeCashFlowEntry(input: {
     daysInMonth: getDaysInMonthFromMonthKey(input.paymentMonth),
     monthlyPaidUsdCents: input.employee.payoutMonthlyUsdCents,
     baseDollarInwardUsdCents: input.invoiceDollarInboundUsdCents,
-    onboardingAdvanceUsdCents: 0,
-    offboardingDeductionUsdCents: 0,
+    onboardingAdvanceUsdCents: input.employee.onboardingAdvanceUsdCents ?? 0,
+    offboardingDeductionUsdCents: input.employee.offboardingDeductionUsdCents ?? 0,
     cashoutUsdInrRate: input.invoiceUsdInrRate,
     paidUsdInrRate: 0,
     pfInrCents: 0,
