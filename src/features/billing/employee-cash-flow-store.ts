@@ -8,6 +8,7 @@ import {
   resolveEmployeeCashFlowStatus,
 } from "./employee-cash-flow";
 import type {
+  EmployeeCashFlowEntryWriteInput,
   EmployeeCashFlowInvoiceOption,
   EmployeeCashFlowMonthRow,
   EmployeeCashFlowSalaryPaymentRow,
@@ -409,11 +410,8 @@ export async function getInvoicePaymentPrefillData(input: {
     return {
       id: nextCashFlowId("cash_entry"),
       employeeId: row.employee_id,
-      employeeName: row.employee_name_snapshot,
-      companyId: row.company_id,
-      invoiceId: row.invoice_id,
+      employeeNameSnapshot: row.employee_name_snapshot,
       invoiceLineItemId: row.invoice_line_item_id ?? undefined,
-      paymentMonth: input.paymentMonth,
       daysWorked: lineItem?.days_worked ?? daysInMonth,
       daysInMonth,
       monthlyPaidUsdCents: row.employee_monthly_usd_cents,
@@ -573,4 +571,169 @@ export async function getEmployeeCashFlowDashboardData(input: {
     rows,
     salaryPayments: salaryPayments as EmployeeCashFlowSalaryPaymentRow[],
   };
+}
+
+export async function upsertInvoicePayment(input: {
+  invoicePaymentId?: string;
+  invoiceId: string;
+  companyId: string;
+  paymentDate: string;
+  paymentMonth: string;
+  usdInrRate: number;
+  notes?: string;
+}) {
+  const supabase = getSupabaseOrThrow();
+  const payload = {
+    invoice_id: input.invoiceId,
+    company_id: input.companyId,
+    payment_date: input.paymentDate,
+    payment_month: input.paymentMonth,
+    usd_inr_rate: input.usdInrRate,
+    notes: input.notes ?? null,
+    updated_at: nowIso(),
+  };
+
+  if (input.invoicePaymentId) {
+    const { error } = await supabase
+      .from("invoice_payments")
+      .update(payload)
+      .eq("id", input.invoicePaymentId);
+    if (error) throw error;
+    return input.invoicePaymentId;
+  }
+
+  const id = nextCashFlowId("invoice_payment");
+  const { error } = await supabase.from("invoice_payments").insert({
+    id,
+    ...payload,
+    created_at: nowIso(),
+  });
+  if (error) throw error;
+  return id;
+}
+
+export async function replaceInvoicePaymentEmployeeEntries(input: {
+  invoicePaymentId: string;
+  invoiceId: string;
+  companyId: string;
+  paymentMonth: string;
+  entries: EmployeeCashFlowEntryWriteInput[];
+}) {
+  const supabase = getSupabaseOrThrow();
+  const { error: deleteError } = await supabase
+    .from("invoice_payment_employee_entries")
+    .delete()
+    .eq("invoice_payment_id", input.invoicePaymentId);
+  if (deleteError) throw deleteError;
+
+  if (input.entries.length === 0) {
+    return;
+  }
+
+  const payload = input.entries.map((entry) => {
+    const effectiveDollarInwardUsdCents = calculateEffectiveDollarInwardUsdCents({
+      baseDollarInwardUsdCents: entry.baseDollarInwardUsdCents,
+      onboardingAdvanceUsdCents: entry.onboardingAdvanceUsdCents,
+      offboardingDeductionUsdCents: entry.offboardingDeductionUsdCents,
+    });
+
+    return {
+      id: nextCashFlowId("cash_entry"),
+      invoice_payment_id: input.invoicePaymentId,
+      invoice_id: input.invoiceId,
+      employee_id: entry.employeeId,
+      company_id: input.companyId,
+      payment_month: input.paymentMonth,
+      invoice_line_item_id: entry.invoiceLineItemId ?? null,
+      employee_name_snapshot: entry.employeeNameSnapshot,
+      days_worked: entry.daysWorked,
+      days_in_month: entry.daysInMonth,
+      monthly_paid_usd_cents: entry.monthlyPaidUsdCents,
+      base_dollar_inward_usd_cents: entry.baseDollarInwardUsdCents,
+      onboarding_advance_usd_cents: entry.onboardingAdvanceUsdCents,
+      offboarding_deduction_usd_cents: entry.offboardingDeductionUsdCents,
+      effective_dollar_inward_usd_cents: effectiveDollarInwardUsdCents,
+      cashout_usd_inr_rate: entry.cashoutUsdInrRate,
+      paid_usd_inr_rate: entry.paidUsdInrRate,
+      cash_in_inr_cents: calculateCashInInrCents({
+        effectiveDollarInwardUsdCents,
+        cashoutUsdInrRate: entry.cashoutUsdInrRate,
+      }),
+      pf_inr_cents: entry.pfInrCents,
+      tds_inr_cents: entry.tdsInrCents,
+      actual_paid_inr_cents: entry.actualPaidInrCents,
+      fx_commission_inr_cents: entry.fxCommissionInrCents,
+      total_commission_usd_cents: entry.totalCommissionUsdCents,
+      commission_earned_inr_cents: entry.commissionEarnedInrCents,
+      gross_earnings_inr_cents: entry.grossEarningsInrCents,
+      is_non_invoice_employee: entry.isNonInvoiceEmployee,
+      is_paid: entry.isPaid,
+      paid_at: entry.paidAt ?? null,
+      notes: entry.notes ?? null,
+      created_at: nowIso(),
+      updated_at: nowIso(),
+    };
+  });
+
+  const { error } = await supabase
+    .from("invoice_payment_employee_entries")
+    .insert(payload);
+  if (error) throw error;
+}
+
+export async function upsertEmployeeSalaryPayment(input: {
+  employeeId: string;
+  companyId: string;
+  month: string;
+  salaryUsdCents: number;
+  paidUsdInrRate: number;
+  paidStatus: boolean;
+  paidDate?: string;
+  notes?: string;
+}) {
+  const supabase = getSupabaseOrThrow();
+  const salaryPaidInrCents = calculateCashInInrCents({
+    effectiveDollarInwardUsdCents: input.salaryUsdCents,
+    cashoutUsdInrRate: input.paidUsdInrRate,
+  });
+
+  const { data: existing, error: existingError } = await supabase
+    .from("employee_salary_payments")
+    .select("id")
+    .eq("employee_id", input.employeeId)
+    .eq("company_id", input.companyId)
+    .eq("month", input.month)
+    .maybeSingle();
+  if (existingError) throw existingError;
+
+  const payload = {
+    employee_id: input.employeeId,
+    company_id: input.companyId,
+    month: input.month,
+    salary_usd_cents: input.salaryUsdCents,
+    paid_usd_inr_rate: input.paidUsdInrRate,
+    salary_paid_inr_cents: salaryPaidInrCents,
+    paid_status: input.paidStatus,
+    paid_date: input.paidDate ?? null,
+    notes: input.notes ?? null,
+    updated_at: nowIso(),
+  };
+
+  if (existing?.id) {
+    const { error } = await supabase
+      .from("employee_salary_payments")
+      .update(payload)
+      .eq("id", String(existing.id));
+    if (error) throw error;
+    return String(existing.id);
+  }
+
+  const id = nextCashFlowId("salary_payment");
+  const { error } = await supabase.from("employee_salary_payments").insert({
+    id,
+    ...payload,
+    created_at: nowIso(),
+  });
+  if (error) throw error;
+  return id;
 }

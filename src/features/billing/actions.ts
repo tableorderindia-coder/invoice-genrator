@@ -32,6 +32,12 @@ import {
   removeEmployeePayoutRow,
   upsertDashboardExpense,
 } from "./store";
+import type { EmployeeCashFlowEntryWriteInput } from "./employee-cash-flow-types";
+import {
+  replaceInvoicePaymentEmployeeEntries,
+  upsertEmployeeSalaryPayment,
+  upsertInvoicePayment,
+} from "./employee-cash-flow-store";
 import { centsFromUsd } from "./utils";
 
 function getString(formData: FormData, key: string) {
@@ -72,6 +78,33 @@ function getErrorMessage(error: unknown, fallback: string) {
     return String(error.message);
   }
   return fallback;
+}
+
+function getNonNegativeNumberOrThrow(rawValue: string, fieldLabel: string) {
+  const value = Number.parseFloat(rawValue);
+  if (!Number.isFinite(value) || value < 0) {
+    throw new Error(`${fieldLabel} cannot be negative.`);
+  }
+  return value;
+}
+
+function parseEmployeeCashFlowEntriesJson(rawValue: string) {
+  if (!rawValue) {
+    return [] as EmployeeCashFlowEntryWriteInput[];
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(rawValue);
+  } catch {
+    throw new Error("Employee cash flow rows could not be parsed.");
+  }
+
+  if (!Array.isArray(parsed)) {
+    throw new Error("Employee cash flow rows must be an array.");
+  }
+
+  return parsed as EmployeeCashFlowEntryWriteInput[];
 }
 
 export async function createCompanyAction(formData: FormData) {
@@ -864,4 +897,177 @@ export async function saveDashboardExpenseAction(formData: FormData) {
   }
 
   redirect(buildFlashRedirect(returnTo, "success", "Expense saved."));
+}
+
+export async function saveInvoicePaymentAction(formData: FormData) {
+  const returnTo = getString(formData, "returnTo") || "/employee-cash-flow";
+
+  try {
+    const invoiceId = getString(formData, "invoiceId");
+    if (!invoiceId) {
+      throw new Error("Select an invoice first.");
+    }
+
+    const companyId = getString(formData, "companyId");
+    if (!companyId) {
+      throw new Error("Select a company first.");
+    }
+
+    const paymentMonth = getString(formData, "paymentMonth");
+    if (!/^\d{4}-\d{2}$/.test(paymentMonth)) {
+      throw new Error("Select a valid payment month.");
+    }
+
+    const paymentDate = getString(formData, "paymentDate");
+    if (!paymentDate) {
+      throw new Error("Select a payment date.");
+    }
+
+    const usdInrRate = getNonNegativeNumberOrThrow(
+      getString(formData, "usdInrRate"),
+      "USD/INR rate",
+    );
+
+    const invoicePaymentId = await upsertInvoicePayment({
+      invoicePaymentId: getString(formData, "invoicePaymentId") || undefined,
+      invoiceId,
+      companyId,
+      paymentDate,
+      paymentMonth,
+      usdInrRate,
+      notes: getString(formData, "notes") || undefined,
+    });
+
+    revalidatePath("/employee-cash-flow");
+    redirect(
+      buildFlashRedirect(
+        `${returnTo}${returnTo.includes("?") ? "&" : "?"}invoicePaymentId=${encodeURIComponent(invoicePaymentId)}`,
+        "success",
+        "Invoice payment saved.",
+      ),
+    );
+  } catch (error) {
+    redirect(
+      buildFlashRedirect(
+        returnTo,
+        "error",
+        getErrorMessage(error, "Unable to save invoice payment."),
+      ),
+    );
+  }
+}
+
+export async function saveInvoicePaymentEmployeeEntriesAction(formData: FormData) {
+  const returnTo = getString(formData, "returnTo") || "/employee-cash-flow";
+
+  try {
+    const invoicePaymentId = getString(formData, "invoicePaymentId");
+    if (!invoicePaymentId) {
+      throw new Error("Save the invoice payment header first.");
+    }
+
+    const invoiceId = getString(formData, "invoiceId");
+    if (!invoiceId) {
+      throw new Error("Invoice is required.");
+    }
+
+    const companyId = getString(formData, "companyId");
+    if (!companyId) {
+      throw new Error("Company is required.");
+    }
+
+    const paymentMonth = getString(formData, "paymentMonth");
+    if (!/^\d{4}-\d{2}$/.test(paymentMonth)) {
+      throw new Error("Payment month is invalid.");
+    }
+
+    const entries = parseEmployeeCashFlowEntriesJson(getString(formData, "entriesJson"));
+
+    await replaceInvoicePaymentEmployeeEntries({
+      invoicePaymentId,
+      invoiceId,
+      companyId,
+      paymentMonth,
+      entries,
+    });
+
+    for (const entry of entries) {
+      await upsertEmployeeSalaryPayment({
+        employeeId: entry.employeeId,
+        companyId,
+        month: paymentMonth,
+        salaryUsdCents: entry.monthlyPaidUsdCents,
+        paidUsdInrRate: entry.paidUsdInrRate,
+        paidStatus: entry.isPaid,
+        paidDate: entry.paidAt,
+        notes: entry.notes,
+      });
+    }
+
+    revalidatePath("/employee-cash-flow");
+  } catch (error) {
+    redirect(
+      buildFlashRedirect(
+        returnTo,
+        "error",
+        getErrorMessage(error, "Unable to save employee cash flow rows."),
+      ),
+    );
+  }
+
+  redirect(buildFlashRedirect(returnTo, "success", "Employee cash flow rows saved."));
+}
+
+export async function saveEmployeeSalaryPaymentAction(formData: FormData) {
+  const returnTo = getString(formData, "returnTo") || "/employee-cash-flow";
+
+  try {
+    const employeeId = getString(formData, "employeeId");
+    if (!employeeId) {
+      throw new Error("Employee is required.");
+    }
+
+    const companyId = getString(formData, "companyId");
+    if (!companyId) {
+      throw new Error("Company is required.");
+    }
+
+    const month = getString(formData, "month");
+    if (!/^\d{4}-\d{2}$/.test(month)) {
+      throw new Error("Month is invalid.");
+    }
+
+    const salaryUsdCents = centsFromUsd(getString(formData, "salaryUsd"));
+    if (salaryUsdCents < 0) {
+      throw new Error("Salary USD cannot be negative.");
+    }
+
+    const paidUsdInrRate = getNonNegativeNumberOrThrow(
+      getString(formData, "paidUsdInrRate"),
+      "Paid USD/INR rate",
+    );
+
+    await upsertEmployeeSalaryPayment({
+      employeeId,
+      companyId,
+      month,
+      salaryUsdCents,
+      paidUsdInrRate,
+      paidStatus: getString(formData, "paidStatus") === "true",
+      paidDate: getString(formData, "paidDate") || undefined,
+      notes: getString(formData, "notes") || undefined,
+    });
+
+    revalidatePath("/employee-cash-flow");
+  } catch (error) {
+    redirect(
+      buildFlashRedirect(
+        returnTo,
+        "error",
+        getErrorMessage(error, "Unable to save salary payment."),
+      ),
+    );
+  }
+
+  redirect(buildFlashRedirect(returnTo, "success", "Salary payment saved."));
 }

@@ -42,3 +42,28 @@ export type EmployeeCashFlowInvoiceOption = {
   month: number;
   year: number;
 };
+
+export type EmployeeCashFlowEntryWriteInput = {
+  employeeId: string;
+  employeeNameSnapshot: string;
+  invoiceLineItemId?: string;
+  daysWorked: number;
+  daysInMonth: number;
+  monthlyPaidUsdCents: number;
+  baseDollarInwardUsdCents: number;
+  onboardingAdvanceUsdCents: number;
+  offboardingDeductionUsdCents: number;
+  cashoutUsdInrRate: number;
+  paidUsdInrRate: number;
+  pfInrCents: number;
+  tdsInrCents: number;
+  actualPaidInrCents: number;
+  fxCommissionInrCents: number;
+  totalCommissionUsdCents: number;
+  commissionEarnedInrCents: number;
+  grossEarningsInrCents: number;
+  isNonInvoiceEmployee: boolean;
+  isPaid: boolean;
+  paidAt?: string;
+  notes?: string;
+};
