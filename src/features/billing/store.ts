@@ -26,6 +26,7 @@ import {
   type PnSourceRow,
 } from "./pn-dashboard";
 import { assertEmployeePayoutRemovable } from "./employee-payout";
+import { calculateEmployeeMonthNetInrCents } from "./employee-cash-flow";
 import { getDaysInMonth } from "./utils";
 import type {
   AdjustmentType,
@@ -189,9 +190,13 @@ type DbDashboardCashFlowEntry = {
   employee_name_snapshot: string;
   company_id: string;
   monthly_paid_usd_cents: number;
+  base_dollar_inward_usd_cents: number;
+  onboarding_advance_usd_cents: number;
+  offboarding_deduction_usd_cents: number;
   effective_dollar_inward_usd_cents: number;
   cashout_usd_inr_rate: number;
   paid_usd_inr_rate: number;
+  cash_in_inr_cents: number;
   pf_inr_cents: number;
   tds_inr_cents: number;
   actual_paid_inr_cents: number;
@@ -2265,7 +2270,7 @@ export async function getPnDashboardData(input: {
   let cashFlowQuery = supabase
     .from("invoice_payment_employee_entries")
     .select(
-      "id, employee_id, payment_month, employee_name_snapshot, company_id, monthly_paid_usd_cents, effective_dollar_inward_usd_cents, cashout_usd_inr_rate, paid_usd_inr_rate, pf_inr_cents, tds_inr_cents, actual_paid_inr_cents, fx_commission_inr_cents, total_commission_usd_cents, commission_earned_inr_cents, gross_earnings_inr_cents, days_worked, days_in_month, invoice_id",
+      "id, employee_id, payment_month, employee_name_snapshot, company_id, monthly_paid_usd_cents, base_dollar_inward_usd_cents, onboarding_advance_usd_cents, offboarding_deduction_usd_cents, effective_dollar_inward_usd_cents, cashout_usd_inr_rate, paid_usd_inr_rate, cash_in_inr_cents, pf_inr_cents, tds_inr_cents, actual_paid_inr_cents, fx_commission_inr_cents, total_commission_usd_cents, commission_earned_inr_cents, gross_earnings_inr_cents, days_worked, days_in_month, invoice_id",
     )
     .eq("company_id", input.companyId);
 
@@ -2369,10 +2374,18 @@ export async function getPnDashboardData(input: {
         month,
         daysWorked: row.days_worked,
         daysInMonth: row.days_in_month,
-        dollarInwardUsdCents: row.effective_dollar_inward_usd_cents,
+        dollarInwardUsdCents: row.base_dollar_inward_usd_cents,
+        baseDollarInwardUsdCents: row.base_dollar_inward_usd_cents,
+        onboardingAdvanceUsdCents: row.onboarding_advance_usd_cents,
+        offboardingDeductionUsdCents: row.offboarding_deduction_usd_cents,
+        effectiveDollarInwardUsdCents: row.effective_dollar_inward_usd_cents,
+        cashInInrCents: row.cash_in_inr_cents,
         employeeMonthlyUsdCents: row.monthly_paid_usd_cents,
         cashoutUsdInrRate: row.cashout_usd_inr_rate,
         paidUsdInrRate: row.paid_usd_inr_rate,
+        salaryPaidInrCents: Math.round(
+          row.monthly_paid_usd_cents * row.paid_usd_inr_rate,
+        ),
         pfInrCents: row.pf_inr_cents,
         tdsInrCents: row.tds_inr_cents,
         actualPaidInrCents: row.actual_paid_inr_cents,
@@ -2380,6 +2393,12 @@ export async function getPnDashboardData(input: {
         totalCommissionUsdCents: row.total_commission_usd_cents,
         commissionEarnedInrCents: row.commission_earned_inr_cents,
         grossEarningsInrCents: row.gross_earnings_inr_cents,
+        netProfitInrCents: calculateEmployeeMonthNetInrCents({
+          cashInInrCents: row.cash_in_inr_cents,
+          salaryPaidInrCents: Math.round(
+            row.monthly_paid_usd_cents * row.paid_usd_inr_rate,
+          ),
+        }),
         isSecurityDepositMonth: false,
       };
     })

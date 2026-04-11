@@ -900,10 +900,7 @@ export async function updateDashboardEmployeeCashFlowEntry(input: {
     | "offboarding_deduction_usd_cents"
   >;
 
-  const baseDollarInwardUsdCents =
-    input.dollarInwardUsdCents -
-    current.onboarding_advance_usd_cents +
-    current.offboarding_deduction_usd_cents;
+  const baseDollarInwardUsdCents = input.dollarInwardUsdCents;
   const effectiveDollarInwardUsdCents = calculateEffectiveDollarInwardUsdCents({
     baseDollarInwardUsdCents,
     onboardingAdvanceUsdCents: current.onboarding_advance_usd_cents,

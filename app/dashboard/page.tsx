@@ -13,7 +13,12 @@ import {
   listEmployees,
 } from "@/src/features/billing/store";
 import type { PnDashboardData } from "@/src/features/billing/types";
-import { formatInr, formatMonthYear, formatUsd } from "@/src/features/billing/utils";
+import {
+  formatInr,
+  formatMonthYear,
+  formatSignedInr,
+  formatUsd,
+} from "@/src/features/billing/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +32,12 @@ function normalizeStringArray(value?: string | string[]) {
       .filter(Boolean);
   }
   return [value];
+}
+
+function netProfitColor(cents: number) {
+  if (cents < 0) return "#fca5a5";
+  if (cents > 0) return "#6ee7b7";
+  return "var(--text-primary)";
 }
 
 export default async function DashboardPage({
@@ -232,12 +243,16 @@ export default async function DashboardPage({
                     <thead>
                       <tr>
                         <th>Month</th>
-                        <th>Invoice</th>
                         <th>Days worked</th>
                         <th>Dollar inward</th>
-                        <th>Monthly $</th>
+                        <th>Onboarding advance</th>
+                        <th>Offboarding deduction</th>
+                        <th>Effective dollar inward</th>
                         <th>Cashout rate</th>
+                        <th>Cash in (INR)</th>
+                        <th>Monthly $</th>
                         <th>Paid rate</th>
+                        <th>Salary paid (INR)</th>
                         <th>PF (INR)</th>
                         <th>TDS (INR)</th>
                         <th>Actual paid (INR)</th>
@@ -245,6 +260,7 @@ export default async function DashboardPage({
                         <th>Total commission (USD)</th>
                         <th>Commission earned (INR)</th>
                         <th>Gross earnings (INR)</th>
+                        <th>Net Profit (INR)</th>
                         <th>Actions</th>
                       </tr>
                     </thead>
@@ -252,7 +268,6 @@ export default async function DashboardPage({
                       {section.rows.map((row) => (
                         <tr key={row.payoutId}>
                           <td>{formatMonthYear(row.month, row.year)}</td>
-                          <td>{row.invoiceNumber}</td>
                           <td>{`${row.daysWorked}/${row.daysInMonth}`}</td>
                           <td>
                             <form id={`dashboard-payout-${row.payoutId}`} action={updateDashboardEmployeeCashFlowEntryAction}></form>
@@ -269,18 +284,9 @@ export default async function DashboardPage({
                               style={{ minWidth: "8rem", border: "1px solid var(--glass-border)", background: "rgba(255,255,255,0.04)", color: "var(--text-primary)" }}
                             />
                           </td>
-                          <td>
-                            <input
-                              form={`dashboard-payout-${row.payoutId}`}
-                              type="number"
-                              name="employeeMonthlyUsd"
-                              min="0.01"
-                              step="0.01"
-                              defaultValue={(row.employeeMonthlyUsdCents / 100).toFixed(2)}
-                              className={inputClass}
-                              style={{ minWidth: "8rem", border: "1px solid var(--glass-border)", background: "rgba(255,255,255,0.04)", color: "var(--text-primary)" }}
-                            />
-                          </td>
+                          <td>{formatUsd(row.onboardingAdvanceUsdCents)}</td>
+                          <td>{formatUsd(row.offboardingDeductionUsdCents)}</td>
+                          <td>{formatUsd(row.effectiveDollarInwardUsdCents)}</td>
                           <td>
                             <input
                               form={`dashboard-payout-${row.payoutId}`}
@@ -291,6 +297,19 @@ export default async function DashboardPage({
                               defaultValue={row.cashoutUsdInrRate.toFixed(4)}
                               className={inputClass}
                               style={{ minWidth: "7rem", border: "1px solid var(--glass-border)", background: "rgba(255,255,255,0.04)", color: "var(--text-primary)" }}
+                            />
+                          </td>
+                          <td>{formatInr(row.cashInInrCents)}</td>
+                          <td>
+                            <input
+                              form={`dashboard-payout-${row.payoutId}`}
+                              type="number"
+                              name="employeeMonthlyUsd"
+                              min="0.01"
+                              step="0.01"
+                              defaultValue={(row.employeeMonthlyUsdCents / 100).toFixed(2)}
+                              className={inputClass}
+                              style={{ minWidth: "8rem", border: "1px solid var(--glass-border)", background: "rgba(255,255,255,0.04)", color: "var(--text-primary)" }}
                             />
                           </td>
                           <td>
@@ -317,6 +336,7 @@ export default async function DashboardPage({
                               />
                             )}
                           </td>
+                          <td>{formatInr(row.salaryPaidInrCents)}</td>
                           <td>
                             <input
                               form={`dashboard-payout-${row.payoutId}`}
@@ -357,6 +377,9 @@ export default async function DashboardPage({
                           <td>{formatUsd(row.totalCommissionUsdCents)}</td>
                           <td>{formatInr(row.commissionEarnedInrCents)}</td>
                           <td>{formatInr(row.grossEarningsInrCents)}</td>
+                          <td style={{ color: netProfitColor(row.netProfitInrCents) }}>
+                            {formatSignedInr(row.netProfitInrCents)}
+                          </td>
                           <td>
                             <PendingActionButton
                               form={`dashboard-payout-${row.payoutId}`}
@@ -367,17 +390,30 @@ export default async function DashboardPage({
                           </td>
                         </tr>
                       ))}
+                      <tr>
+                        <td
+                          colSpan={18}
+                          className="text-right text-sm font-semibold"
+                          style={{ color: "var(--text-primary)" }}
+                        >
+                          Total Net Profit
+                        </td>
+                        <td
+                          className="text-sm font-semibold"
+                          style={{ color: netProfitColor(section.totalNetProfitInrCents) }}
+                        >
+                          {formatSignedInr(section.totalNetProfitInrCents)}
+                        </td>
+                        <td />
+                      </tr>
                     </tbody>
                   </table>
                 </div>
-                <p className="mt-3 text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
-                  Total Gross Earning: {formatInr(section.totalGrossEarningsInrCents)}
-                </p>
               </div>
             ))}
             {data.employeeEditableSections.length === 0 ? (
               <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-                No payout records found for selected filters.
+                No employee cash flow records found for selected filters.
               </p>
             ) : null}
           </div>

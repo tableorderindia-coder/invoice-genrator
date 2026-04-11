@@ -21,7 +21,14 @@ export type PnEditableSourceRow = PnSourceRow & {
   rowId: string;
   invoiceId: string;
   invoiceNumber: string;
+  baseDollarInwardUsdCents: number;
+  onboardingAdvanceUsdCents: number;
+  offboardingDeductionUsdCents: number;
+  effectiveDollarInwardUsdCents: number;
+  cashInInrCents: number;
+  salaryPaidInrCents: number;
   grossEarningsInrCents: number;
+  netProfitInrCents: number;
   isSecurityDepositMonth?: boolean;
 };
 
@@ -59,9 +66,15 @@ export type PnEmployeeEditableRow = {
   daysWorked: number;
   daysInMonth: number;
   dollarInwardUsdCents: number;
+  baseDollarInwardUsdCents: number;
+  onboardingAdvanceUsdCents: number;
+  offboardingDeductionUsdCents: number;
+  effectiveDollarInwardUsdCents: number;
+  cashInInrCents: number;
   employeeMonthlyUsdCents: number;
   cashoutUsdInrRate: number;
   paidUsdInrRate: number;
+  salaryPaidInrCents: number;
   pfInrCents: number;
   tdsInrCents: number;
   actualPaidInrCents: number;
@@ -69,6 +82,7 @@ export type PnEmployeeEditableRow = {
   totalCommissionUsdCents: number;
   commissionEarnedInrCents: number;
   grossEarningsInrCents: number;
+  netProfitInrCents: number;
   isSecurityDepositMonth: boolean;
 };
 
@@ -77,6 +91,7 @@ export type PnEmployeeEditableSection = {
   employeeName: string;
   rows: PnEmployeeEditableRow[];
   totalGrossEarningsInrCents: number;
+  totalNetProfitInrCents: number;
 };
 
 export type PnPeriodType = "monthly" | "yearly";
@@ -184,6 +199,7 @@ export function buildPnEmployeeEditableSections(
         employeeName: row.employeeName,
         rows: [],
         totalGrossEarningsInrCents: 0,
+        totalNetProfitInrCents: 0,
       };
 
     existing.rows.push({
@@ -194,10 +210,16 @@ export function buildPnEmployeeEditableSections(
       month: row.month,
       daysWorked: row.daysWorked,
       daysInMonth: row.daysInMonth,
-      dollarInwardUsdCents: row.dollarInwardUsdCents,
+      dollarInwardUsdCents: row.baseDollarInwardUsdCents,
+      baseDollarInwardUsdCents: row.baseDollarInwardUsdCents,
+      onboardingAdvanceUsdCents: row.onboardingAdvanceUsdCents,
+      offboardingDeductionUsdCents: row.offboardingDeductionUsdCents,
+      effectiveDollarInwardUsdCents: row.effectiveDollarInwardUsdCents,
+      cashInInrCents: row.cashInInrCents,
       employeeMonthlyUsdCents: row.employeeMonthlyUsdCents,
       cashoutUsdInrRate: row.cashoutUsdInrRate,
       paidUsdInrRate: row.paidUsdInrRate,
+      salaryPaidInrCents: row.salaryPaidInrCents,
       pfInrCents: row.pfInrCents,
       tdsInrCents: row.tdsInrCents,
       actualPaidInrCents: row.actualPaidInrCents,
@@ -205,9 +227,11 @@ export function buildPnEmployeeEditableSections(
       totalCommissionUsdCents: row.totalCommissionUsdCents,
       commissionEarnedInrCents: row.commissionEarnedInrCents,
       grossEarningsInrCents: row.grossEarningsInrCents,
+      netProfitInrCents: row.netProfitInrCents,
       isSecurityDepositMonth: row.isSecurityDepositMonth ?? false,
     });
     existing.totalGrossEarningsInrCents += row.grossEarningsInrCents;
+    existing.totalNetProfitInrCents += row.netProfitInrCents;
 
     grouped.set(row.employeeId, existing);
   }

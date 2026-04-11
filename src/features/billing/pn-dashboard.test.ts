@@ -76,10 +76,16 @@ const editableSampleRows: PnEditableSourceRow[] = [
     month: 1,
     daysWorked: 31,
     daysInMonth: 31,
+    baseDollarInwardUsdCents: 100000,
+    onboardingAdvanceUsdCents: 20000,
+    offboardingDeductionUsdCents: 0,
+    effectiveDollarInwardUsdCents: 120000,
+    cashInInrCents: 9984000,
     dollarInwardUsdCents: 120000,
     employeeMonthlyUsdCents: 70000,
     cashoutUsdInrRate: 83.2,
     paidUsdInrRate: 82.1,
+    salaryPaidInrCents: 5747000,
     pfInrCents: 120000,
     tdsInrCents: 60000,
     actualPaidInrCents: 550000,
@@ -87,6 +93,7 @@ const editableSampleRows: PnEditableSourceRow[] = [
     totalCommissionUsdCents: 50000,
     commissionEarnedInrCents: 150000,
     grossEarningsInrCents: 200000,
+    netProfitInrCents: 4237000,
   },
   {
     rowId: "cash_2",
@@ -98,10 +105,16 @@ const editableSampleRows: PnEditableSourceRow[] = [
     month: 2,
     daysWorked: 28,
     daysInMonth: 28,
+    baseDollarInwardUsdCents: 90000,
+    onboardingAdvanceUsdCents: 0,
+    offboardingDeductionUsdCents: 0,
+    effectiveDollarInwardUsdCents: 90000,
+    cashInInrCents: 7515000,
     dollarInwardUsdCents: 90000,
     employeeMonthlyUsdCents: 70000,
     cashoutUsdInrRate: 83.5,
     paidUsdInrRate: 82.4,
+    salaryPaidInrCents: 5768000,
     pfInrCents: 120000,
     tdsInrCents: 65000,
     actualPaidInrCents: 560000,
@@ -109,6 +122,7 @@ const editableSampleRows: PnEditableSourceRow[] = [
     totalCommissionUsdCents: 20000,
     commissionEarnedInrCents: 170000,
     grossEarningsInrCents: 222000,
+    netProfitInrCents: 1747000,
   },
 ];
 
@@ -154,7 +168,44 @@ describe("pn dashboard aggregations", () => {
     expect(sections[0]?.rows[0]).toMatchObject({
       payoutId: "cash_1",
       invoiceNumber: "INV-001",
-      dollarInwardUsdCents: 120000,
+      dollarInwardUsdCents: 100000,
     });
+  });
+
+  it("builds editable dashboard rows with cash-flow display fields and employee net totals", () => {
+    const sections = buildPnEmployeeEditableSections(editableSampleRows);
+
+    expect(sections[0]?.rows[0]).toMatchObject({
+      baseDollarInwardUsdCents: 100000,
+      onboardingAdvanceUsdCents: 20000,
+      offboardingDeductionUsdCents: 0,
+      effectiveDollarInwardUsdCents: 120000,
+      cashInInrCents: 9984000,
+      salaryPaidInrCents: 5747000,
+      netProfitInrCents: 4237000,
+    });
+    expect(sections[0]?.totalNetProfitInrCents).toBe(5984000);
+  });
+
+  it("keeps negative and positive dashboard net profit values distinct", () => {
+    const sections = buildPnEmployeeEditableSections([
+      {
+        ...editableSampleRows[0],
+        rowId: "cash_1",
+        netProfitInrCents: 250000,
+      },
+      {
+        ...editableSampleRows[1],
+        rowId: "cash_2",
+        month: 5,
+        netProfitInrCents: -100000,
+      },
+    ]);
+
+    expect(sections[0]?.rows.map((row) => row.netProfitInrCents)).toEqual([
+      250000,
+      -100000,
+    ]);
+    expect(sections[0]?.totalNetProfitInrCents).toBe(150000);
   });
 });

@@ -203,9 +203,15 @@ export type PnEmployeeEditableRow = {
   daysWorked: number;
   daysInMonth: number;
   dollarInwardUsdCents: number;
+  baseDollarInwardUsdCents: number;
+  onboardingAdvanceUsdCents: number;
+  offboardingDeductionUsdCents: number;
+  effectiveDollarInwardUsdCents: number;
+  cashInInrCents: number;
   employeeMonthlyUsdCents: number;
   cashoutUsdInrRate: number;
   paidUsdInrRate: number;
+  salaryPaidInrCents: number;
   pfInrCents: number;
   tdsInrCents: number;
   actualPaidInrCents: number;
@@ -213,6 +219,7 @@ export type PnEmployeeEditableRow = {
   totalCommissionUsdCents: number;
   commissionEarnedInrCents: number;
   grossEarningsInrCents: number;
+  netProfitInrCents: number;
   isSecurityDepositMonth: boolean;
 };
 
@@ -221,6 +228,7 @@ export type PnEmployeeEditableSection = {
   employeeName: string;
   rows: PnEmployeeEditableRow[];
   totalGrossEarningsInrCents: number;
+  totalNetProfitInrCents: number;
 };
 
 export type PnPeriodRow = {
