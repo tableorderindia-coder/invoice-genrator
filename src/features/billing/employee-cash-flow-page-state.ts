@@ -2,6 +2,10 @@ type SearchValue = string | string[] | undefined;
 
 import type { EmployeeCashFlowEntryWriteInput } from "./employee-cash-flow-types";
 
+type EmployeeOption = {
+  id: string;
+};
+
 function getTodayMonthKey(now = new Date()) {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
@@ -46,6 +50,32 @@ export function resolveEmployeeCashFlowMonthKey(
 
 export function buildEmployeeCashFlowInvoiceOptionsInput(companyId: string) {
   return companyId ? { companyId } : null;
+}
+
+export function resolveEmployeeToAddSelection(
+  currentEmployeeId: string,
+  addableEmployees: EmployeeOption[],
+) {
+  if (addableEmployees.some((employee) => employee.id === currentEmployeeId)) {
+    return currentEmployeeId;
+  }
+
+  return addableEmployees[0]?.id ?? "";
+}
+
+export function removeEmployeeFromSelections<TEntry extends { employeeId: string }>(input: {
+  entries: TEntry[];
+  selectedEmployeeIds: string[];
+  employeeIdToRemove: string;
+}) {
+  return {
+    entries: input.entries.filter(
+      (entry) => entry.employeeId !== input.employeeIdToRemove,
+    ),
+    selectedEmployeeIds: input.selectedEmployeeIds.filter(
+      (employeeId) => employeeId !== input.employeeIdToRemove,
+    ),
+  };
 }
 
 export function buildAddedEmployeeCashFlowEntry(input: {

@@ -17,6 +17,8 @@ import {
 } from "@/src/features/billing/employee-cash-flow-entry-aggregation";
 import {
   buildAddedEmployeeCashFlowEntry,
+  removeEmployeeFromSelections,
+  resolveEmployeeToAddSelection,
 } from "@/src/features/billing/employee-cash-flow-page-state";
 import { formatInr, formatUsd } from "@/src/features/billing/utils";
 
@@ -114,6 +116,10 @@ export default function EmployeeCashFlowEntryForm({
   const addableEmployees = availableEmployees.filter(
     (employee) => !usedEmployeeIds.has(employee.id),
   );
+  const resolvedEmployeeToAdd = resolveEmployeeToAddSelection(
+    employeeToAdd,
+    addableEmployees,
+  );
 
   const visibleEntries = allEmployeesSelected
     ? entries
@@ -126,7 +132,9 @@ export default function EmployeeCashFlowEntryForm({
   }
 
   function addEmployeeRow() {
-    const employee = addableEmployees.find((row) => row.id === employeeToAdd);
+    const employee = addableEmployees.find(
+      (row) => row.id === resolvedEmployeeToAdd,
+    );
     if (!employee) return;
 
     const nextEntry: EmployeeCashFlowEditableEntry = {
@@ -140,6 +148,23 @@ export default function EmployeeCashFlowEntryForm({
 
     setEntries((current) => [...current, nextEntry]);
     setSelectedEmployeeIds((current) => [...new Set([...current, employee.id])]);
+  }
+
+  function removeEmployeeRow(employeeId: string) {
+    setEntries((current) =>
+      removeEmployeeFromSelections({
+        entries: current,
+        selectedEmployeeIds,
+        employeeIdToRemove: employeeId,
+      }).entries,
+    );
+    setSelectedEmployeeIds((current) =>
+      removeEmployeeFromSelections({
+        entries,
+        selectedEmployeeIds: current,
+        employeeIdToRemove: employeeId,
+      }).selectedEmployeeIds,
+    );
   }
 
   return (
@@ -214,7 +239,7 @@ export default function EmployeeCashFlowEntryForm({
               Employee
             </span>
             <select
-              value={employeeToAdd}
+              value={resolvedEmployeeToAdd}
               onChange={(event) => setEmployeeToAdd(event.target.value)}
               className={cardInputClass()}
               style={{
@@ -240,7 +265,7 @@ export default function EmployeeCashFlowEntryForm({
             type="button"
             onClick={addEmployeeRow}
             className="btn-outline mt-4"
-            disabled={!employeeToAdd}
+            disabled={!resolvedEmployeeToAdd}
           >
             Add employee row
           </button>
@@ -273,26 +298,40 @@ export default function EmployeeCashFlowEntryForm({
                     {invoiceNumber} · {paymentMonth}
                   </p>
                 </div>
-                <div
-                  className="rounded-xl px-3 py-2 text-sm font-semibold"
-                  style={{
-                    background:
-                      metrics.status === "profit"
-                        ? "rgba(16, 185, 129, 0.12)"
-                        : "rgba(248, 113, 113, 0.12)",
-                    color:
-                      metrics.status === "waiting_for_payment"
-                        ? "#fca5a5"
-                        : metrics.status === "loss"
-                          ? "#f87171"
-                          : "#6ee7b7",
-                  }}
-                >
-                  {metrics.status === "waiting_for_payment"
-                    ? "Waiting for Payment"
-                    : metrics.status === "loss"
-                      ? "LOSS"
-                      : "PROFIT"}
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => removeEmployeeRow(entry.employeeId)}
+                    className="rounded-xl border px-3 py-2 text-sm font-semibold"
+                    style={{
+                      borderColor: "rgba(248, 113, 113, 0.35)",
+                      background: "rgba(248, 113, 113, 0.08)",
+                      color: "#fca5a5",
+                    }}
+                  >
+                    Remove row
+                  </button>
+                  <div
+                    className="rounded-xl px-3 py-2 text-sm font-semibold"
+                    style={{
+                      background:
+                        metrics.status === "profit"
+                          ? "rgba(16, 185, 129, 0.12)"
+                          : "rgba(248, 113, 113, 0.12)",
+                      color:
+                        metrics.status === "waiting_for_payment"
+                          ? "#fca5a5"
+                          : metrics.status === "loss"
+                            ? "#f87171"
+                            : "#6ee7b7",
+                    }}
+                  >
+                    {metrics.status === "waiting_for_payment"
+                      ? "Waiting for Payment"
+                      : metrics.status === "loss"
+                        ? "LOSS"
+                        : "PROFIT"}
+                  </div>
                 </div>
               </div>
 

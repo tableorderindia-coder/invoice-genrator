@@ -4,6 +4,8 @@ import {
   buildAddedEmployeeCashFlowEntry,
   buildEmployeeCashFlowInvoiceOptionsInput,
   getDaysInMonthFromMonthKey,
+  resolveEmployeeToAddSelection,
+  removeEmployeeFromSelections,
   resolveEmployeeCashFlowMonthKey,
 } from "./employee-cash-flow-page-state";
 
@@ -72,6 +74,31 @@ describe("employee cash flow page state", () => {
       baseDollarInwardUsdCents: 0,
       onboardingAdvanceUsdCents: 900_00,
       offboardingDeductionUsdCents: 200_00,
+    });
+  });
+
+  it("falls back to the first addable employee when the current add selection is stale", () => {
+    expect(
+      resolveEmployeeToAddSelection("emp_missing", [
+        { id: "emp_1", fullName: "Darshan", payoutMonthlyUsdCents: 0 },
+        { id: "emp_2", fullName: "Asha", payoutMonthlyUsdCents: 0 },
+      ]),
+    ).toBe("emp_1");
+  });
+
+  it("removes an employee from both the visible selection and entry list", () => {
+    expect(
+      removeEmployeeFromSelections({
+        entries: [
+          { id: "row_1", employeeId: "emp_1" },
+          { id: "row_2", employeeId: "emp_2" },
+        ],
+        selectedEmployeeIds: ["emp_1", "emp_2"],
+        employeeIdToRemove: "emp_1",
+      }),
+    ).toEqual({
+      entries: [{ id: "row_2", employeeId: "emp_2" }],
+      selectedEmployeeIds: ["emp_2"],
     });
   });
 });
