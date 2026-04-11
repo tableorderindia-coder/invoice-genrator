@@ -7,6 +7,7 @@ import {
   calculateEmployeeMonthNetInrCents,
   resolveEmployeeCashFlowStatus,
 } from "./employee-cash-flow";
+import { calculateEmployeePayoutMetrics } from "./domain";
 import { hasMissingSchemaColumn } from "./schema-fallback";
 import type {
   EmployeeCashFlowEntryWriteInput,
@@ -868,6 +869,77 @@ export async function replaceInvoicePaymentEmployeeEntries(input: {
   const { error } = await supabase
     .from("invoice_payment_employee_entries")
     .insert(payload);
+  if (error) throw error;
+}
+
+export async function updateDashboardEmployeeCashFlowEntry(input: {
+  entryId: string;
+  dollarInwardUsdCents: number;
+  employeeMonthlyUsdCents: number;
+  cashoutUsdInrRate: number;
+  paidUsdInrRate: number;
+  pfInrCents: number;
+  tdsInrCents: number;
+  actualPaidInrCents: number;
+}) {
+  const supabase = getSupabaseOrThrow();
+  const { data: currentRow, error: currentError } = await supabase
+    .from("invoice_payment_employee_entries")
+    .select(
+      "id, base_dollar_inward_usd_cents, onboarding_advance_usd_cents, offboarding_deduction_usd_cents",
+    )
+    .eq("id", input.entryId)
+    .single();
+  if (currentError) throw currentError;
+
+  const current = currentRow as Pick<
+    DbCashFlowEntry,
+    | "id"
+    | "base_dollar_inward_usd_cents"
+    | "onboarding_advance_usd_cents"
+    | "offboarding_deduction_usd_cents"
+  >;
+
+  const baseDollarInwardUsdCents =
+    input.dollarInwardUsdCents -
+    current.onboarding_advance_usd_cents +
+    current.offboarding_deduction_usd_cents;
+  const effectiveDollarInwardUsdCents = calculateEffectiveDollarInwardUsdCents({
+    baseDollarInwardUsdCents,
+    onboardingAdvanceUsdCents: current.onboarding_advance_usd_cents,
+    offboardingDeductionUsdCents: current.offboarding_deduction_usd_cents,
+  });
+  const payoutMetrics = calculateEmployeePayoutMetrics({
+    dollarInwardUsdCents: effectiveDollarInwardUsdCents,
+    employeeMonthlyUsdCents: input.employeeMonthlyUsdCents,
+    cashoutUsdInrRate: input.cashoutUsdInrRate,
+    paidUsdInrRate: input.paidUsdInrRate,
+  });
+
+  const { error } = await supabase
+    .from("invoice_payment_employee_entries")
+    .update({
+      base_dollar_inward_usd_cents: baseDollarInwardUsdCents,
+      effective_dollar_inward_usd_cents: effectiveDollarInwardUsdCents,
+      monthly_paid_usd_cents: input.employeeMonthlyUsdCents,
+      cashout_usd_inr_rate: input.cashoutUsdInrRate,
+      paid_usd_inr_rate: input.paidUsdInrRate,
+      cash_in_inr_cents: calculateCashInInrCents({
+        effectiveDollarInwardUsdCents,
+        cashoutUsdInrRate: input.cashoutUsdInrRate,
+      }),
+      pf_inr_cents: input.pfInrCents,
+      tds_inr_cents: input.tdsInrCents,
+      actual_paid_inr_cents: input.actualPaidInrCents,
+      fx_commission_inr_cents: payoutMetrics.fxCommissionInrCents,
+      total_commission_usd_cents: payoutMetrics.totalCommissionUsdCents,
+      commission_earned_inr_cents: payoutMetrics.commissionEarnedInrCents,
+      gross_earnings_inr_cents:
+        payoutMetrics.fxCommissionInrCents +
+        payoutMetrics.commissionEarnedInrCents,
+      updated_at: nowIso(),
+    })
+    .eq("id", input.entryId);
   if (error) throw error;
 }
 

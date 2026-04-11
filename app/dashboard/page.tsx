@@ -5,7 +5,7 @@ import { PendingActionButton } from "../_components/pending-action-button";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
 import {
   saveDashboardExpenseAction,
-  updateEmployeePayoutAction,
+  updateDashboardEmployeeCashFlowEntryAction,
 } from "@/src/features/billing/actions";
 import {
   getPnDashboardData,
@@ -255,7 +255,7 @@ export default async function DashboardPage({
                           <td>{row.invoiceNumber}</td>
                           <td>{`${row.daysWorked}/${row.daysInMonth}`}</td>
                           <td>
-                            <form id={`dashboard-payout-${row.payoutId}`} action={updateEmployeePayoutAction}></form>
+                            <form id={`dashboard-payout-${row.payoutId}`} action={updateDashboardEmployeeCashFlowEntryAction}></form>
                             <input type="hidden" form={`dashboard-payout-${row.payoutId}`} name="payoutId" value={row.payoutId} />
                             <input type="hidden" form={`dashboard-payout-${row.payoutId}`} name="returnTo" value={returnTo} />
                             <input

@@ -35,6 +35,7 @@ import {
 import type { EmployeeCashFlowEntryWriteInput } from "./employee-cash-flow-types";
 import {
   replaceInvoicePaymentEmployeeEntries,
+  updateDashboardEmployeeCashFlowEntry,
   upsertEmployeeSalaryPayment,
   upsertInvoicePayment,
 } from "./employee-cash-flow-store";
@@ -773,6 +774,73 @@ export async function updateEmployeePayoutAction(formData: FormData) {
   }
 
   redirect(buildFlashRedirect(returnTo, "success", "Employee payout updated."));
+}
+
+export async function updateDashboardEmployeeCashFlowEntryAction(formData: FormData) {
+  const entryId = getString(formData, "payoutId");
+  const returnTo = getString(formData, "returnTo") || "/dashboard";
+
+  try {
+    const employeeMonthlyUsdCents = centsFromUsd(getString(formData, "employeeMonthlyUsd"));
+    if (employeeMonthlyUsdCents <= 0) {
+      throw new Error("Employee monthly dollars must be greater than 0.");
+    }
+    const dollarInwardUsdCents = centsFromUsd(getString(formData, "dollarInwardUsd"));
+    if (dollarInwardUsdCents < 0) {
+      throw new Error("Dollars inward cannot be negative.");
+    }
+
+    const cashoutUsdInrRate = Number.parseFloat(getString(formData, "cashoutUsdInrRate"));
+    if (!Number.isFinite(cashoutUsdInrRate) || cashoutUsdInrRate < 0) {
+      throw new Error("Cashout USD/INR rate cannot be negative.");
+    }
+
+    const paidUsdInrRateRaw = getString(formData, "paidUsdInrRate");
+    const paidUsdInrRate = paidUsdInrRateRaw
+      ? Number.parseFloat(paidUsdInrRateRaw)
+      : 0;
+    if (!Number.isFinite(paidUsdInrRate) || paidUsdInrRate < 0) {
+      throw new Error("Paid USD/INR rate cannot be negative.");
+    }
+    const pfInrCents = centsFromUsd(getString(formData, "pfInr"));
+    if (pfInrCents < 0) {
+      throw new Error("PF cannot be negative.");
+    }
+
+    const tdsInrCents = centsFromUsd(getString(formData, "tdsInr"));
+    if (tdsInrCents < 0) {
+      throw new Error("TDS cannot be negative.");
+    }
+
+    const actualPaidInrCents = centsFromUsd(getString(formData, "actualPaidInr"));
+    if (actualPaidInrCents < 0) {
+      throw new Error("Actual paid cannot be negative.");
+    }
+
+    await updateDashboardEmployeeCashFlowEntry({
+      entryId,
+      dollarInwardUsdCents,
+      employeeMonthlyUsdCents,
+      cashoutUsdInrRate,
+      paidUsdInrRate,
+      pfInrCents,
+      tdsInrCents,
+      actualPaidInrCents,
+    });
+
+    revalidatePath("/dashboard");
+    revalidatePath("/employee-cash-flow");
+  } catch (error) {
+    redirect(
+      buildFlashRedirect(
+        returnTo,
+        "error",
+        getErrorMessage(error, "Unable to update dashboard cash flow row."),
+      ),
+    );
+  }
+
+  redirect(buildFlashRedirect(returnTo, "success", "Dashboard cash flow row updated."));
 }
 
 export async function markEmployeePayoutPaidAction(formData: FormData) {

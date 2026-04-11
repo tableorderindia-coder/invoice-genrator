@@ -19,13 +19,14 @@ import {
 import { findExistingLineItemForEmployee } from "./member-assignment";
 import { buildAdjustmentDuplicateSignature } from "./adjustments";
 import {
+  buildPnEmployeeEditableSections,
   buildPnEmployeeSections,
   buildPnPeriodRows,
+  type PnEditableSourceRow,
   type PnSourceRow,
 } from "./pn-dashboard";
 import { assertEmployeePayoutRemovable } from "./employee-payout";
 import { getDaysInMonth } from "./utils";
-import { hasMissingSchemaColumn } from "./schema-fallback";
 import type {
   AdjustmentType,
   Company,
@@ -41,7 +42,6 @@ import type {
   Team,
   InvoiceTeam,
   PnDashboardData,
-  PnEmployeeEditableSection,
   PnPeriodType,
 } from "./types";
 
@@ -182,6 +182,28 @@ type DbDashboardExpense = {
   updated_at: string;
 };
 
+type DbDashboardCashFlowEntry = {
+  id: string;
+  employee_id: string;
+  payment_month: string;
+  employee_name_snapshot: string;
+  company_id: string;
+  monthly_paid_usd_cents: number;
+  effective_dollar_inward_usd_cents: number;
+  cashout_usd_inr_rate: number;
+  paid_usd_inr_rate: number;
+  pf_inr_cents: number;
+  tds_inr_cents: number;
+  actual_paid_inr_cents: number;
+  fx_commission_inr_cents: number;
+  total_commission_usd_cents: number;
+  commission_earned_inr_cents: number;
+  gross_earnings_inr_cents: number;
+  days_worked: number;
+  days_in_month: number;
+  invoice_id: string;
+};
+
 type DbSecurityDepositLedger = {
   id: string;
   company_id: string;
@@ -284,50 +306,6 @@ function getMissingSchemaColumn(
     new RegExp(`Could not find the '([^']+)' column of '${tableName}'`),
   );
   return match?.[1];
-}
-
-async function listInvoiceLineItemDaysForDashboard(
-  supabase: ReturnType<typeof createSupabaseServerClient>,
-  invoiceLineItemIds: string[],
-) {
-  if (!supabase || invoiceLineItemIds.length === 0) {
-    return [] as Array<{
-      id: string;
-      invoice_team_id: string;
-      days_worked?: number | null;
-    }>;
-  }
-
-  const result = await supabase
-    .from("invoice_line_items")
-    .select("id, invoice_team_id, days_worked")
-    .in("id", invoiceLineItemIds);
-
-  if (!result.error) {
-    return (result.data ?? []) as Array<{
-      id: string;
-      invoice_team_id: string;
-      days_worked?: number | null;
-    }>;
-  }
-
-  if (
-    !hasMissingSchemaColumn(result.error, "invoice_line_items", "days_worked")
-  ) {
-    throw result.error;
-  }
-
-  const fallbackResult = await supabase
-    .from("invoice_line_items")
-    .select("id, invoice_team_id")
-    .in("id", invoiceLineItemIds);
-  if (fallbackResult.error) throw fallbackResult.error;
-
-  return (fallbackResult.data ?? []) as Array<{
-    id: string;
-    invoice_team_id: string;
-    days_worked?: number | null;
-  }>;
 }
 
 async function insertEmployeePayoutWithSchemaFallback(
@@ -2284,20 +2262,22 @@ export async function getPnDashboardData(input: {
   employeeIds?: string[];
 }): Promise<PnDashboardData> {
   const supabase = getSupabaseOrThrow();
-  let payoutQuery = supabase
-    .from("employee_payouts")
-    .select("*")
+  let cashFlowQuery = supabase
+    .from("invoice_payment_employee_entries")
+    .select(
+      "id, employee_id, payment_month, employee_name_snapshot, company_id, monthly_paid_usd_cents, effective_dollar_inward_usd_cents, cashout_usd_inr_rate, paid_usd_inr_rate, pf_inr_cents, tds_inr_cents, actual_paid_inr_cents, fx_commission_inr_cents, total_commission_usd_cents, commission_earned_inr_cents, gross_earnings_inr_cents, days_worked, days_in_month, invoice_id",
+    )
     .eq("company_id", input.companyId);
 
   if (input.employeeIds && input.employeeIds.length > 0) {
-    payoutQuery = payoutQuery.in("employee_id", input.employeeIds);
+    cashFlowQuery = cashFlowQuery.in("employee_id", input.employeeIds);
   }
 
-  const { data: payoutRows, error: payoutError } = await payoutQuery;
-  if (payoutError) throw payoutError;
+  const { data: cashFlowRows, error: cashFlowError } = await cashFlowQuery;
+  if (cashFlowError) throw cashFlowError;
 
-  const payouts = (payoutRows ?? []).map((row) => mapEmployeePayout(row as DbEmployeePayout));
-  const invoiceIds = [...new Set(payouts.map((row) => row.invoiceId))];
+  const entries = (cashFlowRows ?? []) as DbDashboardCashFlowEntry[];
+  const invoiceIds = [...new Set(entries.map((row) => row.invoice_id))];
   const { data: invoiceRows, error: invoiceError } = await supabase
     .from("invoices")
     .select("id, month, year, invoice_number")
@@ -2316,79 +2296,6 @@ export async function getPnDashboardData(input: {
     });
   }
 
-  const invoiceLineItemIds = payouts
-    .map((row) => row.invoiceLineItemId)
-    .filter((id): id is string => Boolean(id));
-  const lineItemRows = await listInvoiceLineItemDaysForDashboard(
-    supabase,
-    invoiceLineItemIds,
-  );
-
-  const { data: invoiceTeamsRows, error: invoiceTeamsError } = await supabase
-    .from("invoice_teams")
-    .select("id, invoice_id")
-    .in("invoice_id", invoiceIds);
-  if (invoiceTeamsError) throw invoiceTeamsError;
-  const invoiceIdByTeamId = new Map<string, string>(
-    (invoiceTeamsRows ?? []).map((row) => [
-      String(row.id),
-      String(row.invoice_id),
-    ]),
-  );
-
-  const lineItemDaysMap = new Map<string, number>();
-  for (const row of lineItemRows as Array<{
-    id: string;
-    invoice_team_id: string;
-    days_worked?: number | null;
-  }>) {
-    const invoiceId = invoiceIdByTeamId.get(String(row.invoice_team_id));
-    const period = invoiceId ? invoicePeriodMap.get(invoiceId) : undefined;
-    const daysInMonth = period ? getDaysInMonth(period.month, period.year) : 30;
-    const normalizedDaysWorked =
-      row.days_worked && row.days_worked > 0
-        ? Math.max(1, Math.round(Number(row.days_worked)))
-        : daysInMonth;
-    lineItemDaysMap.set(String(row.id), normalizedDaysWorked);
-  }
-
-  const { data: securityRows, error: securityError } = await supabase
-    .from("security_deposit_ledger")
-    .select("employee_id, invoice_id, movement_type, amount_usd_cents")
-    .eq("company_id", input.companyId);
-  if (securityError && !isMissingRelationError(securityError, "security_deposit_ledger")) {
-    throw securityError;
-  }
-
-  const securityByEmployeeInvoice = new Map<
-    string,
-    { inUsdCents: number; outUsdCents: number }
-  >();
-  for (const row of (securityRows ?? []) as Array<{
-    employee_id: string;
-    invoice_id: string;
-    movement_type: "credit" | "debit";
-    amount_usd_cents: number;
-  }>) {
-    if (input.employeeIds && input.employeeIds.length > 0) {
-      if (!input.employeeIds.includes(String(row.employee_id))) {
-        continue;
-      }
-    }
-
-    const key = `${row.employee_id}|${row.invoice_id}`;
-    const current = securityByEmployeeInvoice.get(key) ?? {
-      inUsdCents: 0,
-      outUsdCents: 0,
-    };
-    if (row.movement_type === "credit") {
-      current.inUsdCents += Number(row.amount_usd_cents ?? 0);
-    } else {
-      current.outUsdCents += Number(row.amount_usd_cents ?? 0);
-    }
-    securityByEmployeeInvoice.set(key, current);
-  }
-
   const { data: expenseRows, error: expenseError } = await supabase
     .from("dashboard_expenses")
     .select("*")
@@ -2405,31 +2312,30 @@ export async function getPnDashboardData(input: {
     expenseByKey.set(key, Number(row.amount_inr_cents));
   }
 
-  const sourceRows: PnSourceRow[] = payouts
+  const sourceRows: PnSourceRow[] = entries
     .map((row) => {
-      const period = invoicePeriodMap.get(row.invoiceId);
-      if (!period) return undefined;
-      const daysInMonth = getDaysInMonth(period.month, period.year);
-      const daysWorked = row.invoiceLineItemId
-        ? lineItemDaysMap.get(row.invoiceLineItemId) ?? daysInMonth
-        : daysInMonth;
+      const [yearPart, monthPart] = String(row.payment_month ?? "").split("-");
+      const year = Number.parseInt(yearPart ?? "", 10);
+      const month = Number.parseInt(monthPart ?? "", 10);
+      if (!Number.isFinite(year) || !Number.isFinite(month)) return undefined;
+
       return {
-        employeeId: row.employeeId,
-        employeeName: row.employeeNameSnapshot,
-        year: period.year,
-        month: period.month,
-        daysWorked,
-        daysInMonth,
-        dollarInwardUsdCents: row.dollarInwardUsdCents,
-        employeeMonthlyUsdCents: row.employeeMonthlyUsdCents,
-        cashoutUsdInrRate: row.cashoutUsdInrRate,
-        paidUsdInrRate: row.paidUsdInrRate ?? 0,
-        pfInrCents: row.pfInrCents,
-        tdsInrCents: row.tdsInrCents,
-        actualPaidInrCents: row.actualPaidInrCents,
-        fxCommissionInrCents: row.fxCommissionInrCents ?? 0,
-        totalCommissionUsdCents: row.totalCommissionUsdCents,
-        commissionEarnedInrCents: row.commissionEarnedInrCents ?? 0,
+        employeeId: row.employee_id,
+        employeeName: row.employee_name_snapshot,
+        year,
+        month,
+        daysWorked: row.days_worked,
+        daysInMonth: row.days_in_month,
+        dollarInwardUsdCents: row.effective_dollar_inward_usd_cents,
+        employeeMonthlyUsdCents: row.monthly_paid_usd_cents,
+        cashoutUsdInrRate: row.cashout_usd_inr_rate,
+        paidUsdInrRate: row.paid_usd_inr_rate,
+        pfInrCents: row.pf_inr_cents,
+        tdsInrCents: row.tds_inr_cents,
+        actualPaidInrCents: row.actual_paid_inr_cents,
+        fxCommissionInrCents: row.fx_commission_inr_cents,
+        totalCommissionUsdCents: row.total_commission_usd_cents,
+        commissionEarnedInrCents: row.commission_earned_inr_cents,
       };
     })
     .filter(Boolean) as PnSourceRow[];
@@ -2443,106 +2349,45 @@ export async function getPnDashboardData(input: {
     };
   }
 
-  const editableSectionsMap = new Map<string, PnEmployeeEditableSection>();
-  for (const payout of payouts) {
-    const period = invoicePeriodMap.get(payout.invoiceId);
-    if (!period) continue;
-
-    const existingSection =
-      editableSectionsMap.get(payout.employeeId) ??
-      ({
-        employeeId: payout.employeeId,
-        employeeName: payout.employeeNameSnapshot,
-        rows: [],
-        totalGrossEarningsInrCents: 0,
-      } as PnEmployeeEditableSection);
-
-    const fxCommissionInrCents = payout.fxCommissionInrCents ?? 0;
-    const commissionEarnedInrCents = payout.commissionEarnedInrCents ?? 0;
-    const grossEarningsInrCents = fxCommissionInrCents + commissionEarnedInrCents;
-    const daysInMonth = getDaysInMonth(period.month, period.year);
-    const daysWorked = payout.invoiceLineItemId
-      ? lineItemDaysMap.get(payout.invoiceLineItemId) ?? daysInMonth
-      : daysInMonth;
-    const securityKey = `${payout.employeeId}|${payout.invoiceId}`;
-    const security = securityByEmployeeInvoice.get(securityKey) ?? {
-      inUsdCents: 0,
-      outUsdCents: 0,
-    };
-
-    existingSection.rows.push({
-      payoutId: payout.id,
-      invoiceId: payout.invoiceId,
-      invoiceNumber: period.invoiceNumber,
-      year: period.year,
-      month: period.month,
-      daysWorked,
-      daysInMonth,
-      dollarInwardUsdCents: payout.dollarInwardUsdCents,
-      employeeMonthlyUsdCents: payout.employeeMonthlyUsdCents,
-      cashoutUsdInrRate: payout.cashoutUsdInrRate,
-      paidUsdInrRate: payout.paidUsdInrRate ?? 0,
-      pfInrCents: payout.pfInrCents,
-      tdsInrCents: payout.tdsInrCents,
-      actualPaidInrCents: payout.actualPaidInrCents,
-      fxCommissionInrCents,
-      totalCommissionUsdCents: payout.totalCommissionUsdCents,
-      commissionEarnedInrCents,
-      grossEarningsInrCents,
-      isSecurityDepositMonth: security.inUsdCents > 0,
-    });
-    existingSection.totalGrossEarningsInrCents += grossEarningsInrCents;
-
-    editableSectionsMap.set(payout.employeeId, existingSection);
-  }
-
-  const employeeEditableSections = [...editableSectionsMap.values()]
-    .map((section) => {
-      const sortedRows = section.rows.sort((a, b) => {
-        const left = a.year * 100 + a.month;
-        const right = b.year * 100 + b.month;
-        if (left !== right) return left - right;
-        return a.invoiceNumber.localeCompare(b.invoiceNumber);
-      });
-
-      const transformedRows = sortedRows.map((row) => ({ ...row }));
-      const firstSecurityRowIndex = transformedRows.findIndex(
-        (row) => row.isSecurityDepositMonth,
-      );
-
-      if (firstSecurityRowIndex >= 0) {
-        const securityRow = transformedRows[firstSecurityRowIndex];
-        const securityKey = `${section.employeeId}|${securityRow.invoiceId}`;
-        const security = securityByEmployeeInvoice.get(securityKey) ?? {
-          inUsdCents: 0,
-          outUsdCents: 0,
-        };
-
-        securityRow.dollarInwardUsdCents = security.inUsdCents;
-        securityRow.employeeMonthlyUsdCents = 0;
-        securityRow.paidUsdInrRate = 0;
-        securityRow.totalCommissionUsdCents = security.inUsdCents;
-        securityRow.fxCommissionInrCents = 0;
-        securityRow.commissionEarnedInrCents = Math.round(
-          security.inUsdCents * securityRow.cashoutUsdInrRate,
-        );
-        securityRow.grossEarningsInrCents = securityRow.commissionEarnedInrCents;
+  const editableSourceRows: PnEditableSourceRow[] = entries
+    .map((row) => {
+      const period = invoicePeriodMap.get(row.invoice_id);
+      const [yearPart, monthPart] = String(row.payment_month ?? "").split("-");
+      const year = Number.parseInt(yearPart ?? "", 10);
+      const month = Number.parseInt(monthPart ?? "", 10);
+      if (!period || !Number.isFinite(year) || !Number.isFinite(month)) {
+        return undefined;
       }
 
       return {
-        ...section,
-        rows: transformedRows,
-        totalGrossEarningsInrCents: transformedRows.reduce(
-          (sum, row) => sum + row.grossEarningsInrCents,
-          0,
-        ),
+        rowId: row.id,
+        invoiceId: row.invoice_id,
+        invoiceNumber: period.invoiceNumber,
+        employeeId: row.employee_id,
+        employeeName: row.employee_name_snapshot,
+        year,
+        month,
+        daysWorked: row.days_worked,
+        daysInMonth: row.days_in_month,
+        dollarInwardUsdCents: row.effective_dollar_inward_usd_cents,
+        employeeMonthlyUsdCents: row.monthly_paid_usd_cents,
+        cashoutUsdInrRate: row.cashout_usd_inr_rate,
+        paidUsdInrRate: row.paid_usd_inr_rate,
+        pfInrCents: row.pf_inr_cents,
+        tdsInrCents: row.tds_inr_cents,
+        actualPaidInrCents: row.actual_paid_inr_cents,
+        fxCommissionInrCents: row.fx_commission_inr_cents,
+        totalCommissionUsdCents: row.total_commission_usd_cents,
+        commissionEarnedInrCents: row.commission_earned_inr_cents,
+        grossEarningsInrCents: row.gross_earnings_inr_cents,
+        isSecurityDepositMonth: false,
       };
     })
-    .sort((a, b) => a.employeeName.localeCompare(b.employeeName));
+    .filter(Boolean) as PnEditableSourceRow[];
 
   return {
     companyId: input.companyId,
-    employeeEditableSections,
+    employeeEditableSections: buildPnEmployeeEditableSections(editableSourceRows),
     employeeSections: buildPnEmployeeSections(sourceRows),
     periodRows: buildPnPeriodRows({
       rows: sourceRows,

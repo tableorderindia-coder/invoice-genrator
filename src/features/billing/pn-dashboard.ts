@@ -17,6 +17,14 @@ export type PnSourceRow = {
   commissionEarnedInrCents: number;
 };
 
+export type PnEditableSourceRow = PnSourceRow & {
+  rowId: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  grossEarningsInrCents: number;
+  isSecurityDepositMonth?: boolean;
+};
+
 export type PnEmployeeMonthRow = {
   year: number;
   month: number;
@@ -39,6 +47,35 @@ export type PnEmployeeSection = {
   employeeId: string;
   employeeName: string;
   rows: PnEmployeeMonthRow[];
+  totalGrossEarningsInrCents: number;
+};
+
+export type PnEmployeeEditableRow = {
+  payoutId: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  year: number;
+  month: number;
+  daysWorked: number;
+  daysInMonth: number;
+  dollarInwardUsdCents: number;
+  employeeMonthlyUsdCents: number;
+  cashoutUsdInrRate: number;
+  paidUsdInrRate: number;
+  pfInrCents: number;
+  tdsInrCents: number;
+  actualPaidInrCents: number;
+  fxCommissionInrCents: number;
+  totalCommissionUsdCents: number;
+  commissionEarnedInrCents: number;
+  grossEarningsInrCents: number;
+  isSecurityDepositMonth: boolean;
+};
+
+export type PnEmployeeEditableSection = {
+  employeeId: string;
+  employeeName: string;
+  rows: PnEmployeeEditableRow[];
   totalGrossEarningsInrCents: number;
 };
 
@@ -132,6 +169,60 @@ export function buildPnEmployeeSections(rows: PnSourceRow[]): PnEmployeeSection[
   }
 
   return sections.sort((a, b) => a.employeeName.localeCompare(b.employeeName));
+}
+
+export function buildPnEmployeeEditableSections(
+  rows: PnEditableSourceRow[],
+): PnEmployeeEditableSection[] {
+  const grouped = new Map<string, PnEmployeeEditableSection>();
+
+  for (const row of rows) {
+    const existing =
+      grouped.get(row.employeeId) ??
+      {
+        employeeId: row.employeeId,
+        employeeName: row.employeeName,
+        rows: [],
+        totalGrossEarningsInrCents: 0,
+      };
+
+    existing.rows.push({
+      payoutId: row.rowId,
+      invoiceId: row.invoiceId,
+      invoiceNumber: row.invoiceNumber,
+      year: row.year,
+      month: row.month,
+      daysWorked: row.daysWorked,
+      daysInMonth: row.daysInMonth,
+      dollarInwardUsdCents: row.dollarInwardUsdCents,
+      employeeMonthlyUsdCents: row.employeeMonthlyUsdCents,
+      cashoutUsdInrRate: row.cashoutUsdInrRate,
+      paidUsdInrRate: row.paidUsdInrRate,
+      pfInrCents: row.pfInrCents,
+      tdsInrCents: row.tdsInrCents,
+      actualPaidInrCents: row.actualPaidInrCents,
+      fxCommissionInrCents: row.fxCommissionInrCents,
+      totalCommissionUsdCents: row.totalCommissionUsdCents,
+      commissionEarnedInrCents: row.commissionEarnedInrCents,
+      grossEarningsInrCents: row.grossEarningsInrCents,
+      isSecurityDepositMonth: row.isSecurityDepositMonth ?? false,
+    });
+    existing.totalGrossEarningsInrCents += row.grossEarningsInrCents;
+
+    grouped.set(row.employeeId, existing);
+  }
+
+  return [...grouped.values()]
+    .map((section) => ({
+      ...section,
+      rows: section.rows.sort((a, b) => {
+        const left = a.year * 100 + a.month;
+        const right = b.year * 100 + b.month;
+        if (left !== right) return left - right;
+        return a.invoiceNumber.localeCompare(b.invoiceNumber);
+      }),
+    }))
+    .sort((a, b) => a.employeeName.localeCompare(b.employeeName));
 }
 
 export function buildPnPeriodRows(input: {
