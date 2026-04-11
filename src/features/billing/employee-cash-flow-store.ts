@@ -142,6 +142,19 @@ type DbSalaryPayment = {
   notes: string | null;
 };
 
+type AdjustmentAwareEmployee = {
+  id: string;
+  fullName: string;
+  companyId: string;
+  payoutMonthlyUsdCents: number;
+  onboardingAdvanceUsdCents: number;
+  offboardingDeductionUsdCents: number;
+};
+
+type EditableCashFlowEntry = EmployeeCashFlowEntryWriteInput & {
+  id: string;
+};
+
 function getSupabaseOrThrow() {
   const mode = getSupabaseMode(process.env);
   if (mode !== "supabase") {
@@ -181,6 +194,48 @@ export function normalizeEmployeeNameForMatch(name: string | null | undefined) {
     .trim()
     .replace(/\s+/g, " ")
     .toLowerCase();
+}
+
+export function appendMissingAdjustmentEntries(input: {
+  entries: EditableCashFlowEntry[];
+  availableEmployees: AdjustmentAwareEmployee[];
+  paymentMonth: string;
+  daysInMonth: number;
+  cashoutUsdInrRate: number;
+}) {
+  const existingEmployeeIds = new Set(input.entries.map((entry) => entry.employeeId));
+  const missingAdjustmentEntries = input.availableEmployees
+    .filter((employee) => !existingEmployeeIds.has(employee.id))
+    .filter(
+      (employee) =>
+        employee.onboardingAdvanceUsdCents > 0 ||
+        employee.offboardingDeductionUsdCents > 0,
+    )
+    .map((employee) => ({
+      id: nextCashFlowId("cash_entry"),
+      employeeId: employee.id,
+      employeeNameSnapshot: employee.fullName,
+      daysWorked: 0,
+      daysInMonth: input.daysInMonth,
+      monthlyPaidUsdCents: employee.payoutMonthlyUsdCents,
+      baseDollarInwardUsdCents: 0,
+      onboardingAdvanceUsdCents: employee.onboardingAdvanceUsdCents,
+      offboardingDeductionUsdCents: employee.offboardingDeductionUsdCents,
+      cashoutUsdInrRate: input.cashoutUsdInrRate,
+      paidUsdInrRate: 0,
+      pfInrCents: 0,
+      tdsInrCents: 0,
+      actualPaidInrCents: 0,
+      fxCommissionInrCents: 0,
+      totalCommissionUsdCents: 0,
+      commissionEarnedInrCents: 0,
+      grossEarningsInrCents: 0,
+      isNonInvoiceEmployee: true,
+      isPaid: false,
+      notes: `Imported from invoice adjustment for ${input.paymentMonth}.`,
+    }));
+
+  return [...input.entries, ...missingAdjustmentEntries];
 }
 
 async function listInvoiceLineItemsForCashFlow(
@@ -476,7 +531,23 @@ export async function getInvoicePaymentPrefillData(input: {
     return new Date(year, month, 0).getDate();
   })();
 
-  const entries =
+  const availableEmployees = (employeesResult.data ?? []).map((row) => ({
+    id: String(row.id),
+    fullName: String(row.full_name),
+    companyId: String(row.company_id),
+    payoutMonthlyUsdCents: Number(row.payout_monthly_usd_cents ?? 0),
+    onboardingAdvanceUsdCents:
+      onboardingByEmployeeName.get(
+        normalizeEmployeeNameForMatch(String(row.full_name)),
+      ) ?? 0,
+    offboardingDeductionUsdCents: Math.abs(
+      offboardingByEmployeeName.get(
+        normalizeEmployeeNameForMatch(String(row.full_name)),
+      ) ?? 0,
+    ),
+  }));
+
+  const baseEntries =
     savedEntries.length > 0
       ? savedEntries.map((row) => ({
           id: row.id,
@@ -501,10 +572,10 @@ export async function getInvoicePaymentPrefillData(input: {
           commissionEarnedInrCents: row.commission_earned_inr_cents,
           grossEarningsInrCents: row.gross_earnings_inr_cents,
           isNonInvoiceEmployee: row.is_non_invoice_employee,
-          isPaid: row.is_paid,
-          paidAt: row.paid_at ?? undefined,
-          notes: row.notes ?? "",
-        }))
+            isPaid: row.is_paid,
+            paidAt: row.paid_at ?? undefined,
+            notes: row.notes ?? "",
+          }))
       : payouts.map((row) => {
           const lineItem = row.invoice_line_item_id
             ? lineItems.get(row.invoice_line_item_id)
@@ -555,6 +626,14 @@ export async function getInvoicePaymentPrefillData(input: {
           };
         });
 
+  const entries = appendMissingAdjustmentEntries({
+    entries: baseEntries,
+    availableEmployees,
+    paymentMonth: input.paymentMonth,
+    daysInMonth,
+    cashoutUsdInrRate: realization?.usd_inr_rate ?? 0,
+  });
+
   return {
     invoicePaymentId: invoicePayment?.id ?? "",
     invoice: {
@@ -568,21 +647,7 @@ export async function getInvoicePaymentPrefillData(input: {
       usdInrRate: realization?.usd_inr_rate ?? 0,
     },
     entries,
-    availableEmployees: (employeesResult.data ?? []).map((row) => ({
-      id: String(row.id),
-      fullName: String(row.full_name),
-      companyId: String(row.company_id),
-      payoutMonthlyUsdCents: Number(row.payout_monthly_usd_cents ?? 0),
-      onboardingAdvanceUsdCents:
-        onboardingByEmployeeName.get(
-          normalizeEmployeeNameForMatch(String(row.full_name)),
-        ) ?? 0,
-      offboardingDeductionUsdCents: Math.abs(
-        offboardingByEmployeeName.get(
-          normalizeEmployeeNameForMatch(String(row.full_name)),
-        ) ?? 0,
-      ),
-    })),
+    availableEmployees,
   };
 }
 

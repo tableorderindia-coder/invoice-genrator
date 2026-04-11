@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  appendMissingAdjustmentEntries,
   buildEmployeeCashFlowMonthRows,
   normalizeEmployeeNameForMatch,
 } from "./employee-cash-flow-store";
@@ -145,5 +146,38 @@ describe("employee cash flow store shaping", () => {
     expect(normalizeEmployeeNameForMatch("PAWAN KUMAR BEESETTI")).toBe(
       "pawan kumar beesetti",
     );
+  });
+
+  it("adds adjustment-only employees into the monthly cash flow entries", () => {
+    expect(
+      appendMissingAdjustmentEntries({
+        entries: [],
+        availableEmployees: [
+          {
+            id: "emp_1",
+            fullName: "Darshan Tukaram Bandache",
+            companyId: "comp_1",
+            payoutMonthlyUsdCents: 2_000_00,
+            onboardingAdvanceUsdCents: 500_00,
+            offboardingDeductionUsdCents: 0,
+          },
+        ],
+        paymentMonth: "2026-04",
+        daysInMonth: 30,
+        cashoutUsdInrRate: 84.5,
+      }),
+    ).toMatchObject([
+      {
+        employeeId: "emp_1",
+        employeeNameSnapshot: "Darshan Tukaram Bandache",
+        daysWorked: 0,
+        daysInMonth: 30,
+        monthlyPaidUsdCents: 2_000_00,
+        baseDollarInwardUsdCents: 0,
+        onboardingAdvanceUsdCents: 500_00,
+        offboardingDeductionUsdCents: 0,
+        cashoutUsdInrRate: 84.5,
+      },
+    ]);
   });
 });
