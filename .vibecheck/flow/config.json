@@ -1,0 +1,13 @@
+{
+  "version": "1.0.0",
+  "projectName": "Eassyonboard invoice genrator and company dashboard",
+  "userName": "developer",
+  "skillLevel": "intermediate",
+  "outputFolder": ".vibecheck/flow",
+  "planningArtifacts": ".vibecheck\\flow\\planning-artifacts",
+  "implementationArtifacts": ".vibecheck\\flow\\implementation-artifacts",
+  "installedAt": "2026-04-07T08:43:04.218Z",
+  "ide": [
+    "vscode"
+  ]
+}

@@ -1,0 +1,71 @@
+
+> staffing-billing-app@0.1.0 dev
+> next dev --port 3000
+
+▲ Next.js 16.2.2 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.0.129:3000
+- Environments: .env.local
+✓ Ready in 678ms
+
+ GET / 200 in 6.1s (next.js: 722ms, application-code: 5.4s)
+✓ Compiled in 106ms
+✓ Compiled in 67ms
+✓ Compiled in 77ms
+ GET /companies 200 in 1289ms (next.js: 56ms, application-code: 1233ms)
+ GET /companies 200 in 339ms (next.js: 3ms, application-code: 336ms)
+ POST /companies 303 in 928ms (next.js: 4ms, application-code: 924ms)
+  └─ ƒ createCompanyAction({}) in 559ms src/features/billing/actions.ts
+ GET /employees 200 in 800ms (next.js: 32ms, application-code: 768ms)
+ GET /employees 200 in 588ms (next.js: 3ms, application-code: 586ms)
+ POST /employees 303 in 1557ms (next.js: 4ms, application-code: 1553ms)
+  └─ ƒ createEmployeeAction({}) in 952ms src/features/billing/actions.ts
+ GET /employees 200 in 624ms (next.js: 5ms, application-code: 619ms)
+ POST /employees 303 in 1128ms (next.js: 3ms, application-code: 1124ms)
+  └─ ƒ createEmployeeAction({}) in 489ms src/features/billing/actions.ts
+ GET /invoices/create 200 in 2.4s (next.js: 28ms, application-code: 2.3s)
+ GET /invoices/create?flashStatus=error&flashMessage=Supabase+is+missing+invoice+line-item+days+worked+column.+Run+the+latest+invoice_line_items+migration+first. 200 in 2.2s (next.js: 4ms, application-code: 2.2s)
+ POST /invoices/create 303 in 5.3s (next.js: 4ms, application-code: 5.3s)
+  └─ ƒ createInvoiceDraftAction({}) in 3052ms src/features/billing/actions.ts
+✓ Compiled in 100ms
+✓ Compiled in 95ms
+✓ Compiled in 84ms
+ GET /companies 200 in 1652ms (next.js: 117ms, application-code: 1535ms)
+ GET /companies 200 in 397ms (next.js: 4ms, application-code: 394ms)
+ POST /companies 303 in 1131ms (next.js: 4ms, application-code: 1127ms)
+  └─ ƒ createCompanyAction({}) in 715ms src/features/billing/actions.ts
+ GET /employees 200 in 1090ms (next.js: 128ms, application-code: 961ms)
+ GET /employees 200 in 723ms (next.js: 3ms, application-code: 721ms)
+ POST /employees 303 in 2.0s (next.js: 3ms, application-code: 2.0s)
+  └─ ƒ createEmployeeAction({}) in 1270ms src/features/billing/actions.ts
+ GET /employees 200 in 743ms (next.js: 3ms, application-code: 739ms)
+ POST /employees 303 in 1658ms (next.js: 3ms, application-code: 1655ms)
+  └─ ƒ createEmployeeAction({}) in 901ms src/features/billing/actions.ts
+ GET /invoices/create 200 in 2.5s (next.js: 133ms, application-code: 2.4s)
+ GET /invoices/drafts/invoice_20260410132755_8lyfxr 200 in 2.9s (next.js: 648ms, application-code: 2.3s)
+ POST /invoices/create 303 in 10.6s (next.js: 3ms, application-code: 10.6s)
+  └─ ƒ createInvoiceDraftAction({}) in 7676ms src/features/billing/actions.ts
+ GET /invoices/drafts/invoice_20260410132755_8lyfxr?flashStatus=success&flashMessage=Adjustment+added. 200 in 1803ms (next.js: 15ms, application-code: 1788ms)
+ POST /invoices/drafts/invoice_20260410132755_8lyfxr 303 in 5.5s (next.js: 15ms, application-code: 5.5s)
+  └─ ƒ addInvoiceAdjustmentAction({}) in 3675ms src/features/billing/actions.ts
+ GET /invoices/drafts/invoice_20260410132755_8lyfxr?flashStatus=success&flashMessage=Adjustment+removed. 200 in 1715ms (next.js: 14ms, application-code: 1701ms)
+ POST /invoices/drafts/invoice_20260410132755_8lyfxr?flashStatus=success&flashMessage=Adjustment%20added. 303 in 4.0s (next.js: 10ms, application-code: 4.0s)
+  └─ ƒ deleteInvoiceAdjustmentAction({}) in 2304ms src/features/billing/actions.ts
+ POST /invoices/drafts/invoice_20260410132755_8lyfxr?flashStatus=success&flashMessage=Adjustment%20removed. 200 in 156ms (next.js: 16ms, application-code: 140ms)
+ GET /cashout 200 in 460ms (next.js: 38ms, application-code: 422ms)
+ GET /invoices/drafts/invoice_20260410132755_8lyfxr?flashStatus=success&flashMessage=Invoice+status+updated. 200 in 2.0s (next.js: 4ms, application-code: 2.0s)
+ GET /cashout?flashStatus=success&flashMessage=Invoice+marked+as+cashed+out. 200 in 347ms (next.js: 3ms, application-code: 344ms)
+ POST /cashout 303 in 2.3s (next.js: 5ms, application-code: 2.3s)
+  └─ ƒ cashOutInvoiceAction({}) in 1972ms src/features/billing/actions.ts
+ GET /employee-payout 200 in 2.9s (next.js: 31ms, application-code: 2.9s)
+ GET /employee-payout?invoiceId=invoice_20260410132755_8lyfxr 200 in 2.8s (next.js: 3ms, application-code: 2.8s)
+ GET /employee-payout?invoiceId=invoice_20260410132755_8lyfxr&flashStatus=success&flashMessage=Employee+added+to+payout+list. 200 in 2.4s (next.js: 3ms, application-code: 2.4s)
+ POST /employee-payout?invoiceId=invoice_20260410132755_8lyfxr 303 in 5.6s (next.js: 4ms, application-code: 5.6s)
+  └─ ƒ addEmployeePayoutRowAction({}) in 3204ms src/features/billing/actions.ts
+ GET /employee-payout?invoiceId=invoice_20260410132755_8lyfxr&flashStatus=success&flashMessage=Employee+payout+removed. 200 in 2.5s (next.js: 3ms, application-code: 2.5s)
+ POST /employee-payout?invoiceId=invoice_20260410132755_8lyfxr&flashStatus=success&flashMessage=Employee%20added%20to%20payout%20list. 303 in 3.2s (next.js: 3ms, application-code: 3.2s)
+  └─ ƒ removeEmployeePayoutRowAction({}) in 641ms src/features/billing/actions.ts
+ GET /employee-payout?invoiceId=invoice_20260410132755_8lyfxr&flashStatus=success&flashMessage=Employee+payout+updated. 200 in 2.4s (next.js: 4ms, application-code: 2.4s)
+ POST /employee-payout?invoiceId=invoice_20260410132755_8lyfxr&flashStatus=success&flashMessage=Employee%20payout%20removed. 303 in 3.0s (next.js: 3ms, application-code: 3.0s)
+  └─ ƒ updateEmployeePayoutAction({}) in 569ms src/features/billing/actions.ts
+[?25h

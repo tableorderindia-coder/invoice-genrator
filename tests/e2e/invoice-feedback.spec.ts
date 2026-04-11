@@ -9,7 +9,7 @@ test("shows inline success feedback on the draft invoice page", async ({ page })
   const extraEmployeeName = `Playwright Extra Employee ${stamp}`;
   const invoiceNumber = `AUTO-${stamp}`;
 
-  await page.goto("http://localhost:3000/companies");
+  await page.goto("/companies");
   await page.getByLabel("Company name").fill(companyName);
   await page.getByLabel("Billing address").fill("123 Test Street, Surat");
   await page
@@ -18,7 +18,7 @@ test("shows inline success feedback on the draft invoice page", async ({ page })
   await page.getByRole("button", { name: "Save company" }).click();
   await expect(page.getByText(companyName)).toBeVisible();
 
-  await page.goto("http://localhost:3000/employees");
+  await page.goto("/employees");
   await page.getByLabel("Company").selectOption({ label: companyName });
   await page.getByLabel("Name").fill(employeeName);
   await page.getByLabel("Designation").fill("QA Analyst");
@@ -41,7 +41,7 @@ test("shows inline success feedback on the draft invoice page", async ({ page })
   await page.getByRole("button", { name: "Save employee" }).click();
   await expect(page.getByText(extraEmployeeName)).toBeVisible();
 
-  await page.goto("http://localhost:3000/invoices/create");
+  await page.goto("/invoices/create");
   await page.getByLabel("Company").selectOption({ label: companyName });
   await page.getByLabel("Invoice number").fill(invoiceNumber);
   await page.getByLabel("Billing date").fill("2026-04-07");
@@ -97,7 +97,7 @@ test("shows inline success feedback on the draft invoice page", async ({ page })
   await page.getByRole("button", { name: "Mark generated" }).click();
   await page.waitForURL(/\/invoices/);
 
-  await page.goto("http://localhost:3000/cashout");
+  await page.goto("/cashout");
   const cashoutRow = page.locator("tr", { hasText: invoiceNumber });
   await expect(cashoutRow).toBeVisible();
 
@@ -108,7 +108,7 @@ test("shows inline success feedback on the draft invoice page", async ({ page })
   await expect(page.getByText("Invoice marked as cashed out.")).toBeVisible({ timeout: 15000 });
   await expect(page.locator("tr", { hasText: invoiceNumber })).toHaveCount(0);
 
-  await page.goto("http://localhost:3000/employee-payout");
+  await page.goto("/employee-payout");
   const payoutInvoiceOption = page
     .locator('select[name="invoiceId"] option')
     .filter({ hasText: invoiceNumber })

@@ -1,0 +1,16 @@
+
+> staffing-billing-app@0.1.0 dev
+> next dev --port 3001
+
+▲ Next.js 16.2.2 (Turbopack)
+- Local:         http://localhost:3001
+- Network:       http://192.168.0.129:3001
+- Environments: .env.local
+✓ Ready in 2.5s
+
+ GET / 200 in 9.8s (next.js: 2.7s, application-code: 7.0s)
+✓ Finished filesystem cache database compaction in 11.1s
+ GET / 200 in 2.7s (next.js: 7ms, application-code: 2.7s)
+✓ Finished filesystem cache database compaction in 11.4s
+✓ Finished filesystem cache database compaction in 10.3s
+[?25h
