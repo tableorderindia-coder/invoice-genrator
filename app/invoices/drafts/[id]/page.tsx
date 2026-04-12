@@ -68,8 +68,12 @@ export default async function DraftInvoicePage({
 
   return (
     <Shell title={detail.invoice.invoiceNumber} eyebrow="Draft editor">
-      <section className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
-        <div className="space-y-6">
+      <section className="flex min-w-0 flex-col gap-6 xl:flex-row xl:items-start">
+        <div
+          className="min-w-0 flex-1 space-y-6 overflow-x-auto"
+          data-testid="invoice-table-section"
+          style={{ scrollBehavior: "smooth" }}
+        >
           <GlassPanel gradient>
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
@@ -226,8 +230,11 @@ export default async function DraftInvoicePage({
                     </form>
                   </div>
 
-                  <div className="mt-4 overflow-x-auto rounded-2xl" style={{ border: "1px solid var(--glass-border)" }}>
-                    <table className="glass-table">
+                  <div
+                    className="mt-4 overflow-x-auto rounded-2xl"
+                    style={{ border: "1px solid var(--glass-border)", scrollBehavior: "smooth" }}
+                  >
+                    <table className="glass-table min-w-[1200px]" style={{ tableLayout: "auto" }}>
                       <thead>
                         <tr>
                           {[
@@ -402,7 +409,11 @@ export default async function DraftInvoicePage({
 
         </div>
 
-        <div className="space-y-6">
+        <aside
+          className="min-w-0 space-y-6 xl:sticky xl:top-4 xl:h-[calc(100vh-2rem)] xl:w-[340px] xl:min-w-[340px] xl:flex-none xl:overflow-y-auto xl:border-l xl:pl-4"
+          data-testid="invoice-sidebar-section"
+          style={{ borderColor: "rgba(255,255,255,0.1)" }}
+        >
           <GlassPanel gradient>
             <h3 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
               Add existing team
@@ -492,7 +503,7 @@ export default async function DraftInvoicePage({
               />
             </form>
           </GlassPanel>
-        </div>
+        </aside>
       </section>
     </Shell>
   );
