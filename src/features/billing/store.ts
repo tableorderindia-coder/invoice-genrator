@@ -193,6 +193,9 @@ type DbDashboardCashFlowEntry = {
   monthly_paid_usd_cents: number;
   base_dollar_inward_usd_cents: number;
   onboarding_advance_usd_cents: number;
+  reimbursement_usd_cents: number;
+  reimbursement_labels_text: string | null;
+  appraisal_advance_usd_cents: number;
   offboarding_deduction_usd_cents: number;
   effective_dollar_inward_usd_cents: number;
   cashout_usd_inr_rate: number;
@@ -2367,7 +2370,7 @@ export async function getPnDashboardData(input: {
   let cashFlowQuery = supabase
     .from("invoice_payment_employee_entries")
     .select(
-      "id, employee_id, payment_month, employee_name_snapshot, company_id, monthly_paid_usd_cents, base_dollar_inward_usd_cents, onboarding_advance_usd_cents, offboarding_deduction_usd_cents, effective_dollar_inward_usd_cents, cashout_usd_inr_rate, paid_usd_inr_rate, cash_in_inr_cents, pf_inr_cents, tds_inr_cents, actual_paid_inr_cents, fx_commission_inr_cents, total_commission_usd_cents, commission_earned_inr_cents, gross_earnings_inr_cents, days_worked, days_in_month, invoice_id",
+      "id, employee_id, payment_month, employee_name_snapshot, company_id, monthly_paid_usd_cents, base_dollar_inward_usd_cents, onboarding_advance_usd_cents, reimbursement_usd_cents, reimbursement_labels_text, appraisal_advance_usd_cents, offboarding_deduction_usd_cents, effective_dollar_inward_usd_cents, cashout_usd_inr_rate, paid_usd_inr_rate, cash_in_inr_cents, pf_inr_cents, tds_inr_cents, actual_paid_inr_cents, fx_commission_inr_cents, total_commission_usd_cents, commission_earned_inr_cents, gross_earnings_inr_cents, days_worked, days_in_month, invoice_id",
     )
     .eq("company_id", input.companyId);
 
@@ -2416,29 +2419,31 @@ export async function getPnDashboardData(input: {
 
   const { data: adjustmentRows, error: adjustmentError } = await supabase
     .from("invoice_adjustments")
-    .select("invoice_id, type, amount_usd_cents")
+    .select("invoice_id, type, employee_name, amount_usd_cents")
     .in(
       "invoice_id",
       [...invoicePeriodMap.keys()].length > 0 ? [...invoicePeriodMap.keys()] : ["__none__"],
     );
   if (adjustmentError) throw adjustmentError;
 
-  const reimbursementUsdByKey = new Map<string, number>();
+  const companyLevelReimbursementUsdByKey = new Map<string, number>();
   for (const row of (adjustmentRows ?? []) as Array<{
     invoice_id: string;
     type: AdjustmentType;
+    employee_name?: string | null;
     amount_usd_cents: number;
   }>) {
     if (row.type !== "reimbursement") continue;
+    if (row.employee_name) continue;
     const period = invoicePeriodMap.get(String(row.invoice_id));
     if (!period) continue;
     const key =
       input.periodType === "monthly"
         ? `${period.year}-${String(period.month).padStart(2, "0")}`
         : `${period.year}`;
-    reimbursementUsdByKey.set(
+    companyLevelReimbursementUsdByKey.set(
       key,
-      (reimbursementUsdByKey.get(key) ?? 0) + Number(row.amount_usd_cents),
+      (companyLevelReimbursementUsdByKey.get(key) ?? 0) + Number(row.amount_usd_cents),
     );
   }
 
@@ -2457,6 +2462,9 @@ export async function getPnDashboardData(input: {
         daysWorked: row.days_worked,
         daysInMonth: row.days_in_month,
         dollarInwardUsdCents: row.effective_dollar_inward_usd_cents,
+        reimbursementUsdCents: row.reimbursement_usd_cents,
+        reimbursementLabelsText: row.reimbursement_labels_text ?? "",
+        appraisalAdvanceUsdCents: row.appraisal_advance_usd_cents,
         employeeMonthlyUsdCents: row.monthly_paid_usd_cents,
         cashoutUsdInrRate: row.cashout_usd_inr_rate,
         paidUsdInrRate: row.paid_usd_inr_rate,
@@ -2508,6 +2516,9 @@ export async function getPnDashboardData(input: {
         dollarInwardUsdCents: row.base_dollar_inward_usd_cents,
         baseDollarInwardUsdCents: row.base_dollar_inward_usd_cents,
         onboardingAdvanceUsdCents: row.onboarding_advance_usd_cents,
+        reimbursementUsdCents: row.reimbursement_usd_cents,
+        reimbursementLabelsText: row.reimbursement_labels_text ?? "",
+        appraisalAdvanceUsdCents: row.appraisal_advance_usd_cents,
         offboardingDeductionUsdCents: row.offboarding_deduction_usd_cents,
         effectiveDollarInwardUsdCents: row.effective_dollar_inward_usd_cents,
         cashInInrCents: row.cash_in_inr_cents,
@@ -2543,7 +2554,7 @@ export async function getPnDashboardData(input: {
       rows: sourceRows,
       periodType: input.periodType,
       expenseByKey,
-      reimbursementUsdByKey,
+      companyLevelReimbursementUsdByKey,
     }),
   };
 }

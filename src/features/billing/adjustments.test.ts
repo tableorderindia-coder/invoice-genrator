@@ -33,6 +33,7 @@ describe("invoice adjustments", () => {
       buildInvoiceAdjustmentPayload({
         type: "reimbursement",
         label: "Laptop courier",
+        employeeName: "Pawan",
         rateUsdCents: 3000,
         hrsPerWeek: 4,
         daysWorked: 90,
@@ -40,10 +41,51 @@ describe("invoice adjustments", () => {
     ).toEqual({
       type: "reimbursement",
       label: "Laptop courier",
+      employeeName: "Pawan",
       rateUsdCents: 3000,
       hrsPerWeek: 4,
       daysWorked: 90,
       amountUsdCents: 156000,
+    });
+  });
+
+  it("allows reimbursements with or without an employee", () => {
+    expect(
+      buildInvoiceAdjustmentPayload({
+        type: "reimbursement",
+        label: "Laptop",
+        employeeName: "Darshan Tukaram Bandache",
+        rateUsdCents: 0,
+        hrsPerWeek: 0,
+        amountUsdCents: 120000,
+      }),
+    ).toEqual({
+      type: "reimbursement",
+      label: "Laptop",
+      employeeName: "Darshan Tukaram Bandache",
+      rateUsdCents: 0,
+      hrsPerWeek: 0,
+      daysWorked: undefined,
+      amountUsdCents: 120000,
+    });
+
+    expect(
+      buildInvoiceAdjustmentPayload({
+        type: "reimbursement",
+        label: "Office snacks",
+        employeeName: "",
+        rateUsdCents: 0,
+        hrsPerWeek: 0,
+        amountUsdCents: 25000,
+      }),
+    ).toEqual({
+      type: "reimbursement",
+      label: "Office snacks",
+      employeeName: undefined,
+      rateUsdCents: 0,
+      hrsPerWeek: 0,
+      daysWorked: undefined,
+      amountUsdCents: 25000,
     });
   });
 
@@ -83,6 +125,18 @@ describe("invoice adjustments", () => {
       daysWorked: 90,
       amountUsdCents: 136500,
     });
+  });
+
+  it("requires an employee before adding appraisal advance", () => {
+    expect(() =>
+      buildInvoiceAdjustmentPayload({
+        type: "appraisal",
+        employeeName: "",
+        rateUsdCents: 4200,
+        hrsPerWeek: 2.5,
+        daysWorked: 90,
+      }),
+    ).toThrow("Select an employee before adding appraisal advance.");
   });
 
   it("allows overriding person-based adjustment totals with editable amounts", () => {
@@ -166,8 +220,9 @@ describe("invoice adjustments", () => {
         type: "reimbursement",
         amountUsdCents: 7500,
         label: " Laptop Courier ",
+        employeeName: " Darshan ",
       }),
-    ).toBe("reimbursement|7500|laptop courier|||");
+    ).toBe("reimbursement|7500|laptop courier|darshan|||");
 
     expect(
       buildAdjustmentDuplicateSignature({

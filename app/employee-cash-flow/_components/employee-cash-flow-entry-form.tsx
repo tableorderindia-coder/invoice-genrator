@@ -28,6 +28,9 @@ type AvailableEmployee = {
   companyId: string;
   payoutMonthlyUsdCents: number;
   onboardingAdvanceUsdCents: number;
+  reimbursementUsdCents: number;
+  reimbursementLabelsText: string;
+  appraisalAdvanceUsdCents: number;
   offboardingDeductionUsdCents: number;
 };
 
@@ -45,6 +48,8 @@ function deriveCardMetrics(entry: EmployeeCashFlowEditableEntry) {
   const effectiveDollarInwardUsdCents = calculateEffectiveDollarInwardUsdCents({
     baseDollarInwardUsdCents: entry.baseDollarInwardUsdCents,
     onboardingAdvanceUsdCents: entry.onboardingAdvanceUsdCents,
+    reimbursementUsdCents: entry.reimbursementUsdCents,
+    appraisalAdvanceUsdCents: entry.appraisalAdvanceUsdCents,
     offboardingDeductionUsdCents: entry.offboardingDeductionUsdCents,
   });
   const cashInInrCents = calculateCashInInrCents({
@@ -398,6 +403,51 @@ export default function EmployeeCashFlowEntryForm({
 
                 <label className="block">
                   <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
+                    Reimbursements / Expenses
+                  </span>
+                  <input
+                    value={toCurrencyInput(entry.reimbursementUsdCents)}
+                    onChange={(event) =>
+                      updateEntry(entry.id, {
+                        reimbursementUsdCents: fromCurrencyInput(event.target.value),
+                      })
+                    }
+                    className={cardInputClass()}
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
+                    Reimbursement labels
+                  </span>
+                  <input
+                    value={entry.reimbursementLabelsText}
+                    onChange={(event) =>
+                      updateEntry(entry.id, {
+                        reimbursementLabelsText: event.target.value,
+                      })
+                    }
+                    className={cardInputClass()}
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
+                    Appraisal advance
+                  </span>
+                  <input
+                    value={toCurrencyInput(entry.appraisalAdvanceUsdCents)}
+                    onChange={(event) =>
+                      updateEntry(entry.id, {
+                        appraisalAdvanceUsdCents: fromCurrencyInput(event.target.value),
+                      })
+                    }
+                    className={cardInputClass()}
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
                     Offboarding deduction
                   </span>
                   <input
@@ -603,8 +653,10 @@ export default function EmployeeCashFlowEntryForm({
               </label>
 
               <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-                {[
+                {[ 
                   ["Effective inward", formatUsd(metrics.effectiveDollarInwardUsdCents)],
+                  ["Reimbursements / Expenses INR", formatInr(Math.round(entry.reimbursementUsdCents * entry.cashoutUsdInrRate))],
+                  ["Appraisal advance INR", formatInr(Math.round(entry.appraisalAdvanceUsdCents * entry.cashoutUsdInrRate))],
                   ["Cash in INR", formatInr(metrics.cashInInrCents)],
                   ["Salary paid INR", formatInr(metrics.salaryPaidInrCents)],
                   ["Pending amount", formatInr(metrics.pendingAmountInrCents)],

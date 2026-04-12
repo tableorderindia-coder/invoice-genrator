@@ -109,16 +109,42 @@ test("shows inline success feedback on the draft invoice page", async ({ page })
   });
 
   await page.locator('select[name="type"]').selectOption("reimbursement");
+  await expect(page.getByLabel("Employee (optional)")).toBeVisible();
+  await page.getByLabel("Employee (optional)").selectOption({ label: employeeName });
   await expect(page.getByLabel("Type / Label")).toBeVisible();
   await expect(page.getByLabel("Total")).toBeVisible();
   await expect(
-    page.getByPlaceholder("Enter expense type (e.g., travel, food)"),
+    page.getByPlaceholder("Enter expense type (e.g., laptop, signing bonus)"),
   ).toBeVisible();
+  await page.getByLabel("Type / Label").fill("Laptop");
+  await page.getByLabel("Total").fill("800");
+  await page.getByRole("button", { name: "Add / Update" }).click();
+  await page.waitForURL(/flashStatus=success/, { timeout: 15000 });
+  await expect(page.getByText("Adjustment added.")).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText(`${employeeName} · Laptop`)).toBeVisible({ timeout: 15000 });
+
+  await page.locator('select[name="type"]').selectOption("reimbursement");
+  await page.getByLabel("Employee (optional)").selectOption("");
+  await page.getByLabel("Type / Label").fill("Office snacks");
+  await page.getByLabel("Total").fill("200");
+  await page.getByRole("button", { name: "Add / Update" }).click();
+  await page.waitForURL(/flashStatus=success/, { timeout: 15000 });
+  await expect(page.getByText("Office snacks")).toBeVisible({ timeout: 15000 });
+
+  await page.locator('select[name="type"]').selectOption("appraisal");
+  await page.getByLabel("Employee").selectOption({ label: employeeName });
+  await page.getByLabel("Total").fill("650");
+  await page.getByRole("button", { name: "Add / Update" }).click();
+  await page.waitForURL(/flashStatus=success/, { timeout: 15000 });
+  await expect(
+    page.getByRole("paragraph").filter({ hasText: `${employeeName} · $25/hr · 40 hrs/week` }),
+  ).toBeVisible({ timeout: 15000 });
 
   await page
     .locator("div")
-    .filter({ hasText: `${employeeName} · $25/hr · 4 hrs/week` })
+    .filter({ has: page.getByRole("heading", { name: "Onboarding Advance" }) })
     .getByRole("button", { name: "Remove", exact: true })
+    .first()
     .click();
   await page.waitForURL(/flashStatus=success/, { timeout: 15000 });
   await expect(page.getByText("Adjustment removed.")).toBeVisible({ timeout: 15000 });
@@ -142,6 +168,42 @@ test("shows inline success feedback on the draft invoice page", async ({ page })
   await expect(cashedOutInvoiceRow).toBeVisible();
   await expect(cashedOutInvoiceRow).toContainText("cashed out");
   await expect(cashedOutInvoiceRow).toContainText("04-08-2026");
+
+  await page.goto("/employee-cash-flow");
+  await page.getByLabel("Company").selectOption({ label: updatedCompanyName });
+  const cashFlowInvoiceOption = page
+    .locator('select[name="invoiceId"] option')
+    .filter({ hasText: editedInvoiceNumber })
+    .first();
+  const cashFlowInvoiceValue = await cashFlowInvoiceOption.getAttribute("value");
+  expect(cashFlowInvoiceValue).toBeTruthy();
+  await page
+    .getByLabel("Cashed-out invoice")
+    .selectOption(String(cashFlowInvoiceValue));
+  await page.getByRole("button", { name: "Load" }).click();
+  await expect(page.getByRole("heading", { name: employeeName })).toBeVisible({
+    timeout: 15000,
+  });
+  await expect(page.locator('input[value="Laptop"]')).toBeVisible({ timeout: 15000 });
+  await expect(page.locator('input[value="800.00"]')).toBeVisible({ timeout: 15000 });
+  await expect(page.locator('input[value="650.00"]')).toBeVisible({ timeout: 15000 });
+  await page.getByRole("button", { name: "Save employee cash flow rows" }).click();
+  await page.waitForURL(/flashStatus=success/, { timeout: 15000 });
+  await expect(page.getByText("Employee cash flow rows saved.")).toBeVisible({
+    timeout: 15000,
+  });
+
+  await page.goto("/dashboard");
+  await page.getByLabel("Select company").selectOption({ label: updatedCompanyName });
+  await page.getByRole("button", { name: "Load company" }).click();
+  const employeeSection = page.locator("div").filter({ hasText: employeeName }).first();
+  await expect(employeeSection.getByText("Laptop")).toBeVisible({ timeout: 15000 });
+  await expect(employeeSection).toContainText("800");
+  await expect(employeeSection).toContainText("650");
+  await page.getByRole("button", { name: "Monthly / Yearly" }).click();
+  const monthlyRow = page.locator("tr", { hasText: "April 2026" }).first();
+  await expect(monthlyRow).toContainText("1,000");
+  await expect(monthlyRow).toContainText("650");
 
   await page.goto("/employee-payout");
   const payoutInvoiceOption = page

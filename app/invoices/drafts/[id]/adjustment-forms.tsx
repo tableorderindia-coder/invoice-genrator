@@ -83,6 +83,7 @@ function buildClientAdjustmentPayload(form: FormState) {
     return buildInvoiceAdjustmentPayload({
       type: "reimbursement",
       label: form.label,
+      employeeName: form.employeeName || undefined,
       rateUsdCents: centsFromUsd(form.rateUsd),
       hrsPerWeek: Number.parseFloat(form.hrsPerWeek || "0"),
       daysWorked: Number.parseInt(form.daysWorked || "0", 10),
@@ -115,7 +116,7 @@ function getTypeLabel(type: Exclude<AdjustmentTypeOption, "">) {
 
 function describeAdjustment(adjustment: InvoiceAdjustment) {
   if (adjustment.type === "reimbursement") {
-    return adjustment.label;
+    return [adjustment.employeeName, adjustment.label].filter(Boolean).join(" · ");
   }
 
   return [
@@ -374,17 +375,39 @@ export function AdjustmentForms({
         {form.type ? (
           <div className="space-y-4">
             {form.type === "reimbursement" ? (
-              <Field label="Type / Label">
-                <input
-                  name="label"
-                  placeholder="Enter expense type (e.g., travel, food)"
-                  className={`${inputClass} min-h-14`}
-                  value={form.label}
-                  onChange={(event) =>
-                    setForm((current) => ({ ...current, label: event.target.value }))
-                  }
-                />
-              </Field>
+              <>
+                <Field label="Employee (optional)">
+                  <select
+                    name="employeeName"
+                    className={`${inputClass} min-h-14`}
+                    value={form.employeeName}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        employeeName: event.target.value,
+                      }))
+                    }
+                  >
+                    <option value="">Company-wide reimbursement / expense</option>
+                    {employees.map((employee) => (
+                      <option key={employee.id} value={employee.fullName}>
+                        {employee.fullName}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Type / Label">
+                  <input
+                    name="label"
+                    placeholder="Enter expense type (e.g., laptop, signing bonus)"
+                    className={`${inputClass} min-h-14`}
+                    value={form.label}
+                    onChange={(event) =>
+                      setForm((current) => ({ ...current, label: event.target.value }))
+                    }
+                  />
+                </Field>
+              </>
             ) : (
               <Field label="Employee">
                 <select
@@ -434,86 +457,90 @@ export function AdjustmentForms({
                 </span>
               </p>
             ) : null}
-            <Field label="Rate ($/hr)">
-              <input
-                name="rateUsd"
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="Enter hourly rate"
-                className={`${inputClass} min-h-14`}
-                value={form.rateUsd}
-                onChange={(event) =>
-                  setForm((current) => {
-                    const nextRateUsd = event.target.value;
-                    return {
-                      ...current,
-                      rateUsd: nextRateUsd,
-                      amountUsd: personTotalUsdInputValue(
-                        nextRateUsd,
-                        current.hrsPerWeek,
-                        current.daysWorked,
-                      ),
-                    };
-                  })
-                }
-              />
-            </Field>
-            <Field label="Hrs per week">
-              <input
-                name="hrsPerWeek"
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="Enter hrs per week"
-                className={`${inputClass} min-h-14`}
-                value={form.hrsPerWeek}
-                onChange={(event) =>
-                  setForm((current) => {
-                    const nextHours = event.target.value;
-                    return {
-                      ...current,
-                      hrsPerWeek: nextHours,
-                      amountUsd: personTotalUsdInputValue(
-                        current.rateUsd,
-                        nextHours,
-                        current.daysWorked,
-                      ),
-                    };
-                  })
-                }
-              />
-            </Field>
-            <Field label={daysFieldCopy.label}>
-              <input
-                name="daysWorked"
-                type="number"
-                step="1"
-                min="1"
-                placeholder={daysFieldCopy.placeholder}
-                className={`${inputClass} min-h-14`}
-                value={form.daysWorked}
-                onChange={(event) =>
-                  setForm((current) => {
-                    const nextDaysWorked = event.target.value;
-                    return {
-                      ...current,
-                      daysWorked: nextDaysWorked,
-                      amountUsd: personTotalUsdInputValue(
-                        current.rateUsd,
-                        current.hrsPerWeek,
-                        nextDaysWorked,
-                      ),
-                    };
-                  })
-                }
-              />
-            </Field>
-            {daysFieldCopy.helperText ? (
-              <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-                {daysFieldCopy.helperText}
-              </p>
-            ) : null}
+            {form.type === "reimbursement" ? null : (
+              <>
+                <Field label="Rate ($/hr)">
+                  <input
+                    name="rateUsd"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="Enter hourly rate"
+                    className={`${inputClass} min-h-14`}
+                    value={form.rateUsd}
+                    onChange={(event) =>
+                      setForm((current) => {
+                        const nextRateUsd = event.target.value;
+                        return {
+                          ...current,
+                          rateUsd: nextRateUsd,
+                          amountUsd: personTotalUsdInputValue(
+                            nextRateUsd,
+                            current.hrsPerWeek,
+                            current.daysWorked,
+                          ),
+                        };
+                      })
+                    }
+                  />
+                </Field>
+                <Field label="Hrs per week">
+                  <input
+                    name="hrsPerWeek"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="Enter hrs per week"
+                    className={`${inputClass} min-h-14`}
+                    value={form.hrsPerWeek}
+                    onChange={(event) =>
+                      setForm((current) => {
+                        const nextHours = event.target.value;
+                        return {
+                          ...current,
+                          hrsPerWeek: nextHours,
+                          amountUsd: personTotalUsdInputValue(
+                            current.rateUsd,
+                            nextHours,
+                            current.daysWorked,
+                          ),
+                        };
+                      })
+                    }
+                  />
+                </Field>
+                <Field label={daysFieldCopy.label}>
+                  <input
+                    name="daysWorked"
+                    type="number"
+                    step="1"
+                    min="1"
+                    placeholder={daysFieldCopy.placeholder}
+                    className={`${inputClass} min-h-14`}
+                    value={form.daysWorked}
+                    onChange={(event) =>
+                      setForm((current) => {
+                        const nextDaysWorked = event.target.value;
+                        return {
+                          ...current,
+                          daysWorked: nextDaysWorked,
+                          amountUsd: personTotalUsdInputValue(
+                            current.rateUsd,
+                            current.hrsPerWeek,
+                            nextDaysWorked,
+                          ),
+                        };
+                      })
+                    }
+                  />
+                </Field>
+                {daysFieldCopy.helperText ? (
+                  <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                    {daysFieldCopy.helperText}
+                  </p>
+                ) : null}
+              </>
+            )}
             <Field label="Total">
               <input
                 name="amountUsd"

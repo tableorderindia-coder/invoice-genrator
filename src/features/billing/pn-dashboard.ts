@@ -6,6 +6,9 @@ export type PnSourceRow = {
   daysWorked: number;
   daysInMonth: number;
   dollarInwardUsdCents: number;
+  reimbursementUsdCents: number;
+  reimbursementLabelsText: string;
+  appraisalAdvanceUsdCents: number;
   employeeMonthlyUsdCents: number;
   cashoutUsdInrRate: number;
   paidUsdInrRate: number;
@@ -26,6 +29,9 @@ export type PnEditableSourceRow = PnSourceRow & {
   invoiceNumber: string;
   baseDollarInwardUsdCents: number;
   onboardingAdvanceUsdCents: number;
+  reimbursementUsdCents: number;
+  reimbursementLabelsText: string;
+  appraisalAdvanceUsdCents: number;
   offboardingDeductionUsdCents: number;
   effectiveDollarInwardUsdCents: number;
   cashInInrCents: number;
@@ -41,6 +47,11 @@ export type PnEmployeeMonthRow = {
   daysWorked: number;
   daysInMonth: number;
   dollarInwardUsdCents: number;
+  reimbursementUsdCents: number;
+  reimbursementLabelsText: string;
+  reimbursementInrCents: number;
+  appraisalAdvanceUsdCents: number;
+  appraisalAdvanceInrCents: number;
   employeeMonthlyUsdCents: number;
   cashoutUsdInrRate: number;
   paidUsdInrRate: number;
@@ -71,6 +82,11 @@ export type PnEmployeeEditableRow = {
   dollarInwardUsdCents: number;
   baseDollarInwardUsdCents: number;
   onboardingAdvanceUsdCents: number;
+  reimbursementUsdCents: number;
+  reimbursementLabelsText: string;
+  reimbursementInrCents: number;
+  appraisalAdvanceUsdCents: number;
+  appraisalAdvanceInrCents: number;
   offboardingDeductionUsdCents: number;
   effectiveDollarInwardUsdCents: number;
   cashInInrCents: number;
@@ -105,6 +121,8 @@ export type PnPeriodRow = {
   dollarInwardUsdCents: number;
   reimbursementUsdCents: number;
   reimbursementInrCents: number;
+  appraisalAdvanceUsdCents: number;
+  appraisalAdvanceInrCents: number;
   pfInrCents: number;
   tdsInrCents: number;
   actualPaidInrCents: number;
@@ -139,6 +157,20 @@ const toEmployeeMonthRow = (rows: PnSourceRow[]): PnEmployeeMonthRow => {
     daysWorked: sumBy(rows, "daysWorked"),
     daysInMonth: sumBy(rows, "daysInMonth"),
     dollarInwardUsdCents: sumBy(rows, "dollarInwardUsdCents"),
+    reimbursementUsdCents: sumBy(rows, "reimbursementUsdCents"),
+    reimbursementLabelsText: rows
+      .map((row) => row.reimbursementLabelsText)
+      .filter(Boolean)
+      .join(", "),
+    reimbursementInrCents: rows.reduce(
+      (sum, row) => sum + Math.round(row.reimbursementUsdCents * row.cashoutUsdInrRate),
+      0,
+    ),
+    appraisalAdvanceUsdCents: sumBy(rows, "appraisalAdvanceUsdCents"),
+    appraisalAdvanceInrCents: rows.reduce(
+      (sum, row) => sum + Math.round(row.appraisalAdvanceUsdCents * row.cashoutUsdInrRate),
+      0,
+    ),
     employeeMonthlyUsdCents: sumBy(rows, "employeeMonthlyUsdCents"),
     cashoutUsdInrRate: averageRate(rows, "cashoutUsdInrRate"),
     paidUsdInrRate: averageRate(rows, "paidUsdInrRate"),
@@ -215,6 +247,13 @@ export function buildPnEmployeeEditableSections(
       dollarInwardUsdCents: row.baseDollarInwardUsdCents,
       baseDollarInwardUsdCents: row.baseDollarInwardUsdCents,
       onboardingAdvanceUsdCents: row.onboardingAdvanceUsdCents,
+      reimbursementUsdCents: row.reimbursementUsdCents,
+      reimbursementLabelsText: row.reimbursementLabelsText,
+      reimbursementInrCents: Math.round(row.reimbursementUsdCents * row.cashoutUsdInrRate),
+      appraisalAdvanceUsdCents: row.appraisalAdvanceUsdCents,
+      appraisalAdvanceInrCents: Math.round(
+        row.appraisalAdvanceUsdCents * row.cashoutUsdInrRate,
+      ),
       offboardingDeductionUsdCents: row.offboardingDeductionUsdCents,
       effectiveDollarInwardUsdCents: row.effectiveDollarInwardUsdCents,
       cashInInrCents: row.cashInInrCents,
@@ -255,7 +294,7 @@ export function buildPnPeriodRows(input: {
   rows: PnSourceRow[];
   periodType: PnPeriodType;
   expenseByKey: Map<string, number>;
-  reimbursementUsdByKey: Map<string, number>;
+  companyLevelReimbursementUsdByKey: Map<string, number>;
 }): PnPeriodRow[] {
   const grouped = new Map<string, PnSourceRow[]>();
   for (const row of input.rows) {
@@ -275,10 +314,25 @@ export function buildPnPeriodRows(input: {
       const grossEarningsInrCents = fxCommissionInrCents + commissionEarnedInrCents;
       const expensesInrCents = input.expenseByKey.get(key) ?? 0;
       const netProfitInrCents = sumBy(bucket, "netProfitInrCents");
-      const reimbursementUsdCents = input.reimbursementUsdByKey.get(key) ?? 0;
-      const reimbursementInrCents = Math.round(
-        (reimbursementUsdCents / 100) * averageRate(bucket, "cashoutUsdInrRate") * 100,
+      const employeeReimbursementUsdCents = sumBy(bucket, "reimbursementUsdCents");
+      const employeeReimbursementInrCents = bucket.reduce(
+        (sum, row) => sum + Math.round(row.reimbursementUsdCents * row.cashoutUsdInrRate),
+        0,
       );
+      const companyLevelReimbursementUsdCents =
+        input.companyLevelReimbursementUsdByKey.get(key) ?? 0;
+      const companyLevelReimbursementInrCents = Math.round(
+        (companyLevelReimbursementUsdCents / 100) * averageRate(bucket, "cashoutUsdInrRate") * 100,
+      );
+      const appraisalAdvanceUsdCents = sumBy(bucket, "appraisalAdvanceUsdCents");
+      const appraisalAdvanceInrCents = bucket.reduce(
+        (sum, row) => sum + Math.round(row.appraisalAdvanceUsdCents * row.cashoutUsdInrRate),
+        0,
+      );
+      const reimbursementUsdCents =
+        employeeReimbursementUsdCents + companyLevelReimbursementUsdCents;
+      const reimbursementInrCents =
+        employeeReimbursementInrCents + companyLevelReimbursementInrCents;
 
       return {
         year: first.year,
@@ -286,6 +340,8 @@ export function buildPnPeriodRows(input: {
         dollarInwardUsdCents: sumBy(bucket, "dollarInwardUsdCents"),
         reimbursementUsdCents,
         reimbursementInrCents,
+        appraisalAdvanceUsdCents,
+        appraisalAdvanceInrCents,
         pfInrCents: sumBy(bucket, "pfInrCents"),
         tdsInrCents: sumBy(bucket, "tdsInrCents"),
         actualPaidInrCents: sumBy(bucket, "actualPaidInrCents"),
@@ -294,7 +350,11 @@ export function buildPnPeriodRows(input: {
         commissionEarnedInrCents,
         grossEarningsInrCents,
         expensesInrCents,
-        netPlInrCents: netProfitInrCents + reimbursementInrCents - expensesInrCents,
+        netPlInrCents:
+          netProfitInrCents +
+          reimbursementInrCents +
+          appraisalAdvanceInrCents -
+          expensesInrCents,
       };
     })
     .sort((a, b) => {

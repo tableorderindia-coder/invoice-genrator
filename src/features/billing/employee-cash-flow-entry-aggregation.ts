@@ -24,6 +24,14 @@ export function aggregateEmployeeCashFlowEditableEntries(
     );
     existing.baseDollarInwardUsdCents += entry.baseDollarInwardUsdCents;
     existing.onboardingAdvanceUsdCents += entry.onboardingAdvanceUsdCents;
+    existing.reimbursementUsdCents += entry.reimbursementUsdCents;
+    existing.reimbursementLabelsText = [
+      existing.reimbursementLabelsText,
+      entry.reimbursementLabelsText,
+    ]
+      .filter(Boolean)
+      .join(", ");
+    existing.appraisalAdvanceUsdCents += entry.appraisalAdvanceUsdCents;
     existing.offboardingDeductionUsdCents += entry.offboardingDeductionUsdCents;
     existing.cashoutUsdInrRate = entry.cashoutUsdInrRate || existing.cashoutUsdInrRate;
     existing.paidUsdInrRate = entry.paidUsdInrRate || existing.paidUsdInrRate;

@@ -6,11 +6,15 @@ export type EmployeeCashFlowStatus =
 export function calculateEffectiveDollarInwardUsdCents(input: {
   baseDollarInwardUsdCents: number;
   onboardingAdvanceUsdCents: number;
+  reimbursementUsdCents: number;
+  appraisalAdvanceUsdCents: number;
   offboardingDeductionUsdCents: number;
 }) {
   return (
     input.baseDollarInwardUsdCents +
-    input.onboardingAdvanceUsdCents -
+    input.onboardingAdvanceUsdCents +
+    input.reimbursementUsdCents +
+    input.appraisalAdvanceUsdCents -
     input.offboardingDeductionUsdCents
   );
 }

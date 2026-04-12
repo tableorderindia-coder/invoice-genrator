@@ -175,6 +175,11 @@ export type PnEmployeeMonthRow = {
   daysWorked: number;
   daysInMonth: number;
   dollarInwardUsdCents: number;
+  reimbursementUsdCents: number;
+  reimbursementLabelsText: string;
+  reimbursementInrCents: number;
+  appraisalAdvanceUsdCents: number;
+  appraisalAdvanceInrCents: number;
   employeeMonthlyUsdCents: number;
   cashoutUsdInrRate: number;
   paidUsdInrRate: number;
@@ -205,6 +210,11 @@ export type PnEmployeeEditableRow = {
   dollarInwardUsdCents: number;
   baseDollarInwardUsdCents: number;
   onboardingAdvanceUsdCents: number;
+  reimbursementUsdCents: number;
+  reimbursementLabelsText: string;
+  reimbursementInrCents: number;
+  appraisalAdvanceUsdCents: number;
+  appraisalAdvanceInrCents: number;
   offboardingDeductionUsdCents: number;
   effectiveDollarInwardUsdCents: number;
   cashInInrCents: number;
@@ -237,6 +247,8 @@ export type PnPeriodRow = {
   dollarInwardUsdCents: number;
   reimbursementUsdCents: number;
   reimbursementInrCents: number;
+  appraisalAdvanceUsdCents: number;
+  appraisalAdvanceInrCents: number;
   pfInrCents: number;
   tdsInrCents: number;
   actualPaidInrCents: number;

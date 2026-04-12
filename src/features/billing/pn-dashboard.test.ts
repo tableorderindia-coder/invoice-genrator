@@ -16,7 +16,10 @@ const sampleRows: PnSourceRow[] = [
     month: 1,
     daysWorked: 31,
     daysInMonth: 31,
-    dollarInwardUsdCents: 100000,
+    dollarInwardUsdCents: 115000,
+    reimbursementUsdCents: 10000,
+    reimbursementLabelsText: "Laptop",
+    appraisalAdvanceUsdCents: 5000,
     employeeMonthlyUsdCents: 70000,
     cashoutUsdInrRate: 83.2,
     paidUsdInrRate: 82.1,
@@ -26,9 +29,9 @@ const sampleRows: PnSourceRow[] = [
     fxCommissionInrCents: 50000,
     totalCommissionUsdCents: 30000,
     commissionEarnedInrCents: 150000,
-    cashInInrCents: 8320000,
+    cashInInrCents: 9568000,
     salaryPaidInrCents: 5747000,
-    netProfitInrCents: 2573000,
+    netProfitInrCents: 3821000,
   },
   {
     employeeId: "emp_1",
@@ -38,6 +41,9 @@ const sampleRows: PnSourceRow[] = [
     daysWorked: 28,
     daysInMonth: 28,
     dollarInwardUsdCents: 120000,
+    reimbursementUsdCents: 0,
+    reimbursementLabelsText: "",
+    appraisalAdvanceUsdCents: 0,
     employeeMonthlyUsdCents: 70000,
     cashoutUsdInrRate: 83.5,
     paidUsdInrRate: 82.4,
@@ -58,7 +64,10 @@ const sampleRows: PnSourceRow[] = [
     month: 2,
     daysWorked: 21,
     daysInMonth: 28,
-    dollarInwardUsdCents: 90000,
+    dollarInwardUsdCents: 97500,
+    reimbursementUsdCents: 5000,
+    reimbursementLabelsText: "Signing bonus",
+    appraisalAdvanceUsdCents: 2500,
     employeeMonthlyUsdCents: 75000,
     cashoutUsdInrRate: 83.5,
     paidUsdInrRate: 82.8,
@@ -68,9 +77,9 @@ const sampleRows: PnSourceRow[] = [
     fxCommissionInrCents: 30000,
     totalCommissionUsdCents: 15000,
     commissionEarnedInrCents: 110000,
-    cashInInrCents: 7515000,
+    cashInInrCents: 8141250,
     salaryPaidInrCents: 6210000,
-    netProfitInrCents: 1305000,
+    netProfitInrCents: 1931250,
   },
 ];
 
@@ -87,10 +96,13 @@ const editableSampleRows: PnEditableSourceRow[] = [
     daysInMonth: 31,
     baseDollarInwardUsdCents: 100000,
     onboardingAdvanceUsdCents: 20000,
+    reimbursementUsdCents: 10000,
+    reimbursementLabelsText: "Laptop",
+    appraisalAdvanceUsdCents: 5000,
     offboardingDeductionUsdCents: 0,
-    effectiveDollarInwardUsdCents: 120000,
-    cashInInrCents: 9984000,
-    dollarInwardUsdCents: 120000,
+    effectiveDollarInwardUsdCents: 135000,
+    cashInInrCents: 11232000,
+    dollarInwardUsdCents: 135000,
     employeeMonthlyUsdCents: 70000,
     cashoutUsdInrRate: 83.2,
     paidUsdInrRate: 82.1,
@@ -102,7 +114,7 @@ const editableSampleRows: PnEditableSourceRow[] = [
     totalCommissionUsdCents: 50000,
     commissionEarnedInrCents: 150000,
     grossEarningsInrCents: 200000,
-    netProfitInrCents: 4237000,
+    netProfitInrCents: 5485000,
   },
   {
     rowId: "cash_2",
@@ -116,10 +128,13 @@ const editableSampleRows: PnEditableSourceRow[] = [
     daysInMonth: 28,
     baseDollarInwardUsdCents: 90000,
     onboardingAdvanceUsdCents: 0,
+    reimbursementUsdCents: 5000,
+    reimbursementLabelsText: "Signing bonus",
+    appraisalAdvanceUsdCents: 2500,
     offboardingDeductionUsdCents: 0,
-    effectiveDollarInwardUsdCents: 90000,
-    cashInInrCents: 7515000,
-    dollarInwardUsdCents: 90000,
+    effectiveDollarInwardUsdCents: 97500,
+    cashInInrCents: 8141250,
+    dollarInwardUsdCents: 97500,
     employeeMonthlyUsdCents: 70000,
     cashoutUsdInrRate: 83.5,
     paidUsdInrRate: 82.4,
@@ -131,7 +146,7 @@ const editableSampleRows: PnEditableSourceRow[] = [
     totalCommissionUsdCents: 20000,
     commissionEarnedInrCents: 170000,
     grossEarningsInrCents: 222000,
-    netProfitInrCents: 1747000,
+    netProfitInrCents: 2373250,
   },
 ];
 
@@ -153,7 +168,7 @@ describe("pn dashboard aggregations", () => {
         ["2026-01", 50000],
         ["2026-02", 90000],
       ]),
-      reimbursementUsdByKey: new Map([
+      companyLevelReimbursementUsdByKey: new Map([
         ["2026-01", 10000],
         ["2026-02", 5000],
       ]),
@@ -162,15 +177,19 @@ describe("pn dashboard aggregations", () => {
     expect(monthly).toHaveLength(2);
     expect(monthly[0].month).toBe(1);
     expect(monthly[0].grossEarningsInrCents).toBe(200000);
-    expect(monthly[0].reimbursementUsdCents).toBe(10000);
-    expect(monthly[0].reimbursementInrCents).toBe(832000);
-    expect(monthly[0].netPlInrCents).toBe(3355000);
+    expect(monthly[0].reimbursementUsdCents).toBe(20000);
+    expect(monthly[0].reimbursementInrCents).toBe(1664000);
+    expect(monthly[0].appraisalAdvanceUsdCents).toBe(5000);
+    expect(monthly[0].appraisalAdvanceInrCents).toBe(416000);
+    expect(monthly[0].netPlInrCents).toBe(5851000);
 
     expect(monthly[1].month).toBe(2);
     expect(monthly[1].grossEarningsInrCents).toBe(362000);
-    expect(monthly[1].reimbursementUsdCents).toBe(5000);
-    expect(monthly[1].reimbursementInrCents).toBe(417500);
-    expect(monthly[1].netPlInrCents).toBe(5884500);
+    expect(monthly[1].reimbursementUsdCents).toBe(10000);
+    expect(monthly[1].reimbursementInrCents).toBe(835000);
+    expect(monthly[1].appraisalAdvanceUsdCents).toBe(2500);
+    expect(monthly[1].appraisalAdvanceInrCents).toBe(208750);
+    expect(monthly[1].netPlInrCents).toBe(7137000);
   });
 
   it("builds yearly period rows from cash-flow net profit even without outflow", () => {
@@ -190,17 +209,19 @@ describe("pn dashboard aggregations", () => {
       ],
       periodType: "yearly",
       expenseByKey: new Map(),
-      reimbursementUsdByKey: new Map([["2027", 10000]]),
+      companyLevelReimbursementUsdByKey: new Map([["2027", 10000]]),
     });
 
     expect(yearly).toHaveLength(1);
     expect(yearly[0]).toMatchObject({
       year: 2027,
       month: undefined,
-      reimbursementUsdCents: 10000,
-      reimbursementInrCents: 832000,
+      reimbursementUsdCents: 20000,
+      reimbursementInrCents: 1664000,
+      appraisalAdvanceUsdCents: 5000,
+      appraisalAdvanceInrCents: 416000,
       grossEarningsInrCents: 0,
-      netPlInrCents: 1732000,
+      netPlInrCents: 2980000,
     });
   });
 
@@ -217,6 +238,8 @@ describe("pn dashboard aggregations", () => {
       payoutId: "cash_1",
       invoiceNumber: "INV-001",
       dollarInwardUsdCents: 100000,
+      reimbursementUsdCents: 10000,
+      appraisalAdvanceUsdCents: 5000,
     });
   });
 
@@ -226,13 +249,18 @@ describe("pn dashboard aggregations", () => {
     expect(sections[0]?.rows[0]).toMatchObject({
       baseDollarInwardUsdCents: 100000,
       onboardingAdvanceUsdCents: 20000,
+      reimbursementUsdCents: 10000,
+      reimbursementLabelsText: "Laptop",
+      reimbursementInrCents: 832000,
+      appraisalAdvanceUsdCents: 5000,
+      appraisalAdvanceInrCents: 416000,
       offboardingDeductionUsdCents: 0,
-      effectiveDollarInwardUsdCents: 120000,
-      cashInInrCents: 9984000,
+      effectiveDollarInwardUsdCents: 135000,
+      cashInInrCents: 11232000,
       salaryPaidInrCents: 5747000,
-      netProfitInrCents: 4237000,
+      netProfitInrCents: 5485000,
     });
-    expect(sections[0]?.totalNetProfitInrCents).toBe(5984000);
+    expect(sections[0]?.totalNetProfitInrCents).toBe(7858250);
   });
 
   it("keeps negative and positive dashboard net profit values distinct", () => {

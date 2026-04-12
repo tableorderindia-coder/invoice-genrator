@@ -17,6 +17,9 @@ describe("employee cash flow store shaping", () => {
           cashInInrCents: 1_000,
           effectiveDollarInwardUsdCents: 1_000,
           onboardingAdvanceUsdCents: 0,
+          reimbursementUsdCents: 0,
+          reimbursementLabelsText: "",
+          appraisalAdvanceUsdCents: 0,
           offboardingDeductionUsdCents: 0,
           monthlyPaidUsdCents: 1_000,
           daysWorked: 10,
@@ -33,6 +36,9 @@ describe("employee cash flow store shaping", () => {
           cashInInrCents: 2_000,
           effectiveDollarInwardUsdCents: 2_000,
           onboardingAdvanceUsdCents: 500,
+          reimbursementUsdCents: 250,
+          reimbursementLabelsText: "Laptop",
+          appraisalAdvanceUsdCents: 125,
           offboardingDeductionUsdCents: 0,
           monthlyPaidUsdCents: 1_000,
           daysWorked: 12,
@@ -62,6 +68,8 @@ describe("employee cash flow store shaping", () => {
 
     expect(rows).toHaveLength(1);
     expect(rows[0]?.cashInInrCents).toBe(3_000);
+    expect(rows[0]?.reimbursementUsdCents).toBe(250);
+    expect(rows[0]?.appraisalAdvanceUsdCents).toBe(125);
     expect(rows[0]?.salaryPaidInrCents).toBe(2_500);
     expect(rows[0]?.pendingAmountInrCents).toBe(2_000);
     expect(rows[0]?.status).toBe("profit");
@@ -76,6 +84,9 @@ describe("employee cash flow store shaping", () => {
           cashInInrCents: 0,
           effectiveDollarInwardUsdCents: 0,
           onboardingAdvanceUsdCents: 0,
+          reimbursementUsdCents: 0,
+          reimbursementLabelsText: "",
+          appraisalAdvanceUsdCents: 0,
           offboardingDeductionUsdCents: 0,
           monthlyPaidUsdCents: 1_000,
           daysWorked: 0,
@@ -106,6 +117,8 @@ describe("employee cash flow store shaping", () => {
     const effectiveDollarInwardUsdCents = calculateEffectiveDollarInwardUsdCents({
       baseDollarInwardUsdCents: 0,
       onboardingAdvanceUsdCents,
+      reimbursementUsdCents: 250_000,
+      appraisalAdvanceUsdCents: 100_000,
       offboardingDeductionUsdCents: 0,
     });
 
@@ -117,6 +130,9 @@ describe("employee cash flow store shaping", () => {
           cashInInrCents: 100,
           effectiveDollarInwardUsdCents,
           onboardingAdvanceUsdCents,
+          reimbursementUsdCents: 250_000,
+          reimbursementLabelsText: "Laptop",
+          appraisalAdvanceUsdCents: 100_000,
           offboardingDeductionUsdCents: 0,
           monthlyPaidUsdCents: 1_000,
           daysWorked: 0,
@@ -134,6 +150,9 @@ describe("employee cash flow store shaping", () => {
 
     expect(rows[0]).toMatchObject({
       onboardingAdvanceUsdCents,
+      reimbursementUsdCents: 250_000,
+      reimbursementLabelsText: "Laptop",
+      appraisalAdvanceUsdCents: 100_000,
       baseDollarInwardUsdCents: 0,
       effectiveDollarInwardUsdCents,
     });
@@ -162,6 +181,9 @@ describe("employee cash flow store shaping", () => {
             companyId: "comp_1",
             payoutMonthlyUsdCents: 2_000_00,
             onboardingAdvanceUsdCents: 500_00,
+            reimbursementUsdCents: 300_00,
+            reimbursementLabelsText: "Signing bonus",
+            appraisalAdvanceUsdCents: 200_00,
             offboardingDeductionUsdCents: 0,
           },
         ],
@@ -178,6 +200,9 @@ describe("employee cash flow store shaping", () => {
         monthlyPaidUsdCents: 2_000_00,
         baseDollarInwardUsdCents: 0,
         onboardingAdvanceUsdCents: 500_00,
+        reimbursementUsdCents: 300_00,
+        reimbursementLabelsText: "Signing bonus",
+        appraisalAdvanceUsdCents: 200_00,
         offboardingDeductionUsdCents: 0,
         cashoutUsdInrRate: 84.5,
       },

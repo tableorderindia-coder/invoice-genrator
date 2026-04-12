@@ -84,6 +84,9 @@ export function buildAddedEmployeeCashFlowEntry(input: {
     fullName: string;
     payoutMonthlyUsdCents: number;
     onboardingAdvanceUsdCents?: number;
+    reimbursementUsdCents?: number;
+    reimbursementLabelsText?: string;
+    appraisalAdvanceUsdCents?: number;
     offboardingDeductionUsdCents?: number;
   };
   paymentMonth: string;
@@ -97,6 +100,9 @@ export function buildAddedEmployeeCashFlowEntry(input: {
     monthlyPaidUsdCents: input.employee.payoutMonthlyUsdCents,
     baseDollarInwardUsdCents: 0,
     onboardingAdvanceUsdCents: input.employee.onboardingAdvanceUsdCents ?? 0,
+    reimbursementUsdCents: input.employee.reimbursementUsdCents ?? 0,
+    reimbursementLabelsText: input.employee.reimbursementLabelsText ?? "",
+    appraisalAdvanceUsdCents: input.employee.appraisalAdvanceUsdCents ?? 0,
     offboardingDeductionUsdCents: input.employee.offboardingDeductionUsdCents ?? 0,
     cashoutUsdInrRate: input.invoiceUsdInrRate,
     paidUsdInrRate: 0,

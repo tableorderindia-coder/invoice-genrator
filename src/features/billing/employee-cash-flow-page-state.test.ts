@@ -65,6 +65,9 @@ describe("employee cash flow page state", () => {
           fullName: "Asha",
           payoutMonthlyUsdCents: 2_000_00,
           onboardingAdvanceUsdCents: 900_00,
+          reimbursementUsdCents: 300_00,
+          reimbursementLabelsText: "Laptop",
+          appraisalAdvanceUsdCents: 400_00,
           offboardingDeductionUsdCents: 200_00,
         },
         paymentMonth: "2026-05",
@@ -73,6 +76,9 @@ describe("employee cash flow page state", () => {
     ).toMatchObject({
       baseDollarInwardUsdCents: 0,
       onboardingAdvanceUsdCents: 900_00,
+      reimbursementUsdCents: 300_00,
+      reimbursementLabelsText: "Laptop",
+      appraisalAdvanceUsdCents: 400_00,
       offboardingDeductionUsdCents: 200_00,
     });
   });

@@ -92,6 +92,7 @@ export function buildInvoiceAdjustmentPayload(
     | {
         type: "reimbursement";
         label: string;
+        employeeName?: string;
         rateUsdCents: number;
         hrsPerWeek: number;
         daysWorked?: number;
@@ -119,6 +120,7 @@ export function buildInvoiceAdjustmentPayload(
     return {
       type: input.type,
       label,
+      employeeName: input.employeeName?.trim() || undefined,
       rateUsdCents: input.rateUsdCents,
       hrsPerWeek: input.hrsPerWeek,
       daysWorked: input.daysWorked,
@@ -128,7 +130,11 @@ export function buildInvoiceAdjustmentPayload(
 
   const employeeName = input.employeeName.trim();
   if (!employeeName) {
-    throw new Error("Name is required for this adjustment.");
+    throw new Error(
+      input.type === "appraisal"
+        ? "Select an employee before adding appraisal advance."
+        : "Name is required for this adjustment.",
+    );
   }
 
   const amountUsdCents =
@@ -178,6 +184,7 @@ export function buildAdjustmentDuplicateSignature(
       adjustment.type,
       adjustment.amountUsdCents,
       normalizeText(adjustment.label),
+      normalizeText(adjustment.employeeName),
       adjustment.rateUsdCents ?? "",
       normalizeHours(adjustment.hrsPerWeek),
       adjustment.daysWorked ?? "",

@@ -246,6 +246,11 @@ export default async function DashboardPage({
                         <th>Days worked</th>
                         <th>Dollar inward</th>
                         <th>Onboarding advance</th>
+                        <th>Reimbursements / Expenses</th>
+                        <th>Reimbursement labels</th>
+                        <th>Reimbursements / Expenses (INR)</th>
+                        <th>Appraisal advance</th>
+                        <th>Appraisal advance (INR)</th>
                         <th>Offboarding deduction</th>
                         <th>Effective dollar inward</th>
                         <th>Cashout rate</th>
@@ -285,6 +290,11 @@ export default async function DashboardPage({
                             />
                           </td>
                           <td>{formatUsd(row.onboardingAdvanceUsdCents)}</td>
+                          <td>{formatUsd(row.reimbursementUsdCents)}</td>
+                          <td>{row.reimbursementLabelsText || "-"}</td>
+                          <td>{formatInr(row.reimbursementInrCents)}</td>
+                          <td>{formatUsd(row.appraisalAdvanceUsdCents)}</td>
+                          <td>{formatInr(row.appraisalAdvanceInrCents)}</td>
                           <td>{formatUsd(row.offboardingDeductionUsdCents)}</td>
                           <td>{formatUsd(row.effectiveDollarInwardUsdCents)}</td>
                           <td>
@@ -392,7 +402,7 @@ export default async function DashboardPage({
                       ))}
                       <tr>
                         <td
-                          colSpan={18}
+                          colSpan={23}
                           className="text-right text-sm font-semibold"
                           style={{ color: "var(--text-primary)" }}
                         >
@@ -451,6 +461,8 @@ export default async function DashboardPage({
                     <th>Dollar inward</th>
                     <th>Reimbursements / Expenses (USD)</th>
                     <th>Reimbursements / Expenses (INR)</th>
+                    <th>Appraisal Advance (USD)</th>
+                    <th>Appraisal Advance (INR)</th>
                     <th>PF (INR)</th>
                     <th>TDS (INR)</th>
                     <th>Actual paid (INR)</th>
@@ -474,6 +486,8 @@ export default async function DashboardPage({
                         <td>{formatUsd(row.dollarInwardUsdCents)}</td>
                         <td>{formatUsd(row.reimbursementUsdCents)}</td>
                         <td>{formatInr(row.reimbursementInrCents)}</td>
+                        <td>{formatUsd(row.appraisalAdvanceUsdCents)}</td>
+                        <td>{formatInr(row.appraisalAdvanceInrCents)}</td>
                         <td>{formatInr(row.pfInrCents)}</td>
                         <td>{formatInr(row.tdsInrCents)}</td>
                         <td>{formatInr(row.actualPaidInrCents)}</td>
@@ -517,7 +531,7 @@ export default async function DashboardPage({
                 })}
                 {data.periodRows.length === 0 ? (
                   <tr>
-                      <td colSpan={13} className="py-8 text-center" style={{ color: "var(--text-muted)" }}>
+                      <td colSpan={15} className="py-8 text-center" style={{ color: "var(--text-muted)" }}>
                         No period data available for selected filters.
                       </td>
                   </tr>
@@ -529,7 +543,7 @@ export default async function DashboardPage({
       )}
       <GlassPanel>
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-            Gross Earnings (INR) = Commission Earned (INR) + FX Commission (INR). Net P/L in Monthly / Yearly view uses Employee Cash Flow net profit, plus reimbursements converted to INR, minus dashboard expenses.
+            Gross Earnings (INR) = Commission Earned (INR) + FX Commission (INR). Net P/L in Monthly / Yearly view uses Employee Cash Flow net profit, plus reimbursements and appraisal advances converted to INR, minus dashboard expenses.
           </p>
         </GlassPanel>
     </Shell>

@@ -11,9 +11,14 @@ export type EmployeeCashFlowMonthRow = {
   monthlyPaidUsdCents: number;
   baseDollarInwardUsdCents: number;
   onboardingAdvanceUsdCents: number;
+  reimbursementUsdCents: number;
+  reimbursementLabelsText: string;
+  appraisalAdvanceUsdCents: number;
   offboardingDeductionUsdCents: number;
   effectiveDollarInwardUsdCents: number;
   cashoutUsdInrRate: number;
+  reimbursementInrCents: number;
+  appraisalAdvanceInrCents: number;
   paidUsdInrRate: number;
   cashInInrCents: number;
   salaryPaidInrCents: number;
@@ -52,6 +57,9 @@ export type EmployeeCashFlowEntryWriteInput = {
   monthlyPaidUsdCents: number;
   baseDollarInwardUsdCents: number;
   onboardingAdvanceUsdCents: number;
+  reimbursementUsdCents: number;
+  reimbursementLabelsText: string;
+  appraisalAdvanceUsdCents: number;
   offboardingDeductionUsdCents: number;
   cashoutUsdInrRate: number;
   paidUsdInrRate: number;

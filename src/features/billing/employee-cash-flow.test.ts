@@ -14,9 +14,11 @@ describe("employee cash flow calculations", () => {
       calculateEffectiveDollarInwardUsdCents({
         baseDollarInwardUsdCents: 100_00,
         onboardingAdvanceUsdCents: 20_00,
+        reimbursementUsdCents: 10_00,
+        appraisalAdvanceUsdCents: 15_00,
         offboardingDeductionUsdCents: 5_00,
       }),
-    ).toBe(115_00);
+    ).toBe(140_00);
   });
 
   it("converts effective inward into INR cents using the cashout rate", () => {
@@ -59,14 +61,19 @@ describe("employee cash flow calculations", () => {
       monthlyPaidUsdCents: 100_000,
       baseDollarInwardUsdCents: 100_000,
       onboardingAdvanceUsdCents: 10_000,
+      reimbursementUsdCents: 5_000,
+      reimbursementLabelsText: "Laptop",
+      reimbursementInrCents: 425_000,
+      appraisalAdvanceUsdCents: 10_000,
+      appraisalAdvanceInrCents: 850_000,
       offboardingDeductionUsdCents: 5_000,
-      effectiveDollarInwardUsdCents: 105_000,
+      effectiveDollarInwardUsdCents: 120_000,
       cashoutUsdInrRate: 85,
       paidUsdInrRate: 84,
-      cashInInrCents: 8_925_000,
+      cashInInrCents: 10_200_000,
       salaryPaidInrCents: 5_000_000,
       pendingAmountInrCents: 1_000_000,
-      netInrCents: 3_925_000,
+      netInrCents: 5_200_000,
       status: "profit",
     };
 
