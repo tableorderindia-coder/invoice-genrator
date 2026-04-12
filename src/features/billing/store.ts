@@ -2317,6 +2317,34 @@ export async function getPnDashboardData(input: {
     expenseByKey.set(key, Number(row.amount_inr_cents));
   }
 
+  const { data: adjustmentRows, error: adjustmentError } = await supabase
+    .from("invoice_adjustments")
+    .select("invoice_id, type, amount_usd_cents")
+    .in(
+      "invoice_id",
+      [...invoicePeriodMap.keys()].length > 0 ? [...invoicePeriodMap.keys()] : ["__none__"],
+    );
+  if (adjustmentError) throw adjustmentError;
+
+  const reimbursementUsdByKey = new Map<string, number>();
+  for (const row of (adjustmentRows ?? []) as Array<{
+    invoice_id: string;
+    type: AdjustmentType;
+    amount_usd_cents: number;
+  }>) {
+    if (row.type !== "reimbursement") continue;
+    const period = invoicePeriodMap.get(String(row.invoice_id));
+    if (!period) continue;
+    const key =
+      input.periodType === "monthly"
+        ? `${period.year}-${String(period.month).padStart(2, "0")}`
+        : `${period.year}`;
+    reimbursementUsdByKey.set(
+      key,
+      (reimbursementUsdByKey.get(key) ?? 0) + Number(row.amount_usd_cents),
+    );
+  }
+
   const sourceRows: PnSourceRow[] = entries
     .map((row) => {
       const [yearPart, monthPart] = String(row.payment_month ?? "").split("-");
@@ -2418,6 +2446,7 @@ export async function getPnDashboardData(input: {
       rows: sourceRows,
       periodType: input.periodType,
       expenseByKey,
+      reimbursementUsdByKey,
     }),
   };
 }

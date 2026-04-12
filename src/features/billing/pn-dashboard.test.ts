@@ -153,16 +153,24 @@ describe("pn dashboard aggregations", () => {
         ["2026-01", 50000],
         ["2026-02", 90000],
       ]),
+      reimbursementUsdByKey: new Map([
+        ["2026-01", 10000],
+        ["2026-02", 5000],
+      ]),
     });
 
     expect(monthly).toHaveLength(2);
     expect(monthly[0].month).toBe(1);
     expect(monthly[0].grossEarningsInrCents).toBe(200000);
-    expect(monthly[0].netPlInrCents).toBe(2523000);
+    expect(monthly[0].reimbursementUsdCents).toBe(10000);
+    expect(monthly[0].reimbursementInrCents).toBe(832000);
+    expect(monthly[0].netPlInrCents).toBe(3355000);
 
     expect(monthly[1].month).toBe(2);
     expect(monthly[1].grossEarningsInrCents).toBe(362000);
-    expect(monthly[1].netPlInrCents).toBe(5467000);
+    expect(monthly[1].reimbursementUsdCents).toBe(5000);
+    expect(monthly[1].reimbursementInrCents).toBe(417500);
+    expect(monthly[1].netPlInrCents).toBe(5884500);
   });
 
   it("builds yearly period rows from cash-flow net profit even without outflow", () => {
@@ -182,14 +190,17 @@ describe("pn dashboard aggregations", () => {
       ],
       periodType: "yearly",
       expenseByKey: new Map(),
+      reimbursementUsdByKey: new Map([["2027", 10000]]),
     });
 
     expect(yearly).toHaveLength(1);
     expect(yearly[0]).toMatchObject({
       year: 2027,
       month: undefined,
+      reimbursementUsdCents: 10000,
+      reimbursementInrCents: 832000,
       grossEarningsInrCents: 0,
-      netPlInrCents: 900000,
+      netPlInrCents: 1732000,
     });
   });
 

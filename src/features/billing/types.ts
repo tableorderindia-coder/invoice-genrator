@@ -234,10 +234,9 @@ export type PnEmployeeEditableSection = {
 export type PnPeriodRow = {
   year: number;
   month?: number;
-  daysWorked: number;
-  daysInMonth: number;
   dollarInwardUsdCents: number;
-  employeeMonthlyUsdCents: number;
+  reimbursementUsdCents: number;
+  reimbursementInrCents: number;
   pfInrCents: number;
   tdsInrCents: number;
   actualPaidInrCents: number;

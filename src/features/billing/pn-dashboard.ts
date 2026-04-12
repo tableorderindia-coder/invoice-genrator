@@ -102,10 +102,9 @@ export type PnPeriodType = "monthly" | "yearly";
 export type PnPeriodRow = {
   year: number;
   month?: number;
-  daysWorked: number;
-  daysInMonth: number;
   dollarInwardUsdCents: number;
-  employeeMonthlyUsdCents: number;
+  reimbursementUsdCents: number;
+  reimbursementInrCents: number;
   pfInrCents: number;
   tdsInrCents: number;
   actualPaidInrCents: number;
@@ -256,6 +255,7 @@ export function buildPnPeriodRows(input: {
   rows: PnSourceRow[];
   periodType: PnPeriodType;
   expenseByKey: Map<string, number>;
+  reimbursementUsdByKey: Map<string, number>;
 }): PnPeriodRow[] {
   const grouped = new Map<string, PnSourceRow[]>();
   for (const row of input.rows) {
@@ -275,14 +275,17 @@ export function buildPnPeriodRows(input: {
       const grossEarningsInrCents = fxCommissionInrCents + commissionEarnedInrCents;
       const expensesInrCents = input.expenseByKey.get(key) ?? 0;
       const netProfitInrCents = sumBy(bucket, "netProfitInrCents");
+      const reimbursementUsdCents = input.reimbursementUsdByKey.get(key) ?? 0;
+      const reimbursementInrCents = Math.round(
+        (reimbursementUsdCents / 100) * averageRate(bucket, "cashoutUsdInrRate") * 100,
+      );
 
       return {
         year: first.year,
         month,
-        daysWorked: sumBy(bucket, "daysWorked"),
-        daysInMonth: sumBy(bucket, "daysInMonth"),
         dollarInwardUsdCents: sumBy(bucket, "dollarInwardUsdCents"),
-        employeeMonthlyUsdCents: sumBy(bucket, "employeeMonthlyUsdCents"),
+        reimbursementUsdCents,
+        reimbursementInrCents,
         pfInrCents: sumBy(bucket, "pfInrCents"),
         tdsInrCents: sumBy(bucket, "tdsInrCents"),
         actualPaidInrCents: sumBy(bucket, "actualPaidInrCents"),
@@ -291,7 +294,7 @@ export function buildPnPeriodRows(input: {
         commissionEarnedInrCents,
         grossEarningsInrCents,
         expensesInrCents,
-        netPlInrCents: netProfitInrCents - expensesInrCents,
+        netPlInrCents: netProfitInrCents + reimbursementInrCents - expensesInrCents,
       };
     })
     .sort((a, b) => {

@@ -445,15 +445,15 @@ export default async function DashboardPage({
 
           <div className="overflow-x-auto rounded-2xl" style={{ border: "1px solid var(--glass-border)" }}>
             <table className="glass-table">
-              <thead>
-                <tr>
-                  <th>Period</th>
-                  <th>Days worked</th>
-                  <th>Dollar inward</th>
-                  <th>Monthly $</th>
-                  <th>PF (INR)</th>
-                  <th>TDS (INR)</th>
-                  <th>Actual paid (INR)</th>
+                <thead>
+                  <tr>
+                    <th>Period</th>
+                    <th>Dollar inward</th>
+                    <th>Reimbursements / Expenses (USD)</th>
+                    <th>Reimbursements / Expenses (INR)</th>
+                    <th>PF (INR)</th>
+                    <th>TDS (INR)</th>
+                    <th>Actual paid (INR)</th>
                   <th>FX commission (INR)</th>
                   <th>Total commission (USD)</th>
                   <th>Commission earned (INR)</th>
@@ -468,15 +468,15 @@ export default async function DashboardPage({
                     periodType === "monthly"
                       ? formatMonthYear(row.month ?? 1, row.year)
                       : String(row.year);
-                  return (
-                    <tr key={`${row.year}-${row.month ?? 0}`}>
-                      <td>{periodLabel}</td>
-                      <td>{`${row.daysWorked}/${row.daysInMonth}`}</td>
-                      <td>{formatUsd(row.dollarInwardUsdCents)}</td>
-                      <td>{formatUsd(row.employeeMonthlyUsdCents)}</td>
-                      <td>{formatInr(row.pfInrCents)}</td>
-                      <td>{formatInr(row.tdsInrCents)}</td>
-                      <td>{formatInr(row.actualPaidInrCents)}</td>
+                    return (
+                      <tr key={`${row.year}-${row.month ?? 0}`}>
+                        <td>{periodLabel}</td>
+                        <td>{formatUsd(row.dollarInwardUsdCents)}</td>
+                        <td>{formatUsd(row.reimbursementUsdCents)}</td>
+                        <td>{formatInr(row.reimbursementInrCents)}</td>
+                        <td>{formatInr(row.pfInrCents)}</td>
+                        <td>{formatInr(row.tdsInrCents)}</td>
+                        <td>{formatInr(row.actualPaidInrCents)}</td>
                       <td>{formatInr(row.fxCommissionInrCents)}</td>
                       <td>{formatUsd(row.totalCommissionUsdCents)}</td>
                       <td>{formatInr(row.commissionEarnedInrCents)}</td>
@@ -517,9 +517,9 @@ export default async function DashboardPage({
                 })}
                 {data.periodRows.length === 0 ? (
                   <tr>
-                    <td colSpan={13} className="py-8 text-center" style={{ color: "var(--text-muted)" }}>
-                      No period data available for selected filters.
-                    </td>
+                      <td colSpan={13} className="py-8 text-center" style={{ color: "var(--text-muted)" }}>
+                        No period data available for selected filters.
+                      </td>
                   </tr>
                 ) : null}
               </tbody>
@@ -529,7 +529,7 @@ export default async function DashboardPage({
       )}
       <GlassPanel>
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-            Gross Earnings (INR) = Commission Earned (INR) + FX Commission (INR). Net P/L in Monthly / Yearly view uses Employee Cash Flow net profit minus dashboard expenses.
+            Gross Earnings (INR) = Commission Earned (INR) + FX Commission (INR). Net P/L in Monthly / Yearly view uses Employee Cash Flow net profit, plus reimbursements converted to INR, minus dashboard expenses.
           </p>
         </GlassPanel>
     </Shell>
