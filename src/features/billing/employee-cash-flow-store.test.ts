@@ -190,6 +190,8 @@ describe("employee cash flow store shaping", () => {
         paymentMonth: "2026-04",
         daysInMonth: 30,
         cashoutUsdInrRate: 84.5,
+        invoiceId: "inv_1",
+        invoiceNumber: "INV-1",
       }),
     ).toMatchObject([
       {
@@ -205,6 +207,8 @@ describe("employee cash flow store shaping", () => {
         appraisalAdvanceUsdCents: 200_00,
         offboardingDeductionUsdCents: 0,
         cashoutUsdInrRate: 84.5,
+        invoiceId: "inv_1",
+        invoiceNumber: "INV-1",
       },
     ]);
   });

@@ -17,7 +17,7 @@ import {
 } from "@/src/features/billing/employee-cash-flow-entry-aggregation";
 import {
   buildAddedEmployeeCashFlowEntry,
-  removeEmployeeFromSelections,
+  removeEntryFromSelections,
   resolveEmployeeToAddSelection,
 } from "@/src/features/billing/employee-cash-flow-page-state";
 import { formatInr, formatUsd } from "@/src/features/billing/utils";
@@ -84,42 +84,51 @@ function cardInputClass() {
 }
 
 export default function EmployeeCashFlowEntryForm({
-  invoicePaymentId,
-  invoiceId,
   companyId,
   paymentMonth,
   returnTo,
-  invoiceNumber,
-  invoiceUsdInrRate,
   initialEntries,
-  availableEmployees,
+  selectedInvoices,
 }: {
-  invoicePaymentId?: string;
-  invoiceId: string;
   companyId: string;
   paymentMonth: string;
   returnTo: string;
-  invoiceNumber: string;
-  invoiceUsdInrRate: number;
   initialEntries: EmployeeCashFlowEditableEntry[];
-  availableEmployees: AvailableEmployee[];
+  selectedInvoices: Array<{
+    invoicePaymentId?: string;
+    invoiceId: string;
+    invoiceNumber: string;
+    invoiceUsdInrRate: number;
+    availableEmployees: AvailableEmployee[];
+  }>;
 }) {
   const [entries, setEntries] = useState<EmployeeCashFlowEditableEntry[]>(
     aggregateEmployeeCashFlowEditableEntries(initialEntries),
   );
-  const [employeeToAdd, setEmployeeToAdd] = useState(availableEmployees[0]?.id ?? "");
+  const [invoiceToAdd, setInvoiceToAdd] = useState(selectedInvoices[0]?.invoiceId ?? "");
+  const activeInvoiceToAdd =
+    selectedInvoices.find((invoice) => invoice.invoiceId === invoiceToAdd) ??
+    selectedInvoices[0];
+  const [employeeToAdd, setEmployeeToAdd] = useState(
+    activeInvoiceToAdd?.availableEmployees[0]?.id ?? "",
+  );
   const [allEmployeesSelected, setAllEmployeesSelected] = useState(true);
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>(
-    aggregateEmployeeCashFlowEditableEntries(initialEntries).map((entry) => entry.employeeId),
+    [...new Set(aggregateEmployeeCashFlowEditableEntries(initialEntries).map((entry) => entry.employeeId))],
   );
 
-  const usedEmployeeIds = useMemo(
-    () => new Set(entries.map((entry) => entry.employeeId)),
-    [entries],
+  const usedEmployeeIdsForInvoice = useMemo(
+    () =>
+      new Set(
+        entries
+          .filter((entry) => entry.invoiceId === activeInvoiceToAdd?.invoiceId)
+          .map((entry) => entry.employeeId),
+      ),
+    [entries, activeInvoiceToAdd?.invoiceId],
   );
 
-  const addableEmployees = availableEmployees.filter(
-    (employee) => !usedEmployeeIds.has(employee.id),
+  const addableEmployees = (activeInvoiceToAdd?.availableEmployees ?? []).filter(
+    (employee) => !usedEmployeeIdsForInvoice.has(employee.id),
   );
   const resolvedEmployeeToAdd = resolveEmployeeToAddSelection(
     employeeToAdd,
@@ -129,6 +138,9 @@ export default function EmployeeCashFlowEntryForm({
   const visibleEntries = allEmployeesSelected
     ? entries
     : entries.filter((entry) => selectedEmployeeIds.includes(entry.employeeId));
+  const employeeFilterOptions = [...new Map(
+    entries.map((entry) => [entry.employeeId, entry.employeeNameSnapshot]),
+  ).entries()];
 
   function updateEntry(id: string, patch: Partial<EmployeeCashFlowEditableEntry>) {
     setEntries((current) =>
@@ -137,17 +149,20 @@ export default function EmployeeCashFlowEntryForm({
   }
 
   function addEmployeeRow() {
+    if (!activeInvoiceToAdd) return;
     const employee = addableEmployees.find(
       (row) => row.id === resolvedEmployeeToAdd,
     );
     if (!employee) return;
 
     const nextEntry: EmployeeCashFlowEditableEntry = {
-      id: `manual_${employee.id}`,
+      id: `manual_${activeInvoiceToAdd.invoiceId}_${employee.id}`,
       ...buildAddedEmployeeCashFlowEntry({
         employee,
         paymentMonth,
-        invoiceUsdInrRate,
+        invoiceId: activeInvoiceToAdd.invoiceId,
+        invoiceNumber: activeInvoiceToAdd.invoiceNumber,
+        invoiceUsdInrRate: activeInvoiceToAdd.invoiceUsdInrRate,
       }),
     };
 
@@ -155,19 +170,19 @@ export default function EmployeeCashFlowEntryForm({
     setSelectedEmployeeIds((current) => [...new Set([...current, employee.id])]);
   }
 
-  function removeEmployeeRow(employeeId: string) {
+  function removeEmployeeRow(entryId: string) {
     setEntries((current) =>
-      removeEmployeeFromSelections({
+      removeEntryFromSelections({
         entries: current,
         selectedEmployeeIds,
-        employeeIdToRemove: employeeId,
+        entryIdToRemove: entryId,
       }).entries,
     );
     setSelectedEmployeeIds((current) =>
-      removeEmployeeFromSelections({
+      removeEntryFromSelections({
         entries,
         selectedEmployeeIds: current,
-        employeeIdToRemove: employeeId,
+        entryIdToRemove: entryId,
       }).selectedEmployeeIds,
     );
   }
@@ -183,7 +198,7 @@ export default function EmployeeCashFlowEntryForm({
             Employee Monthly View
           </p>
           <p className="mt-1 text-sm" style={{ color: "var(--text-secondary)" }}>
-            Filter employees for {paymentMonth} on invoice {invoiceNumber}.
+            Filter employees for {paymentMonth} across the selected invoices.
           </p>
 
           <label className="mt-4 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
@@ -195,7 +210,7 @@ export default function EmployeeCashFlowEntryForm({
             onChange={(event) => {
               const values = Array.from(event.target.selectedOptions).map((option) => option.value);
               setSelectedEmployeeIds(values);
-              setAllEmployeesSelected(values.length === entries.length);
+              setAllEmployeesSelected(values.length === employeeFilterOptions.length);
             }}
             className={cardInputClass()}
             style={{
@@ -205,9 +220,9 @@ export default function EmployeeCashFlowEntryForm({
               color: "var(--text-primary)",
             }}
           >
-            {entries.map((entry) => (
-              <option key={entry.employeeId} value={entry.employeeId}>
-                {entry.employeeNameSnapshot}
+            {employeeFilterOptions.map(([employeeId, employeeName]) => (
+              <option key={employeeId} value={employeeId}>
+                {employeeName}
               </option>
             ))}
           </select>
@@ -220,7 +235,7 @@ export default function EmployeeCashFlowEntryForm({
                 const checked = event.target.checked;
                 setAllEmployeesSelected(checked);
                 if (checked) {
-                  setSelectedEmployeeIds(entries.map((entry) => entry.employeeId));
+                  setSelectedEmployeeIds(employeeFilterOptions.map(([employeeId]) => employeeId));
                 }
               }}
             />
@@ -236,8 +251,36 @@ export default function EmployeeCashFlowEntryForm({
             Add employee
           </p>
           <p className="mt-1 text-sm" style={{ color: "var(--text-secondary)" }}>
-            Add a company employee even if they had no inward on this invoice.
+            Add a company employee to one selected invoice even if they had no inward on that invoice.
           </p>
+
+          <label className="mt-4 block">
+            <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
+              Invoice
+            </span>
+            <select
+              value={activeInvoiceToAdd?.invoiceId ?? ""}
+              onChange={(event) => {
+                setInvoiceToAdd(event.target.value);
+                const nextInvoice = selectedInvoices.find(
+                  (invoice) => invoice.invoiceId === event.target.value,
+                );
+                setEmployeeToAdd(nextInvoice?.availableEmployees[0]?.id ?? "");
+              }}
+              className={cardInputClass()}
+              style={{
+                border: "1px solid var(--glass-border)",
+                background: "rgba(255,255,255,0.04)",
+                color: "var(--text-primary)",
+              }}
+            >
+              {selectedInvoices.map((invoice) => (
+                <option key={invoice.invoiceId} value={invoice.invoiceId}>
+                  {invoice.invoiceNumber}
+                </option>
+              ))}
+            </select>
+          </label>
 
           <label className="mt-4 block">
             <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
@@ -278,11 +321,19 @@ export default function EmployeeCashFlowEntryForm({
       </div>
 
       <form action={saveInvoicePaymentEmployeeEntriesAction} className="space-y-4">
-        <input type="hidden" name="invoicePaymentId" value={invoicePaymentId ?? ""} />
-        <input type="hidden" name="invoiceId" value={invoiceId} />
         <input type="hidden" name="companyId" value={companyId} />
         <input type="hidden" name="paymentMonth" value={paymentMonth} />
         <input type="hidden" name="returnTo" value={returnTo} />
+        <input
+          type="hidden"
+          name="invoicePaymentIdsJson"
+          value={JSON.stringify(
+            selectedInvoices.reduce<Record<string, string>>((result, invoice) => {
+              result[invoice.invoiceId] = invoice.invoicePaymentId ?? "";
+              return result;
+            }, {}),
+          )}
+        />
         <input type="hidden" name="entriesJson" value={JSON.stringify(entries)} />
 
         {visibleEntries.map((entry) => {
@@ -300,13 +351,13 @@ export default function EmployeeCashFlowEntryForm({
                     {entry.employeeNameSnapshot}
                   </h3>
                   <p className="mt-1 text-sm" style={{ color: "var(--text-secondary)" }}>
-                    {invoiceNumber} · {paymentMonth}
+                    {entry.invoiceNumber} · {paymentMonth}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
                   <button
                     type="button"
-                    onClick={() => removeEmployeeRow(entry.employeeId)}
+                    onClick={() => removeEmployeeRow(entry.id)}
                     className="rounded-xl border px-3 py-2 text-sm font-semibold"
                     style={{
                       borderColor: "rgba(248, 113, 113, 0.35)",

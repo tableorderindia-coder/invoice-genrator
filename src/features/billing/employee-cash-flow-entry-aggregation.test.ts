@@ -3,10 +3,12 @@ import { describe, expect, it } from "vitest";
 import { aggregateEmployeeCashFlowEditableEntries } from "./employee-cash-flow-entry-aggregation";
 
 describe("aggregateEmployeeCashFlowEditableEntries", () => {
-  it("collapses multiple invoice rows into one editable employee card", () => {
+  it("preserves separate editable rows for the same employee across invoices", () => {
     const result = aggregateEmployeeCashFlowEditableEntries([
       {
         id: "row_1",
+        invoiceId: "inv_1",
+        invoiceNumber: "INV-1",
         employeeId: "emp_1",
         employeeNameSnapshot: "Asha",
         invoiceLineItemId: "line_1",
@@ -15,6 +17,9 @@ describe("aggregateEmployeeCashFlowEditableEntries", () => {
         monthlyPaidUsdCents: 100_000,
         baseDollarInwardUsdCents: 50_000,
         onboardingAdvanceUsdCents: 5_000,
+        reimbursementUsdCents: 0,
+        reimbursementLabelsText: "",
+        appraisalAdvanceUsdCents: 0,
         offboardingDeductionUsdCents: 0,
         cashoutUsdInrRate: 84.5,
         paidUsdInrRate: 82.5,
@@ -30,6 +35,8 @@ describe("aggregateEmployeeCashFlowEditableEntries", () => {
       },
       {
         id: "row_2",
+        invoiceId: "inv_2",
+        invoiceNumber: "INV-2",
         employeeId: "emp_1",
         employeeNameSnapshot: "Asha",
         invoiceLineItemId: "line_2",
@@ -38,6 +45,9 @@ describe("aggregateEmployeeCashFlowEditableEntries", () => {
         monthlyPaidUsdCents: 100_000,
         baseDollarInwardUsdCents: 25_000,
         onboardingAdvanceUsdCents: 0,
+        reimbursementUsdCents: 0,
+        reimbursementLabelsText: "",
+        appraisalAdvanceUsdCents: 0,
         offboardingDeductionUsdCents: 1_500,
         cashoutUsdInrRate: 84.5,
         paidUsdInrRate: 83.1,
@@ -55,22 +65,29 @@ describe("aggregateEmployeeCashFlowEditableEntries", () => {
       },
     ]);
 
-    expect(result).toHaveLength(1);
+    expect(result).toHaveLength(2);
     expect(result[0]).toMatchObject({
+      invoiceId: "inv_1",
+      invoiceNumber: "INV-1",
       employeeId: "emp_1",
-      daysWorked: 22,
+      daysWorked: 10,
+    });
+    expect(result[1]).toMatchObject({
+      invoiceId: "inv_2",
+      invoiceNumber: "INV-2",
+      employeeId: "emp_1",
+      daysWorked: 12,
       daysInMonth: 30,
       monthlyPaidUsdCents: 100_000,
-      baseDollarInwardUsdCents: 75_000,
-      onboardingAdvanceUsdCents: 5_000,
+      baseDollarInwardUsdCents: 25_000,
+      onboardingAdvanceUsdCents: 0,
       offboardingDeductionUsdCents: 1_500,
       paidUsdInrRate: 83.1,
-      pfInrCents: 1_500,
-      tdsInrCents: 2_800,
-      actualPaidInrCents: 50_000,
+      pfInrCents: 500,
+      tdsInrCents: 800,
+      actualPaidInrCents: 20_000,
       isPaid: true,
       paidAt: "2026-04-11",
-      invoiceLineItemId: undefined,
       notes: "saved",
     });
   });

@@ -4,7 +4,9 @@ import {
   buildAddedEmployeeCashFlowEntry,
   buildEmployeeCashFlowInvoiceOptionsInput,
   getDaysInMonthFromMonthKey,
+  removeEntryFromSelections,
   resolveEmployeeToAddSelection,
+  resolveEmployeeCashFlowInvoiceIds,
   removeEmployeeFromSelections,
   resolveEmployeeCashFlowMonthKey,
 } from "./employee-cash-flow-page-state";
@@ -43,9 +45,13 @@ describe("employee cash flow page state", () => {
           payoutMonthlyUsdCents: 2_000_00,
         },
         paymentMonth: "2026-05",
+        invoiceId: "inv_1",
+        invoiceNumber: "2026/005",
         invoiceUsdInrRate: 84.25,
       }),
     ).toMatchObject({
+      invoiceId: "inv_1",
+      invoiceNumber: "2026/005",
       employeeId: "emp_1",
       employeeNameSnapshot: "Asha",
       daysWorked: 0,
@@ -71,6 +77,8 @@ describe("employee cash flow page state", () => {
           offboardingDeductionUsdCents: 200_00,
         },
         paymentMonth: "2026-05",
+        invoiceId: "inv_1",
+        invoiceNumber: "2026/005",
         invoiceUsdInrRate: 84.25,
       }),
     ).toMatchObject({
@@ -86,10 +94,18 @@ describe("employee cash flow page state", () => {
   it("falls back to the first addable employee when the current add selection is stale", () => {
     expect(
       resolveEmployeeToAddSelection("emp_missing", [
-        { id: "emp_1", fullName: "Darshan", payoutMonthlyUsdCents: 0 },
-        { id: "emp_2", fullName: "Asha", payoutMonthlyUsdCents: 0 },
+        { id: "emp_1" },
+        { id: "emp_2" },
       ]),
     ).toBe("emp_1");
+  });
+
+  it("parses multiple invoice ids from repeated and comma-separated search params", () => {
+    expect(resolveEmployeeCashFlowInvoiceIds(["inv_1", "inv_2,inv_3", "inv_2"])).toEqual([
+      "inv_1",
+      "inv_2",
+      "inv_3",
+    ]);
   });
 
   it("removes an employee from both the visible selection and entry list", () => {
@@ -105,6 +121,26 @@ describe("employee cash flow page state", () => {
     ).toEqual({
       entries: [{ id: "row_2", employeeId: "emp_2" }],
       selectedEmployeeIds: ["emp_2"],
+    });
+  });
+
+  it("removes only the selected entry and keeps the employee selected when another row remains", () => {
+    expect(
+      removeEntryFromSelections({
+        entries: [
+          { id: "row_1", employeeId: "emp_1" },
+          { id: "row_2", employeeId: "emp_1" },
+          { id: "row_3", employeeId: "emp_2" },
+        ],
+        selectedEmployeeIds: ["emp_1", "emp_2"],
+        entryIdToRemove: "row_1",
+      }),
+    ).toEqual({
+      entries: [
+        { id: "row_2", employeeId: "emp_1" },
+        { id: "row_3", employeeId: "emp_2" },
+      ],
+      selectedEmployeeIds: ["emp_1", "emp_2"],
     });
   });
 });

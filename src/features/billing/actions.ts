@@ -110,6 +110,25 @@ function parseEmployeeCashFlowEntriesJson(rawValue: string) {
   return parsed as EmployeeCashFlowEntryWriteInput[];
 }
 
+function parseInvoicePaymentIdsJson(rawValue: string) {
+  if (!rawValue) {
+    return {} as Record<string, string>;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(rawValue);
+  } catch {
+    throw new Error("Invoice payment ids could not be parsed.");
+  }
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Invoice payment ids must be an object.");
+  }
+
+  return parsed as Record<string, string>;
+}
+
 export async function createCompanyAction(formData: FormData) {
   await createCompany({
     name: getString(formData, "name"),
@@ -1075,11 +1094,6 @@ export async function saveInvoicePaymentEmployeeEntriesAction(formData: FormData
   const returnTo = getString(formData, "returnTo") || "/employee-cash-flow";
 
   try {
-    const invoiceId = getString(formData, "invoiceId");
-    if (!invoiceId) {
-      throw new Error("Invoice is required.");
-    }
-
     const companyId = getString(formData, "companyId");
     if (!companyId) {
       throw new Error("Company is required.");
@@ -1091,24 +1105,46 @@ export async function saveInvoicePaymentEmployeeEntriesAction(formData: FormData
     }
 
     const entries = parseEmployeeCashFlowEntriesJson(getString(formData, "entriesJson"));
+    const invoicePaymentIdsByInvoiceId = parseInvoicePaymentIdsJson(
+      getString(formData, "invoicePaymentIdsJson"),
+    );
+    const entriesByInvoiceId = new Map<string, EmployeeCashFlowEntryWriteInput[]>();
+    for (const entry of entries) {
+      if (!entry.invoiceId) {
+        throw new Error("Each employee cash flow row must include an invoice.");
+      }
+      const existing = entriesByInvoiceId.get(entry.invoiceId) ?? [];
+      existing.push(entry);
+      entriesByInvoiceId.set(entry.invoiceId, existing);
+    }
 
-    const invoicePaymentId =
-      getString(formData, "invoicePaymentId") ||
-      (await upsertInvoicePayment({
+    for (const invoiceId of Object.keys(invoicePaymentIdsByInvoiceId)) {
+      const invoiceEntries = entriesByInvoiceId.get(invoiceId) ?? [];
+      const existingInvoicePaymentId = invoicePaymentIdsByInvoiceId[invoiceId];
+      const invoicePaymentId =
+        existingInvoicePaymentId ||
+        (invoiceEntries.length > 0
+          ? await upsertInvoicePayment({
+              invoiceId,
+              companyId,
+              paymentDate: `${paymentMonth}-01`,
+              paymentMonth,
+              usdInrRate: invoiceEntries[0]?.cashoutUsdInrRate ?? 0,
+            })
+          : "");
+
+      if (!invoicePaymentId) {
+        continue;
+      }
+
+      await replaceInvoicePaymentEmployeeEntries({
+        invoicePaymentId,
         invoiceId,
         companyId,
-        paymentDate: `${paymentMonth}-01`,
         paymentMonth,
-        usdInrRate: entries[0]?.cashoutUsdInrRate ?? 0,
-      }));
-
-    await replaceInvoicePaymentEmployeeEntries({
-      invoicePaymentId,
-      invoiceId,
-      companyId,
-      paymentMonth,
-      entries,
-    });
+        entries: invoiceEntries,
+      });
+    }
 
     for (const entry of entries) {
       await upsertEmployeeSalaryPayment({

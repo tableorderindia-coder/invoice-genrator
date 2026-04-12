@@ -213,6 +213,8 @@ export function appendMissingAdjustmentEntries(input: {
   paymentMonth: string;
   daysInMonth: number;
   cashoutUsdInrRate: number;
+  invoiceId: string;
+  invoiceNumber: string;
 }) {
   const existingEmployeeIds = new Set(input.entries.map((entry) => entry.employeeId));
   const missingAdjustmentEntries = input.availableEmployees
@@ -226,6 +228,8 @@ export function appendMissingAdjustmentEntries(input: {
     )
     .map((employee) => ({
       id: nextCashFlowId("cash_entry"),
+      invoiceId: input.invoiceId,
+      invoiceNumber: input.invoiceNumber,
       employeeId: employee.id,
       employeeNameSnapshot: employee.fullName,
       daysWorked: 0,
@@ -625,6 +629,8 @@ export async function getInvoicePaymentPrefillData(input: {
     savedEntries.length > 0
       ? savedEntries.map((row) => ({
           id: row.id,
+          invoiceId: row.invoice_id,
+          invoiceNumber: invoice.invoice_number,
           employeeId: row.employee_id,
           employeeNameSnapshot: row.employee_name_snapshot,
           invoiceLineItemId: row.invoice_line_item_id ?? undefined,
@@ -681,6 +687,8 @@ export async function getInvoicePaymentPrefillData(input: {
 
           return {
             id: nextCashFlowId("cash_entry"),
+            invoiceId: invoice.id,
+            invoiceNumber: invoice.invoice_number,
             employeeId: row.employee_id,
             employeeNameSnapshot: row.employee_name_snapshot,
             invoiceLineItemId: row.invoice_line_item_id ?? undefined,
@@ -721,6 +729,8 @@ export async function getInvoicePaymentPrefillData(input: {
     paymentMonth: input.paymentMonth,
     daysInMonth,
     cashoutUsdInrRate: realization?.usd_inr_rate ?? 0,
+    invoiceId: invoice.id,
+    invoiceNumber: invoice.invoice_number,
   });
 
   return {
@@ -924,7 +934,7 @@ export async function replaceInvoicePaymentEmployeeEntries(input: {
     return {
       id: nextCashFlowId("cash_entry"),
       invoice_payment_id: input.invoicePaymentId,
-      invoice_id: input.invoiceId,
+      invoice_id: entry.invoiceId || input.invoiceId,
       employee_id: entry.employeeId,
       company_id: input.companyId,
       payment_month: input.paymentMonth,

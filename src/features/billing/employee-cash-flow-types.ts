@@ -49,6 +49,8 @@ export type EmployeeCashFlowInvoiceOption = {
 };
 
 export type EmployeeCashFlowEntryWriteInput = {
+  invoiceId: string;
+  invoiceNumber: string;
   employeeId: string;
   employeeNameSnapshot: string;
   invoiceLineItemId?: string;

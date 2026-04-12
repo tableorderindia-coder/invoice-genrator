@@ -52,6 +52,19 @@ export function buildEmployeeCashFlowInvoiceOptionsInput(companyId: string) {
   return companyId ? { companyId } : null;
 }
 
+export function resolveEmployeeCashFlowInvoiceIds(input?: SearchValue) {
+  const rawValues = Array.isArray(input) ? input : input ? [input] : [];
+
+  const invoiceIds = rawValues.flatMap((value) =>
+    String(value)
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean),
+  );
+
+  return [...new Set(invoiceIds)];
+}
+
 export function resolveEmployeeToAddSelection(
   currentEmployeeId: string,
   addableEmployees: EmployeeOption[],
@@ -78,6 +91,26 @@ export function removeEmployeeFromSelections<TEntry extends { employeeId: string
   };
 }
 
+export function removeEntryFromSelections<TEntry extends { id: string; employeeId: string }>(input: {
+  entries: TEntry[];
+  selectedEmployeeIds: string[];
+  entryIdToRemove: string;
+}) {
+  const removedEntry = input.entries.find((entry) => entry.id === input.entryIdToRemove);
+  const entries = input.entries.filter((entry) => entry.id !== input.entryIdToRemove);
+  const stillHasEmployee =
+    removedEntry &&
+    entries.some((entry) => entry.employeeId === removedEntry.employeeId);
+
+  return {
+    entries,
+    selectedEmployeeIds:
+      removedEntry && !stillHasEmployee
+        ? input.selectedEmployeeIds.filter((employeeId) => employeeId !== removedEntry.employeeId)
+        : input.selectedEmployeeIds,
+  };
+}
+
 export function buildAddedEmployeeCashFlowEntry(input: {
   employee: {
     id: string;
@@ -90,9 +123,13 @@ export function buildAddedEmployeeCashFlowEntry(input: {
     offboardingDeductionUsdCents?: number;
   };
   paymentMonth: string;
+  invoiceId: string;
+  invoiceNumber: string;
   invoiceUsdInrRate: number;
 }): EmployeeCashFlowEntryWriteInput {
   return {
+    invoiceId: input.invoiceId,
+    invoiceNumber: input.invoiceNumber,
     employeeId: input.employee.id,
     employeeNameSnapshot: input.employee.fullName,
     daysWorked: 0,

@@ -8,6 +8,7 @@ import {
 } from "@/src/features/billing/employee-cash-flow-store";
 import {
   buildEmployeeCashFlowInvoiceOptionsInput,
+  resolveEmployeeCashFlowInvoiceIds,
   resolveEmployeeCashFlowMonthKey,
 } from "@/src/features/billing/employee-cash-flow-page-state";
 import { listCompanies } from "@/src/features/billing/store";
@@ -43,20 +44,48 @@ export default async function EmployeeCashFlowPage({
   const monthKey = resolveEmployeeCashFlowMonthKey(resolved.month, resolved.year);
 
   const invoiceOptionsInput = buildEmployeeCashFlowInvoiceOptionsInput(selectedCompanyId);
+  const [yearValue, monthValue] = monthKey.split("-").map((value) => Number.parseInt(value, 10));
   const invoiceOptions = invoiceOptionsInput
-    ? await listCashFlowInvoiceOptions(invoiceOptionsInput)
+    ? await listCashFlowInvoiceOptions({
+        ...invoiceOptionsInput,
+        month: monthValue,
+        year: yearValue,
+      })
     : [];
 
-  const selectedInvoiceIdRaw = Array.isArray(resolved.invoiceId)
-    ? resolved.invoiceId[0]
-    : resolved.invoiceId;
-  const selectedInvoiceId = selectedInvoiceIdRaw || invoiceOptions[0]?.id || "";
+  const selectedInvoiceIdsRaw = resolveEmployeeCashFlowInvoiceIds(resolved.invoiceId);
+  const selectedInvoiceIds =
+    selectedInvoiceIdsRaw.length > 0 ? selectedInvoiceIdsRaw : invoiceOptions[0]?.id ? [invoiceOptions[0].id] : [];
 
-  const prefillData = selectedInvoiceId
-    ? await getInvoicePaymentPrefillData({
-        invoiceId: selectedInvoiceId,
-        paymentMonth: monthKey,
-      })
+  const prefillDataList = selectedInvoiceIds.length
+    ? await Promise.all(
+        selectedInvoiceIds.map((invoiceId) =>
+          getInvoicePaymentPrefillData({
+            invoiceId,
+            paymentMonth: monthKey,
+          }),
+        ),
+      )
+    : [];
+
+  const prefillData = prefillDataList.length > 0
+    ? {
+        companyId: prefillDataList[0].invoice.companyId,
+        selectedInvoices: prefillDataList.map((item) => ({
+          invoicePaymentId: item.invoicePaymentId,
+          invoiceId: item.invoice.id,
+          invoiceNumber: item.invoice.invoiceNumber,
+          invoiceUsdInrRate: item.invoice.usdInrRate,
+          availableEmployees: item.availableEmployees,
+        })),
+        entries: prefillDataList.flatMap((item) =>
+          item.entries.map((entry) => ({
+            ...entry,
+            invoiceId: item.invoice.id,
+            invoiceNumber: item.invoice.invoiceNumber,
+          })),
+        ),
+      }
     : undefined;
 
   const flashStatus = Array.isArray(resolved.flashStatus)
@@ -66,7 +95,10 @@ export default async function EmployeeCashFlowPage({
     ? resolved.flashMessage[0]
     : resolved.flashMessage;
 
-  const returnTo = `/employee-cash-flow?companyId=${encodeURIComponent(selectedCompanyId)}&month=${monthKey}${selectedInvoiceId ? `&invoiceId=${encodeURIComponent(selectedInvoiceId)}` : ""}`;
+  const invoiceParams = selectedInvoiceIds
+    .map((invoiceId) => `invoiceId=${encodeURIComponent(invoiceId)}`)
+    .join("&");
+  const returnTo = `/employee-cash-flow?companyId=${encodeURIComponent(selectedCompanyId)}&month=${monthKey}${invoiceParams ? `&${invoiceParams}` : ""}`;
   const initialEntries: EmployeeCashFlowEditableEntry[] = prefillData
     ? aggregateEmployeeCashFlowEditableEntries(prefillData.entries)
     : [];
@@ -98,9 +130,15 @@ export default async function EmployeeCashFlowPage({
           </label>
           <label className="block">
             <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
-              Cashed-out invoice
+              Cashed-out invoices
             </span>
-            <select name="invoiceId" defaultValue={selectedInvoiceId} className={inputClass}>
+            <select
+              name="invoiceId"
+              multiple
+              defaultValue={selectedInvoiceIds}
+              className={inputClass}
+              style={{ minHeight: "180px" }}
+            >
               {invoiceOptions.length === 0 ? (
                 <option value="">No cashed-out invoices available</option>
               ) : (
@@ -142,19 +180,15 @@ export default async function EmployeeCashFlowPage({
       <GlassPanel title="Editable Employee Cash Flow Rows" gradient>
         {prefillData ? (
           <EmployeeCashFlowEntryForm
-            invoicePaymentId={prefillData.invoicePaymentId}
-            invoiceId={prefillData.invoice.id}
-            companyId={prefillData.invoice.companyId}
+            companyId={prefillData.companyId}
             paymentMonth={monthKey}
             returnTo={returnTo}
-            invoiceNumber={prefillData.invoice.invoiceNumber}
-            invoiceUsdInrRate={prefillData.invoice.usdInrRate}
             initialEntries={initialEntries}
-            availableEmployees={prefillData.availableEmployees}
+            selectedInvoices={prefillData.selectedInvoices}
           />
         ) : (
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-            Select a company, month, and cashed-out invoice to load aggregated employee cash flow cards.
+            Select a company, month, and one or more cashed-out invoices to load invoice-level employee cash flow cards.
           </p>
         )}
       </GlassPanel>
