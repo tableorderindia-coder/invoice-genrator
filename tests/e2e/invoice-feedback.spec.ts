@@ -51,6 +51,8 @@ test("shows inline success feedback on the draft invoice page", async ({ page })
   await page.getByRole("button", { name: "Create draft" }).click();
   await page.waitForURL(/\/invoices\/drafts\//);
   await expect(page.getByText("Billing 04-07-2026 · Due 04-30-2026")).toBeVisible();
+  const adjustmentSidebarScroll = page.getByTestId("adjustment-sidebar-scroll");
+  await expect(adjustmentSidebarScroll).toBeVisible();
 
   await page.locator('select[name="type"]').selectOption("onboarding");
   await expect(page.getByLabel("Employee")).toBeVisible();
@@ -69,6 +71,12 @@ test("shows inline success feedback on the draft invoice page", async ({ page })
   await expect(page.getByText(`${employeeName} · $25/hr · 4 hrs/week`)).toBeVisible({
     timeout: 15000,
   });
+  await expect(
+    adjustmentSidebarScroll
+      .locator("button")
+      .filter({ hasText: "Remove" })
+      .first(),
+  ).toBeVisible();
 
   await page.locator('select[name="type"]').selectOption("onboarding");
   await page.getByLabel("Employee").selectOption({ label: employeeName });

@@ -178,7 +178,7 @@ function AdjustmentGroup({
         {items.map((adjustment) => (
           <div
             key={adjustment.id}
-            className="flex items-center justify-between gap-4 rounded-2xl p-3"
+            className="flex min-w-max items-center justify-between gap-4 rounded-2xl p-3"
             style={{
               background: "rgba(255,255,255,0.02)",
               border: "1px solid var(--glass-border)",
@@ -303,8 +303,9 @@ export function AdjustmentForms({
   const daysFieldCopy = getAdjustmentDaysFieldCopy(form.type);
 
   return (
-    <div className="space-y-4">
-      <form
+    <div className="overflow-x-auto pb-2" data-testid="adjustment-sidebar-scroll">
+      <div className="space-y-4" style={{ minWidth: "42rem" }}>
+        <form
         action={addAction}
         className="rounded-3xl p-6 space-y-5"
         onSubmit={(event) => {
@@ -544,44 +545,45 @@ export function AdjustmentForms({
         >
           {isAdding ? "Adding..." : "Add / Update"}
         </button>
-      </form>
+        </form>
 
-      <AdjustmentGroup
-        title="Onboarding Advance"
-        items={grouped.onboarding.items}
-        totalUsdCents={grouped.onboarding.totalUsdCents}
-        invoiceId={invoiceId}
-        returnTo={returnTo}
-        deleteAction={deleteAction}
-        updateAmountAction={updateAmountAction}
-      />
-      <AdjustmentGroup
-        title="Appraisal Advance"
-        items={grouped.appraisal.items}
-        totalUsdCents={grouped.appraisal.totalUsdCents}
-        invoiceId={invoiceId}
-        returnTo={returnTo}
-        deleteAction={deleteAction}
-        updateAmountAction={updateAmountAction}
-      />
-      <AdjustmentGroup
-        title="Reimbursements / Expenses"
-        items={grouped.reimbursement.items}
-        totalUsdCents={grouped.reimbursement.totalUsdCents}
-        invoiceId={invoiceId}
-        returnTo={returnTo}
-        deleteAction={deleteAction}
-        updateAmountAction={updateAmountAction}
-      />
-      <AdjustmentGroup
-        title="Offboarding Deductions"
-        items={grouped.offboarding.items}
-        totalUsdCents={grouped.offboarding.totalUsdCents}
-        invoiceId={invoiceId}
-        returnTo={returnTo}
-        deleteAction={deleteAction}
-        updateAmountAction={updateAmountAction}
-      />
+        <AdjustmentGroup
+          title="Onboarding Advance"
+          items={grouped.onboarding.items}
+          totalUsdCents={grouped.onboarding.totalUsdCents}
+          invoiceId={invoiceId}
+          returnTo={returnTo}
+          deleteAction={deleteAction}
+          updateAmountAction={updateAmountAction}
+        />
+        <AdjustmentGroup
+          title="Appraisal Advance"
+          items={grouped.appraisal.items}
+          totalUsdCents={grouped.appraisal.totalUsdCents}
+          invoiceId={invoiceId}
+          returnTo={returnTo}
+          deleteAction={deleteAction}
+          updateAmountAction={updateAmountAction}
+        />
+        <AdjustmentGroup
+          title="Reimbursements / Expenses"
+          items={grouped.reimbursement.items}
+          totalUsdCents={grouped.reimbursement.totalUsdCents}
+          invoiceId={invoiceId}
+          returnTo={returnTo}
+          deleteAction={deleteAction}
+          updateAmountAction={updateAmountAction}
+        />
+        <AdjustmentGroup
+          title="Offboarding Deductions"
+          items={grouped.offboarding.items}
+          totalUsdCents={grouped.offboarding.totalUsdCents}
+          invoiceId={invoiceId}
+          returnTo={returnTo}
+          deleteAction={deleteAction}
+          updateAmountAction={updateAmountAction}
+        />
+      </div>
     </div>
   );
 }
