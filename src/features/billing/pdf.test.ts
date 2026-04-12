@@ -137,7 +137,9 @@ describe("branded invoice pdf model", () => {
 
     expect(model.billTo.name).toBe("The Arena Platform, Inc.");
     expect(model.invoiceDetails.invoiceNumber).toBe("2026/006");
-    expect(model.invoiceDetails.billingDuration).toBe("03/15/2026 - 04/14/2026");
+    expect(model.invoiceDetails.invoiceDate).toBe("04-04-2026");
+    expect(model.invoiceDetails.dueDate).toBe("04-15-2026");
+    expect(model.invoiceDetails.billingDuration).toBe("03-15-2026 - 04-14-2026");
 
     expect(model.sections.map((section) => section.title)).toEqual([
       "Data Team :",

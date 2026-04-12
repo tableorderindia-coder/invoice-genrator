@@ -5,6 +5,7 @@ import PDFDocument from "pdfkit";
 
 import { groupInvoiceAdjustments } from "./adjustments";
 import type { InvoiceAdjustment, InvoiceDetail } from "./types";
+import { formatDate, normalizeDateRange } from "./utils";
 
 type PdfSectionRow = {
   contractorName: string;
@@ -148,11 +149,13 @@ export function buildInvoicePdfModel(detail: InvoiceDetail): PdfModel {
     },
     invoiceDetails: {
       invoiceNumber: detail.invoice.invoiceNumber,
-      invoiceDate: formatUsDate(detail.invoice.billingDate),
+      invoiceDate: formatDate(detail.invoice.billingDate),
       billingDuration:
-        detail.invoice.billingDuration?.trim() ||
+        (detail.invoice.billingDuration?.trim()
+          ? normalizeDateRange(detail.invoice.billingDuration.trim())
+          : undefined) ||
         buildBillingDuration(detail.invoice.month, detail.invoice.year),
-      dueDate: formatUsDate(detail.invoice.dueDate),
+      dueDate: formatDate(detail.invoice.dueDate),
     },
     sections,
     grandTotal: {
@@ -502,17 +505,9 @@ function formatDays(daysWorked: number) {
     : String(Math.round(daysWorked));
 }
 
-function formatUsDate(value: string | Date) {
-  const date = typeof value === "string" ? new Date(value) : value;
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  const year = date.getFullYear();
-  return `${month}/${day}/${year}`;
-}
-
 function buildBillingDuration(month: number, year: number) {
-  const start = new Date(year, month - 1, 1);
-  const end = new Date(year, month, 0);
+  const start = new Date(Date.UTC(year, month - 1, 1));
+  const end = new Date(Date.UTC(year, month, 0));
 
-  return `${formatUsDate(start)} – ${formatUsDate(end)}`;
+  return `${formatDate(start)} - ${formatDate(end)}`;
 }

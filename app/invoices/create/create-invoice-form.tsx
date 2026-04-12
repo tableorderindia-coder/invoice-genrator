@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { formatDuplicateInvoiceOptionLabel } from "@/src/features/billing/invoice-create";
+import { formatDate } from "@/src/features/billing/utils";
 
 import { Field, inputClass } from "../../_components/field";
 
@@ -138,12 +139,5 @@ function buildDefaultBillingDuration(month: number, year: number) {
 
   const start = new Date(Date.UTC(year, month - 1, 1));
   const end = new Date(Date.UTC(year, month, 0));
-  return `${formatUsDate(start)} - ${formatUsDate(end)}`;
-}
-
-function formatUsDate(date: Date) {
-  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(date.getUTCDate()).padStart(2, "0");
-  const year = date.getUTCFullYear();
-  return `${month}/${day}/${year}`;
+  return `${formatDate(start)} - ${formatDate(end)}`;
 }
