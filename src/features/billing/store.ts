@@ -304,14 +304,25 @@ function getMissingSchemaColumn(
       ? error.message
       : undefined;
 
-  if (code !== "PGRST204" || !message) {
+  if (!message) {
     return undefined;
   }
 
-  const match = message.match(
-    new RegExp(`Could not find the '([^']+)' column of '${tableName}'`),
-  );
-  return match?.[1];
+  if (code === "PGRST204") {
+    const match = message.match(
+      new RegExp(`Could not find the '([^']+)' column of '${tableName}'`),
+    );
+    return match?.[1];
+  }
+
+  if (code === "42703") {
+    const match = message.match(
+      new RegExp(`column ${tableName}\\.([^ ]+) does not exist`),
+    );
+    return match?.[1];
+  }
+
+  return undefined;
 }
 
 async function insertEmployeePayoutWithSchemaFallback(
@@ -1030,6 +1041,7 @@ export async function createInvoiceDraft(input: {
     for (const team of sourceDetail.teams) {
       const insertedTeam = await addInvoiceTeam(invoiceId, team.teamName, {
         autoIncludeMembers: false,
+        recomputeInvoice: false,
       });
       for (const lineItem of team.lineItems) {
         await addInvoiceLineItem({
@@ -1040,6 +1052,7 @@ export async function createInvoiceDraft(input: {
           daysWorked: lineItem.daysWorked,
           billingRateUsdCents: lineItem.billingRateUsdCents,
           payoutMonthlyUsdCents: lineItem.payoutMonthlyUsdCentsSnapshot,
+          recomputeInvoice: false,
         });
       }
     }
@@ -1053,6 +1066,7 @@ export async function createInvoiceDraft(input: {
         rateUsdCents: adjustment.rateUsdCents,
         hrsPerWeek: adjustment.hrsPerWeek,
         amountUsdCents: adjustment.amountUsdCents,
+        recomputeInvoice: false,
       });
     }
 
@@ -1063,9 +1077,17 @@ export async function createInvoiceDraft(input: {
       employeeDefaultTeams: [],
     });
     for (const teamName of selectedTeamNames) {
-      await addInvoiceTeam(invoiceId, teamName, { autoIncludeMembers: true });
+      await addInvoiceTeam(invoiceId, teamName, {
+        autoIncludeMembers: true,
+        recomputeInvoice: false,
+      });
     }
   }
+
+  await recomputeSupabaseInvoice(invoiceId, {
+    clearTeamManualTotals: true,
+    clearGrandManualTotal: true,
+  });
 
   return mapInvoice(data);
 }
@@ -1194,7 +1216,7 @@ export async function getCompanySecurityDepositBalances(companyId: string) {
 export async function addInvoiceTeam(
   invoiceId: string,
   teamName: string,
-  options?: { autoIncludeMembers?: boolean },
+  options?: { autoIncludeMembers?: boolean; recomputeInvoice?: boolean },
 ) {
   const supabase = getSupabaseOrThrow();
   const { data: existingTeamRows, error: existingTeamError } = await supabase
@@ -1253,14 +1275,17 @@ export async function addInvoiceTeam(
         hrsPerWeek: employee.hrsPerWeek,
         billingRateUsdCents: employee.billingRateUsdCents,
         payoutMonthlyUsdCents: employee.payoutMonthlyUsdCents,
+        recomputeInvoice: false,
       });
     }
   }
 
-  await recomputeSupabaseInvoice(invoiceId, {
-    clearTeamManualTotals: true,
-    clearGrandManualTotal: true,
-  });
+  if (options?.recomputeInvoice !== false) {
+    await recomputeSupabaseInvoice(invoiceId, {
+      clearTeamManualTotals: true,
+      clearGrandManualTotal: true,
+    });
+  }
   return mappedTeam;
 }
 
@@ -1287,6 +1312,7 @@ export async function addInvoiceLineItem(input: {
   daysWorked?: number;
   billingRateUsdCents?: number;
   payoutMonthlyUsdCents?: number;
+  recomputeInvoice?: boolean;
 }) {
   const supabase = getSupabaseOrThrow();
   const [
@@ -1361,10 +1387,12 @@ export async function addInvoiceLineItem(input: {
 
   const data = await insertInvoiceLineItemWithSchemaFallback(payload);
 
-  await recomputeSupabaseInvoice(input.invoiceId, {
-    clearTeamManualTotals: true,
-    clearGrandManualTotal: true,
-  });
+  if (input.recomputeInvoice !== false) {
+    await recomputeSupabaseInvoice(input.invoiceId, {
+      clearTeamManualTotals: true,
+      clearGrandManualTotal: true,
+    });
+  }
   return normalizeLineItemDaysWorked(
     mapInvoiceLineItem(data as DbInvoiceLineItem),
     Number(invoiceRow.month),
@@ -1543,6 +1571,7 @@ export async function assignEmployeeToInvoiceTeam(input: {
       hrsPerWeek: employee.hrsPerWeek,
       billingRateUsdCents: employee.billingRateUsdCents,
       payoutMonthlyUsdCents: employee.payoutMonthlyUsdCents,
+      recomputeInvoice: false,
     });
   }
 
@@ -1569,6 +1598,7 @@ export async function addInvoiceAdjustment(input: {
   hrsPerWeek?: number;
   daysWorked?: number;
   amountUsdCents: number;
+  recomputeInvoice?: boolean;
 }) {
   const supabase = getSupabaseOrThrow();
   const { data: invoiceRow, error: invoiceError } = await supabase
@@ -1668,10 +1698,12 @@ export async function addInvoiceAdjustment(input: {
     });
   }
 
-  await recomputeSupabaseInvoice(input.invoiceId, {
-    clearTeamManualTotals: true,
-    clearGrandManualTotal: true,
-  });
+  if (input.recomputeInvoice !== false) {
+    await recomputeSupabaseInvoice(input.invoiceId, {
+      clearTeamManualTotals: true,
+      clearGrandManualTotal: true,
+    });
+  }
   return mapInvoiceAdjustment(data as DbInvoiceAdjustment);
 }
 
