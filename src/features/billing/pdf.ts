@@ -11,7 +11,6 @@ type PdfSectionRow = {
   contractorName: string;
   hourlyRate: string;
   hrsPerWeek: string;
-  daysWorked: string;
   total: string;
 };
 
@@ -78,7 +77,6 @@ export function buildInvoicePdfModel(detail: InvoiceDetail): PdfModel {
         contractorName: lineItem.employeeNameSnapshot,
         hourlyRate: formatUsdCompact(lineItem.billingRateUsdCents),
         hrsPerWeek: formatHours(lineItem.hrsPerWeek),
-        daysWorked: formatDays(lineItem.daysWorked),
         total: formatUsdCompact(lineItem.billedTotalUsdCents),
       })),
       totalAmount: formatUsdCompact(
@@ -274,10 +272,9 @@ export async function buildInvoicePdf(detail: InvoiceDetail) {
   const drawTable = (section: PdfSection) => {
     const columnX = [
       PAGE.margin,
-      PAGE.margin + 140,
-      PAGE.margin + 230,
-      PAGE.margin + 300,
-      PAGE.margin + 370,
+      PAGE.margin + 185,
+      PAGE.margin + 290,
+      PAGE.margin + 395,
       doc.page.width - PAGE.margin,
     ];
     const defaultRowHeight = 24;
@@ -316,7 +313,6 @@ export async function buildInvoicePdf(detail: InvoiceDetail) {
         contractorName: "Contractor Name",
         hourlyRate: "Hourly Rate\n(USD)",
         hrsPerWeek: "Hrs / Week",
-        daysWorked: "Days Worked",
         total: "Total (USD) **",
       },
       ...section.rows,
@@ -324,7 +320,6 @@ export async function buildInvoicePdf(detail: InvoiceDetail) {
         contractorName: section.totalLabel,
         hourlyRate: "",
         hrsPerWeek: "",
-        daysWorked: "",
         total: section.totalAmount,
       },
     ];
@@ -370,10 +365,7 @@ export async function buildInvoicePdf(detail: InvoiceDetail) {
       drawCellText(row.hrsPerWeek, columnX[2], y, columnX[3] - columnX[2], {
         bold: isHeader,
       });
-      drawCellText(row.daysWorked, columnX[3], y, columnX[4] - columnX[3], {
-        bold: isHeader,
-      });
-      drawCellText(row.total, columnX[4], y, columnX[5] - columnX[4], {
+      drawCellText(row.total, columnX[3], y, columnX[4] - columnX[3], {
         bold: isHeader || isTotal,
       });
 
@@ -465,8 +457,6 @@ function buildAdjustmentRows(
         : "",
     hrsPerWeek:
       adjustment.hrsPerWeek !== undefined ? formatHours(adjustment.hrsPerWeek) : "",
-    daysWorked:
-      adjustment.daysWorked !== undefined ? formatDays(adjustment.daysWorked) : "",
     total: formatUsdCompact(
       isDeduction ? Math.abs(adjustment.amountUsdCents) : adjustment.amountUsdCents,
     ),
@@ -497,12 +487,6 @@ function formatUsdCompact(cents: number) {
 
 function formatHours(hrsPerWeek: number) {
   return Number.isInteger(hrsPerWeek) ? String(hrsPerWeek) : String(hrsPerWeek);
-}
-
-function formatDays(daysWorked: number) {
-  return Number.isInteger(daysWorked)
-    ? String(daysWorked)
-    : String(Math.round(daysWorked));
 }
 
 function buildBillingDuration(month: number, year: number) {

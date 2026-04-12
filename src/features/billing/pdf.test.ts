@@ -161,6 +161,7 @@ describe("branded invoice pdf model", () => {
       hrsPerWeek: "",
       total: "$800",
     });
+    expect("daysWorked" in model.sections[0].rows[0]).toBe(false);
     expect(model.sections[5].isDeduction).toBe(true);
 
     expect(model.grandTotal.formula).toBe(
