@@ -106,12 +106,14 @@ export default async function InvoicesPage({
                   </td>
                   <td>
                     <div className="flex flex-wrap gap-2">
-                      <Link
+                      <a
                         href={`/api/invoices/${invoice.id}/pdf`}
                         className="btn-outline"
+                        target="_blank"
+                        rel="noreferrer"
                       >
                         Open PDF
-                      </Link>
+                      </a>
                       <Link href={`/invoices/${invoice.id}`} className="btn-outline">
                         Open editor
                       </Link>

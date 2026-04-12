@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import { Shell } from "../_components/shell";
 import { GlassPanel } from "../_components/glass-panel";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
@@ -104,9 +102,14 @@ export default async function CashoutPage({
                   </td>
                   <td>
                     <div className="flex flex-wrap items-center gap-2">
-                      <Link href={`/api/invoices/${invoice.id}/pdf`} className="btn-outline">
+                      <a
+                        href={`/api/invoices/${invoice.id}/pdf`}
+                        className="btn-outline"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
                         Open PDF
-                      </Link>
+                      </a>
                       <form
                         action={cashOutInvoiceAction}
                         className="grid gap-2 md:grid-cols-4 md:items-center"
