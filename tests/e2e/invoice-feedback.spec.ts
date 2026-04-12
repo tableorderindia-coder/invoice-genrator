@@ -4,10 +4,12 @@ test("shows inline success feedback on the draft invoice page", async ({ page })
   test.setTimeout(120000);
   const stamp = Date.now();
   const companyName = `Playwright Co ${stamp}`;
+  const updatedCompanyName = `${companyName} Updated`;
   const teamName = `Data Team ${stamp}`;
   const employeeName = `Playwright Employee ${stamp}`;
   const extraEmployeeName = `Playwright Extra Employee ${stamp}`;
   const invoiceNumber = `AUTO-${stamp}`;
+  const editedInvoiceNumber = `${invoiceNumber}-EDIT`;
 
   await page.goto("/companies");
   await page.getByLabel("Company name").fill(companyName);
@@ -50,7 +52,24 @@ test("shows inline success feedback on the draft invoice page", async ({ page })
 
   await page.getByRole("button", { name: "Create draft" }).click();
   await page.waitForURL(/\/invoices\/drafts\//);
-  await expect(page.getByText("Billing 04-07-2026 · Due 04-30-2026")).toBeVisible();
+  await expect(page.getByLabel("Company name")).toBeVisible();
+  await expect(page.getByLabel("Invoice number")).toBeVisible();
+  await expect(page.getByLabel("Billing month")).toBeVisible();
+  await expect(page.getByLabel("Billing year")).toBeVisible();
+  await expect(page.getByLabel("Billing date")).toBeVisible();
+  await expect(page.getByLabel("Due date")).toBeVisible();
+  await expect(page.getByLabel("Status")).toBeVisible();
+  await page.getByLabel("Company name").fill(updatedCompanyName);
+  await page.getByLabel("Invoice number").fill(editedInvoiceNumber);
+  await page.getByLabel("Billing date").fill("2026-04-08");
+  await page.getByLabel("Due date").fill("2026-05-02");
+  await page.getByLabel("Status").selectOption("generated");
+  await page.getByRole("button", { name: "Save header" }).click();
+  await page.waitForURL(/flashStatus=success/, { timeout: 15000 });
+  await expect(page.getByText("Invoice header updated.")).toBeVisible({ timeout: 15000 });
+  await expect(page.getByLabel("Company name")).toHaveValue(updatedCompanyName);
+  await expect(page.getByLabel("Invoice number")).toHaveValue(editedInvoiceNumber);
+  await expect(page.getByText("Billing 04-08-2026 · Due 05-02-2026")).toBeVisible();
   const adjustmentSidebarScroll = page.getByTestId("adjustment-sidebar-scroll");
   await expect(adjustmentSidebarScroll).toBeVisible();
 
@@ -104,13 +123,11 @@ test("shows inline success feedback on the draft invoice page", async ({ page })
   await page.waitForURL(/flashStatus=success/, { timeout: 15000 });
   await expect(page.getByText("Adjustment removed.")).toBeVisible({ timeout: 15000 });
 
-  await page.getByRole("button", { name: "Mark generated" }).click();
-  await page.waitForURL(/flashStatus=success/, { timeout: 15000 });
   await page.goto("/invoices");
-  await expect(page.locator("tr", { hasText: invoiceNumber })).toContainText("04-07-2026");
+  await expect(page.locator("tr", { hasText: editedInvoiceNumber })).toContainText("04-08-2026");
 
   await page.goto("/cashout");
-  const cashoutRow = page.locator("tr", { hasText: invoiceNumber });
+  const cashoutRow = page.locator("tr", { hasText: editedInvoiceNumber });
   await expect(cashoutRow).toBeVisible();
 
   await cashoutRow.getByLabel("Dollar inbound (USD)").fill("4300.00");
@@ -118,18 +135,18 @@ test("shows inline success feedback on the draft invoice page", async ({ page })
   await cashoutRow.getByRole("button", { name: "Mark cashout" }).click();
 
   await expect(page.getByText("Invoice marked as cashed out.")).toBeVisible({ timeout: 15000 });
-  await expect(page.locator("tr", { hasText: invoiceNumber })).toHaveCount(0);
+  await expect(page.locator("tr", { hasText: editedInvoiceNumber })).toHaveCount(0);
 
   await page.goto("/invoices");
-  const cashedOutInvoiceRow = page.locator("tr", { hasText: invoiceNumber });
+  const cashedOutInvoiceRow = page.locator("tr", { hasText: editedInvoiceNumber });
   await expect(cashedOutInvoiceRow).toBeVisible();
   await expect(cashedOutInvoiceRow).toContainText("cashed out");
-  await expect(cashedOutInvoiceRow).toContainText("04-07-2026");
+  await expect(cashedOutInvoiceRow).toContainText("04-08-2026");
 
   await page.goto("/employee-payout");
   const payoutInvoiceOption = page
     .locator('select[name="invoiceId"] option')
-    .filter({ hasText: invoiceNumber })
+    .filter({ hasText: editedInvoiceNumber })
     .first();
   const payoutInvoiceValue = await payoutInvoiceOption.getAttribute("value");
   expect(payoutInvoiceValue).toBeTruthy();

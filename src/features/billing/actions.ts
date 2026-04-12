@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { buildInvoiceAdjustmentPayload } from "./adjustments";
+import { parseInvoiceHeaderFormInput } from "./invoice-editor";
 import {
   addInvoiceAdjustment,
   addInvoiceLineItem,
@@ -22,6 +23,7 @@ import {
   updateInvoiceLineItemTotal,
   updateInvoiceTeamTotal,
   updateInvoiceGrandTotal,
+  updateInvoiceHeader,
   updateInvoiceAdjustmentAmount,
   updateInvoiceNote,
   updateInvoiceStatus,
@@ -474,6 +476,45 @@ export async function updateInvoiceGrandTotalAction(formData: FormData) {
   }
 
   redirect(buildFlashRedirect(returnTo, "success", "Grand total updated."));
+}
+
+export async function updateInvoiceHeaderAction(formData: FormData) {
+  const invoiceId = getString(formData, "invoiceId");
+  const returnTo = getDraftReturnPath(formData, invoiceId);
+
+  try {
+    const parsed = parseInvoiceHeaderFormInput({
+      companyId: getString(formData, "companyId"),
+      companyName: getString(formData, "companyName"),
+      invoiceNumber: getString(formData, "invoiceNumber"),
+      month: getString(formData, "month"),
+      year: getString(formData, "year"),
+      billingDate: getString(formData, "billingDate"),
+      dueDate: getString(formData, "dueDate"),
+      status: getString(formData, "status"),
+    });
+
+    await updateInvoiceHeader({
+      invoiceId,
+      ...parsed,
+    });
+
+    revalidatePath(`/invoices/${invoiceId}`);
+    revalidatePath(`/invoices/drafts/${invoiceId}`);
+    revalidatePath("/invoices");
+    revalidatePath("/cashout");
+    revalidatePath("/dashboard");
+  } catch (error) {
+    redirect(
+      buildFlashRedirect(
+        returnTo,
+        "error",
+        error instanceof Error ? error.message : "Unable to update invoice header.",
+      ),
+    );
+  }
+
+  redirect(buildFlashRedirect(returnTo, "success", "Invoice header updated."));
 }
 
 export async function addInvoiceAdjustmentAction(formData: FormData) {

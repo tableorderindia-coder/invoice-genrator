@@ -15,6 +15,7 @@ import {
   deleteInvoiceLineItemAction,
   deleteInvoiceTeamAction,
   updateInvoiceGrandTotalAction,
+  updateInvoiceHeaderAction,
   updateInvoiceLineItemTotalAction,
   updateInvoiceNoteAction,
   updateInvoiceTeamTotalAction,
@@ -75,77 +76,172 @@ export default async function DraftInvoicePage({
           style={{ scrollBehavior: "smooth" }}
         >
           <GlassPanel gradient>
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] gradient-text">
-                  {detail.company.name}
-                </p>
-                <h2 className="mt-1 text-2xl font-semibold" style={{ color: "var(--text-primary)" }}>
-                  {formatMonthYear(detail.invoice.month, detail.invoice.year)}
-                </h2>
-                <p className="mt-2 text-sm" style={{ color: "var(--text-secondary)" }}>
-                  Billing {formatDate(detail.invoice.billingDate)} · Due{" "}
-                  {formatDate(detail.invoice.dueDate)}
-                </p>
-              </div>
-              <div className="text-right">
-                <span className={`status-badge status-${detail.invoice.status.replace("_", "-")}`}>
-                  <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: "currentColor" }} />
-                  {detail.invoice.status}
-                </span>
-                <p
-                  className="mt-3 text-3xl font-semibold"
-                  style={{
-                    fontFamily: "var(--font-jetbrains-mono), monospace",
-                    color: "var(--text-primary)",
-                  }}
-                >
-                  {formatUsd(detail.invoice.grandTotalUsdCents)}
-                </p>
-              </div>
-            </div>
+            <div className="space-y-6">
 
-            <div className="mt-6 flex flex-wrap gap-3">
-              <Link
-                href={`/api/invoices/${detail.invoice.id}/pdf`}
-                className="btn-outline flex items-center gap-2"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                  <polyline points="14 2 14 8 20 8" />
-                </svg>
-                Open PDF
-              </Link>
-              {detail.invoice.status === "draft" ? (
-                <form action={updateInvoiceStatusAction}>
-                  <input type="hidden" name="invoiceId" value={detail.invoice.id} />
-                  <input type="hidden" name="status" value="generated" />
-                  <input type="hidden" name="returnTo" value={returnTo} />
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] gradient-text">
+                    {detail.company.name}
+                  </p>
+                  <h2 className="mt-1 text-2xl font-semibold" style={{ color: "var(--text-primary)" }}>
+                    {formatMonthYear(detail.invoice.month, detail.invoice.year)}
+                  </h2>
+                  <p className="mt-2 text-sm" style={{ color: "var(--text-secondary)" }}>
+                    Billing {formatDate(detail.invoice.billingDate)} · Due{" "}
+                    {formatDate(detail.invoice.dueDate)}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <span className={`status-badge status-${detail.invoice.status.replace("_", "-")}`}>
+                    <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: "currentColor" }} />
+                    {detail.invoice.status}
+                  </span>
+                  <p
+                    className="mt-3 text-3xl font-semibold"
+                    style={{
+                      fontFamily: "var(--font-jetbrains-mono), monospace",
+                      color: "var(--text-primary)",
+                    }}
+                  >
+                    {formatUsd(detail.invoice.grandTotalUsdCents)}
+                  </p>
+                </div>
+              </div>
+
+              <form action={updateInvoiceHeaderAction} className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <input type="hidden" name="invoiceId" value={detail.invoice.id} />
+                <input type="hidden" name="companyId" value={detail.company.id} />
+                <input type="hidden" name="returnTo" value={returnTo} />
+                <label className="space-y-2 text-sm" style={{ color: "var(--text-secondary)" }}>
+                  <span>Company name</span>
+                  <input
+                    name="companyName"
+                    defaultValue={detail.company.name}
+                    className={inputClass}
+                    aria-label="Company name"
+                  />
+                </label>
+                <label className="space-y-2 text-sm" style={{ color: "var(--text-secondary)" }}>
+                  <span>Invoice number</span>
+                  <input
+                    name="invoiceNumber"
+                    defaultValue={detail.invoice.invoiceNumber}
+                    className={inputClass}
+                    aria-label="Invoice number"
+                  />
+                </label>
+                <label className="space-y-2 text-sm" style={{ color: "var(--text-secondary)" }}>
+                  <span>Billing month</span>
+                  <input
+                    name="month"
+                    type="number"
+                    min="1"
+                    max="12"
+                    defaultValue={detail.invoice.month}
+                    className={inputClass}
+                    aria-label="Billing month"
+                  />
+                </label>
+                <label className="space-y-2 text-sm" style={{ color: "var(--text-secondary)" }}>
+                  <span>Billing year</span>
+                  <input
+                    name="year"
+                    type="number"
+                    min="2000"
+                    max="2100"
+                    defaultValue={detail.invoice.year}
+                    className={inputClass}
+                    aria-label="Billing year"
+                  />
+                </label>
+                <label className="space-y-2 text-sm" style={{ color: "var(--text-secondary)" }}>
+                  <span>Billing date</span>
+                  <input
+                    name="billingDate"
+                    type="date"
+                    defaultValue={detail.invoice.billingDate}
+                    className={inputClass}
+                    aria-label="Billing date"
+                  />
+                </label>
+                <label className="space-y-2 text-sm" style={{ color: "var(--text-secondary)" }}>
+                  <span>Due date</span>
+                  <input
+                    name="dueDate"
+                    type="date"
+                    defaultValue={detail.invoice.dueDate}
+                    className={inputClass}
+                    aria-label="Due date"
+                  />
+                </label>
+                <label
+                  className="space-y-2 text-sm md:col-span-2 xl:col-span-2"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  <span>Status</span>
+                  <select
+                    name="status"
+                    defaultValue={detail.invoice.status}
+                    className={inputClass}
+                    aria-label="Status"
+                  >
+                    <option value="draft">draft</option>
+                    <option value="generated">generated</option>
+                    <option value="sent">sent</option>
+                    <option value="cashed_out">cashed_out</option>
+                  </select>
+                </label>
+                <div className="md:col-span-2 xl:col-span-4">
                   <PendingSubmitButton
                     className="gradient-btn"
-                    defaultText="Mark generated"
-                    pendingText="Marking..."
+                    defaultText="Save header"
+                    pendingText="Saving..."
+                  />
+                </div>
+              </form>
+
+              <div className="flex flex-wrap gap-3">
+                <Link
+                  href={`/api/invoices/${detail.invoice.id}/pdf`}
+                  className="btn-outline flex items-center gap-2"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                  </svg>
+                  Open PDF
+                </Link>
+                {detail.invoice.status === "draft" ? (
+                  <form action={updateInvoiceStatusAction}>
+                    <input type="hidden" name="invoiceId" value={detail.invoice.id} />
+                    <input type="hidden" name="status" value="generated" />
+                    <input type="hidden" name="returnTo" value={returnTo} />
+                    <PendingSubmitButton
+                      className="btn-outline"
+                      defaultText="Mark generated"
+                      pendingText="Marking..."
+                    />
+                  </form>
+                ) : null}
+                <form action={updateInvoiceGrandTotalAction} className="flex items-center gap-2">
+                  <input type="hidden" name="invoiceId" value={detail.invoice.id} />
+                  <input type="hidden" name="returnTo" value={returnTo} />
+                  <input
+                    name="grandTotalUsd"
+                    type="number"
+                    step="1"
+                    min="0"
+                    defaultValue={Math.round(detail.invoice.grandTotalUsdCents / 100)}
+                    className={inputClass}
+                    style={{ minWidth: "8rem" }}
+                  />
+                  <PendingSubmitButton
+                    className="btn-outline"
+                    defaultText="Update grand total"
+                    pendingText="Updating..."
                   />
                 </form>
-              ) : null}
-              <form action={updateInvoiceGrandTotalAction} className="flex items-center gap-2">
-                <input type="hidden" name="invoiceId" value={detail.invoice.id} />
-                <input type="hidden" name="returnTo" value={returnTo} />
-                <input
-                  name="grandTotalUsd"
-                  type="number"
-                  step="1"
-                  min="0"
-                  defaultValue={Math.round(detail.invoice.grandTotalUsdCents / 100)}
-                  className={inputClass}
-                  style={{ minWidth: "8rem" }}
-                />
-                <PendingSubmitButton
-                  className="btn-outline"
-                  defaultText="Update grand total"
-                  pendingText="Updating..."
-                />
-              </form>
+              </div>
             </div>
           </GlassPanel>
 

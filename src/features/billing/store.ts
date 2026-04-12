@@ -1813,6 +1813,56 @@ export async function updateInvoiceGrandTotal(input: {
   if (error) throw error;
 }
 
+export async function updateInvoiceHeader(input: {
+  invoiceId: string;
+  companyId: string;
+  companyName: string;
+  invoiceNumber: string;
+  month: number;
+  year: number;
+  billingDate: string;
+  dueDate: string;
+  status: InvoiceStatus;
+}) {
+  const supabase = getSupabaseOrThrow();
+  const normalizedInvoiceNumber = input.invoiceNumber.trim();
+  const normalizedCompanyName = input.companyName.trim();
+
+  const { data: existingInvoiceRows, error: existingInvoiceError } = await supabase
+    .from("invoices")
+    .select("id, invoice_number")
+    .neq("id", input.invoiceId);
+  if (existingInvoiceError) throw existingInvoiceError;
+
+  assertNoCaseInsensitiveDuplicate({
+    existingValues: (existingInvoiceRows ?? []).map((row) => String(row.invoice_number)),
+    candidateValue: normalizedInvoiceNumber,
+    entityLabel: "Invoice number",
+  });
+
+  const { error: invoiceError } = await supabase
+    .from("invoices")
+    .update({
+      invoice_number: normalizedInvoiceNumber,
+      month: input.month,
+      year: input.year,
+      billing_date: input.billingDate,
+      due_date: input.dueDate,
+      status: input.status,
+      updated_at: nowIso(),
+    })
+    .eq("id", input.invoiceId);
+  if (invoiceError) throw invoiceError;
+
+  const { error: companyError } = await supabase
+    .from("companies")
+    .update({
+      name: normalizedCompanyName,
+    })
+    .eq("id", input.companyId);
+  if (companyError) throw companyError;
+}
+
 export async function updateInvoiceAdjustmentAmount(input: {
   invoiceId: string;
   adjustmentId: string;
