@@ -35,8 +35,11 @@ import {
   upsertDashboardExpense,
 } from "./store";
 import type { EmployeeCashFlowEntryWriteInput } from "./employee-cash-flow-types";
+import type { EmployeeCashFlowSavedEntry } from "./employee-cash-flow-types";
 import {
+  deleteSavedEmployeeCashFlowEntry,
   replaceInvoicePaymentEmployeeEntries,
+  updateSavedEmployeeCashFlowEntry,
   updateDashboardEmployeeCashFlowEntry,
   upsertEmployeeSalaryPayment,
   upsertInvoicePayment,
@@ -110,23 +113,19 @@ function parseEmployeeCashFlowEntriesJson(rawValue: string) {
   return parsed as EmployeeCashFlowEntryWriteInput[];
 }
 
-function parseInvoicePaymentIdsJson(rawValue: string) {
+function parseSavedEmployeeCashFlowEntryJson(rawValue: string) {
   if (!rawValue) {
-    return {} as Record<string, string>;
+    throw new Error("Saved employee cash flow row is required.");
   }
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(rawValue);
   } catch {
-    throw new Error("Invoice payment ids could not be parsed.");
+    throw new Error("Saved employee cash flow row could not be parsed.");
   }
 
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error("Invoice payment ids must be an object.");
-  }
-
-  return parsed as Record<string, string>;
+  return parsed as EmployeeCashFlowSavedEntry;
 }
 
 export async function createCompanyAction(formData: FormData) {
@@ -1105,44 +1104,43 @@ export async function saveInvoicePaymentEmployeeEntriesAction(formData: FormData
     }
 
     const entries = parseEmployeeCashFlowEntriesJson(getString(formData, "entriesJson"));
-    const invoicePaymentIdsByInvoiceId = parseInvoicePaymentIdsJson(
-      getString(formData, "invoicePaymentIdsJson"),
-    );
-    const entriesByInvoiceId = new Map<string, EmployeeCashFlowEntryWriteInput[]>();
+    const entriesByBatchId = new Map<string, EmployeeCashFlowEntryWriteInput[]>();
     for (const entry of entries) {
       if (!entry.invoiceId) {
         throw new Error("Each employee cash flow row must include an invoice.");
       }
-      const existing = entriesByInvoiceId.get(entry.invoiceId) ?? [];
+      if (!entry.clientBatchId) {
+        throw new Error("Each employee cash flow row must include a batch id.");
+      }
+      const existing = entriesByBatchId.get(entry.clientBatchId) ?? [];
       existing.push(entry);
-      entriesByInvoiceId.set(entry.invoiceId, existing);
+      entriesByBatchId.set(entry.clientBatchId, existing);
     }
 
-    for (const invoiceId of Object.keys(invoicePaymentIdsByInvoiceId)) {
-      const invoiceEntries = entriesByInvoiceId.get(invoiceId) ?? [];
-      const existingInvoicePaymentId = invoicePaymentIdsByInvoiceId[invoiceId];
-      const invoicePaymentId =
-        existingInvoicePaymentId ||
-        (invoiceEntries.length > 0
-          ? await upsertInvoicePayment({
-              invoiceId,
-              companyId,
-              paymentDate: `${paymentMonth}-01`,
-              paymentMonth,
-              usdInrRate: invoiceEntries[0]?.cashoutUsdInrRate ?? 0,
-            })
-          : "");
+    for (const invoiceEntries of entriesByBatchId.values()) {
+      const firstEntry = invoiceEntries[0];
+      if (!firstEntry) continue;
 
-      if (!invoicePaymentId) {
-        continue;
-      }
+      const invoiceId = firstEntry.invoiceId;
+      const invoicePaymentId =
+        firstEntry.invoicePaymentId ||
+        (await upsertInvoicePayment({
+          invoiceId,
+          companyId,
+          paymentDate: `${paymentMonth}-01`,
+          paymentMonth,
+          usdInrRate: firstEntry.cashoutUsdInrRate ?? 0,
+        }));
 
       await replaceInvoicePaymentEmployeeEntries({
         invoicePaymentId,
         invoiceId,
         companyId,
         paymentMonth,
-        entries: invoiceEntries,
+        entries: invoiceEntries.map((entry) => ({
+          ...entry,
+          invoicePaymentId,
+        })),
       });
     }
 
@@ -1225,4 +1223,50 @@ export async function saveEmployeeSalaryPaymentAction(formData: FormData) {
   }
 
   redirect(buildFlashRedirect(returnTo, "success", "Salary payment saved."));
+}
+
+export async function updateSavedEmployeeCashFlowEntryAction(formData: FormData) {
+  const returnTo = getString(formData, "returnTo") || "/employee-cash-flow";
+
+  try {
+    await updateSavedEmployeeCashFlowEntry(
+      parseSavedEmployeeCashFlowEntryJson(getString(formData, "entryJson")),
+    );
+
+    revalidatePath("/employee-cash-flow");
+  } catch (error) {
+    redirect(
+      buildFlashRedirect(
+        returnTo,
+        "error",
+        getErrorMessage(error, "Unable to update employee cash flow row."),
+      ),
+    );
+  }
+
+  redirect(buildFlashRedirect(returnTo, "success", "Employee cash flow row updated."));
+}
+
+export async function deleteSavedEmployeeCashFlowEntryAction(formData: FormData) {
+  const returnTo = getString(formData, "returnTo") || "/employee-cash-flow";
+
+  try {
+    const entryId = getString(formData, "entryId");
+    if (!entryId) {
+      throw new Error("Employee cash flow row is required.");
+    }
+
+    await deleteSavedEmployeeCashFlowEntry(entryId);
+    revalidatePath("/employee-cash-flow");
+  } catch (error) {
+    redirect(
+      buildFlashRedirect(
+        returnTo,
+        "error",
+        getErrorMessage(error, "Unable to delete employee cash flow row."),
+      ),
+    );
+  }
+
+  redirect(buildFlashRedirect(returnTo, "success", "Employee cash flow row deleted."));
 }

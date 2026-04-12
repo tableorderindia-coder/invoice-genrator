@@ -7,6 +7,7 @@ describe("aggregateEmployeeCashFlowEditableEntries", () => {
     const result = aggregateEmployeeCashFlowEditableEntries([
       {
         id: "row_1",
+        clientBatchId: "batch_1",
         invoiceId: "inv_1",
         invoiceNumber: "INV-1",
         employeeId: "emp_1",
@@ -35,6 +36,7 @@ describe("aggregateEmployeeCashFlowEditableEntries", () => {
       },
       {
         id: "row_2",
+        clientBatchId: "batch_2",
         invoiceId: "inv_2",
         invoiceNumber: "INV-2",
         employeeId: "emp_1",

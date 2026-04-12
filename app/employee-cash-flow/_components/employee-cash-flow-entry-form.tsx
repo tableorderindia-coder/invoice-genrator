@@ -6,6 +6,7 @@ import { inputClass } from "@/app/_components/field";
 import { PendingSubmitButton } from "@/app/_components/pending-submit-button";
 import { saveInvoicePaymentEmployeeEntriesAction } from "@/src/features/billing/actions";
 import {
+  calculateActualPaidInrCents,
   calculateCashInInrCents,
   calculateEffectiveDollarInwardUsdCents,
   calculateEmployeeMonthNetInrCents,
@@ -17,6 +18,7 @@ import {
 } from "@/src/features/billing/employee-cash-flow-entry-aggregation";
 import {
   buildAddedEmployeeCashFlowEntry,
+  nextCashFlowClientBatchId,
   removeEntryFromSelections,
   resolveEmployeeToAddSelection,
 } from "@/src/features/billing/employee-cash-flow-page-state";
@@ -35,13 +37,19 @@ type AvailableEmployee = {
 };
 
 function toCurrencyInput(value: number) {
-  return (value / 100).toFixed(2);
+  const formatted = (value / 100).toFixed(2);
+  return formatted.replace(/\.00$/, "").replace(/(\.\d*?[1-9])0+$/, "$1");
 }
 
 function fromCurrencyInput(value: string) {
   const parsed = Number.parseFloat(value || "0");
   if (!Number.isFinite(parsed)) return 0;
   return Math.round(parsed * 100);
+}
+
+function toEditableRate(value: number) {
+  const formatted = value.toFixed(4);
+  return formatted.replace(/\.?0+$/, "");
 }
 
 function deriveCardMetrics(entry: EmployeeCashFlowEditableEntry) {
@@ -56,24 +64,25 @@ function deriveCardMetrics(entry: EmployeeCashFlowEditableEntry) {
     effectiveDollarInwardUsdCents,
     cashoutUsdInrRate: entry.cashoutUsdInrRate,
   });
-  const salaryPaidInrCents = calculateCashInInrCents({
-    effectiveDollarInwardUsdCents: entry.monthlyPaidUsdCents,
-    cashoutUsdInrRate: entry.paidUsdInrRate,
+  const actualPaidInrCents = calculateActualPaidInrCents({
+    daysWorked: entry.daysWorked,
+    monthlyPaidUsdCents: entry.monthlyPaidUsdCents,
+    paidUsdInrRate: entry.paidUsdInrRate,
   });
   const netInrCents = calculateEmployeeMonthNetInrCents({
     cashInInrCents,
-    salaryPaidInrCents,
+    salaryPaidInrCents: actualPaidInrCents,
   });
 
   return {
     effectiveDollarInwardUsdCents,
     cashInInrCents,
-    salaryPaidInrCents,
-    pendingAmountInrCents: cashInInrCents - entry.actualPaidInrCents,
+    salaryPaidInrCents: actualPaidInrCents,
+    pendingAmountInrCents: cashInInrCents - actualPaidInrCents,
     netInrCents,
     status: resolveEmployeeCashFlowStatus({
       effectiveDollarInwardUsdCents,
-      salaryPaidInrCents,
+      salaryPaidInrCents: actualPaidInrCents,
       netInrCents,
     }),
   };
@@ -95,6 +104,8 @@ export default function EmployeeCashFlowEntryForm({
   returnTo: string;
   initialEntries: EmployeeCashFlowEditableEntry[];
   selectedInvoices: Array<{
+    clientBatchId: string;
+    batchLabel: string;
     invoicePaymentId?: string;
     invoiceId: string;
     invoiceNumber: string;
@@ -105,10 +116,11 @@ export default function EmployeeCashFlowEntryForm({
   const [entries, setEntries] = useState<EmployeeCashFlowEditableEntry[]>(
     aggregateEmployeeCashFlowEditableEntries(initialEntries),
   );
-  const [invoiceToAdd, setInvoiceToAdd] = useState(selectedInvoices[0]?.invoiceId ?? "");
+  const [invoiceBatches, setInvoiceBatches] = useState(selectedInvoices);
+  const [invoiceToAdd, setInvoiceToAdd] = useState(invoiceBatches[0]?.clientBatchId ?? "");
   const activeInvoiceToAdd =
-    selectedInvoices.find((invoice) => invoice.invoiceId === invoiceToAdd) ??
-    selectedInvoices[0];
+    invoiceBatches.find((invoice) => invoice.clientBatchId === invoiceToAdd) ??
+    invoiceBatches[0];
   const [employeeToAdd, setEmployeeToAdd] = useState(
     activeInvoiceToAdd?.availableEmployees[0]?.id ?? "",
   );
@@ -121,10 +133,10 @@ export default function EmployeeCashFlowEntryForm({
     () =>
       new Set(
         entries
-          .filter((entry) => entry.invoiceId === activeInvoiceToAdd?.invoiceId)
+          .filter((entry) => entry.clientBatchId === activeInvoiceToAdd?.clientBatchId)
           .map((entry) => entry.employeeId),
       ),
-    [entries, activeInvoiceToAdd?.invoiceId],
+    [entries, activeInvoiceToAdd?.clientBatchId],
   );
 
   const addableEmployees = (activeInvoiceToAdd?.availableEmployees ?? []).filter(
@@ -164,6 +176,9 @@ export default function EmployeeCashFlowEntryForm({
         invoiceNumber: activeInvoiceToAdd.invoiceNumber,
         invoiceUsdInrRate: activeInvoiceToAdd.invoiceUsdInrRate,
       }),
+      clientBatchId: activeInvoiceToAdd.clientBatchId,
+      invoicePaymentId: activeInvoiceToAdd.invoicePaymentId,
+      batchLabel: activeInvoiceToAdd.batchLabel,
     };
 
     setEntries((current) => [...current, nextEntry]);
@@ -187,6 +202,40 @@ export default function EmployeeCashFlowEntryForm({
     );
   }
 
+  function duplicateInvoiceBatch() {
+    if (!activeInvoiceToAdd) return;
+
+    const nextBatchId = nextCashFlowClientBatchId();
+    const batchIndex =
+      invoiceBatches.filter((batch) => batch.invoiceId === activeInvoiceToAdd.invoiceId).length + 1;
+    const batchLabel = `${activeInvoiceToAdd.invoiceNumber} • Batch ${batchIndex}`;
+    const duplicateBatch = {
+      ...activeInvoiceToAdd,
+      clientBatchId: nextBatchId,
+      invoicePaymentId: undefined,
+      batchLabel,
+    };
+
+    const clonedEntries = entries
+      .filter((entry) => entry.clientBatchId === activeInvoiceToAdd.clientBatchId)
+      .map((entry, index) => ({
+        ...entry,
+        id: `${entry.id}_dup_${index}_${nextBatchId}`,
+        clientBatchId: nextBatchId,
+        invoicePaymentId: undefined,
+        batchLabel,
+      }));
+
+    setInvoiceBatches((current) => [...current, duplicateBatch]);
+    setEntries((current) => [...current, ...clonedEntries]);
+    setInvoiceToAdd(nextBatchId);
+    setEmployeeToAdd(
+      duplicateBatch.availableEmployees.find(
+        (employee) => !clonedEntries.some((entry) => entry.employeeId === employee.id),
+      )?.id ?? "",
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
@@ -206,7 +255,11 @@ export default function EmployeeCashFlowEntryForm({
           </label>
           <select
             multiple
-            value={allEmployeesSelected ? entries.map((entry) => entry.employeeId) : selectedEmployeeIds}
+            value={
+              allEmployeesSelected
+                ? employeeFilterOptions.map(([employeeId]) => employeeId)
+                : selectedEmployeeIds
+            }
             onChange={(event) => {
               const values = Array.from(event.target.selectedOptions).map((option) => option.value);
               setSelectedEmployeeIds(values);
@@ -259,11 +312,11 @@ export default function EmployeeCashFlowEntryForm({
               Invoice
             </span>
             <select
-              value={activeInvoiceToAdd?.invoiceId ?? ""}
+              value={activeInvoiceToAdd?.clientBatchId ?? ""}
               onChange={(event) => {
                 setInvoiceToAdd(event.target.value);
-                const nextInvoice = selectedInvoices.find(
-                  (invoice) => invoice.invoiceId === event.target.value,
+                const nextInvoice = invoiceBatches.find(
+                  (invoice) => invoice.clientBatchId === event.target.value,
                 );
                 setEmployeeToAdd(nextInvoice?.availableEmployees[0]?.id ?? "");
               }}
@@ -274,13 +327,22 @@ export default function EmployeeCashFlowEntryForm({
                 color: "var(--text-primary)",
               }}
             >
-              {selectedInvoices.map((invoice) => (
-                <option key={invoice.invoiceId} value={invoice.invoiceId}>
-                  {invoice.invoiceNumber}
+              {invoiceBatches.map((invoice) => (
+                <option key={invoice.clientBatchId} value={invoice.clientBatchId}>
+                  {invoice.batchLabel}
                 </option>
               ))}
             </select>
           </label>
+
+          <button
+            type="button"
+            onClick={duplicateInvoiceBatch}
+            className="btn-outline mt-4"
+            disabled={!activeInvoiceToAdd}
+          >
+            Add same invoice again
+          </button>
 
           <label className="mt-4 block">
             <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
@@ -326,15 +388,16 @@ export default function EmployeeCashFlowEntryForm({
         <input type="hidden" name="returnTo" value={returnTo} />
         <input
           type="hidden"
-          name="invoicePaymentIdsJson"
+          name="entriesJson"
           value={JSON.stringify(
-            selectedInvoices.reduce<Record<string, string>>((result, invoice) => {
-              result[invoice.invoiceId] = invoice.invoicePaymentId ?? "";
-              return result;
-            }, {}),
+            entries.map((entry) => ({
+              ...entry,
+              actualPaidInrCents: Math.round(
+                entry.daysWorked * entry.monthlyPaidUsdCents * entry.paidUsdInrRate,
+              ),
+            })),
           )}
         />
-        <input type="hidden" name="entriesJson" value={JSON.stringify(entries)} />
 
         {visibleEntries.map((entry) => {
           const metrics = deriveCardMetrics(entry);
@@ -351,7 +414,7 @@ export default function EmployeeCashFlowEntryForm({
                     {entry.employeeNameSnapshot}
                   </h3>
                   <p className="mt-1 text-sm" style={{ color: "var(--text-secondary)" }}>
-                    {entry.invoiceNumber} · {paymentMonth}
+                    {entry.batchLabel ?? entry.invoiceNumber} · {paymentMonth}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
@@ -404,6 +467,7 @@ export default function EmployeeCashFlowEntryForm({
                       })
                     }
                     className={cardInputClass()}
+                    inputMode="decimal"
                   />
                 </label>
 
@@ -419,6 +483,7 @@ export default function EmployeeCashFlowEntryForm({
                       })
                     }
                     className={cardInputClass()}
+                    inputMode="decimal"
                   />
                 </label>
 
@@ -434,6 +499,7 @@ export default function EmployeeCashFlowEntryForm({
                       })
                     }
                     className={cardInputClass()}
+                    inputMode="decimal"
                   />
                 </label>
 
@@ -449,6 +515,7 @@ export default function EmployeeCashFlowEntryForm({
                       })
                     }
                     className={cardInputClass()}
+                    inputMode="decimal"
                   />
                 </label>
 
@@ -464,6 +531,7 @@ export default function EmployeeCashFlowEntryForm({
                       })
                     }
                     className={cardInputClass()}
+                    inputMode="decimal"
                   />
                 </label>
 
@@ -479,6 +547,7 @@ export default function EmployeeCashFlowEntryForm({
                       })
                     }
                     className={cardInputClass()}
+                    inputMode="decimal"
                   />
                 </label>
 
@@ -494,6 +563,7 @@ export default function EmployeeCashFlowEntryForm({
                       })
                     }
                     className={cardInputClass()}
+                    inputMode="decimal"
                   />
                 </label>
 
@@ -509,6 +579,7 @@ export default function EmployeeCashFlowEntryForm({
                       })
                     }
                     className={cardInputClass()}
+                    inputMode="decimal"
                   />
                 </label>
 
@@ -517,13 +588,14 @@ export default function EmployeeCashFlowEntryForm({
                     Cashout USD/INR
                   </span>
                   <input
-                    value={String(entry.cashoutUsdInrRate)}
+                    value={toEditableRate(entry.cashoutUsdInrRate)}
                     onChange={(event) =>
                       updateEntry(entry.id, {
                         cashoutUsdInrRate: Number.parseFloat(event.target.value || "0") || 0,
                       })
                     }
                     className={cardInputClass()}
+                    inputMode="decimal"
                   />
                 </label>
 
@@ -532,7 +604,7 @@ export default function EmployeeCashFlowEntryForm({
                     Paid USD/INR
                   </span>
                   <input
-                    value={String(entry.paidUsdInrRate)}
+                    value={toEditableRate(entry.paidUsdInrRate)}
                     onChange={(event) =>
                       updateEntry(entry.id, {
                         paidUsdInrRate: Number.parseFloat(event.target.value || "0") || 0,
@@ -547,13 +619,13 @@ export default function EmployeeCashFlowEntryForm({
                     Actual paid (INR)
                   </span>
                   <input
-                    value={toCurrencyInput(entry.actualPaidInrCents)}
-                    onChange={(event) =>
-                      updateEntry(entry.id, {
-                        actualPaidInrCents: fromCurrencyInput(event.target.value),
-                      })
-                    }
+                    value={toCurrencyInput(
+                      Math.round(
+                        entry.daysWorked * entry.monthlyPaidUsdCents * entry.paidUsdInrRate,
+                      ),
+                    )}
                     className={cardInputClass()}
+                    readOnly
                   />
                 </label>
 
@@ -709,7 +781,14 @@ export default function EmployeeCashFlowEntryForm({
                   ["Reimbursements / Expenses INR", formatInr(Math.round(entry.reimbursementUsdCents * entry.cashoutUsdInrRate))],
                   ["Appraisal advance INR", formatInr(Math.round(entry.appraisalAdvanceUsdCents * entry.cashoutUsdInrRate))],
                   ["Cash in INR", formatInr(metrics.cashInInrCents)],
-                  ["Salary paid INR", formatInr(metrics.salaryPaidInrCents)],
+                  [
+                    "Total paid INR",
+                    formatInr(
+                      Math.round(
+                        entry.daysWorked * entry.monthlyPaidUsdCents * entry.paidUsdInrRate,
+                      ),
+                    ),
+                  ],
                   ["Pending amount", formatInr(metrics.pendingAmountInrCents)],
                   ["Net result", formatInr(metrics.netInrCents)],
                 ].map(([label, value]) => (

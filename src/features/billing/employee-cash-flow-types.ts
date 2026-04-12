@@ -6,6 +6,9 @@ export type EmployeeCashFlowMonthRow = {
   companyId: string;
   paymentMonth: string;
   invoiceNumber: string;
+  invoicePaymentId?: string;
+  clientBatchId?: string;
+  batchLabel?: string;
   daysWorked: number;
   daysInMonth: number;
   monthlyPaidUsdCents: number;
@@ -49,6 +52,9 @@ export type EmployeeCashFlowInvoiceOption = {
 };
 
 export type EmployeeCashFlowEntryWriteInput = {
+  clientBatchId: string;
+  batchLabel?: string;
+  invoicePaymentId?: string;
   invoiceId: string;
   invoiceNumber: string;
   employeeId: string;
@@ -76,4 +82,10 @@ export type EmployeeCashFlowEntryWriteInput = {
   isPaid: boolean;
   paidAt?: string;
   notes?: string;
+};
+
+export type EmployeeCashFlowSavedEntry = EmployeeCashFlowEntryWriteInput & {
+  id: string;
+  companyId: string;
+  paymentMonth: string;
 };

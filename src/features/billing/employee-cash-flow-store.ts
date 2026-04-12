@@ -2,6 +2,7 @@ import { createSupabaseServerClient } from "../../lib/supabase/server";
 import { getSupabaseMode } from "../../lib/supabase/config";
 
 import {
+  calculateActualPaidInrCents,
   calculateCashInInrCents,
   calculateEffectiveDollarInwardUsdCents,
   calculateEmployeeMonthNetInrCents,
@@ -13,12 +14,15 @@ import type {
   EmployeeCashFlowEntryWriteInput,
   EmployeeCashFlowInvoiceOption,
   EmployeeCashFlowMonthRow,
+  EmployeeCashFlowSavedEntry,
   EmployeeCashFlowSalaryPaymentRow,
 } from "./employee-cash-flow-types";
 
 type CashFlowPaymentEntryInput = {
   employeeId: string;
   paymentMonth: string;
+  invoicePaymentId?: string;
+  batchLabel?: string;
   cashInInrCents: number;
   effectiveDollarInwardUsdCents: number;
   onboardingAdvanceUsdCents: number;
@@ -27,6 +31,7 @@ type CashFlowPaymentEntryInput = {
   appraisalAdvanceUsdCents: number;
   offboardingDeductionUsdCents: number;
   monthlyPaidUsdCents: number;
+  actualPaidInrCents: number;
   daysWorked: number;
   daysInMonth: number;
   cashoutUsdInrRate: number;
@@ -105,6 +110,7 @@ type DbInvoiceLineItem = {
 
 type DbCashFlowEntry = {
   id: string;
+  invoice_payment_id?: string;
   employee_id: string;
   payment_month: string;
   invoice_line_item_id: string | null;
@@ -200,6 +206,14 @@ function normalizeInvoiceNumber(invoiceNumber: string, invoiceNumbers: Set<strin
   return [...invoiceNumbers].sort().join(", ");
 }
 
+function buildCashFlowBatchLabel(invoiceNumber: string, invoicePaymentId?: string | null) {
+  if (!invoicePaymentId) {
+    return invoiceNumber;
+  }
+
+  return `${invoiceNumber} • ${invoicePaymentId.slice(-6)}`;
+}
+
 export function normalizeEmployeeNameForMatch(name: string | null | undefined) {
   return String(name ?? "")
     .trim()
@@ -228,6 +242,9 @@ export function appendMissingAdjustmentEntries(input: {
     )
     .map((employee) => ({
       id: nextCashFlowId("cash_entry"),
+      clientBatchId: input.invoiceId,
+      invoicePaymentId: undefined,
+      batchLabel: buildCashFlowBatchLabel(input.invoiceNumber),
       invoiceId: input.invoiceId,
       invoiceNumber: input.invoiceNumber,
       employeeId: employee.id,
@@ -316,7 +333,8 @@ export function buildEmployeeCashFlowMonthRows(input: {
 
   for (const row of input.paymentEntries) {
     const key = `${row.employeeId}:${row.paymentMonth}`;
-    const salaryPaidInrCents = salaryMap.get(key) ?? 0;
+    const savedSalaryPaidInrCents = salaryMap.get(key) ?? 0;
+    const actualPaidInrCents = row.actualPaidInrCents || savedSalaryPaidInrCents;
 
     const existing = grouped.get(key);
     if (existing) {
@@ -352,16 +370,16 @@ export function buildEmployeeCashFlowMonthRows(input: {
         row.invoiceNumber,
         existing.invoiceNumbers,
       );
-      existing.salaryPaidInrCents = salaryPaidInrCents;
+      existing.salaryPaidInrCents += actualPaidInrCents;
       const accrualInrCents = accrualMap.get(key) ?? 0;
       existing.pendingAmountInrCents = accrualInrCents - existing.cashInInrCents;
       existing.netInrCents = calculateEmployeeMonthNetInrCents({
         cashInInrCents: existing.cashInInrCents,
-        salaryPaidInrCents,
+        salaryPaidInrCents: existing.salaryPaidInrCents,
       });
       existing.status = resolveEmployeeCashFlowStatus({
         effectiveDollarInwardUsdCents: existing.effectiveDollarInwardUsdCents,
-        salaryPaidInrCents,
+        salaryPaidInrCents: existing.salaryPaidInrCents,
         netInrCents: existing.netInrCents,
       });
       continue;
@@ -397,25 +415,28 @@ export function buildEmployeeCashFlowMonthRows(input: {
       ),
       paidUsdInrRate: row.paidUsdInrRate,
       cashInInrCents: row.cashInInrCents,
-      salaryPaidInrCents,
+      salaryPaidInrCents: actualPaidInrCents,
       pendingAmountInrCents: accrualInrCents - row.cashInInrCents,
       netInrCents: calculateEmployeeMonthNetInrCents({
         cashInInrCents: row.cashInInrCents,
-        salaryPaidInrCents,
+        salaryPaidInrCents: actualPaidInrCents,
       }),
       status: "profit",
       invoiceNumbers,
     };
     cashFlowRow.status = resolveEmployeeCashFlowStatus({
       effectiveDollarInwardUsdCents: cashFlowRow.effectiveDollarInwardUsdCents,
-      salaryPaidInrCents,
+      salaryPaidInrCents: actualPaidInrCents,
       netInrCents: cashFlowRow.netInrCents,
     });
     grouped.set(key, cashFlowRow);
   }
 
   return [...grouped.values()]
-    .map(({ invoiceNumbers: _invoiceNumbers, ...row }) => row)
+    .map(({ invoiceNumbers, ...row }) => {
+      void invoiceNumbers;
+      return row;
+    })
     .sort((left, right) =>
       `${right.paymentMonth}:${right.employeeName}`.localeCompare(
         `${left.paymentMonth}:${left.employeeName}`,
@@ -624,11 +645,17 @@ export async function getInvoicePaymentPrefillData(input: {
       ) ?? 0,
     ),
   }));
+  const employeeMonthlyById = new Map(
+    availableEmployees.map((employee) => [employee.id, employee.payoutMonthlyUsdCents]),
+  );
 
   const baseEntries =
     savedEntries.length > 0
       ? savedEntries.map((row) => ({
           id: row.id,
+          clientBatchId: invoicePayment?.id ?? row.id,
+          invoicePaymentId: invoicePayment?.id ?? undefined,
+          batchLabel: buildCashFlowBatchLabel(invoice.invoice_number, invoicePayment?.id),
           invoiceId: row.invoice_id,
           invoiceNumber: invoice.invoice_number,
           employeeId: row.employee_id,
@@ -636,7 +663,10 @@ export async function getInvoicePaymentPrefillData(input: {
           invoiceLineItemId: row.invoice_line_item_id ?? undefined,
           daysWorked: row.days_worked ?? daysInMonth,
           daysInMonth: row.days_in_month ?? daysInMonth,
-          monthlyPaidUsdCents: row.monthly_paid_usd_cents,
+          monthlyPaidUsdCents:
+            row.monthly_paid_usd_cents ||
+            employeeMonthlyById.get(row.employee_id) ||
+            0,
           baseDollarInwardUsdCents: row.base_dollar_inward_usd_cents,
           onboardingAdvanceUsdCents: row.onboarding_advance_usd_cents,
           reimbursementUsdCents: row.reimbursement_usd_cents,
@@ -684,9 +714,16 @@ export async function getInvoicePaymentPrefillData(input: {
           });
           const cashoutUsdInrRate =
             realization?.usd_inr_rate ?? row.cashout_usd_inr_rate ?? 0;
+          const monthlyPaidUsdCents =
+            row.employee_monthly_usd_cents ||
+            employeeMonthlyById.get(row.employee_id) ||
+            0;
 
           return {
             id: nextCashFlowId("cash_entry"),
+            clientBatchId: invoicePayment?.id ?? invoice.id,
+            invoicePaymentId: invoicePayment?.id ?? undefined,
+            batchLabel: buildCashFlowBatchLabel(invoice.invoice_number, invoicePayment?.id),
             invoiceId: invoice.id,
             invoiceNumber: invoice.invoice_number,
             employeeId: row.employee_id,
@@ -694,7 +731,7 @@ export async function getInvoicePaymentPrefillData(input: {
             invoiceLineItemId: row.invoice_line_item_id ?? undefined,
             daysWorked: lineItem?.days_worked ?? daysInMonth,
             daysInMonth,
-            monthlyPaidUsdCents: row.employee_monthly_usd_cents,
+            monthlyPaidUsdCents,
             baseDollarInwardUsdCents: row.dollar_inward_usd_cents,
             onboardingAdvanceUsdCents,
             reimbursementUsdCents,
@@ -710,7 +747,13 @@ export async function getInvoicePaymentPrefillData(input: {
             }),
             pfInrCents: row.pf_inr_cents ?? 0,
             tdsInrCents: row.tds_inr_cents ?? 0,
-            actualPaidInrCents: row.actual_paid_inr_cents ?? 0,
+            actualPaidInrCents:
+              row.actual_paid_inr_cents ??
+              calculateActualPaidInrCents({
+                daysWorked: lineItem?.days_worked ?? daysInMonth,
+                monthlyPaidUsdCents,
+                paidUsdInrRate: row.paid_usd_inr_rate ?? 0,
+              }),
             fxCommissionInrCents: row.fx_commission_inr_cents ?? 0,
             totalCommissionUsdCents: row.total_commission_usd_cents ?? 0,
             commissionEarnedInrCents: row.commission_earned_inr_cents ?? 0,
@@ -760,7 +803,7 @@ export async function getEmployeeCashFlowDashboardData(input: {
   let entryQuery = supabase
     .from("invoice_payment_employee_entries")
     .select(
-      "employee_id, payment_month, employee_name_snapshot, company_id, monthly_paid_usd_cents, base_dollar_inward_usd_cents, onboarding_advance_usd_cents, reimbursement_usd_cents, reimbursement_labels_text, appraisal_advance_usd_cents, offboarding_deduction_usd_cents, effective_dollar_inward_usd_cents, cashout_usd_inr_rate, paid_usd_inr_rate, cash_in_inr_cents, days_worked, days_in_month, invoice_id",
+      "id, employee_id, payment_month, employee_name_snapshot, company_id, monthly_paid_usd_cents, base_dollar_inward_usd_cents, onboarding_advance_usd_cents, reimbursement_usd_cents, reimbursement_labels_text, appraisal_advance_usd_cents, offboarding_deduction_usd_cents, effective_dollar_inward_usd_cents, cashout_usd_inr_rate, paid_usd_inr_rate, cash_in_inr_cents, actual_paid_inr_cents, days_worked, days_in_month, invoice_id",
     )
     .eq("company_id", input.companyId);
 
@@ -806,6 +849,7 @@ export async function getEmployeeCashFlowDashboardData(input: {
   const paymentEntries = ((entryResult.data ?? []) as DbCashFlowEntry[]).map((row) => ({
     employeeId: row.employee_id,
     paymentMonth: row.payment_month,
+    invoicePaymentId: row.id,
     cashInInrCents: row.cash_in_inr_cents,
     effectiveDollarInwardUsdCents: row.effective_dollar_inward_usd_cents,
     onboardingAdvanceUsdCents: row.onboarding_advance_usd_cents,
@@ -814,6 +858,7 @@ export async function getEmployeeCashFlowDashboardData(input: {
     appraisalAdvanceUsdCents: row.appraisal_advance_usd_cents,
     offboardingDeductionUsdCents: row.offboarding_deduction_usd_cents,
     monthlyPaidUsdCents: row.monthly_paid_usd_cents,
+    actualPaidInrCents: row.actual_paid_inr_cents,
     daysWorked: row.days_worked,
     daysInMonth: row.days_in_month,
     cashoutUsdInrRate: row.cashout_usd_inr_rate,
@@ -930,6 +975,11 @@ export async function replaceInvoicePaymentEmployeeEntries(input: {
       appraisalAdvanceUsdCents: entry.appraisalAdvanceUsdCents,
       offboardingDeductionUsdCents: entry.offboardingDeductionUsdCents,
     });
+    const actualPaidInrCents = calculateActualPaidInrCents({
+      daysWorked: entry.daysWorked,
+      monthlyPaidUsdCents: entry.monthlyPaidUsdCents,
+      paidUsdInrRate: entry.paidUsdInrRate,
+    });
 
     return {
       id: nextCashFlowId("cash_entry"),
@@ -958,7 +1008,7 @@ export async function replaceInvoicePaymentEmployeeEntries(input: {
       }),
       pf_inr_cents: entry.pfInrCents,
       tds_inr_cents: entry.tdsInrCents,
-      actual_paid_inr_cents: entry.actualPaidInrCents,
+      actual_paid_inr_cents: actualPaidInrCents,
       fx_commission_inr_cents: entry.fxCommissionInrCents,
       total_commission_usd_cents: entry.totalCommissionUsdCents,
       commission_earned_inr_cents: entry.commissionEarnedInrCents,
@@ -978,8 +1028,138 @@ export async function replaceInvoicePaymentEmployeeEntries(input: {
   if (error) throw error;
 }
 
+export async function listSavedEmployeeCashFlowEntries(input: {
+  companyId: string;
+  paymentMonth: string;
+}) {
+  const supabase = getSupabaseOrThrow();
+  const { data, error } = await supabase
+    .from("invoice_payment_employee_entries")
+    .select(
+      "id, invoice_payment_id, invoice_id, employee_id, company_id, payment_month, invoice_line_item_id, employee_name_snapshot, days_worked, days_in_month, monthly_paid_usd_cents, base_dollar_inward_usd_cents, onboarding_advance_usd_cents, reimbursement_usd_cents, reimbursement_labels_text, appraisal_advance_usd_cents, offboarding_deduction_usd_cents, cashout_usd_inr_rate, paid_usd_inr_rate, pf_inr_cents, tds_inr_cents, actual_paid_inr_cents, fx_commission_inr_cents, total_commission_usd_cents, commission_earned_inr_cents, gross_earnings_inr_cents, is_non_invoice_employee, is_paid, paid_at, notes",
+    )
+    .eq("company_id", input.companyId)
+    .eq("payment_month", input.paymentMonth)
+    .order("employee_name_snapshot");
+  if (error) throw error;
+
+  const rows = (data ?? []) as DbCashFlowEntry[];
+  const invoiceIds = [...new Set(rows.map((row) => row.invoice_id).filter(Boolean))];
+  const { data: invoiceRows, error: invoiceError } = await supabase
+    .from("invoices")
+    .select("id, invoice_number")
+    .in("id", invoiceIds.length > 0 ? invoiceIds : ["__none__"]);
+  if (invoiceError) throw invoiceError;
+
+  const invoiceMap = new Map(
+    (invoiceRows ?? []).map((row) => [String(row.id), String(row.invoice_number ?? "")]),
+  );
+
+  return rows.map((row) => ({
+    id: row.id,
+    companyId: row.company_id,
+    paymentMonth: row.payment_month,
+    clientBatchId: row.invoice_payment_id ?? row.id,
+    batchLabel: buildCashFlowBatchLabel(
+      invoiceMap.get(row.invoice_id) ?? "",
+      row.invoice_payment_id,
+    ),
+    invoicePaymentId: row.invoice_payment_id ?? undefined,
+    invoiceId: row.invoice_id,
+    invoiceNumber: invoiceMap.get(row.invoice_id) ?? "",
+    employeeId: row.employee_id,
+    employeeNameSnapshot: row.employee_name_snapshot,
+    invoiceLineItemId: row.invoice_line_item_id ?? undefined,
+    daysWorked: row.days_worked,
+    daysInMonth: row.days_in_month,
+    monthlyPaidUsdCents: row.monthly_paid_usd_cents,
+    baseDollarInwardUsdCents: row.base_dollar_inward_usd_cents,
+    onboardingAdvanceUsdCents: row.onboarding_advance_usd_cents,
+    reimbursementUsdCents: row.reimbursement_usd_cents,
+    reimbursementLabelsText: row.reimbursement_labels_text ?? "",
+    appraisalAdvanceUsdCents: row.appraisal_advance_usd_cents,
+    offboardingDeductionUsdCents: row.offboarding_deduction_usd_cents,
+    cashoutUsdInrRate: row.cashout_usd_inr_rate,
+    paidUsdInrRate: row.paid_usd_inr_rate,
+    pfInrCents: row.pf_inr_cents,
+    tdsInrCents: row.tds_inr_cents,
+    actualPaidInrCents: row.actual_paid_inr_cents,
+    fxCommissionInrCents: row.fx_commission_inr_cents,
+    totalCommissionUsdCents: row.total_commission_usd_cents,
+    commissionEarnedInrCents: row.commission_earned_inr_cents,
+    grossEarningsInrCents: row.gross_earnings_inr_cents,
+    isNonInvoiceEmployee: row.is_non_invoice_employee,
+    isPaid: row.is_paid,
+    paidAt: row.paid_at ?? undefined,
+    notes: row.notes ?? "",
+  })) as EmployeeCashFlowSavedEntry[];
+}
+
+export async function updateSavedEmployeeCashFlowEntry(
+  entry: EmployeeCashFlowSavedEntry,
+) {
+  const supabase = getSupabaseOrThrow();
+  const effectiveDollarInwardUsdCents = calculateEffectiveDollarInwardUsdCents({
+    baseDollarInwardUsdCents: entry.baseDollarInwardUsdCents,
+    onboardingAdvanceUsdCents: entry.onboardingAdvanceUsdCents,
+    reimbursementUsdCents: entry.reimbursementUsdCents,
+    appraisalAdvanceUsdCents: entry.appraisalAdvanceUsdCents,
+    offboardingDeductionUsdCents: entry.offboardingDeductionUsdCents,
+  });
+  const actualPaidInrCents = calculateActualPaidInrCents({
+    daysWorked: entry.daysWorked,
+    monthlyPaidUsdCents: entry.monthlyPaidUsdCents,
+    paidUsdInrRate: entry.paidUsdInrRate,
+  });
+
+  const { error } = await supabase
+    .from("invoice_payment_employee_entries")
+    .update({
+      days_worked: entry.daysWorked,
+      days_in_month: entry.daysInMonth,
+      monthly_paid_usd_cents: entry.monthlyPaidUsdCents,
+      base_dollar_inward_usd_cents: entry.baseDollarInwardUsdCents,
+      onboarding_advance_usd_cents: entry.onboardingAdvanceUsdCents,
+      reimbursement_usd_cents: entry.reimbursementUsdCents,
+      reimbursement_labels_text: entry.reimbursementLabelsText || null,
+      appraisal_advance_usd_cents: entry.appraisalAdvanceUsdCents,
+      offboarding_deduction_usd_cents: entry.offboardingDeductionUsdCents,
+      effective_dollar_inward_usd_cents: effectiveDollarInwardUsdCents,
+      cashout_usd_inr_rate: entry.cashoutUsdInrRate,
+      paid_usd_inr_rate: entry.paidUsdInrRate,
+      cash_in_inr_cents: calculateCashInInrCents({
+        effectiveDollarInwardUsdCents,
+        cashoutUsdInrRate: entry.cashoutUsdInrRate,
+      }),
+      pf_inr_cents: entry.pfInrCents,
+      tds_inr_cents: entry.tdsInrCents,
+      actual_paid_inr_cents: actualPaidInrCents,
+      fx_commission_inr_cents: entry.fxCommissionInrCents,
+      total_commission_usd_cents: entry.totalCommissionUsdCents,
+      commission_earned_inr_cents: entry.commissionEarnedInrCents,
+      gross_earnings_inr_cents: entry.grossEarningsInrCents,
+      is_non_invoice_employee: entry.isNonInvoiceEmployee,
+      is_paid: entry.isPaid,
+      paid_at: entry.paidAt ?? null,
+      notes: entry.notes ?? null,
+      updated_at: nowIso(),
+    })
+    .eq("id", entry.id);
+  if (error) throw error;
+}
+
+export async function deleteSavedEmployeeCashFlowEntry(entryId: string) {
+  const supabase = getSupabaseOrThrow();
+  const { error } = await supabase
+    .from("invoice_payment_employee_entries")
+    .delete()
+    .eq("id", entryId);
+  if (error) throw error;
+}
+
 export async function updateDashboardEmployeeCashFlowEntry(input: {
   entryId: string;
+  daysWorked?: number;
   dollarInwardUsdCents: number;
   employeeMonthlyUsdCents: number;
   cashoutUsdInrRate: number;
@@ -992,7 +1172,7 @@ export async function updateDashboardEmployeeCashFlowEntry(input: {
   const { data: currentRow, error: currentError } = await supabase
     .from("invoice_payment_employee_entries")
     .select(
-      "id, base_dollar_inward_usd_cents, onboarding_advance_usd_cents, reimbursement_usd_cents, appraisal_advance_usd_cents, offboarding_deduction_usd_cents",
+      "id, days_worked, base_dollar_inward_usd_cents, onboarding_advance_usd_cents, reimbursement_usd_cents, appraisal_advance_usd_cents, offboarding_deduction_usd_cents",
     )
     .eq("id", input.entryId)
     .single();
@@ -1001,6 +1181,7 @@ export async function updateDashboardEmployeeCashFlowEntry(input: {
   const current = currentRow as Pick<
     DbCashFlowEntry,
     | "id"
+    | "days_worked"
     | "base_dollar_inward_usd_cents"
     | "onboarding_advance_usd_cents"
     | "reimbursement_usd_cents"
@@ -1022,6 +1203,11 @@ export async function updateDashboardEmployeeCashFlowEntry(input: {
     cashoutUsdInrRate: input.cashoutUsdInrRate,
     paidUsdInrRate: input.paidUsdInrRate,
   });
+  const actualPaidInrCents = calculateActualPaidInrCents({
+    daysWorked: input.daysWorked ?? current.days_worked,
+    monthlyPaidUsdCents: input.employeeMonthlyUsdCents,
+    paidUsdInrRate: input.paidUsdInrRate,
+  });
 
   const { error } = await supabase
     .from("invoice_payment_employee_entries")
@@ -1037,7 +1223,7 @@ export async function updateDashboardEmployeeCashFlowEntry(input: {
       }),
       pf_inr_cents: input.pfInrCents,
       tds_inr_cents: input.tdsInrCents,
-      actual_paid_inr_cents: input.actualPaidInrCents,
+      actual_paid_inr_cents: actualPaidInrCents,
       fx_commission_inr_cents: payoutMetrics.fxCommissionInrCents,
       total_commission_usd_cents: payoutMetrics.totalCommissionUsdCents,
       commission_earned_inr_cents: payoutMetrics.commissionEarnedInrCents,

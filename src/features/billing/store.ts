@@ -2475,10 +2475,10 @@ export async function getPnDashboardData(input: {
         totalCommissionUsdCents: row.total_commission_usd_cents,
         commissionEarnedInrCents: row.commission_earned_inr_cents,
         cashInInrCents: row.cash_in_inr_cents,
-        salaryPaidInrCents: Math.round(row.monthly_paid_usd_cents * row.paid_usd_inr_rate),
+        salaryPaidInrCents: row.actual_paid_inr_cents,
         netProfitInrCents: calculateEmployeeMonthNetInrCents({
           cashInInrCents: row.cash_in_inr_cents,
-          salaryPaidInrCents: Math.round(row.monthly_paid_usd_cents * row.paid_usd_inr_rate),
+          salaryPaidInrCents: row.actual_paid_inr_cents,
         }),
       };
     })
@@ -2525,9 +2525,7 @@ export async function getPnDashboardData(input: {
         employeeMonthlyUsdCents: row.monthly_paid_usd_cents,
         cashoutUsdInrRate: row.cashout_usd_inr_rate,
         paidUsdInrRate: row.paid_usd_inr_rate,
-        salaryPaidInrCents: Math.round(
-          row.monthly_paid_usd_cents * row.paid_usd_inr_rate,
-        ),
+        salaryPaidInrCents: row.actual_paid_inr_cents,
         pfInrCents: row.pf_inr_cents,
         tdsInrCents: row.tds_inr_cents,
         actualPaidInrCents: row.actual_paid_inr_cents,
@@ -2537,9 +2535,7 @@ export async function getPnDashboardData(input: {
         grossEarningsInrCents: row.gross_earnings_inr_cents,
         netProfitInrCents: calculateEmployeeMonthNetInrCents({
           cashInInrCents: row.cash_in_inr_cents,
-          salaryPaidInrCents: Math.round(
-            row.monthly_paid_usd_cents * row.paid_usd_inr_rate,
-          ),
+          salaryPaidInrCents: row.actual_paid_inr_cents,
         }),
         isSecurityDepositMonth: false,
       };

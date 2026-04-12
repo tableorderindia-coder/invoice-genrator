@@ -50,6 +50,9 @@ describe("employee cash flow page state", () => {
         invoiceUsdInrRate: 84.25,
       }),
     ).toMatchObject({
+      clientBatchId: expect.stringMatching(/^batch_/),
+      invoicePaymentId: undefined,
+      batchLabel: "2026/005",
       invoiceId: "inv_1",
       invoiceNumber: "2026/005",
       employeeId: "emp_1",

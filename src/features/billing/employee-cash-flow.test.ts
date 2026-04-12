@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { EmployeeCashFlowMonthRow } from "./employee-cash-flow-types";
 
 import {
+  calculateActualPaidInrCents,
   calculateCashInInrCents,
   calculateEffectiveDollarInwardUsdCents,
   calculateEmployeeMonthNetInrCents,
@@ -37,6 +38,16 @@ describe("employee cash flow calculations", () => {
         salaryPaidInrCents: 50_000_00,
       }),
     ).toBe(-50_000_00);
+  });
+
+  it("derives actual paid INR from days worked, monthly paid dollars, and paid rate", () => {
+    expect(
+      calculateActualPaidInrCents({
+        daysWorked: 3,
+        monthlyPaidUsdCents: 100_00,
+        paidUsdInrRate: 84.5,
+      }),
+    ).toBe(25_35_000);
   });
 
   it("flags waiting-for-payment when salary is paid and inward is zero", () => {

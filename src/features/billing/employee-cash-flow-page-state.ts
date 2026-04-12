@@ -10,6 +10,10 @@ function getTodayMonthKey(now = new Date()) {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
 
+export function nextCashFlowClientBatchId() {
+  return `batch_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
 export function getDaysInMonthFromMonthKey(monthKey: string) {
   const match = /^(\d{4})-(\d{2})$/.exec(monthKey);
   if (!match) {
@@ -128,6 +132,9 @@ export function buildAddedEmployeeCashFlowEntry(input: {
   invoiceUsdInrRate: number;
 }): EmployeeCashFlowEntryWriteInput {
   return {
+    clientBatchId: nextCashFlowClientBatchId(),
+    invoicePaymentId: undefined,
+    batchLabel: input.invoiceNumber,
     invoiceId: input.invoiceId,
     invoiceNumber: input.invoiceNumber,
     employeeId: input.employee.id,

@@ -14,6 +14,7 @@ describe("employee cash flow store shaping", () => {
         {
           employeeId: "emp_1",
           paymentMonth: "2026-04",
+          actualPaidInrCents: 2_500,
           cashInInrCents: 1_000,
           effectiveDollarInwardUsdCents: 1_000,
           onboardingAdvanceUsdCents: 0,
@@ -33,6 +34,7 @@ describe("employee cash flow store shaping", () => {
         {
           employeeId: "emp_1",
           paymentMonth: "2026-04",
+          actualPaidInrCents: 0,
           cashInInrCents: 2_000,
           effectiveDollarInwardUsdCents: 2_000,
           onboardingAdvanceUsdCents: 500,
@@ -50,13 +52,7 @@ describe("employee cash flow store shaping", () => {
           invoiceNumber: "INV-2",
         },
       ],
-      salaryPayments: [
-        {
-          employeeId: "emp_1",
-          month: "2026-04",
-          salaryPaidInrCents: 2_500,
-        },
-      ],
+      salaryPayments: [],
       accrualByEmployeeMonth: [
         {
           employeeId: "emp_1",
@@ -81,6 +77,7 @@ describe("employee cash flow store shaping", () => {
         {
           employeeId: "emp_1",
           paymentMonth: "2026-04",
+          actualPaidInrCents: 0,
           cashInInrCents: 0,
           effectiveDollarInwardUsdCents: 0,
           onboardingAdvanceUsdCents: 0,
@@ -127,6 +124,7 @@ describe("employee cash flow store shaping", () => {
         {
           employeeId: "emp_1",
           paymentMonth: "2026-04",
+          actualPaidInrCents: 0,
           cashInInrCents: 100,
           effectiveDollarInwardUsdCents,
           onboardingAdvanceUsdCents,
