@@ -4,9 +4,9 @@ import { createInvoiceDraftAction } from "@/src/features/billing/actions";
 import { CreateInvoiceForm } from "./create-invoice-form";
 import { CreateInvoiceSubmitButton } from "./submit-button";
 import {
-  findLatestInvoiceForCompany,
   listAvailableTeamNames,
   listCompanies,
+  listInvoicesForCompany,
 } from "@/src/features/billing/store";
 
 export const dynamic = "force-dynamic";
@@ -27,10 +27,10 @@ export default async function CreateInvoicePage({
   const flashMessage = Array.isArray(resolvedSearchParams.flashMessage)
     ? resolvedSearchParams.flashMessage[0]
     : resolvedSearchParams.flashMessage;
-  const latestInvoices = await Promise.all(
+  const previousInvoices = await Promise.all(
     companies.map(async (company) => ({
       company,
-      previous: await findLatestInvoiceForCompany(company.id),
+      invoices: await listInvoicesForCompany(company.id),
     })),
   );
   const teamCatalog = await Promise.all(
@@ -70,17 +70,13 @@ export default async function CreateInvoicePage({
               id: company.id,
               name: company.name,
             }))}
-            latestInvoices={latestInvoices.flatMap(({ company, previous }) =>
-              previous
-                ? [
-                    {
-                      companyId: company.id,
-                      companyName: company.name,
-                      invoiceId: previous.id,
-                      invoiceNumber: previous.invoiceNumber,
-                    },
-                  ]
-                : [],
+            previousInvoices={previousInvoices.flatMap(({ company, invoices }) =>
+              invoices.map((invoice) => ({
+                companyId: company.id,
+                invoiceId: invoice.id,
+                invoiceNumber: invoice.invoiceNumber,
+                status: invoice.status,
+              })),
             )}
             availableTeamNamesByCompany={availableTeamNamesByCompany}
           />

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { formatDuplicateInvoiceOptionLabel } from "@/src/features/billing/invoice-create";
 
 import { Field, inputClass } from "../../_components/field";
 
@@ -11,11 +12,11 @@ type CompanyOption = {
 
 type CreateInvoiceFormProps = {
   companies: CompanyOption[];
-  latestInvoices: Array<{
+  previousInvoices: Array<{
     companyId: string;
-    companyName: string;
     invoiceId: string;
     invoiceNumber: string;
+    status: "draft" | "generated" | "sent" | "cashed_out";
   }>;
   availableTeamNamesByCompany: Record<string, string[]>;
 };
@@ -108,11 +109,11 @@ export function CreateInvoiceForm(props: CreateInvoiceFormProps) {
       <Field label="Duplicate from previous invoice">
         <select name="duplicateSourceId" className={inputClass}>
           <option value="">Start empty</option>
-          {props.latestInvoices
+          {props.previousInvoices
             .filter((invoice) => invoice.companyId === companyId)
             .map((invoice) => (
               <option key={invoice.invoiceId} value={invoice.invoiceId}>
-                {invoice.companyName} · {invoice.invoiceNumber}
+                {formatDuplicateInvoiceOptionLabel(invoice.invoiceNumber, invoice.status)}
               </option>
             ))}
         </select>

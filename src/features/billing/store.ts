@@ -977,6 +977,21 @@ export async function findLatestInvoiceForCompany(companyId: string) {
   return data ? mapInvoice(data as DbInvoice) : undefined;
 }
 
+export async function listInvoicesForCompany(companyId: string) {
+  const supabase = getSupabaseOrThrow();
+  const { data, error } = await supabase
+    .from("invoices")
+    .select("*")
+    .eq("company_id", companyId)
+    .order("year", { ascending: false })
+    .order("month", { ascending: false })
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? [])
+    .map((row) => mapInvoice(row as DbInvoice))
+    .sort(sortInvoicesDesc);
+}
+
 export async function createInvoiceDraft(input: {
   companyId: string;
   month: number;
