@@ -71,6 +71,17 @@ export function getDaysInMonth(month: number, year: number) {
   return new Date(year, month, 0).getDate();
 }
 
+export function sanitizeDownloadFilename(value: string) {
+  const sanitized = value
+    .trim()
+    .replace(/[\\/:*?"<>|]+/g, "-")
+    .replace(/\s+/g, " ")
+    .replace(/-+/g, "-")
+    .replace(/^[-.\s]+|[-.\s]+$/g, "");
+
+  return sanitized || "invoice";
+}
+
 function parseDateValue(value: string | Date) {
   if (value instanceof Date) {
     if (Number.isNaN(value.getTime())) {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatDate, normalizeDateRange } from "./utils";
+import { formatDate, normalizeDateRange, sanitizeDownloadFilename } from "./utils";
 
 describe("billing date formatting", () => {
   it("formats ISO dates as MM-DD-YYYY", () => {
@@ -15,5 +15,10 @@ describe("billing date formatting", () => {
     expect(normalizeDateRange("03/15/2026 - 04/14/2026")).toBe(
       "03-15-2026 - 04-14-2026",
     );
+  });
+
+  it("sanitizes invoice numbers for download filenames", () => {
+    expect(sanitizeDownloadFilename("2026/006")).toBe("2026-006");
+    expect(sanitizeDownloadFilename("  INV:APRIL*2026  ")).toBe("INV-APRIL-2026");
   });
 });
