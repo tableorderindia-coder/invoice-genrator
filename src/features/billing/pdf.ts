@@ -330,6 +330,7 @@ export async function buildInvoicePdf(detail: InvoiceDetail) {
       const isHeader = index === 0;
       const isTotal = index === rows.length - 1;
       const rowHeight = isHeader ? 36 : defaultRowHeight;
+      const lastColumnX = columnX[columnX.length - 1] ?? doc.page.width - PAGE.margin;
 
       ensureSpace(rowHeight + 4, false);
       if (y + rowHeight > doc.page.height - PAGE.margin - PAGE.footerGap) {
@@ -342,7 +343,7 @@ export async function buildInvoicePdf(detail: InvoiceDetail) {
       doc
         .lineWidth(0.8)
         .strokeColor(COLORS.line)
-        .rect(columnX[0], y, columnX[5] - columnX[0], rowHeight)
+        .rect(columnX[0], y, lastColumnX - columnX[0], rowHeight)
         .stroke();
 
       for (let columnIndex = 1; columnIndex < columnX.length - 1; columnIndex += 1) {

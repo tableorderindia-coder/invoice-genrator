@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { InvoiceDetail } from "./types";
-import { buildInvoicePdfModel } from "./pdf";
+import { buildInvoicePdf, buildInvoicePdfModel } from "./pdf";
 
 const detail: InvoiceDetail = {
   company: {
@@ -168,5 +168,12 @@ describe("branded invoice pdf model", () => {
       "Grand Total = Total(A) + Total(B) + Total(C) + Total(D) + Total(E) - Total(F)",
     );
     expect(model.grandTotal.amount).toBe("$24,582");
+  });
+
+  it("renders a PDF buffer for invoices with adjustments", async () => {
+    const pdfBuffer = await buildInvoicePdf(detail);
+
+    expect(pdfBuffer.byteLength).toBeGreaterThan(1000);
+    expect(pdfBuffer.subarray(0, 4).toString("utf8")).toBe("%PDF");
   });
 });
