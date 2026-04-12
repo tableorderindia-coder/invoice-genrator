@@ -27,6 +27,7 @@ import {
 } from "./pn-dashboard";
 import { assertEmployeePayoutRemovable } from "./employee-payout";
 import { calculateEmployeeMonthNetInrCents } from "./employee-cash-flow";
+import { normalizeEmployeeNameForMatch } from "./employee-cash-flow-store";
 import { getDaysInMonth } from "./utils";
 import type {
   AdjustmentType,
@@ -1074,7 +1075,7 @@ async function resolveEmployeeForSecurityDeposit(input: {
   employeeName: string;
 }) {
   const supabase = getSupabaseOrThrow();
-  const normalizedEmployeeName = input.employeeName.trim().replace(/\s+/g, " ");
+  const normalizedEmployeeName = normalizeEmployeeNameForMatch(input.employeeName);
   if (!normalizedEmployeeName) {
     throw new Error("Employee is required for security deposit adjustments.");
   }
@@ -1087,8 +1088,7 @@ async function resolveEmployeeForSecurityDeposit(input: {
 
   const match = (employeeRows ?? []).find(
     (row) =>
-      String(row.full_name).trim().toLowerCase() ===
-      normalizedEmployeeName.toLowerCase(),
+      normalizeEmployeeNameForMatch(String(row.full_name)) === normalizedEmployeeName,
   );
   if (!match) {
     throw new Error("Selected employee was not found in this company.");

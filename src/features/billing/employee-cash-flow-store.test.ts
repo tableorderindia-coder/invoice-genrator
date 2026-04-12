@@ -146,6 +146,9 @@ describe("employee cash flow store shaping", () => {
     expect(normalizeEmployeeNameForMatch("PAWAN KUMAR BEESETTI")).toBe(
       "pawan kumar beesetti",
     );
+    expect(normalizeEmployeeNameForMatch("Nirbhay\u00A0 Kumar   Giri")).toBe(
+      "nirbhay kumar giri",
+    );
   });
 
   it("adds adjustment-only employees into the monthly cash flow entries", () => {
