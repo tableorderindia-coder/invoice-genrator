@@ -73,6 +73,11 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
     formData.set("returnTo", "/dashboard?companyId=comp_1&view=employee");
     formData.set("daysWorked", "24");
     formData.set("dollarInwardUsd", "1250");
+    formData.set("onboardingAdvanceUsd", "150");
+    formData.set("reimbursementUsd", "200");
+    formData.set("reimbursementLabelsText", "Laptop");
+    formData.set("appraisalAdvanceUsd", "75");
+    formData.set("offboardingDeductionUsd", "25");
     formData.set("employeeMonthlyUsd", "900");
     formData.set("cashoutUsdInrRate", "83.45");
     formData.set("paidUsdInrRate", "82.75");
@@ -88,6 +93,11 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
       entryId: "cash_1",
       daysWorked: 24,
       dollarInwardUsdCents: 125000,
+      onboardingAdvanceUsdCents: 15000,
+      reimbursementUsdCents: 20000,
+      reimbursementLabelsText: "Laptop",
+      appraisalAdvanceUsdCents: 7500,
+      offboardingDeductionUsdCents: 2500,
       employeeMonthlyUsdCents: 90000,
       cashoutUsdInrRate: 83.45,
       paidUsdInrRate: 82.75,

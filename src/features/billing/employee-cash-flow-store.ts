@@ -1142,6 +1142,11 @@ export async function updateDashboardEmployeeCashFlowEntry(input: {
   entryId: string;
   daysWorked?: number;
   dollarInwardUsdCents: number;
+  onboardingAdvanceUsdCents: number;
+  reimbursementUsdCents: number;
+  reimbursementLabelsText: string;
+  appraisalAdvanceUsdCents: number;
+  offboardingDeductionUsdCents: number;
   employeeMonthlyUsdCents: number;
   cashoutUsdInrRate: number;
   paidUsdInrRate: number;
@@ -1153,7 +1158,7 @@ export async function updateDashboardEmployeeCashFlowEntry(input: {
   const { data: currentRow, error: currentError } = await supabase
     .from("invoice_payment_employee_entries")
     .select(
-      "id, days_worked, days_in_month, base_dollar_inward_usd_cents, onboarding_advance_usd_cents, reimbursement_usd_cents, appraisal_advance_usd_cents, offboarding_deduction_usd_cents",
+      "id, days_worked, days_in_month, base_dollar_inward_usd_cents, onboarding_advance_usd_cents, reimbursement_usd_cents, reimbursement_labels_text, appraisal_advance_usd_cents, offboarding_deduction_usd_cents",
     )
     .eq("id", input.entryId)
     .single();
@@ -1167,6 +1172,7 @@ export async function updateDashboardEmployeeCashFlowEntry(input: {
     | "base_dollar_inward_usd_cents"
     | "onboarding_advance_usd_cents"
     | "reimbursement_usd_cents"
+    | "reimbursement_labels_text"
     | "appraisal_advance_usd_cents"
     | "offboarding_deduction_usd_cents"
   >;
@@ -1174,10 +1180,10 @@ export async function updateDashboardEmployeeCashFlowEntry(input: {
   const baseDollarInwardUsdCents = input.dollarInwardUsdCents;
   const effectiveDollarInwardUsdCents = calculateEffectiveDollarInwardUsdCents({
     baseDollarInwardUsdCents,
-    onboardingAdvanceUsdCents: current.onboarding_advance_usd_cents,
-    reimbursementUsdCents: current.reimbursement_usd_cents,
-    appraisalAdvanceUsdCents: current.appraisal_advance_usd_cents,
-    offboardingDeductionUsdCents: current.offboarding_deduction_usd_cents,
+    onboardingAdvanceUsdCents: input.onboardingAdvanceUsdCents,
+    reimbursementUsdCents: input.reimbursementUsdCents,
+    appraisalAdvanceUsdCents: input.appraisalAdvanceUsdCents,
+    offboardingDeductionUsdCents: input.offboardingDeductionUsdCents,
   });
   const payoutMetrics = calculateEmployeePayoutMetrics({
     dollarInwardUsdCents: effectiveDollarInwardUsdCents,
@@ -1190,6 +1196,11 @@ export async function updateDashboardEmployeeCashFlowEntry(input: {
     .update({
       days_worked: input.daysWorked ?? current.days_worked,
       base_dollar_inward_usd_cents: baseDollarInwardUsdCents,
+      onboarding_advance_usd_cents: input.onboardingAdvanceUsdCents,
+      reimbursement_usd_cents: input.reimbursementUsdCents,
+      reimbursement_labels_text: input.reimbursementLabelsText || null,
+      appraisal_advance_usd_cents: input.appraisalAdvanceUsdCents,
+      offboarding_deduction_usd_cents: input.offboardingDeductionUsdCents,
       effective_dollar_inward_usd_cents: effectiveDollarInwardUsdCents,
       monthly_paid_usd_cents: input.employeeMonthlyUsdCents,
       cashout_usd_inr_rate: input.cashoutUsdInrRate,

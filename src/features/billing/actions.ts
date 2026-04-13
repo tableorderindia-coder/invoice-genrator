@@ -854,6 +854,25 @@ export async function updateDashboardEmployeeCashFlowEntryAction(formData: FormD
     if (dollarInwardUsdCents < 0) {
       throw new Error("Dollars inward cannot be negative.");
     }
+    const onboardingAdvanceUsdCents = centsFromUsd(getString(formData, "onboardingAdvanceUsd"));
+    if (onboardingAdvanceUsdCents < 0) {
+      throw new Error("Onboarding advance cannot be negative.");
+    }
+    const reimbursementUsdCents = centsFromUsd(getString(formData, "reimbursementUsd"));
+    if (reimbursementUsdCents < 0) {
+      throw new Error("Reimbursements / Expenses cannot be negative.");
+    }
+    const reimbursementLabelsText = getString(formData, "reimbursementLabelsText");
+    const appraisalAdvanceUsdCents = centsFromUsd(getString(formData, "appraisalAdvanceUsd"));
+    if (appraisalAdvanceUsdCents < 0) {
+      throw new Error("Appraisal advance cannot be negative.");
+    }
+    const offboardingDeductionUsdCents = centsFromUsd(
+      getString(formData, "offboardingDeductionUsd"),
+    );
+    if (offboardingDeductionUsdCents < 0) {
+      throw new Error("Offboarding deduction cannot be negative.");
+    }
 
     const cashoutUsdInrRate = Number.parseFloat(getString(formData, "cashoutUsdInrRate"));
     if (!Number.isFinite(cashoutUsdInrRate) || cashoutUsdInrRate < 0) {
@@ -886,6 +905,11 @@ export async function updateDashboardEmployeeCashFlowEntryAction(formData: FormD
       entryId,
       daysWorked,
       dollarInwardUsdCents,
+      onboardingAdvanceUsdCents,
+      reimbursementUsdCents,
+      reimbursementLabelsText,
+      appraisalAdvanceUsdCents,
+      offboardingDeductionUsdCents,
       employeeMonthlyUsdCents,
       cashoutUsdInrRate,
       paidUsdInrRate,

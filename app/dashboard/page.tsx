@@ -40,6 +40,10 @@ function netProfitColor(cents: number) {
   return "var(--text-primary)";
 }
 
+function calculateMonthlyPaidInrCents(monthlyUsdCents: number, paidUsdInrRate: number) {
+  return Math.round(monthlyUsdCents * paidUsdInrRate);
+}
+
 export default async function DashboardPage({
   searchParams,
 }: {
@@ -257,10 +261,11 @@ export default async function DashboardPage({
                         <th>Cash in (INR)</th>
                         <th>Monthly $</th>
                         <th>Paid rate</th>
-                        <th>Salary paid (INR)</th>
+                        <th>Monthly paid INR</th>
+                        <th>Actual paid (INR)</th>
                         <th>PF (INR)</th>
                         <th>TDS (INR)</th>
-                        <th>Actual paid (INR)</th>
+                        <th>Salary paid</th>
                         <th>FX commission (INR)</th>
                         <th>Total commission (USD)</th>
                         <th>Commission earned (INR)</th>
@@ -303,13 +308,66 @@ export default async function DashboardPage({
                               style={{ minWidth: "8rem", border: "1px solid var(--glass-border)", background: "rgba(255,255,255,0.04)", color: "var(--text-primary)" }}
                             />
                           </td>
-                          <td>{formatUsd(row.onboardingAdvanceUsdCents)}</td>
-                          <td>{formatUsd(row.reimbursementUsdCents)}</td>
-                          <td>{row.reimbursementLabelsText || "-"}</td>
+                          <td>
+                            <input
+                              form={`dashboard-payout-${row.payoutId}`}
+                              type="number"
+                              name="onboardingAdvanceUsd"
+                              min="0"
+                              step="0.01"
+                              defaultValue={(row.onboardingAdvanceUsdCents / 100).toFixed(2)}
+                              className={inputClass}
+                              style={{ minWidth: "8rem", border: "1px solid var(--glass-border)", background: "rgba(255,255,255,0.04)", color: "var(--text-primary)" }}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              form={`dashboard-payout-${row.payoutId}`}
+                              type="number"
+                              name="reimbursementUsd"
+                              min="0"
+                              step="0.01"
+                              defaultValue={(row.reimbursementUsdCents / 100).toFixed(2)}
+                              className={inputClass}
+                              style={{ minWidth: "8rem", border: "1px solid var(--glass-border)", background: "rgba(255,255,255,0.04)", color: "var(--text-primary)" }}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              form={`dashboard-payout-${row.payoutId}`}
+                              type="text"
+                              name="reimbursementLabelsText"
+                              defaultValue={row.reimbursementLabelsText}
+                              className={inputClass}
+                              style={{ minWidth: "10rem", border: "1px solid var(--glass-border)", background: "rgba(255,255,255,0.04)", color: "var(--text-primary)" }}
+                            />
+                          </td>
                           <td>{formatInr(row.reimbursementInrCents)}</td>
-                          <td>{formatUsd(row.appraisalAdvanceUsdCents)}</td>
+                          <td>
+                            <input
+                              form={`dashboard-payout-${row.payoutId}`}
+                              type="number"
+                              name="appraisalAdvanceUsd"
+                              min="0"
+                              step="0.01"
+                              defaultValue={(row.appraisalAdvanceUsdCents / 100).toFixed(2)}
+                              className={inputClass}
+                              style={{ minWidth: "8rem", border: "1px solid var(--glass-border)", background: "rgba(255,255,255,0.04)", color: "var(--text-primary)" }}
+                            />
+                          </td>
                           <td>{formatInr(row.appraisalAdvanceInrCents)}</td>
-                          <td>{formatUsd(row.offboardingDeductionUsdCents)}</td>
+                          <td>
+                            <input
+                              form={`dashboard-payout-${row.payoutId}`}
+                              type="number"
+                              name="offboardingDeductionUsd"
+                              min="0"
+                              step="0.01"
+                              defaultValue={(row.offboardingDeductionUsdCents / 100).toFixed(2)}
+                              className={inputClass}
+                              style={{ minWidth: "8rem", border: "1px solid var(--glass-border)", background: "rgba(255,255,255,0.04)", color: "var(--text-primary)" }}
+                            />
+                          </td>
                           <td>{formatUsd(row.effectiveDollarInwardUsdCents)}</td>
                           <td>
                             <input
@@ -360,7 +418,26 @@ export default async function DashboardPage({
                               />
                             )}
                           </td>
-                          <td>{formatInr(row.salaryPaidInrCents)}</td>
+                          <td>
+                            {formatInr(
+                              calculateMonthlyPaidInrCents(
+                                row.employeeMonthlyUsdCents,
+                                row.paidUsdInrRate,
+                              ),
+                            )}
+                          </td>
+                          <td>
+                            <input
+                              form={`dashboard-payout-${row.payoutId}`}
+                              type="number"
+                              name="actualPaidInr"
+                              min="0"
+                              step="0.01"
+                              defaultValue={(row.actualPaidInrCents / 100).toFixed(2)}
+                              className={inputClass}
+                              style={{ minWidth: "8rem", border: "1px solid var(--glass-border)", background: "rgba(255,255,255,0.04)", color: "var(--text-primary)" }}
+                            />
+                          </td>
                           <td>
                             <input
                               form={`dashboard-payout-${row.payoutId}`}
@@ -385,18 +462,7 @@ export default async function DashboardPage({
                               style={{ minWidth: "8rem", border: "1px solid var(--glass-border)", background: "rgba(255,255,255,0.04)", color: "var(--text-primary)" }}
                             />
                           </td>
-                          <td>
-                            <input
-                              form={`dashboard-payout-${row.payoutId}`}
-                              type="number"
-                              name="actualPaidInr"
-                              min="0"
-                              step="0.01"
-                              defaultValue={(row.actualPaidInrCents / 100).toFixed(2)}
-                              className={inputClass}
-                              style={{ minWidth: "8rem", border: "1px solid var(--glass-border)", background: "rgba(255,255,255,0.04)", color: "var(--text-primary)" }}
-                            />
-                          </td>
+                          <td>{formatInr(row.actualPaidInrCents - row.pfInrCents - row.tdsInrCents)}</td>
                           <td>{formatInr(row.fxCommissionInrCents)}</td>
                           <td>{formatUsd(row.totalCommissionUsdCents)}</td>
                           <td>{formatInr(row.commissionEarnedInrCents)}</td>
@@ -416,7 +482,7 @@ export default async function DashboardPage({
                       ))}
                       <tr>
                         <td
-                          colSpan={23}
+                          colSpan={24}
                           className="text-right text-sm font-semibold"
                           style={{ color: "var(--text-primary)" }}
                         >
