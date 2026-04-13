@@ -446,27 +446,15 @@ export function buildEmployeeCashFlowMonthRows(input: {
 
 export async function listCashFlowInvoiceOptions(input: {
   companyId: string;
-  month?: number;
-  year?: number;
 }): Promise<EmployeeCashFlowInvoiceOption[]> {
   const supabase = getSupabaseOrThrow();
-  let query = supabase
+  const { data, error } = await supabase
     .from("invoices")
     .select("id, invoice_number, company_id, month, year")
     .eq("company_id", input.companyId)
     .eq("status", "cashed_out")
     .order("year", { ascending: false })
     .order("month", { ascending: false });
-
-  if (input.month) {
-    query = query.eq("month", input.month);
-  }
-
-  if (input.year) {
-    query = query.eq("year", input.year);
-  }
-
-  const { data, error } = await query;
   if (error) throw error;
 
   return ((data ?? []) as DbInvoiceOption[]).map((row) => ({

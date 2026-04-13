@@ -49,13 +49,8 @@ export default async function EmployeeCashFlowPage({
   const selectedTab = selectedTabRaw === "saved" ? "saved" : "compose";
 
   const invoiceOptionsInput = buildEmployeeCashFlowInvoiceOptionsInput(selectedCompanyId);
-  const [yearValue, monthValue] = monthKey.split("-").map((value) => Number.parseInt(value, 10));
   const invoiceOptions = invoiceOptionsInput
-    ? await listCashFlowInvoiceOptions({
-        ...invoiceOptionsInput,
-        month: monthValue,
-        year: yearValue,
-      })
+    ? await listCashFlowInvoiceOptions(invoiceOptionsInput)
     : [];
 
   const selectedInvoiceIdsRaw = resolveEmployeeCashFlowInvoiceIds(resolved.invoiceId);

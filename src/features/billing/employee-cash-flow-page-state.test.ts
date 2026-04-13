@@ -18,6 +18,11 @@ describe("employee cash flow page state", () => {
     });
   });
 
+  it("does not add month or year constraints to invoice option filtering", () => {
+    expect(buildEmployeeCashFlowInvoiceOptionsInput("company_1")).not.toHaveProperty("month");
+    expect(buildEmployeeCashFlowInvoiceOptionsInput("company_1")).not.toHaveProperty("year");
+  });
+
   it("resolves legacy month/year search params into a payment month key", () => {
     expect(
       resolveEmployeeCashFlowMonthKey("4", "2026", new Date("2026-06-01T00:00:00Z")),
