@@ -78,7 +78,7 @@ export default function EmployeeCashFlowSavedRows({
         className="rounded-2xl p-6 text-sm"
         style={{ border: "1px solid var(--glass-border)", color: "var(--text-muted)" }}
       >
-        No saved employee cash flow rows for this company and month.
+        No saved employee cash flow rows for this company.
       </div>
     );
   }

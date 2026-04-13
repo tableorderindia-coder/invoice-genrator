@@ -107,7 +107,6 @@ export default async function EmployeeCashFlowPage({
   const savedRows = selectedCompanyId
     ? await listSavedEmployeeCashFlowEntries({
         companyId: selectedCompanyId,
-        paymentMonth: monthKey,
       })
     : [];
 
@@ -131,7 +130,11 @@ export default async function EmployeeCashFlowPage({
       <GlassPanel gradient>
         <form
           action="/employee-cash-flow"
-          className="grid gap-3 md:grid-cols-[1.2fr_180px_1.2fr_auto] md:items-end"
+          className={
+            selectedTab === "saved"
+              ? "grid gap-3 md:grid-cols-[1.2fr_auto] md:items-end"
+              : "grid gap-3 md:grid-cols-[1.2fr_180px_1.2fr_auto] md:items-end"
+          }
         >
           <label className="block">
             <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
@@ -145,34 +148,38 @@ export default async function EmployeeCashFlowPage({
               ))}
             </select>
           </label>
-          <label className="block">
-            <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
-              Month
-            </span>
-            <input name="month" type="month" defaultValue={monthKey} className={inputClass} />
-          </label>
-          <label className="block">
-            <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
-              Cashed-out invoices
-            </span>
-            <select
-              name="invoiceId"
-              multiple
-              defaultValue={selectedInvoiceIds}
-              className={inputClass}
-              style={{ minHeight: "180px" }}
-            >
-              {invoiceOptions.length === 0 ? (
-                <option value="">No cashed-out invoices available</option>
-              ) : (
-                invoiceOptions.map((invoice) => (
-                  <option key={invoice.id} value={invoice.id}>
-                    {invoice.invoiceNumber} ({invoice.year}-{String(invoice.month).padStart(2, "0")})
-                  </option>
-                ))
-              )}
-            </select>
-          </label>
+          {selectedTab === "compose" ? (
+            <>
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
+                  Month
+                </span>
+                <input name="month" type="month" defaultValue={monthKey} className={inputClass} />
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
+                  Cashed-out invoices
+                </span>
+                <select
+                  name="invoiceId"
+                  multiple
+                  defaultValue={selectedInvoiceIds}
+                  className={inputClass}
+                  style={{ minHeight: "180px" }}
+                >
+                  {invoiceOptions.length === 0 ? (
+                    <option value="">No cashed-out invoices available</option>
+                  ) : (
+                    invoiceOptions.map((invoice) => (
+                      <option key={invoice.id} value={invoice.id}>
+                        {invoice.invoiceNumber} ({invoice.year}-{String(invoice.month).padStart(2, "0")})
+                      </option>
+                    ))
+                  )}
+                </select>
+              </label>
+            </>
+          ) : null}
           <PendingSubmitButton
             className="gradient-btn"
             defaultText="Load"
@@ -203,10 +210,14 @@ export default async function EmployeeCashFlowPage({
       <GlassPanel gradient>
         <form action="/employee-cash-flow" className="mb-2 flex flex-wrap items-center gap-2">
           <input type="hidden" name="companyId" value={selectedCompanyId} />
-          <input type="hidden" name="month" value={monthKey} />
-          {selectedInvoiceIds.map((invoiceId) => (
-            <input key={invoiceId} type="hidden" name="invoiceId" value={invoiceId} />
-          ))}
+          {selectedTab === "compose" ? (
+            <>
+              <input type="hidden" name="month" value={monthKey} />
+              {selectedInvoiceIds.map((invoiceId) => (
+                <input key={invoiceId} type="hidden" name="invoiceId" value={invoiceId} />
+              ))}
+            </>
+          ) : null}
           <PendingSubmitButton
             name="tab"
             value="compose"

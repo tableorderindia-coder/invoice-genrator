@@ -1030,17 +1030,20 @@ export async function replaceInvoicePaymentEmployeeEntries(input: {
 
 export async function listSavedEmployeeCashFlowEntries(input: {
   companyId: string;
-  paymentMonth: string;
+  paymentMonth?: string;
 }) {
   const supabase = getSupabaseOrThrow();
-  const { data, error } = await supabase
+  let query = supabase
     .from("invoice_payment_employee_entries")
     .select(
       "id, invoice_payment_id, invoice_id, employee_id, company_id, payment_month, invoice_line_item_id, employee_name_snapshot, days_worked, days_in_month, monthly_paid_usd_cents, base_dollar_inward_usd_cents, onboarding_advance_usd_cents, reimbursement_usd_cents, reimbursement_labels_text, appraisal_advance_usd_cents, offboarding_deduction_usd_cents, cashout_usd_inr_rate, paid_usd_inr_rate, pf_inr_cents, tds_inr_cents, actual_paid_inr_cents, fx_commission_inr_cents, total_commission_usd_cents, commission_earned_inr_cents, gross_earnings_inr_cents, is_non_invoice_employee, is_paid, paid_at, notes",
     )
     .eq("company_id", input.companyId)
-    .eq("payment_month", input.paymentMonth)
     .order("employee_name_snapshot");
+  if (input.paymentMonth) {
+    query = query.eq("payment_month", input.paymentMonth);
+  }
+  const { data, error } = await query;
   if (error) throw error;
 
   const rows = (data ?? []) as DbCashFlowEntry[];
