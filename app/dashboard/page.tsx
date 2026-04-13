@@ -273,11 +273,25 @@ export default async function DashboardPage({
                       {section.rows.map((row) => (
                         <tr key={row.payoutId}>
                           <td>{formatMonthYear(row.month, row.year)}</td>
-                          <td>{`${row.daysWorked}/${row.daysInMonth}`}</td>
                           <td>
                             <form id={`dashboard-payout-${row.payoutId}`} action={updateDashboardEmployeeCashFlowEntryAction}></form>
                             <input type="hidden" form={`dashboard-payout-${row.payoutId}`} name="payoutId" value={row.payoutId} />
                             <input type="hidden" form={`dashboard-payout-${row.payoutId}`} name="returnTo" value={returnTo} />
+                            <div className="flex items-center gap-2">
+                              <input
+                                form={`dashboard-payout-${row.payoutId}`}
+                                type="number"
+                                name="daysWorked"
+                                min="1"
+                                step="1"
+                                defaultValue={row.daysWorked}
+                                className={inputClass}
+                                style={{ minWidth: "6rem", border: "1px solid var(--glass-border)", background: "rgba(255,255,255,0.04)", color: "var(--text-primary)" }}
+                              />
+                              <span style={{ color: "var(--text-muted)" }}>/ {row.daysInMonth}</span>
+                            </div>
+                          </td>
+                          <td>
                             <input
                               form={`dashboard-payout-${row.payoutId}`}
                               type="number"

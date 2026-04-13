@@ -841,6 +841,11 @@ export async function updateDashboardEmployeeCashFlowEntryAction(formData: FormD
   const returnTo = getString(formData, "returnTo") || "/dashboard";
 
   try {
+    const daysWorked = Number.parseFloat(getString(formData, "daysWorked"));
+    if (!Number.isFinite(daysWorked) || daysWorked <= 0) {
+      throw new Error("Days worked must be greater than 0.");
+    }
+
     const employeeMonthlyUsdCents = centsFromUsd(getString(formData, "employeeMonthlyUsd"));
     if (employeeMonthlyUsdCents <= 0) {
       throw new Error("Employee monthly dollars must be greater than 0.");
@@ -879,6 +884,7 @@ export async function updateDashboardEmployeeCashFlowEntryAction(formData: FormD
 
     await updateDashboardEmployeeCashFlowEntry({
       entryId,
+      daysWorked,
       dollarInwardUsdCents,
       employeeMonthlyUsdCents,
       cashoutUsdInrRate,
