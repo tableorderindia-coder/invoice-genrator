@@ -27,6 +27,19 @@ function toEditableRate(value: number) {
   return formatted.replace(/\.?0+$/, "");
 }
 
+function formatPaymentMonth(paymentMonth: string) {
+  const [year, month] = paymentMonth.split("-").map((value) => Number(value));
+  if (!year || !month) {
+    return paymentMonth;
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(year, month - 1, 1)));
+}
+
 export default function EmployeeCashFlowSavedRows({
   initialRows,
   returnTo,
@@ -99,15 +112,14 @@ export default function EmployeeCashFlowSavedRows({
             {employeeGroup.months.map(([month, monthRows]) => (
               <div key={`${employeeGroup.employeeId}-${month}`} className="space-y-3">
                 <p className="text-sm font-semibold" style={{ color: "var(--text-secondary)" }}>
-                  {month}
+                  {formatPaymentMonth(month)}
                 </p>
 
                 <div className="overflow-x-auto rounded-2xl" style={{ border: "1px solid var(--glass-border)" }}>
                   <table className="glass-table min-w-[1500px]">
                     <thead>
                       <tr>
-                        <th>Batch</th>
-                        <th>Invoice</th>
+                        <th>Month</th>
                         <th>Days worked</th>
                         <th>Monthly Paid $</th>
                         <th>Dollar inward</th>
@@ -135,8 +147,7 @@ export default function EmployeeCashFlowSavedRows({
 
                         return (
                           <tr key={row.id}>
-                            <td>{row.batchLabel ?? row.invoiceNumber}</td>
-                            <td>{row.invoiceNumber}</td>
+                            <td>{formatPaymentMonth(row.paymentMonth)}</td>
                             <td>
                               <input
                                 value={String(row.daysWorked)}
