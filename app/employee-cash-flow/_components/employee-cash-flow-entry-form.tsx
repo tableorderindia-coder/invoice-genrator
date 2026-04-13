@@ -66,6 +66,7 @@ function deriveCardMetrics(entry: EmployeeCashFlowEditableEntry) {
   });
   const actualPaidInrCents = calculateActualPaidInrCents({
     daysWorked: entry.daysWorked,
+    daysInMonth: entry.daysInMonth,
     monthlyPaidUsdCents: entry.monthlyPaidUsdCents,
     paidUsdInrRate: entry.paidUsdInrRate,
   });
@@ -392,9 +393,12 @@ export default function EmployeeCashFlowEntryForm({
           value={JSON.stringify(
             entries.map((entry) => ({
               ...entry,
-              actualPaidInrCents: Math.round(
-                entry.daysWorked * entry.monthlyPaidUsdCents * entry.paidUsdInrRate,
-              ),
+              actualPaidInrCents: calculateActualPaidInrCents({
+                daysWorked: entry.daysWorked,
+                daysInMonth: entry.daysInMonth,
+                monthlyPaidUsdCents: entry.monthlyPaidUsdCents,
+                paidUsdInrRate: entry.paidUsdInrRate,
+              }),
             })),
           )}
         />

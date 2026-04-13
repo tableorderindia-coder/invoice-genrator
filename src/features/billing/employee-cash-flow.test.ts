@@ -40,14 +40,15 @@ describe("employee cash flow calculations", () => {
     ).toBe(-50_000_00);
   });
 
-  it("derives actual paid INR from days worked, monthly paid dollars, and paid rate", () => {
+  it("derives actual paid INR by prorating monthly paid dollars over days in month", () => {
     expect(
       calculateActualPaidInrCents({
         daysWorked: 3,
+        daysInMonth: 30,
         monthlyPaidUsdCents: 100_00,
         paidUsdInrRate: 84.5,
       }),
-    ).toBe(25_35_000);
+    ).toBe(84_500);
   });
 
   it("flags waiting-for-payment when salary is paid and inward is zero", () => {

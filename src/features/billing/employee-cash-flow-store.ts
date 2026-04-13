@@ -751,6 +751,7 @@ export async function getInvoicePaymentPrefillData(input: {
               row.actual_paid_inr_cents ??
               calculateActualPaidInrCents({
                 daysWorked: lineItem?.days_worked ?? daysInMonth,
+                daysInMonth,
                 monthlyPaidUsdCents,
                 paidUsdInrRate: row.paid_usd_inr_rate ?? 0,
               }),
@@ -977,6 +978,7 @@ export async function replaceInvoicePaymentEmployeeEntries(input: {
     });
     const actualPaidInrCents = calculateActualPaidInrCents({
       daysWorked: entry.daysWorked,
+      daysInMonth: entry.daysInMonth,
       monthlyPaidUsdCents: entry.monthlyPaidUsdCents,
       paidUsdInrRate: entry.paidUsdInrRate,
     });
@@ -1111,6 +1113,7 @@ export async function updateSavedEmployeeCashFlowEntry(
   });
   const actualPaidInrCents = calculateActualPaidInrCents({
     daysWorked: entry.daysWorked,
+    daysInMonth: entry.daysInMonth,
     monthlyPaidUsdCents: entry.monthlyPaidUsdCents,
     paidUsdInrRate: entry.paidUsdInrRate,
   });
@@ -1175,7 +1178,7 @@ export async function updateDashboardEmployeeCashFlowEntry(input: {
   const { data: currentRow, error: currentError } = await supabase
     .from("invoice_payment_employee_entries")
     .select(
-      "id, days_worked, base_dollar_inward_usd_cents, onboarding_advance_usd_cents, reimbursement_usd_cents, appraisal_advance_usd_cents, offboarding_deduction_usd_cents",
+      "id, days_worked, days_in_month, base_dollar_inward_usd_cents, onboarding_advance_usd_cents, reimbursement_usd_cents, appraisal_advance_usd_cents, offboarding_deduction_usd_cents",
     )
     .eq("id", input.entryId)
     .single();
@@ -1185,6 +1188,7 @@ export async function updateDashboardEmployeeCashFlowEntry(input: {
     DbCashFlowEntry,
     | "id"
     | "days_worked"
+    | "days_in_month"
     | "base_dollar_inward_usd_cents"
     | "onboarding_advance_usd_cents"
     | "reimbursement_usd_cents"
@@ -1208,6 +1212,7 @@ export async function updateDashboardEmployeeCashFlowEntry(input: {
   });
   const actualPaidInrCents = calculateActualPaidInrCents({
     daysWorked: input.daysWorked ?? current.days_worked,
+    daysInMonth: current.days_in_month,
     monthlyPaidUsdCents: input.employeeMonthlyUsdCents,
     paidUsdInrRate: input.paidUsdInrRate,
   });

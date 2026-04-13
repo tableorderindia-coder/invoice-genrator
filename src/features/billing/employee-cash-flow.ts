@@ -37,11 +37,16 @@ export function calculateEmployeeMonthNetInrCents(input: {
 
 export function calculateActualPaidInrCents(input: {
   daysWorked: number;
+  daysInMonth: number;
   monthlyPaidUsdCents: number;
   paidUsdInrRate: number;
 }) {
+  const normalizedDaysInMonth = Math.max(1, Math.round(input.daysInMonth));
   return Math.round(
-    input.daysWorked * input.monthlyPaidUsdCents * input.paidUsdInrRate,
+    (input.daysWorked *
+      input.monthlyPaidUsdCents *
+      input.paidUsdInrRate) /
+      normalizedDaysInMonth,
   );
 }
 

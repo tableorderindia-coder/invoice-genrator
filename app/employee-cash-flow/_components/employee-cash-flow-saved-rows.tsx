@@ -141,6 +141,7 @@ export default function EmployeeCashFlowSavedRows({
                       {monthRows.map((row) => {
                         const actualPaidInrCents = calculateActualPaidInrCents({
                           daysWorked: row.daysWorked,
+                          daysInMonth: row.daysInMonth,
                           monthlyPaidUsdCents: row.monthlyPaidUsdCents,
                           paidUsdInrRate: row.paidUsdInrRate,
                         });
