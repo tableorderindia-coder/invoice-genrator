@@ -1111,13 +1111,6 @@ export async function updateSavedEmployeeCashFlowEntry(
     appraisalAdvanceUsdCents: entry.appraisalAdvanceUsdCents,
     offboardingDeductionUsdCents: entry.offboardingDeductionUsdCents,
   });
-  const actualPaidInrCents = calculateActualPaidInrCents({
-    daysWorked: entry.daysWorked,
-    daysInMonth: entry.daysInMonth,
-    monthlyPaidUsdCents: entry.monthlyPaidUsdCents,
-    paidUsdInrRate: entry.paidUsdInrRate,
-  });
-
   const { error } = await supabase
     .from("invoice_payment_employee_entries")
     .update({
@@ -1139,7 +1132,7 @@ export async function updateSavedEmployeeCashFlowEntry(
       }),
       pf_inr_cents: entry.pfInrCents,
       tds_inr_cents: entry.tdsInrCents,
-      actual_paid_inr_cents: actualPaidInrCents,
+      actual_paid_inr_cents: entry.actualPaidInrCents,
       fx_commission_inr_cents: entry.fxCommissionInrCents,
       total_commission_usd_cents: entry.totalCommissionUsdCents,
       commission_earned_inr_cents: entry.commissionEarnedInrCents,
@@ -1210,13 +1203,6 @@ export async function updateDashboardEmployeeCashFlowEntry(input: {
     cashoutUsdInrRate: input.cashoutUsdInrRate,
     paidUsdInrRate: input.paidUsdInrRate,
   });
-  const actualPaidInrCents = calculateActualPaidInrCents({
-    daysWorked: input.daysWorked ?? current.days_worked,
-    daysInMonth: current.days_in_month,
-    monthlyPaidUsdCents: input.employeeMonthlyUsdCents,
-    paidUsdInrRate: input.paidUsdInrRate,
-  });
-
   const { error } = await supabase
     .from("invoice_payment_employee_entries")
     .update({
@@ -1232,7 +1218,7 @@ export async function updateDashboardEmployeeCashFlowEntry(input: {
       }),
       pf_inr_cents: input.pfInrCents,
       tds_inr_cents: input.tdsInrCents,
-      actual_paid_inr_cents: actualPaidInrCents,
+      actual_paid_inr_cents: input.actualPaidInrCents,
       fx_commission_inr_cents: payoutMetrics.fxCommissionInrCents,
       total_commission_usd_cents: payoutMetrics.totalCommissionUsdCents,
       commission_earned_inr_cents: payoutMetrics.commissionEarnedInrCents,
