@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   appendMissingAdjustmentEntries,
   buildEmployeeCashFlowMonthRows,
+  buildInvoiceCashFlowFallbackEntries,
   normalizeEmployeeNameForMatch,
 } from "./employee-cash-flow-store";
 import { calculateEffectiveDollarInwardUsdCents } from "./employee-cash-flow";
@@ -209,5 +210,75 @@ describe("employee cash flow store shaping", () => {
         invoiceNumber: "INV-1",
       },
     ]);
+  });
+
+  it("falls back to invoice line items when payouts are missing", () => {
+    const entries = buildInvoiceCashFlowFallbackEntries({
+      invoice: {
+        id: "inv_2025_004",
+        invoice_number: "2025/004",
+        company_id: "comp_1",
+        month: 10,
+        year: 2025,
+        status: "cashed_out",
+      },
+      invoicePayment: null,
+      lineItems: [
+        {
+          id: "line_1",
+          employee_id: "emp_1",
+          employee_name_snapshot: "Nirbhay Kumar Giri",
+          payout_monthly_usd_cents_snapshot: 250_000,
+          billed_total_usd_cents: 400_000,
+          manual_total_usd_cents: null,
+          days_worked: 31,
+        },
+      ],
+      availableEmployees: [
+        {
+          id: "emp_1",
+          fullName: "Nirbhay Kumar Giri",
+          companyId: "comp_1",
+          payoutMonthlyUsdCents: 250_000,
+          onboardingAdvanceUsdCents: 50_000,
+          reimbursementUsdCents: 25_000,
+          reimbursementLabelsText: "Laptop",
+          appraisalAdvanceUsdCents: 10_000,
+          offboardingDeductionUsdCents: 5_000,
+        },
+      ],
+      onboardingByEmployeeName: new Map([["nirbhay kumar giri", 50_000]]),
+      reimbursementByEmployeeName: new Map([["nirbhay kumar giri", 25_000]]),
+      reimbursementLabelsByEmployeeName: new Map([
+        ["nirbhay kumar giri", new Set(["Laptop"])],
+      ]),
+      appraisalByEmployeeName: new Map([["nirbhay kumar giri", 10_000]]),
+      offboardingByEmployeeName: new Map([["nirbhay kumar giri", 5_000]]),
+      realization: {
+        invoice_id: "inv_2025_004",
+        dollar_inbound_usd_cents: 0,
+        usd_inr_rate: 84,
+      },
+      daysInMonth: 31,
+    });
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      invoiceId: "inv_2025_004",
+      invoiceNumber: "2025/004",
+      employeeId: "emp_1",
+      employeeNameSnapshot: "Nirbhay Kumar Giri",
+      invoiceLineItemId: "line_1",
+      daysWorked: 31,
+      monthlyPaidUsdCents: 250_000,
+      baseDollarInwardUsdCents: 400_000,
+      onboardingAdvanceUsdCents: 50_000,
+      reimbursementUsdCents: 25_000,
+      reimbursementLabelsText: "Laptop",
+      appraisalAdvanceUsdCents: 10_000,
+      offboardingDeductionUsdCents: 5_000,
+      effectiveDollarInwardUsdCents: 480_000,
+      cashoutUsdInrRate: 84,
+    });
   });
 });
