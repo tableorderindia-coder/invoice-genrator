@@ -263,6 +263,81 @@ describe("pn dashboard aggregations", () => {
     expect(sections[0]?.totalNetProfitInrCents).toBe(7858250);
   });
 
+  it("merges editable rows by employee and month", () => {
+    const sections = buildPnEmployeeEditableSections([
+      {
+        ...editableSampleRows[0],
+        rowId: "cash_a",
+        month: 1,
+        daysWorked: 10,
+        baseDollarInwardUsdCents: 50000,
+        onboardingAdvanceUsdCents: 10000,
+        reimbursementUsdCents: 2000,
+        reimbursementLabelsText: "Laptop",
+        appraisalAdvanceUsdCents: 0,
+        offboardingDeductionUsdCents: 0,
+        effectiveDollarInwardUsdCents: 62000,
+        cashInInrCents: 5200000,
+        employeeMonthlyUsdCents: 70000,
+        cashoutUsdInrRate: 83.2,
+        paidUsdInrRate: 82.1,
+        pfInrCents: 10000,
+        tdsInrCents: 5000,
+        actualPaidInrCents: 300000,
+        fxCommissionInrCents: 20000,
+        totalCommissionUsdCents: 15000,
+        commissionEarnedInrCents: 60000,
+        grossEarningsInrCents: 80000,
+        netProfitInrCents: 4900000,
+        invoiceNumber: "INV-001",
+      },
+      {
+        ...editableSampleRows[0],
+        rowId: "cash_b",
+        month: 1,
+        daysWorked: 15,
+        baseDollarInwardUsdCents: 40000,
+        onboardingAdvanceUsdCents: 0,
+        reimbursementUsdCents: 3000,
+        reimbursementLabelsText: "Bonus",
+        appraisalAdvanceUsdCents: 1000,
+        offboardingDeductionUsdCents: 0,
+        effectiveDollarInwardUsdCents: 44000,
+        cashInInrCents: 3650000,
+        employeeMonthlyUsdCents: 70000,
+        cashoutUsdInrRate: 83.2,
+        paidUsdInrRate: 82.1,
+        pfInrCents: 12000,
+        tdsInrCents: 8000,
+        actualPaidInrCents: 200000,
+        fxCommissionInrCents: 15000,
+        totalCommissionUsdCents: 10000,
+        commissionEarnedInrCents: 40000,
+        grossEarningsInrCents: 55000,
+        netProfitInrCents: 3450000,
+        invoiceNumber: "INV-002",
+      },
+    ]);
+
+    expect(sections).toHaveLength(1);
+    expect(sections[0]?.rows).toHaveLength(1);
+    expect(sections[0]?.rows[0]).toMatchObject({
+      month: 1,
+      daysWorked: 25,
+      baseDollarInwardUsdCents: 90000,
+      reimbursementUsdCents: 5000,
+      appraisalAdvanceUsdCents: 1000,
+      cashInInrCents: 8850000,
+      actualPaidInrCents: 500000,
+      pfInrCents: 22000,
+      tdsInrCents: 13000,
+      totalCommissionUsdCents: 25000,
+      commissionEarnedInrCents: 100000,
+      grossEarningsInrCents: 135000,
+    });
+    expect(sections[0]?.rows[0]?.invoiceNumber).toBe("INV-001, INV-002");
+  });
+
   it("keeps negative and positive dashboard net profit values distinct", () => {
     const sections = buildPnEmployeeEditableSections([
       {

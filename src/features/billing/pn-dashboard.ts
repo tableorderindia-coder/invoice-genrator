@@ -147,6 +147,9 @@ const averageRate = (rows: PnSourceRow[], key: "cashoutUsdInrRate" | "paidUsdInr
 const sumBy = (rows: PnSourceRow[], key: keyof PnSourceRow) =>
   rows.reduce((sum, row) => sum + Number(row[key]), 0);
 
+const sumEditableBy = (rows: PnEditableSourceRow[], key: keyof PnEditableSourceRow) =>
+  rows.reduce((sum, row) => sum + Number(row[key]), 0);
+
 const toEmployeeMonthRow = (rows: PnSourceRow[]): PnEmployeeMonthRow => {
   const first = rows[0];
   const fxCommissionInrCents = sumBy(rows, "fxCommissionInrCents");
@@ -182,6 +185,74 @@ const toEmployeeMonthRow = (rows: PnSourceRow[]): PnEmployeeMonthRow => {
     commissionEarnedInrCents,
     grossEarningsInrCents: fxCommissionInrCents + commissionEarnedInrCents,
   };
+};
+
+const mergeEditableRowsByMonth = (rows: PnEditableSourceRow[]) => {
+  const grouped = new Map<string, PnEditableSourceRow[]>();
+  for (const row of rows) {
+    const key = `${row.employeeId}:${monthKey(row.year, row.month)}`;
+    const list = grouped.get(key) ?? [];
+    list.push(row);
+    grouped.set(key, list);
+  }
+
+  return [...grouped.values()].map((bucket) => {
+    const last = bucket[bucket.length - 1];
+    const labels = new Set<string>();
+    const invoiceNumbers = new Set<string>();
+
+    for (const row of bucket) {
+      if (row.reimbursementLabelsText) {
+        row.reimbursementLabelsText
+          .split(",")
+          .map((label) => label.trim())
+          .filter(Boolean)
+          .forEach((label) => labels.add(label));
+      }
+      if (row.invoiceNumber) {
+        row.invoiceNumber
+          .split(",")
+          .map((value) => value.trim())
+          .filter(Boolean)
+          .forEach((value) => invoiceNumbers.add(value));
+      }
+    }
+
+    const grossEarningsInrCents = sumEditableBy(bucket, "grossEarningsInrCents");
+
+    return {
+      ...last,
+      rowId: last.rowId,
+      invoiceId: last.invoiceId,
+      invoiceNumber: [...invoiceNumbers].sort().join(", "),
+      daysWorked: sumEditableBy(bucket, "daysWorked"),
+      daysInMonth: last.daysInMonth,
+      baseDollarInwardUsdCents: sumEditableBy(bucket, "baseDollarInwardUsdCents"),
+      onboardingAdvanceUsdCents: sumEditableBy(bucket, "onboardingAdvanceUsdCents"),
+      reimbursementUsdCents: sumEditableBy(bucket, "reimbursementUsdCents"),
+      reimbursementLabelsText: [...labels].join(", "),
+      appraisalAdvanceUsdCents: sumEditableBy(bucket, "appraisalAdvanceUsdCents"),
+      offboardingDeductionUsdCents: sumEditableBy(bucket, "offboardingDeductionUsdCents"),
+      effectiveDollarInwardUsdCents: sumEditableBy(
+        bucket,
+        "effectiveDollarInwardUsdCents",
+      ),
+      cashInInrCents: sumEditableBy(bucket, "cashInInrCents"),
+      employeeMonthlyUsdCents: sumEditableBy(bucket, "employeeMonthlyUsdCents"),
+      cashoutUsdInrRate: last.cashoutUsdInrRate,
+      paidUsdInrRate: last.paidUsdInrRate,
+      salaryPaidInrCents: sumEditableBy(bucket, "salaryPaidInrCents"),
+      pfInrCents: sumEditableBy(bucket, "pfInrCents"),
+      tdsInrCents: sumEditableBy(bucket, "tdsInrCents"),
+      actualPaidInrCents: sumEditableBy(bucket, "actualPaidInrCents"),
+      fxCommissionInrCents: sumEditableBy(bucket, "fxCommissionInrCents"),
+      totalCommissionUsdCents: sumEditableBy(bucket, "totalCommissionUsdCents"),
+      commissionEarnedInrCents: sumEditableBy(bucket, "commissionEarnedInrCents"),
+      grossEarningsInrCents,
+      netProfitInrCents: sumEditableBy(bucket, "netProfitInrCents"),
+      isSecurityDepositMonth: last.isSecurityDepositMonth,
+    };
+  });
 };
 
 export function buildPnEmployeeSections(rows: PnSourceRow[]): PnEmployeeSection[] {
@@ -225,7 +296,9 @@ export function buildPnEmployeeEditableSections(
 ): PnEmployeeEditableSection[] {
   const grouped = new Map<string, PnEmployeeEditableSection>();
 
-  for (const row of rows) {
+  const mergedRows = mergeEditableRowsByMonth(rows);
+
+  for (const row of mergedRows) {
     const existing =
       grouped.get(row.employeeId) ??
       {
