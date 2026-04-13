@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  applyEmployeeCashFlowEntryPatch,
   buildAddedEmployeeCashFlowEntry,
   buildEmployeeCashFlowInvoiceOptionsInput,
   getDaysInMonthFromMonthKey,
@@ -68,6 +69,46 @@ describe("employee cash flow page state", () => {
       baseDollarInwardUsdCents: 0,
       cashoutUsdInrRate: 84.25,
       isNonInvoiceEmployee: true,
+    });
+  });
+
+  it("keeps formula-based actual paid in sync until manually overridden", () => {
+    expect(
+      applyEmployeeCashFlowEntryPatch(
+        {
+          daysWorked: 10,
+          daysInMonth: 30,
+          monthlyPaidUsdCents: 3_000_00,
+          paidUsdInrRate: 80,
+          actualPaidInrCents: 8_000_000,
+        },
+        {
+          daysWorked: 15,
+        },
+      ),
+    ).toMatchObject({
+      daysWorked: 15,
+      actualPaidInrCents: 12_000_000,
+    });
+  });
+
+  it("preserves manual actual paid overrides when formula inputs change", () => {
+    expect(
+      applyEmployeeCashFlowEntryPatch(
+        {
+          daysWorked: 10,
+          daysInMonth: 30,
+          monthlyPaidUsdCents: 3_000_00,
+          paidUsdInrRate: 80,
+          actualPaidInrCents: 950_000,
+        },
+        {
+          daysWorked: 15,
+        },
+      ),
+    ).toMatchObject({
+      daysWorked: 15,
+      actualPaidInrCents: 950_000,
     });
   });
 

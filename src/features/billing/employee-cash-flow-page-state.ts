@@ -1,5 +1,6 @@
 type SearchValue = string | string[] | undefined;
 
+import { calculateActualPaidInrCents } from "./employee-cash-flow";
 import type { EmployeeCashFlowEntryWriteInput } from "./employee-cash-flow-types";
 
 type EmployeeOption = {
@@ -160,5 +161,56 @@ export function buildAddedEmployeeCashFlowEntry(input: {
     isNonInvoiceEmployee: true,
     isPaid: false,
     notes: "",
+  };
+}
+
+export function applyEmployeeCashFlowEntryPatch<
+  TEntry extends Pick<
+    EmployeeCashFlowEntryWriteInput,
+    | "daysWorked"
+    | "daysInMonth"
+    | "monthlyPaidUsdCents"
+    | "paidUsdInrRate"
+    | "actualPaidInrCents"
+  >,
+>(entry: TEntry, patch: Partial<TEntry>) {
+  const nextEntry = { ...entry, ...patch } as TEntry;
+
+  if (patch.actualPaidInrCents !== undefined) {
+    return nextEntry;
+  }
+
+  const touchesCalculatedInputs =
+    patch.daysWorked !== undefined ||
+    patch.daysInMonth !== undefined ||
+    patch.monthlyPaidUsdCents !== undefined ||
+    patch.paidUsdInrRate !== undefined;
+
+  if (!touchesCalculatedInputs) {
+    return nextEntry;
+  }
+
+  const previousCalculatedActualPaid = calculateActualPaidInrCents({
+    daysWorked: entry.daysWorked,
+    daysInMonth: entry.daysInMonth,
+    monthlyPaidUsdCents: entry.monthlyPaidUsdCents,
+    paidUsdInrRate: entry.paidUsdInrRate,
+  });
+
+  if (
+    entry.actualPaidInrCents !== 0 &&
+    entry.actualPaidInrCents !== previousCalculatedActualPaid
+  ) {
+    return nextEntry;
+  }
+
+  return {
+    ...nextEntry,
+    actualPaidInrCents: calculateActualPaidInrCents({
+      daysWorked: nextEntry.daysWorked,
+      daysInMonth: nextEntry.daysInMonth,
+      monthlyPaidUsdCents: nextEntry.monthlyPaidUsdCents,
+      paidUsdInrRate: nextEntry.paidUsdInrRate,
+    }),
   };
 }

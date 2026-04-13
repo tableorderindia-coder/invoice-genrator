@@ -6,7 +6,6 @@ import { inputClass } from "@/app/_components/field";
 import { PendingSubmitButton } from "@/app/_components/pending-submit-button";
 import { saveInvoicePaymentEmployeeEntriesAction } from "@/src/features/billing/actions";
 import {
-  calculateActualPaidInrCents,
   calculateCashInInrCents,
   calculateEffectiveDollarInwardUsdCents,
   calculateEmployeeMonthNetInrCents,
@@ -17,6 +16,7 @@ import {
   type EmployeeCashFlowEditableEntry,
 } from "@/src/features/billing/employee-cash-flow-entry-aggregation";
 import {
+  applyEmployeeCashFlowEntryPatch,
   buildAddedEmployeeCashFlowEntry,
   nextCashFlowClientBatchId,
   removeEntryFromSelections,
@@ -64,12 +64,7 @@ function deriveCardMetrics(entry: EmployeeCashFlowEditableEntry) {
     effectiveDollarInwardUsdCents,
     cashoutUsdInrRate: entry.cashoutUsdInrRate,
   });
-  const actualPaidInrCents = calculateActualPaidInrCents({
-    daysWorked: entry.daysWorked,
-    daysInMonth: entry.daysInMonth,
-    monthlyPaidUsdCents: entry.monthlyPaidUsdCents,
-    paidUsdInrRate: entry.paidUsdInrRate,
-  });
+  const actualPaidInrCents = entry.actualPaidInrCents;
   const netInrCents = calculateEmployeeMonthNetInrCents({
     cashInInrCents,
     salaryPaidInrCents: actualPaidInrCents,
@@ -157,7 +152,9 @@ export default function EmployeeCashFlowEntryForm({
 
   function updateEntry(id: string, patch: Partial<EmployeeCashFlowEditableEntry>) {
     setEntries((current) =>
-      current.map((entry) => (entry.id === id ? { ...entry, ...patch } : entry)),
+      current.map((entry) =>
+        entry.id === id ? applyEmployeeCashFlowEntryPatch(entry, patch) : entry,
+      ),
     );
   }
 
@@ -390,17 +387,7 @@ export default function EmployeeCashFlowEntryForm({
         <input
           type="hidden"
           name="entriesJson"
-          value={JSON.stringify(
-            entries.map((entry) => ({
-              ...entry,
-              actualPaidInrCents: calculateActualPaidInrCents({
-                daysWorked: entry.daysWorked,
-                daysInMonth: entry.daysInMonth,
-                monthlyPaidUsdCents: entry.monthlyPaidUsdCents,
-                paidUsdInrRate: entry.paidUsdInrRate,
-              }),
-            })),
-          )}
+          value={JSON.stringify(entries)}
         />
 
         {visibleEntries.map((entry) => {
@@ -623,16 +610,14 @@ export default function EmployeeCashFlowEntryForm({
                     Actual paid (INR)
                   </span>
                   <input
-                    value={toCurrencyInput(
-                      calculateActualPaidInrCents({
-                        daysWorked: entry.daysWorked,
-                        daysInMonth: entry.daysInMonth,
-                        monthlyPaidUsdCents: entry.monthlyPaidUsdCents,
-                        paidUsdInrRate: entry.paidUsdInrRate,
-                      }),
-                    )}
+                    value={toCurrencyInput(entry.actualPaidInrCents)}
+                    onChange={(event) =>
+                      updateEntry(entry.id, {
+                        actualPaidInrCents: fromCurrencyInput(event.target.value),
+                      })
+                    }
                     className={cardInputClass()}
-                    readOnly
+                    inputMode="decimal"
                   />
                 </label>
 
@@ -783,22 +768,12 @@ export default function EmployeeCashFlowEntryForm({
               </label>
 
               <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-                {[ 
+                {[
                   ["Effective inward", formatUsd(metrics.effectiveDollarInwardUsdCents)],
                   ["Reimbursements / Expenses INR", formatInr(Math.round(entry.reimbursementUsdCents * entry.cashoutUsdInrRate))],
                   ["Appraisal advance INR", formatInr(Math.round(entry.appraisalAdvanceUsdCents * entry.cashoutUsdInrRate))],
                   ["Cash in INR", formatInr(metrics.cashInInrCents)],
-                  [
-                    "Total paid INR",
-                    formatInr(
-                      calculateActualPaidInrCents({
-                        daysWorked: entry.daysWorked,
-                        daysInMonth: entry.daysInMonth,
-                        monthlyPaidUsdCents: entry.monthlyPaidUsdCents,
-                        paidUsdInrRate: entry.paidUsdInrRate,
-                      }),
-                    ),
-                  ],
+                  ["Total paid INR", formatInr(metrics.salaryPaidInrCents)],
                   ["Pending amount", formatInr(metrics.pendingAmountInrCents)],
                   ["Net result", formatInr(metrics.netInrCents)],
                 ].map(([label, value]) => (
@@ -815,6 +790,14 @@ export default function EmployeeCashFlowEntryForm({
                     </p>
                   </div>
                 ))}
+              </div>
+
+              <div className="mt-4 flex justify-end">
+                <PendingSubmitButton
+                  className="btn-outline"
+                  defaultText="Update row"
+                  pendingText="Updating row..."
+                />
               </div>
             </div>
           );
