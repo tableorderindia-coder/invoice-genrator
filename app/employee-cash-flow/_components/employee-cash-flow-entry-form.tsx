@@ -624,9 +624,12 @@ export default function EmployeeCashFlowEntryForm({
                   </span>
                   <input
                     value={toCurrencyInput(
-                      Math.round(
-                        entry.daysWorked * entry.monthlyPaidUsdCents * entry.paidUsdInrRate,
-                      ),
+                      calculateActualPaidInrCents({
+                        daysWorked: entry.daysWorked,
+                        daysInMonth: entry.daysInMonth,
+                        monthlyPaidUsdCents: entry.monthlyPaidUsdCents,
+                        paidUsdInrRate: entry.paidUsdInrRate,
+                      }),
                     )}
                     className={cardInputClass()}
                     readOnly
@@ -788,9 +791,12 @@ export default function EmployeeCashFlowEntryForm({
                   [
                     "Total paid INR",
                     formatInr(
-                      Math.round(
-                        entry.daysWorked * entry.monthlyPaidUsdCents * entry.paidUsdInrRate,
-                      ),
+                      calculateActualPaidInrCents({
+                        daysWorked: entry.daysWorked,
+                        daysInMonth: entry.daysInMonth,
+                        monthlyPaidUsdCents: entry.monthlyPaidUsdCents,
+                        paidUsdInrRate: entry.paidUsdInrRate,
+                      }),
                     ),
                   ],
                   ["Pending amount", formatInr(metrics.pendingAmountInrCents)],

@@ -1220,6 +1220,7 @@ export async function updateDashboardEmployeeCashFlowEntry(input: {
   const { error } = await supabase
     .from("invoice_payment_employee_entries")
     .update({
+      days_worked: input.daysWorked ?? current.days_worked,
       base_dollar_inward_usd_cents: baseDollarInwardUsdCents,
       effective_dollar_inward_usd_cents: effectiveDollarInwardUsdCents,
       monthly_paid_usd_cents: input.employeeMonthlyUsdCents,
