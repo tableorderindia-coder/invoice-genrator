@@ -5,6 +5,8 @@ const redirectMock = vi.fn((path: string) => {
   throw new Error(`REDIRECT:${path}`);
 });
 const updateDashboardEmployeeCashFlowEntryMock = vi.fn();
+const replaceInvoicePaymentEmployeeEntriesMock = vi.fn();
+const upsertInvoicePaymentMock = vi.fn();
 
 vi.mock("next/cache", () => ({
   revalidatePath: revalidatePathMock,
@@ -46,11 +48,11 @@ vi.mock("./store", () => ({
 
 vi.mock("./employee-cash-flow-store", () => ({
   deleteSavedEmployeeCashFlowEntry: vi.fn(),
-  replaceInvoicePaymentEmployeeEntries: vi.fn(),
+  replaceInvoicePaymentEmployeeEntries: replaceInvoicePaymentEmployeeEntriesMock,
   updateSavedEmployeeCashFlowEntry: vi.fn(),
   updateDashboardEmployeeCashFlowEntry: updateDashboardEmployeeCashFlowEntryMock,
   upsertEmployeeSalaryPayment: vi.fn(),
-  upsertInvoicePayment: vi.fn(),
+  upsertInvoicePayment: upsertInvoicePaymentMock,
 }));
 
 describe("updateDashboardEmployeeCashFlowEntryAction", () => {
@@ -59,6 +61,9 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
     redirectMock.mockClear();
     updateDashboardEmployeeCashFlowEntryMock.mockReset();
     updateDashboardEmployeeCashFlowEntryMock.mockResolvedValue(undefined);
+    replaceInvoicePaymentEmployeeEntriesMock.mockReset();
+    upsertInvoicePaymentMock.mockReset();
+    upsertInvoicePaymentMock.mockResolvedValue("pay_1");
   });
 
   it("passes days worked through to the dashboard cash-flow update", async () => {
@@ -92,5 +97,63 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
     });
     expect(revalidatePathMock).toHaveBeenCalledWith("/dashboard");
     expect(revalidatePathMock).toHaveBeenCalledWith("/employee-cash-flow");
+  });
+
+  it("passes manual actual paid values through compose cash-flow saves", async () => {
+    const { saveInvoicePaymentEmployeeEntriesAction } = await import("./actions");
+    const formData = new FormData();
+    formData.set("companyId", "comp_1");
+    formData.set("paymentMonth", "2026-04");
+    formData.set("returnTo", "/employee-cash-flow?companyId=comp_1&paymentMonth=2026-04");
+    formData.set(
+      "entriesJson",
+      JSON.stringify([
+        {
+          clientBatchId: "batch_1",
+          invoicePaymentId: undefined,
+          batchLabel: "INV-1",
+          invoiceId: "inv_1",
+          invoiceNumber: "INV-1",
+          employeeId: "emp_1",
+          employeeNameSnapshot: "Asha",
+          daysWorked: 10,
+          daysInMonth: 30,
+          monthlyPaidUsdCents: 300000,
+          baseDollarInwardUsdCents: 0,
+          onboardingAdvanceUsdCents: 0,
+          reimbursementUsdCents: 0,
+          reimbursementLabelsText: "",
+          appraisalAdvanceUsdCents: 0,
+          offboardingDeductionUsdCents: 0,
+          cashoutUsdInrRate: 84,
+          paidUsdInrRate: 82,
+          pfInrCents: 0,
+          tdsInrCents: 0,
+          actualPaidInrCents: 950000,
+          fxCommissionInrCents: 0,
+          totalCommissionUsdCents: 0,
+          commissionEarnedInrCents: 0,
+          grossEarningsInrCents: 0,
+          isNonInvoiceEmployee: false,
+          isPaid: false,
+          notes: "",
+        },
+      ]),
+    );
+
+    await expect(saveInvoicePaymentEmployeeEntriesAction(formData)).rejects.toThrow(
+      "REDIRECT:/employee-cash-flow?companyId=comp_1&paymentMonth=2026-04&flashStatus=success&flashMessage=Employee%20cash%20flow%20rows%20saved.",
+    );
+
+    expect(replaceInvoicePaymentEmployeeEntriesMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entries: [
+          expect.objectContaining({
+            employeeId: "emp_1",
+            actualPaidInrCents: 950000,
+          }),
+        ],
+      }),
+    );
   });
 });

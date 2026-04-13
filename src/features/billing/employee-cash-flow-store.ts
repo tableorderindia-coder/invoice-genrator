@@ -964,12 +964,6 @@ export async function replaceInvoicePaymentEmployeeEntries(input: {
       appraisalAdvanceUsdCents: entry.appraisalAdvanceUsdCents,
       offboardingDeductionUsdCents: entry.offboardingDeductionUsdCents,
     });
-    const actualPaidInrCents = calculateActualPaidInrCents({
-      daysWorked: entry.daysWorked,
-      daysInMonth: entry.daysInMonth,
-      monthlyPaidUsdCents: entry.monthlyPaidUsdCents,
-      paidUsdInrRate: entry.paidUsdInrRate,
-    });
 
     return {
       id: nextCashFlowId("cash_entry"),
@@ -998,7 +992,7 @@ export async function replaceInvoicePaymentEmployeeEntries(input: {
       }),
       pf_inr_cents: entry.pfInrCents,
       tds_inr_cents: entry.tdsInrCents,
-      actual_paid_inr_cents: actualPaidInrCents,
+      actual_paid_inr_cents: entry.actualPaidInrCents,
       fx_commission_inr_cents: entry.fxCommissionInrCents,
       total_commission_usd_cents: entry.totalCommissionUsdCents,
       commission_earned_inr_cents: entry.commissionEarnedInrCents,
