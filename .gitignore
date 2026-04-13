@@ -41,3 +41,4 @@ New Text Document.txt
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+.worktrees
