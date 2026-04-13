@@ -964,6 +964,12 @@ export async function replaceInvoicePaymentEmployeeEntries(input: {
       appraisalAdvanceUsdCents: entry.appraisalAdvanceUsdCents,
       offboardingDeductionUsdCents: entry.offboardingDeductionUsdCents,
     });
+    const payoutMetrics = calculateEmployeePayoutMetrics({
+      dollarInwardUsdCents: effectiveDollarInwardUsdCents,
+      employeeMonthlyUsdCents: entry.monthlyPaidUsdCents,
+      cashoutUsdInrRate: entry.cashoutUsdInrRate,
+      paidUsdInrRate: entry.paidUsdInrRate,
+    });
 
     return {
       id: nextCashFlowId("cash_entry"),
@@ -993,10 +999,11 @@ export async function replaceInvoicePaymentEmployeeEntries(input: {
       pf_inr_cents: entry.pfInrCents,
       tds_inr_cents: entry.tdsInrCents,
       actual_paid_inr_cents: entry.actualPaidInrCents,
-      fx_commission_inr_cents: entry.fxCommissionInrCents,
-      total_commission_usd_cents: entry.totalCommissionUsdCents,
-      commission_earned_inr_cents: entry.commissionEarnedInrCents,
-      gross_earnings_inr_cents: entry.grossEarningsInrCents,
+      fx_commission_inr_cents: payoutMetrics.fxCommissionInrCents,
+      total_commission_usd_cents: payoutMetrics.totalCommissionUsdCents,
+      commission_earned_inr_cents: payoutMetrics.commissionEarnedInrCents,
+      gross_earnings_inr_cents:
+        payoutMetrics.fxCommissionInrCents + payoutMetrics.commissionEarnedInrCents,
       is_non_invoice_employee: entry.isNonInvoiceEmployee,
       is_paid: entry.isPaid,
       paid_at: entry.paidAt ?? null,

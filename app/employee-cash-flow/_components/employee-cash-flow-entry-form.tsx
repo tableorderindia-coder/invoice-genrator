@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { inputClass } from "@/app/_components/field";
 import { PendingSubmitButton } from "@/app/_components/pending-submit-button";
 import { saveInvoicePaymentEmployeeEntriesAction } from "@/src/features/billing/actions";
+import { calculateEmployeePayoutMetrics } from "@/src/features/billing/domain";
 import {
   calculateCashInInrCents,
   calculateEffectiveDollarInwardUsdCents,
@@ -64,6 +65,12 @@ function deriveCardMetrics(entry: EmployeeCashFlowEditableEntry) {
     effectiveDollarInwardUsdCents,
     cashoutUsdInrRate: entry.cashoutUsdInrRate,
   });
+  const payoutMetrics = calculateEmployeePayoutMetrics({
+    dollarInwardUsdCents: effectiveDollarInwardUsdCents,
+    employeeMonthlyUsdCents: entry.monthlyPaidUsdCents,
+    cashoutUsdInrRate: entry.cashoutUsdInrRate,
+    paidUsdInrRate: entry.paidUsdInrRate,
+  });
   const actualPaidInrCents = entry.actualPaidInrCents;
   const netInrCents = calculateEmployeeMonthNetInrCents({
     cashInInrCents,
@@ -74,6 +81,11 @@ function deriveCardMetrics(entry: EmployeeCashFlowEditableEntry) {
     effectiveDollarInwardUsdCents,
     cashInInrCents,
     salaryPaidInrCents: actualPaidInrCents,
+    fxCommissionInrCents: payoutMetrics.fxCommissionInrCents,
+    totalCommissionUsdCents: payoutMetrics.totalCommissionUsdCents,
+    commissionEarnedInrCents: payoutMetrics.commissionEarnedInrCents,
+    grossEarningsInrCents:
+      payoutMetrics.fxCommissionInrCents + payoutMetrics.commissionEarnedInrCents,
     pendingAmountInrCents: cashInInrCents - actualPaidInrCents,
     netInrCents,
     status: resolveEmployeeCashFlowStatus({
@@ -387,7 +399,18 @@ export default function EmployeeCashFlowEntryForm({
         <input
           type="hidden"
           name="entriesJson"
-          value={JSON.stringify(entries)}
+          value={JSON.stringify(
+            entries.map((entry) => {
+              const metrics = deriveCardMetrics(entry);
+              return {
+                ...entry,
+                fxCommissionInrCents: metrics.fxCommissionInrCents,
+                totalCommissionUsdCents: metrics.totalCommissionUsdCents,
+                commissionEarnedInrCents: metrics.commissionEarnedInrCents,
+                grossEarningsInrCents: metrics.grossEarningsInrCents,
+              };
+            }),
+          )}
         />
 
         {visibleEntries.map((entry) => {
@@ -656,13 +679,9 @@ export default function EmployeeCashFlowEntryForm({
                     FX commission (INR)
                   </span>
                   <input
-                    value={toCurrencyInput(entry.fxCommissionInrCents)}
-                    onChange={(event) =>
-                      updateEntry(entry.id, {
-                        fxCommissionInrCents: fromCurrencyInput(event.target.value),
-                      })
-                    }
+                    value={toCurrencyInput(metrics.fxCommissionInrCents)}
                     className={cardInputClass()}
+                    readOnly
                   />
                 </label>
 
@@ -671,13 +690,9 @@ export default function EmployeeCashFlowEntryForm({
                     Total commission (USD)
                   </span>
                   <input
-                    value={toCurrencyInput(entry.totalCommissionUsdCents)}
-                    onChange={(event) =>
-                      updateEntry(entry.id, {
-                        totalCommissionUsdCents: fromCurrencyInput(event.target.value),
-                      })
-                    }
+                    value={toCurrencyInput(metrics.totalCommissionUsdCents)}
                     className={cardInputClass()}
+                    readOnly
                   />
                 </label>
 
@@ -686,13 +701,9 @@ export default function EmployeeCashFlowEntryForm({
                     Commission earned (INR)
                   </span>
                   <input
-                    value={toCurrencyInput(entry.commissionEarnedInrCents)}
-                    onChange={(event) =>
-                      updateEntry(entry.id, {
-                        commissionEarnedInrCents: fromCurrencyInput(event.target.value),
-                      })
-                    }
+                    value={toCurrencyInput(metrics.commissionEarnedInrCents)}
                     className={cardInputClass()}
+                    readOnly
                   />
                 </label>
 
@@ -701,13 +712,9 @@ export default function EmployeeCashFlowEntryForm({
                     Gross earnings (INR)
                   </span>
                   <input
-                    value={toCurrencyInput(entry.grossEarningsInrCents)}
-                    onChange={(event) =>
-                      updateEntry(entry.id, {
-                        grossEarningsInrCents: fromCurrencyInput(event.target.value),
-                      })
-                    }
+                    value={toCurrencyInput(metrics.grossEarningsInrCents)}
                     className={cardInputClass()}
+                    readOnly
                   />
                 </label>
 
