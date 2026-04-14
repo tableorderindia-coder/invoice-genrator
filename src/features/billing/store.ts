@@ -743,6 +743,54 @@ function mapEmployeePayout(row: DbEmployeePayout): EmployeePayout {
   };
 }
 
+function mapEmployeeStatementInvoiceRow(
+  row: DbEmployeeStatementInvoiceRow,
+): EmployeeStatementInvoiceRow {
+  return {
+    employeeId: row.employee_id,
+    employeeName: row.employee_name_snapshot,
+    invoiceId: row.invoice_id,
+    invoiceNumber: row.invoice_number_snapshot,
+    monthKey: row.month_key,
+    monthLabel: formatMonthYearFromKey(row.month_key),
+    dollarInwardUsdCents: row.dollar_inward_usd_cents,
+    onboardingAdvanceUsdCents: row.onboarding_advance_usd_cents,
+    reimbursementUsdCents: row.reimbursement_usd_cents,
+    reimbursementLabelsText: row.reimbursement_labels_text,
+    offboardingDeductionUsdCents: row.offboarding_deduction_usd_cents,
+  };
+}
+
+function mapEmployeeStatementMonthSummary(
+  row: DbEmployeeStatementMonthSummary,
+): EmployeeStatementMonthSummary {
+  return {
+    employeeId: row.employee_id,
+    monthKey: row.month_key,
+    monthLabel: row.month_label_snapshot || formatMonthYearFromKey(row.month_key),
+    effectiveDollarInwardUsdCents: row.effective_dollar_inward_usd_cents,
+    monthlyDollarPaidUsdCents: row.monthly_dollar_paid_usd_cents,
+  };
+}
+
+function formatMonthYearFromKey(monthKey: string) {
+  const match = /^(\d{4})-(\d{2})$/.exec(monthKey);
+  if (!match) {
+    return monthKey;
+  }
+
+  const year = Number.parseInt(match[1] ?? "", 10);
+  const month = Number.parseInt(match[2] ?? "", 10);
+  if (!Number.isFinite(year) || !Number.isFinite(month)) {
+    return monthKey;
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    year: "numeric",
+  }).format(new Date(year, month - 1, 1));
+}
+
 async function recomputeSupabaseInvoice(
   invoiceId: string,
   options?: { clearTeamManualTotals?: boolean; clearGrandManualTotal?: boolean },
@@ -2418,6 +2466,67 @@ export async function upsertEmployeeStatementSection(input: {
   }
 
   return input;
+}
+
+export async function listEmployeeStatementInvoiceRows(input: {
+  employeeIds: string[];
+  startMonth?: string;
+  endMonth?: string;
+}) {
+  if (input.employeeIds.length === 0) {
+    return [] as EmployeeStatementInvoiceRow[];
+  }
+
+  const supabase = getSupabaseOrThrow();
+  let query = supabase
+    .from("employee_statement_invoice_rows")
+    .select("*")
+    .in("employee_id", input.employeeIds)
+    .order("month_key", { ascending: true })
+    .order("invoice_number_snapshot", { ascending: true });
+
+  if (input.startMonth) {
+    query = query.gte("month_key", input.startMonth);
+  }
+  if (input.endMonth) {
+    query = query.lte("month_key", input.endMonth);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return ((data ?? []) as DbEmployeeStatementInvoiceRow[]).map((row) =>
+    mapEmployeeStatementInvoiceRow(row),
+  );
+}
+
+export async function listEmployeeStatementMonthSummaries(input: {
+  employeeIds: string[];
+  startMonth?: string;
+  endMonth?: string;
+}) {
+  if (input.employeeIds.length === 0) {
+    return [] as EmployeeStatementMonthSummary[];
+  }
+
+  const supabase = getSupabaseOrThrow();
+  let query = supabase
+    .from("employee_statement_month_summaries")
+    .select("*")
+    .in("employee_id", input.employeeIds)
+    .order("month_key", { ascending: true });
+
+  if (input.startMonth) {
+    query = query.gte("month_key", input.startMonth);
+  }
+  if (input.endMonth) {
+    query = query.lte("month_key", input.endMonth);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return ((data ?? []) as DbEmployeeStatementMonthSummary[]).map((row) =>
+    mapEmployeeStatementMonthSummary(row),
+  );
 }
 
 export async function upsertDashboardExpense(input: {

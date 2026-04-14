@@ -1,8 +1,23 @@
-import { normalizeMultiSelectValue } from "./filter-selection";
+import { resolveEffectiveLineItemTotalUsdCents } from "./domain";
+import { normalizeEmployeeNameForMatch } from "./employee-cash-flow-store";
+import {
+  formatPaymentMonthLabel,
+  normalizeMultiSelectValue,
+} from "./filter-selection";
+import {
+  getInvoiceDetail,
+  listEmployeeStatementInvoiceRows,
+  listEmployeeStatementMonthSummaries,
+  listEmployees,
+  listInvoicesForCompany,
+} from "./store";
 import type {
+  Employee,
   EmployeeStatementInvoiceRow,
   EmployeeStatementMonthSummary,
   EmployeeStatementSection,
+  InvoiceAdjustment,
+  InvoiceDetail,
 } from "./types";
 
 type SearchValue = string | string[] | undefined;
@@ -12,6 +27,24 @@ export type EmployeeStatementFilters = {
   employeeIds: string[];
   startMonth: string;
   endMonth: string;
+};
+
+export type EmployeeStatementPdfTotals = {
+  dollarInwardUsdCents: number;
+  onboardingAdvanceUsdCents: number;
+  reimbursementUsdCents: number;
+  offboardingDeductionUsdCents: number;
+  effectiveDollarInwardUsdCents: number;
+  monthlyDollarPaidUsdCents: number;
+};
+
+export type EmployeeStatementPdfInput = {
+  companyName: string;
+  employeeName: string;
+  dateRangeLabel: string;
+  generatedDate: string;
+  months: EmployeeStatementSection["months"];
+  totals: EmployeeStatementPdfTotals;
 };
 
 export function parseEmployeeStatementFilters(input: {
@@ -40,6 +73,21 @@ export function parseEmployeeStatementFilters(input: {
 
 export function toEmployeeStatementMonthKey(input: { year: number; month: number }) {
   return `${input.year}-${String(input.month).padStart(2, "0")}`;
+}
+
+export function compareEmployeeStatementMonthKeys(left: string, right: string) {
+  return left.localeCompare(right);
+}
+
+export function isEmployeeStatementMonthKeyInRange(input: {
+  monthKey: string;
+  startMonth: string;
+  endMonth: string;
+}) {
+  return (
+    compareEmployeeStatementMonthKeys(input.monthKey, input.startMonth) >= 0 &&
+    compareEmployeeStatementMonthKeys(input.monthKey, input.endMonth) <= 0
+  );
 }
 
 export function groupEmployeeStatementRows<
@@ -132,31 +180,290 @@ export function applySavedEmployeeStatementOverrides(
     ...section,
     months: section.months.map((month) => {
       const savedMonthSummary = savedMonthSummaryByMonthKey.get(month.monthKey);
+      const overriddenRows = month.rows.map((row) => {
+        const savedRow = savedInvoiceRowByInvoiceId.get(row.invoiceId);
+        if (!savedRow) {
+          return row;
+        }
+
+        return {
+          ...row,
+          dollarInwardUsdCents: savedRow.dollarInwardUsdCents,
+          onboardingAdvanceUsdCents: savedRow.onboardingAdvanceUsdCents,
+          reimbursementUsdCents: savedRow.reimbursementUsdCents,
+          reimbursementLabelsText: savedRow.reimbursementLabelsText,
+          offboardingDeductionUsdCents: savedRow.offboardingDeductionUsdCents,
+        };
+      });
+      const calculatedEffectiveDollarInwardUsdCents = overriddenRows.reduce(
+        (sum, row) =>
+          sum +
+          calculateStatementEffectiveDollarInwardUsdCents({
+            dollarInwardUsdCents: row.dollarInwardUsdCents,
+            onboardingAdvanceUsdCents: row.onboardingAdvanceUsdCents,
+            reimbursementUsdCents: row.reimbursementUsdCents,
+            offboardingDeductionUsdCents: row.offboardingDeductionUsdCents,
+          }),
+        0,
+      );
 
       return {
         ...month,
-        rows: month.rows.map((row) => {
-          const savedRow = savedInvoiceRowByInvoiceId.get(row.invoiceId);
-          if (!savedRow) {
-            return row;
-          }
-
-          return {
-            ...row,
-            dollarInwardUsdCents: savedRow.dollarInwardUsdCents,
-            onboardingAdvanceUsdCents: savedRow.onboardingAdvanceUsdCents,
-            reimbursementUsdCents: savedRow.reimbursementUsdCents,
-            reimbursementLabelsText: savedRow.reimbursementLabelsText,
-            offboardingDeductionUsdCents: savedRow.offboardingDeductionUsdCents,
-          };
-        }),
+        rows: overriddenRows,
         effectiveDollarInwardUsdCents:
           savedMonthSummary?.effectiveDollarInwardUsdCents ??
-          month.effectiveDollarInwardUsdCents,
+          calculatedEffectiveDollarInwardUsdCents,
         monthlyDollarPaidUsdCents:
           savedMonthSummary?.monthlyDollarPaidUsdCents ??
           month.monthlyDollarPaidUsdCents,
       };
     }),
+  };
+}
+
+function sumAdjustmentAmounts(
+  adjustments: InvoiceAdjustment[],
+  type: InvoiceAdjustment["type"],
+  employeeNames: Set<string>,
+) {
+  return adjustments
+    .filter((adjustment) => adjustment.type === type)
+    .filter((adjustment) => {
+      const normalized = normalizeEmployeeNameForMatch(adjustment.employeeName);
+      return normalized ? employeeNames.has(normalized) : false;
+    })
+    .reduce((sum, adjustment) => sum + adjustment.amountUsdCents, 0);
+}
+
+function buildReimbursementLabels(
+  adjustments: InvoiceAdjustment[],
+  employeeNames: Set<string>,
+) {
+  return adjustments
+    .filter((adjustment) => adjustment.type === "reimbursement")
+    .filter((adjustment) => {
+      const normalized = normalizeEmployeeNameForMatch(adjustment.employeeName);
+      return normalized ? employeeNames.has(normalized) : false;
+    })
+    .map((adjustment) => adjustment.label.trim())
+    .filter(Boolean)
+    .join(", ");
+}
+
+export function buildEmployeeStatementInvoiceRowFromDetail(input: {
+  employee: Employee;
+  detail: InvoiceDetail;
+}) {
+  const lineItems = input.detail.teams
+    .flatMap((team) => team.lineItems)
+    .filter((lineItem) => lineItem.employeeId === input.employee.id);
+
+  if (lineItems.length === 0) {
+    return undefined;
+  }
+
+  const employeeNames = new Set(
+    [
+      normalizeEmployeeNameForMatch(input.employee.fullName),
+      ...lineItems.map((lineItem) =>
+        normalizeEmployeeNameForMatch(lineItem.employeeNameSnapshot),
+      ),
+    ].filter(Boolean),
+  );
+
+  return {
+    employeeId: input.employee.id,
+    employeeName: input.employee.fullName,
+    invoiceId: input.detail.invoice.id,
+    invoiceNumber: input.detail.invoice.invoiceNumber,
+    monthKey: toEmployeeStatementMonthKey({
+      year: input.detail.invoice.year,
+      month: input.detail.invoice.month,
+    }),
+    monthLabel: formatPaymentMonthLabel(
+      toEmployeeStatementMonthKey({
+        year: input.detail.invoice.year,
+        month: input.detail.invoice.month,
+      }),
+    ),
+    dollarInwardUsdCents: lineItems.reduce(
+      (sum, lineItem) =>
+        sum +
+        resolveEffectiveLineItemTotalUsdCents({
+          formulaTotalUsdCents: lineItem.billedTotalUsdCents,
+          manualTotalUsdCents: lineItem.manualTotalUsdCents,
+        }),
+      0,
+    ),
+    onboardingAdvanceUsdCents: sumAdjustmentAmounts(
+      input.detail.adjustments,
+      "onboarding",
+      employeeNames,
+    ),
+    reimbursementUsdCents: sumAdjustmentAmounts(
+      input.detail.adjustments,
+      "reimbursement",
+      employeeNames,
+    ),
+    reimbursementLabelsText: buildReimbursementLabels(
+      input.detail.adjustments,
+      employeeNames,
+    ),
+    offboardingDeductionUsdCents: Math.abs(
+      sumAdjustmentAmounts(input.detail.adjustments, "offboarding", employeeNames),
+    ),
+  };
+}
+
+export async function listEmployeeStatementSections(input: {
+  companyId: string;
+  employeeIds?: string[];
+  startMonth: string;
+  endMonth: string;
+}) {
+  if (!input.companyId || !input.startMonth || !input.endMonth) {
+    return [] as EmployeeStatementSection[];
+  }
+
+  const employees = await listEmployees(input.companyId);
+  const selectedEmployees =
+    input.employeeIds && input.employeeIds.length > 0
+      ? employees.filter((employee) => input.employeeIds?.includes(employee.id))
+      : employees;
+
+  if (selectedEmployees.length === 0) {
+    return [] as EmployeeStatementSection[];
+  }
+
+  const invoices = await listInvoicesForCompany(input.companyId);
+  const invoicesInRange = invoices.filter((invoice) =>
+    isEmployeeStatementMonthKeyInRange({
+      monthKey: toEmployeeStatementMonthKey({
+        year: invoice.year,
+        month: invoice.month,
+      }),
+      startMonth: input.startMonth,
+      endMonth: input.endMonth,
+    }),
+  );
+
+  if (invoicesInRange.length === 0) {
+    return [] as EmployeeStatementSection[];
+  }
+
+  const [details, savedInvoiceRows, savedMonthSummaries] = await Promise.all([
+    Promise.all(invoicesInRange.map((invoice) => getInvoiceDetail(invoice.id))),
+    listEmployeeStatementInvoiceRows({
+      employeeIds: selectedEmployees.map((employee) => employee.id),
+      startMonth: input.startMonth,
+      endMonth: input.endMonth,
+    }),
+    listEmployeeStatementMonthSummaries({
+      employeeIds: selectedEmployees.map((employee) => employee.id),
+      startMonth: input.startMonth,
+      endMonth: input.endMonth,
+    }),
+  ]);
+
+  const validDetails = details.filter(Boolean) as InvoiceDetail[];
+  const savedRowsByEmployeeId = new Map<string, EmployeeStatementInvoiceRow[]>();
+  for (const row of savedInvoiceRows) {
+    const existing = savedRowsByEmployeeId.get(row.employeeId) ?? [];
+    existing.push(row);
+    savedRowsByEmployeeId.set(row.employeeId, existing);
+  }
+
+  const savedMonthsByEmployeeId = new Map<string, EmployeeStatementMonthSummary[]>();
+  for (const summary of savedMonthSummaries) {
+    const existing = savedMonthsByEmployeeId.get(summary.employeeId) ?? [];
+    existing.push(summary);
+    savedMonthsByEmployeeId.set(summary.employeeId, existing);
+  }
+
+  return selectedEmployees
+    .map((employee) => {
+      const rows = validDetails
+        .map((detail) =>
+          buildEmployeeStatementInvoiceRowFromDetail({
+            employee,
+            detail,
+          }),
+        )
+        .filter(Boolean) as EmployeeStatementInvoiceRow[];
+
+      if (rows.length === 0) {
+        return undefined;
+      }
+
+      return applySavedEmployeeStatementOverrides(
+        buildEmployeeStatementSection({
+          employee,
+          rows,
+        }),
+        {
+          invoiceRows: savedRowsByEmployeeId.get(employee.id) ?? [],
+          monthSummaries: savedMonthsByEmployeeId.get(employee.id) ?? [],
+        },
+      );
+    })
+    .filter(Boolean)
+    .sort((left, right) =>
+      (left?.employeeName ?? "").localeCompare(right?.employeeName ?? ""),
+    ) as EmployeeStatementSection[];
+}
+
+export function buildEmployeeStatementTotals(section: EmployeeStatementSection) {
+  return section.months.reduce<EmployeeStatementPdfTotals>(
+    (totals, month) => {
+      for (const row of month.rows) {
+        totals.dollarInwardUsdCents += row.dollarInwardUsdCents;
+        totals.onboardingAdvanceUsdCents += row.onboardingAdvanceUsdCents;
+        totals.reimbursementUsdCents += row.reimbursementUsdCents;
+        totals.offboardingDeductionUsdCents += row.offboardingDeductionUsdCents;
+      }
+
+      totals.effectiveDollarInwardUsdCents += month.effectiveDollarInwardUsdCents;
+      totals.monthlyDollarPaidUsdCents += month.monthlyDollarPaidUsdCents;
+      return totals;
+    },
+    {
+      dollarInwardUsdCents: 0,
+      onboardingAdvanceUsdCents: 0,
+      reimbursementUsdCents: 0,
+      offboardingDeductionUsdCents: 0,
+      effectiveDollarInwardUsdCents: 0,
+      monthlyDollarPaidUsdCents: 0,
+    },
+  );
+}
+
+export function buildEmployeeStatementDateRangeLabel(input: {
+  startMonth: string;
+  endMonth: string;
+}) {
+  if (input.startMonth === input.endMonth) {
+    return formatPaymentMonthLabel(input.startMonth);
+  }
+
+  return `${formatPaymentMonthLabel(input.startMonth)} - ${formatPaymentMonthLabel(input.endMonth)}`;
+}
+
+export function buildEmployeeStatementPdfInput(input: {
+  companyName: string;
+  section: EmployeeStatementSection;
+  startMonth: string;
+  endMonth: string;
+  generatedDate: string;
+}): EmployeeStatementPdfInput {
+  return {
+    companyName: input.companyName,
+    employeeName: input.section.employeeName,
+    dateRangeLabel: buildEmployeeStatementDateRangeLabel({
+      startMonth: input.startMonth,
+      endMonth: input.endMonth,
+    }),
+    generatedDate: input.generatedDate,
+    months: input.section.months,
+    totals: buildEmployeeStatementTotals(input.section),
   };
 }

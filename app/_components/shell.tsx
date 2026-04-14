@@ -93,6 +93,20 @@ const links = [
     ),
   },
   {
+    href: "/employee-statements",
+    label: "Employee Statements",
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M8 6h13" />
+        <path d="M8 12h13" />
+        <path d="M8 18h13" />
+        <path d="M3 6h.01" />
+        <path d="M3 12h.01" />
+        <path d="M3 18h.01" />
+      </svg>
+    ),
+  },
+  {
     href: "/expenses",
     label: "Expenses",
     icon: (
