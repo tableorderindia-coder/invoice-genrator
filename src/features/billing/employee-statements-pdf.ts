@@ -31,6 +31,7 @@ type PdfModel = {
     generatedDate: string;
   };
   rows: PdfTableRow[];
+  totalsTitle: string;
   totals: {
     dollarInward: string;
     onboardingAdvance: string;
@@ -123,6 +124,7 @@ export function buildEmployeeStatementPdfModel(
       generatedDate: input.generatedDate,
     },
     rows: flattenPdfRows(input),
+    totalsTitle: "Totals",
     totals: {
       dollarInward: formatUsdCompact(input.totals.dollarInwardUsdCents),
       onboardingAdvance: formatUsdCompact(input.totals.onboardingAdvanceUsdCents),
@@ -211,7 +213,7 @@ export async function buildEmployeeStatementPdf(input: EmployeeStatementPdfInput
   };
 
   const drawFooter = () => {
-    const footerY = doc.page.height - PAGE.margin - 12;
+    const footerY = doc.page.height - PAGE.margin - 24;
     doc.font(fontName).fontSize(9.5).fillColor(COLORS.blue);
     doc.text(BRAND.website, PAGE.margin, footerY, { width: 160, underline: true });
     doc.text(BRAND.email, PAGE.margin + 180, footerY, {
@@ -366,9 +368,13 @@ export async function buildEmployeeStatementPdf(input: EmployeeStatementPdfInput
 
   drawStatementTable();
 
-  ensureSpace(120);
+  ensureSpace(72);
   doc.moveDown(0.3);
-  doc.font(fontName).fontSize(14).fillColor(COLORS.blue).text("Totals");
+  doc
+    .font(fontName)
+    .fontSize(14)
+    .fillColor(COLORS.blue)
+    .text(model.totalsTitle, PAGE.margin, doc.y, { align: "left" });
   doc.moveDown(0.2);
   [
     ["Dollar inward", model.totals.dollarInward],

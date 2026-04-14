@@ -418,6 +418,7 @@ export async function listEmployeeStatementSections(input: {
 
   const invoices = await listInvoicesForCompany(input.companyId);
   const invoicesInRange = invoices.filter((invoice) =>
+    invoice.status !== "draft" &&
     isEmployeeStatementMonthKeyInRange({
       monthKey: toEmployeeStatementMonthKey({
         year: invoice.year,

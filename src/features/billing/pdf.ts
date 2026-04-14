@@ -229,7 +229,7 @@ export async function buildInvoicePdf(detail: InvoiceDetail) {
   };
 
   const drawFooter = () => {
-    const footerY = doc.page.height - PAGE.margin - 12;
+    const footerY = doc.page.height - PAGE.margin - 24;
 
     doc.font("Helvetica").fontSize(9.5).fillColor(COLORS.blue);
     doc.font(fontName);
@@ -410,7 +410,7 @@ export async function buildInvoicePdf(detail: InvoiceDetail) {
     drawTable(section);
   }
 
-  ensureSpace(120, false);
+  ensureSpace(42, false);
   doc.moveDown(0.15);
   doc
     .font(fontName)
@@ -422,6 +422,12 @@ export async function buildInvoicePdf(detail: InvoiceDetail) {
     .fontSize(17)
     .text(`=  ${model.grandTotal.amount}`, PAGE.margin + 106, doc.y + 4);
 
+  const noteHeight = doc.heightOfString(`Note : ${model.note}`, {
+    width: doc.page.width - PAGE.margin * 2,
+    align: "left",
+  });
+
+  ensureSpace(noteHeight + 54, false);
   doc.moveDown(0.8);
   doc
     .font(fontName)
@@ -431,6 +437,7 @@ export async function buildInvoicePdf(detail: InvoiceDetail) {
       align: "left",
     });
 
+  ensureSpace(BRAND.signoffLines.length * 16 + 20, false);
   doc.moveDown(0.75);
   BRAND.signoffLines.forEach((line) => {
     doc.font(fontName).fontSize(10.75).text(line);

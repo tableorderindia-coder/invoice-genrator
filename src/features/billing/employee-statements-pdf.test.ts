@@ -54,6 +54,7 @@ describe("employee statement pdf", () => {
       invoiceNumber: "2026/001",
       totalBalance: "-$1,260",
     });
+    expect(model.totalsTitle).toBe("Totals");
     expect(model.totals.effectiveDollarInward).toBe("$1,240");
     expect(model.totals.totalBalance).toBe("-$1,260");
   });

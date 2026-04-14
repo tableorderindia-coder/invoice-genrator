@@ -3,6 +3,10 @@ import { describe, expect, it } from "vitest";
 import type { InvoiceDetail } from "./types";
 import { buildInvoicePdf, buildInvoicePdfModel } from "./pdf";
 
+function countPdfPages(buffer: Buffer) {
+  return (buffer.toString("latin1").match(/\/Type \/Page\b/g) ?? []).length;
+}
+
 const detail: InvoiceDetail = {
   company: {
     id: "company_1",
@@ -131,6 +135,20 @@ const detail: InvoiceDetail = {
   ],
 };
 
+const minimalDetail: InvoiceDetail = {
+  ...detail,
+  invoice: {
+    ...detail.invoice,
+    invoiceNumber: "2026/001",
+    noteText: "Short note.",
+    subtotalUsdCents: 589333,
+    adjustmentsUsdCents: 0,
+    grandTotalUsdCents: 589333,
+  },
+  teams: [detail.teams[0]!],
+  adjustments: [],
+};
+
 describe("branded invoice pdf model", () => {
   it("builds sample-style sections and grand total formula", () => {
     const model = buildInvoicePdfModel(detail);
@@ -170,10 +188,11 @@ describe("branded invoice pdf model", () => {
     expect(model.grandTotal.amount).toBe("$24,582");
   });
 
-  it("renders a PDF buffer for invoices with adjustments", async () => {
-    const pdfBuffer = await buildInvoicePdf(detail);
+  it("renders a single-page PDF for compact invoices without a blank extra page", async () => {
+    const pdfBuffer = await buildInvoicePdf(minimalDetail);
 
     expect(pdfBuffer.byteLength).toBeGreaterThan(1000);
     expect(pdfBuffer.subarray(0, 4).toString("utf8")).toBe("%PDF");
+    expect(countPdfPages(pdfBuffer)).toBe(1);
   });
 });

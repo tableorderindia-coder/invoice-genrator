@@ -41,20 +41,30 @@ describe("employee statement loading", () => {
     ]);
     listInvoicesForCompanyMock.mockResolvedValue([
       {
+        id: "inv_draft",
+        companyId: "comp_1",
+        month: 4,
+        year: 2026,
+        invoiceNumber: "INV-DRAFT",
+        status: "draft",
+      },
+      {
         id: "inv_1",
         companyId: "comp_1",
         month: 4,
         year: 2026,
         invoiceNumber: "INV-001",
+        status: "generated",
       },
     ]);
-    getInvoiceDetailMock.mockResolvedValue({
+    getInvoiceDetailMock.mockImplementation(async (invoiceId: string) => ({
       invoice: {
-        id: "inv_1",
+        id: invoiceId,
         companyId: "comp_1",
         month: 4,
         year: 2026,
-        invoiceNumber: "INV-001",
+        invoiceNumber: invoiceId === "inv_draft" ? "INV-DRAFT" : "INV-001",
+        status: invoiceId === "inv_draft" ? "draft" : "generated",
       },
       company: {
         id: "comp_1",
@@ -66,12 +76,12 @@ describe("employee statement loading", () => {
       teams: [
         {
           id: "team_1",
-          invoiceId: "inv_1",
+          invoiceId,
           teamName: "Team A",
           sortOrder: 0,
           lineItems: [
             {
-              id: "line_1",
+              id: `line_${invoiceId}`,
               invoiceTeamId: "team_1",
               employeeId: "emp_1",
               employeeNameSnapshot: "Asha",
@@ -81,43 +91,46 @@ describe("employee statement loading", () => {
               payoutMonthlyUsdCentsSnapshot: 250000,
               hrsPerWeek: 40,
               daysWorked: 30,
-              billedTotalUsdCents: 100000,
+              billedTotalUsdCents: invoiceId === "inv_draft" ? 999999 : 100000,
               payoutTotalUsdCents: 0,
               profitTotalUsdCents: 0,
             },
           ],
         },
       ],
-      adjustments: [
-        {
-          id: "adj_1",
-          invoiceId: "inv_1",
-          type: "onboarding",
-          label: "Joining",
-          employeeName: "Asha",
-          amountUsdCents: 10000,
-          sortOrder: 0,
-        },
-        {
-          id: "adj_2",
-          invoiceId: "inv_1",
-          type: "reimbursement",
-          label: "Laptop",
-          employeeName: "Asha",
-          amountUsdCents: 5000,
-          sortOrder: 1,
-        },
-        {
-          id: "adj_3",
-          invoiceId: "inv_1",
-          type: "offboarding",
-          label: "Recovery",
-          employeeName: "Asha",
-          amountUsdCents: -2000,
-          sortOrder: 2,
-        },
-      ],
-    });
+      adjustments:
+        invoiceId === "inv_draft"
+          ? []
+          : [
+              {
+                id: "adj_1",
+                invoiceId: "inv_1",
+                type: "onboarding",
+                label: "Joining",
+                employeeName: "Asha",
+                amountUsdCents: 10000,
+                sortOrder: 0,
+              },
+              {
+                id: "adj_2",
+                invoiceId: "inv_1",
+                type: "reimbursement",
+                label: "Laptop",
+                employeeName: "Asha",
+                amountUsdCents: 5000,
+                sortOrder: 1,
+              },
+              {
+                id: "adj_3",
+                invoiceId: "inv_1",
+                type: "offboarding",
+                label: "Recovery",
+                employeeName: "Asha",
+                amountUsdCents: -2000,
+                sortOrder: 2,
+              },
+            ],
+    }));
     listEmployeeStatementInvoiceRowsMock.mockResolvedValue([]);
     listEmployeeStatementMonthSummariesMock.mockResolvedValue([
       {
@@ -148,5 +161,7 @@ describe("employee statement loading", () => {
     });
     expect(sections[0]?.months[0]?.effectiveDollarInwardUsdCents).toBe(120000);
     expect(sections[0]?.months[0]?.monthlyDollarPaidUsdCents).toBe(260000);
+    expect(sections[0]?.months[0]?.rows).toHaveLength(1);
+    expect(getInvoiceDetailMock).toHaveBeenCalledTimes(1);
   });
 });
