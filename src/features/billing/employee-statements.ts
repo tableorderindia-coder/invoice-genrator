@@ -36,6 +36,7 @@ export type EmployeeStatementPdfTotals = {
   offboardingDeductionUsdCents: number;
   effectiveDollarInwardUsdCents: number;
   monthlyDollarPaidUsdCents: number;
+  totalBalanceUsdCents: number;
 };
 
 export type EmployeeStatementPdfInput = {
@@ -46,6 +47,27 @@ export type EmployeeStatementPdfInput = {
   months: EmployeeStatementSection["months"];
   totals: EmployeeStatementPdfTotals;
 };
+
+export type FlattenedEmployeeStatementRow =
+  | {
+      kind: "invoice";
+      invoiceId: string;
+      monthKey: string;
+      monthLabel: string;
+      invoiceNumber: string;
+      dollarInwardUsdCents: number;
+      onboardingAdvanceUsdCents: number;
+      reimbursementUsdCents: number;
+      reimbursementLabelsText: string;
+      offboardingDeductionUsdCents: number;
+      effectiveDollarInwardUsdCents: number | null;
+      monthlyDollarPaidUsdCents: number | null;
+      totalBalanceUsdCents: number | null;
+    }
+  | {
+      kind: "spacer";
+      monthKey: string;
+    };
 
 export function parseEmployeeStatementFilters(input: {
   companyId?: SearchValue;
@@ -123,6 +145,13 @@ export function calculateStatementEffectiveDollarInwardUsdCents(input: {
     input.reimbursementUsdCents -
     input.offboardingDeductionUsdCents
   );
+}
+
+export function calculateEmployeeStatementTotalBalanceUsdCents(input: {
+  effectiveDollarInwardUsdCents: number;
+  monthlyDollarPaidUsdCents: number;
+}) {
+  return input.effectiveDollarInwardUsdCents - input.monthlyDollarPaidUsdCents;
 }
 
 export function buildEmployeeStatementSection(input: {
@@ -258,10 +287,6 @@ export function buildEmployeeStatementInvoiceRowFromDetail(input: {
     .flatMap((team) => team.lineItems)
     .filter((lineItem) => lineItem.employeeId === input.employee.id);
 
-  if (lineItems.length === 0) {
-    return undefined;
-  }
-
   const employeeNames = new Set(
     [
       normalizeEmployeeNameForMatch(input.employee.fullName),
@@ -270,6 +295,42 @@ export function buildEmployeeStatementInvoiceRowFromDetail(input: {
       ),
     ].filter(Boolean),
   );
+
+  const onboardingAdvanceUsdCents = sumAdjustmentAmounts(
+    input.detail.adjustments,
+    "onboarding",
+    employeeNames,
+  );
+  const reimbursementUsdCents = sumAdjustmentAmounts(
+    input.detail.adjustments,
+    "reimbursement",
+    employeeNames,
+  );
+  const reimbursementLabelsText = buildReimbursementLabels(
+    input.detail.adjustments,
+    employeeNames,
+  );
+  const offboardingDeductionUsdCents = Math.abs(
+    sumAdjustmentAmounts(input.detail.adjustments, "offboarding", employeeNames),
+  );
+  const dollarInwardUsdCents = lineItems.reduce(
+    (sum, lineItem) =>
+      sum +
+      resolveEffectiveLineItemTotalUsdCents({
+        formulaTotalUsdCents: lineItem.billedTotalUsdCents,
+        manualTotalUsdCents: lineItem.manualTotalUsdCents,
+      }),
+    0,
+  );
+
+  if (
+    lineItems.length === 0 &&
+    onboardingAdvanceUsdCents === 0 &&
+    reimbursementUsdCents === 0 &&
+    offboardingDeductionUsdCents === 0
+  ) {
+    return undefined;
+  }
 
   return {
     employeeId: input.employee.id,
@@ -286,33 +347,53 @@ export function buildEmployeeStatementInvoiceRowFromDetail(input: {
         month: input.detail.invoice.month,
       }),
     ),
-    dollarInwardUsdCents: lineItems.reduce(
-      (sum, lineItem) =>
-        sum +
-        resolveEffectiveLineItemTotalUsdCents({
-          formulaTotalUsdCents: lineItem.billedTotalUsdCents,
-          manualTotalUsdCents: lineItem.manualTotalUsdCents,
-        }),
-      0,
-    ),
-    onboardingAdvanceUsdCents: sumAdjustmentAmounts(
-      input.detail.adjustments,
-      "onboarding",
-      employeeNames,
-    ),
-    reimbursementUsdCents: sumAdjustmentAmounts(
-      input.detail.adjustments,
-      "reimbursement",
-      employeeNames,
-    ),
-    reimbursementLabelsText: buildReimbursementLabels(
-      input.detail.adjustments,
-      employeeNames,
-    ),
-    offboardingDeductionUsdCents: Math.abs(
-      sumAdjustmentAmounts(input.detail.adjustments, "offboarding", employeeNames),
-    ),
+    dollarInwardUsdCents,
+    onboardingAdvanceUsdCents,
+    reimbursementUsdCents,
+    reimbursementLabelsText,
+    offboardingDeductionUsdCents,
   };
+}
+
+export function buildFlattenedEmployeeStatementRows(
+  section: EmployeeStatementSection,
+): FlattenedEmployeeStatementRow[] {
+  return section.months.flatMap((month, monthIndex) => {
+    const invoiceRows: FlattenedEmployeeStatementRow[] = month.rows.map((row, rowIndex) => ({
+      kind: "invoice",
+      invoiceId: row.invoiceId,
+      monthKey: row.monthKey,
+      monthLabel: row.monthLabel,
+      invoiceNumber: row.invoiceNumber,
+      dollarInwardUsdCents: row.dollarInwardUsdCents,
+      onboardingAdvanceUsdCents: row.onboardingAdvanceUsdCents,
+      reimbursementUsdCents: row.reimbursementUsdCents,
+      reimbursementLabelsText: row.reimbursementLabelsText,
+      offboardingDeductionUsdCents: row.offboardingDeductionUsdCents,
+      effectiveDollarInwardUsdCents:
+        rowIndex === 0 ? month.effectiveDollarInwardUsdCents : null,
+      monthlyDollarPaidUsdCents: rowIndex === 0 ? month.monthlyDollarPaidUsdCents : null,
+      totalBalanceUsdCents:
+        rowIndex === 0
+          ? calculateEmployeeStatementTotalBalanceUsdCents({
+              effectiveDollarInwardUsdCents: month.effectiveDollarInwardUsdCents,
+              monthlyDollarPaidUsdCents: month.monthlyDollarPaidUsdCents,
+            })
+          : null,
+    }));
+
+    if (monthIndex === section.months.length - 1) {
+      return invoiceRows;
+    }
+
+    return [
+      ...invoiceRows,
+      {
+        kind: "spacer",
+        monthKey: month.monthKey,
+      } satisfies FlattenedEmployeeStatementRow,
+    ];
+  });
 }
 
 export async function listEmployeeStatementSections(input: {
@@ -424,6 +505,10 @@ export function buildEmployeeStatementTotals(section: EmployeeStatementSection) 
 
       totals.effectiveDollarInwardUsdCents += month.effectiveDollarInwardUsdCents;
       totals.monthlyDollarPaidUsdCents += month.monthlyDollarPaidUsdCents;
+      totals.totalBalanceUsdCents += calculateEmployeeStatementTotalBalanceUsdCents({
+        effectiveDollarInwardUsdCents: month.effectiveDollarInwardUsdCents,
+        monthlyDollarPaidUsdCents: month.monthlyDollarPaidUsdCents,
+      });
       return totals;
     },
     {
@@ -433,6 +518,7 @@ export function buildEmployeeStatementTotals(section: EmployeeStatementSection) 
       offboardingDeductionUsdCents: 0,
       effectiveDollarInwardUsdCents: 0,
       monthlyDollarPaidUsdCents: 0,
+      totalBalanceUsdCents: 0,
     },
   );
 }

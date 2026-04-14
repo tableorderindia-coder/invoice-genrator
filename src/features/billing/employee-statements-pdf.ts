@@ -5,19 +5,23 @@ import PDFDocument from "pdfkit";
 
 import type { EmployeeStatementPdfInput } from "./employee-statements";
 
-type PdfMonthRow = {
-  monthLabel: string;
-  rows: Array<{
-    invoiceNumber: string;
-    dollarInward: string;
-    onboardingAdvance: string;
-    reimbursements: string;
-    reimbursementLabels: string;
-    offboardingDeduction: string;
-  }>;
-  effectiveDollarInward: string;
-  monthlyDollarPaid: string;
-};
+type PdfTableRow =
+  | {
+      kind: "invoice";
+      monthLabel: string;
+      invoiceNumber: string;
+      dollarInward: string;
+      onboardingAdvance: string;
+      reimbursements: string;
+      offboardingDeduction: string;
+      effectiveDollarInward: string;
+      monthlyDollarPaid: string;
+      totalBalance: string;
+    }
+  | {
+      kind: "spacer";
+      monthKey: string;
+    };
 
 type PdfModel = {
   header: {
@@ -26,7 +30,7 @@ type PdfModel = {
     dateRangeLabel: string;
     generatedDate: string;
   };
-  months: PdfMonthRow[];
+  rows: PdfTableRow[];
   totals: {
     dollarInward: string;
     onboardingAdvance: string;
@@ -34,6 +38,7 @@ type PdfModel = {
     offboardingDeduction: string;
     effectiveDollarInward: string;
     monthlyDollarPaid: string;
+    totalBalance: string;
   };
 };
 
@@ -71,6 +76,42 @@ function formatUsdCompact(cents: number) {
   }).format(cents / 100);
 }
 
+function flattenPdfRows(input: EmployeeStatementPdfInput): PdfTableRow[] {
+  return input.months.flatMap((month, monthIndex) => {
+    const monthRows: PdfTableRow[] = month.rows.map((row, rowIndex) => ({
+      kind: "invoice",
+      monthLabel: row.monthLabel,
+      invoiceNumber: row.invoiceNumber,
+      dollarInward: formatUsdCompact(row.dollarInwardUsdCents),
+      onboardingAdvance: formatUsdCompact(row.onboardingAdvanceUsdCents),
+      reimbursements: formatUsdCompact(row.reimbursementUsdCents),
+      offboardingDeduction: formatUsdCompact(row.offboardingDeductionUsdCents),
+      effectiveDollarInward:
+        rowIndex === 0 ? formatUsdCompact(month.effectiveDollarInwardUsdCents) : "",
+      monthlyDollarPaid:
+        rowIndex === 0 ? formatUsdCompact(month.monthlyDollarPaidUsdCents) : "",
+      totalBalance:
+        rowIndex === 0
+          ? formatUsdCompact(
+              month.effectiveDollarInwardUsdCents - month.monthlyDollarPaidUsdCents,
+            )
+          : "",
+    }));
+
+    if (monthIndex === input.months.length - 1) {
+      return monthRows;
+    }
+
+    return [
+      ...monthRows,
+      {
+        kind: "spacer",
+        monthKey: month.monthKey,
+      } satisfies PdfTableRow,
+    ];
+  });
+}
+
 export function buildEmployeeStatementPdfModel(
   input: EmployeeStatementPdfInput,
 ): PdfModel {
@@ -81,19 +122,7 @@ export function buildEmployeeStatementPdfModel(
       dateRangeLabel: input.dateRangeLabel,
       generatedDate: input.generatedDate,
     },
-    months: input.months.map((month) => ({
-      monthLabel: month.monthLabel,
-      rows: month.rows.map((row) => ({
-        invoiceNumber: row.invoiceNumber,
-        dollarInward: formatUsdCompact(row.dollarInwardUsdCents),
-        onboardingAdvance: formatUsdCompact(row.onboardingAdvanceUsdCents),
-        reimbursements: formatUsdCompact(row.reimbursementUsdCents),
-        reimbursementLabels: row.reimbursementLabelsText,
-        offboardingDeduction: formatUsdCompact(row.offboardingDeductionUsdCents),
-      })),
-      effectiveDollarInward: formatUsdCompact(month.effectiveDollarInwardUsdCents),
-      monthlyDollarPaid: formatUsdCompact(month.monthlyDollarPaidUsdCents),
-    })),
+    rows: flattenPdfRows(input),
     totals: {
       dollarInward: formatUsdCompact(input.totals.dollarInwardUsdCents),
       onboardingAdvance: formatUsdCompact(input.totals.onboardingAdvanceUsdCents),
@@ -103,6 +132,7 @@ export function buildEmployeeStatementPdfModel(
         input.totals.effectiveDollarInwardUsdCents,
       ),
       monthlyDollarPaid: formatUsdCompact(input.totals.monthlyDollarPaidUsdCents),
+      totalBalance: formatUsdCompact(input.totals.totalBalanceUsdCents),
     },
   };
 }
@@ -200,19 +230,19 @@ export async function buildEmployeeStatementPdf(input: EmployeeStatementPdfInput
       .text(` ${value}`);
   };
 
-  const drawMonthTable = (month: PdfMonthRow) => {
-    ensureSpace(120);
-    doc.moveDown(0.3);
-    doc.font(fontName).fontSize(13.5).fillColor(COLORS.blue).text(month.monthLabel);
-    doc.moveDown(0.2);
+  const drawStatementTable = () => {
+    ensureSpace(140);
 
     const columnX = [
       PAGE.margin,
-      PAGE.margin + 82,
-      PAGE.margin + 168,
-      PAGE.margin + 254,
-      PAGE.margin + 340,
-      PAGE.margin + 425,
+      PAGE.margin + 70,
+      PAGE.margin + 126,
+      PAGE.margin + 184,
+      PAGE.margin + 242,
+      PAGE.margin + 300,
+      PAGE.margin + 358,
+      PAGE.margin + 426,
+      PAGE.margin + 484,
       doc.page.width - PAGE.margin,
     ];
     const drawCell = (
@@ -222,23 +252,24 @@ export async function buildEmployeeStatementPdf(input: EmployeeStatementPdfInput
       width: number,
       align: "left" | "right" = "left",
     ) => {
-      doc.font(fontName).fontSize(8.75).fillColor(COLORS.ink).text(text, x + 4, y + 6, {
-        width: width - 8,
+      doc.font(fontName).fontSize(7.5).fillColor(COLORS.ink).text(text, x + 3, y + 6, {
+        width: width - 6,
         align,
       });
     };
 
-    const headerY = doc.y + 4;
-    const rowHeight = 26;
-    const summaryHeight = 24;
+    const headerY = doc.y + 6;
+    const rowHeight = 28;
     const headers = [
       "Month",
       "Invoice no.",
       "Dollar inward",
       "Onboarding",
       "Reimbursements",
-      "Reimb. labels",
       "Offboarding",
+      "Effective dollar inward",
+      "Monthly $ paid",
+      "Total balance",
     ];
 
     doc
@@ -253,13 +284,18 @@ export async function buildEmployeeStatementPdf(input: EmployeeStatementPdfInput
         columnX[index],
         headerY,
         columnX[index + 1] - columnX[index],
-        index >= 2 && index !== 5 ? "right" : "left",
+        index >= 2 ? "right" : "left",
       );
     });
 
     let y = headerY + rowHeight;
-    for (const row of month.rows) {
-      ensureSpace(rowHeight + summaryHeight * 2 + 16);
+    for (const row of model.rows) {
+      if (row.kind === "spacer") {
+        y += 14;
+        continue;
+      }
+
+      ensureSpace(rowHeight + 24);
       if (y + rowHeight > doc.page.height - PAGE.margin - PAGE.footerGap) {
         drawFooter();
         doc.addPage();
@@ -274,7 +310,7 @@ export async function buildEmployeeStatementPdf(input: EmployeeStatementPdfInput
         doc.moveTo(columnX[i], y).lineTo(columnX[i], y + rowHeight).stroke();
       }
 
-      drawCell(month.monthLabel, columnX[0], y, columnX[1] - columnX[0]);
+      drawCell(row.monthLabel, columnX[0], y, columnX[1] - columnX[0]);
       drawCell(row.invoiceNumber, columnX[1], y, columnX[2] - columnX[1]);
       drawCell(row.dollarInward, columnX[2], y, columnX[3] - columnX[2], "right");
       drawCell(
@@ -292,35 +328,29 @@ export async function buildEmployeeStatementPdf(input: EmployeeStatementPdfInput
         "right",
       );
       drawCell(
-        row.reimbursementLabels || "-",
+        row.offboardingDeduction,
         columnX[5],
         y,
-        columnX[6] - columnX[5] - 68,
+        columnX[6] - columnX[5],
+        "right",
       );
-      drawCell(row.offboardingDeduction, columnX[6] - 68, y, 68, "right");
+      drawCell(
+        row.effectiveDollarInward,
+        columnX[6],
+        y,
+        columnX[7] - columnX[6],
+        "right",
+      );
+      drawCell(
+        row.monthlyDollarPaid,
+        columnX[7],
+        y,
+        columnX[8] - columnX[7],
+        "right",
+      );
+      drawCell(row.totalBalance, columnX[8], y, columnX[9] - columnX[8], "right");
       y += rowHeight;
     }
-
-    const drawSummaryRow = (label: string, value: string) => {
-      doc
-        .rect(columnX[0], y, columnX[columnX.length - 1] - columnX[0], summaryHeight)
-        .fillAndStroke("#eef3f8", COLORS.line);
-      doc
-        .font(fontName)
-        .fontSize(9.25)
-        .fillColor(COLORS.ink)
-        .text(label, columnX[0] + 6, y + 6, {
-          width: columnX[columnX.length - 2] - columnX[0] - 8,
-        });
-      doc.text(value, columnX[columnX.length - 2], y + 6, {
-        width: columnX[columnX.length - 1] - columnX[columnX.length - 2] - 6,
-        align: "right",
-      });
-      y += summaryHeight;
-    };
-
-    drawSummaryRow("Effective dollar inward", month.effectiveDollarInward);
-    drawSummaryRow("Monthly $ paid", month.monthlyDollarPaid);
 
     doc.y = y + 10;
   };
@@ -334,9 +364,7 @@ export async function buildEmployeeStatementPdf(input: EmployeeStatementPdfInput
   drawInfoLine("Selected range:", model.header.dateRangeLabel);
   drawInfoLine("Generated date:", model.header.generatedDate);
 
-  for (const month of model.months) {
-    drawMonthTable(month);
-  }
+  drawStatementTable();
 
   ensureSpace(120);
   doc.moveDown(0.3);
@@ -349,6 +377,7 @@ export async function buildEmployeeStatementPdf(input: EmployeeStatementPdfInput
     ["Offboarding deduction", model.totals.offboardingDeduction],
     ["Effective dollar inward", model.totals.effectiveDollarInward],
     ["Monthly $ paid", model.totals.monthlyDollarPaid],
+    ["Total balance", model.totals.totalBalance],
   ].forEach(([label, value]) => {
     doc
       .font(fontName)

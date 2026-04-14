@@ -7,13 +7,11 @@ import { PendingSubmitButton } from "@/app/_components/pending-submit-button";
 import { saveEmployeeStatementAction } from "@/src/features/billing/actions";
 import {
   buildEmployeeStatementDateRangeLabel,
+  buildEmployeeStatementTotals,
+  buildFlattenedEmployeeStatementRows,
   buildEmployeeStatementSavePayload,
-  calculateStatementEffectiveDollarInwardUsdCents,
 } from "@/src/features/billing/employee-statements";
-import type {
-  EmployeeStatementMonthSection,
-  EmployeeStatementSection,
-} from "@/src/features/billing/types";
+import type { EmployeeStatementSection } from "@/src/features/billing/types";
 import { centsFromUsd, formatUsd } from "@/src/features/billing/utils";
 
 function formatUsdInput(cents: number) {
@@ -22,23 +20,6 @@ function formatUsdInput(cents: number) {
 
 function parseUsdInput(value: string) {
   return centsFromUsd(value);
-}
-
-function buildDerivedMonths(months: EmployeeStatementMonthSection[]) {
-  return months.map((month) => ({
-    ...month,
-    effectiveDollarInwardUsdCents: month.rows.reduce(
-      (sum, row) =>
-        sum +
-        calculateStatementEffectiveDollarInwardUsdCents({
-          dollarInwardUsdCents: row.dollarInwardUsdCents,
-          onboardingAdvanceUsdCents: row.onboardingAdvanceUsdCents,
-          reimbursementUsdCents: row.reimbursementUsdCents,
-          offboardingDeductionUsdCents: row.offboardingDeductionUsdCents,
-        }),
-      0,
-    ),
-  }));
 }
 
 export default function EmployeeStatementEditor(props: {
@@ -50,18 +31,33 @@ export default function EmployeeStatementEditor(props: {
   generatedDate: string;
   returnTo: string;
 }) {
-  const [months, setMonths] = useState<EmployeeStatementMonthSection[]>(() =>
+  const [months, setMonths] = useState<EmployeeStatementSection["months"]>(() =>
     props.section.months.map((month) => ({
       ...month,
       rows: month.rows.map((row) => ({ ...row })),
     })),
   );
 
-  const derivedMonths = buildDerivedMonths(months);
+  const derivedSection: EmployeeStatementSection = {
+    ...props.section,
+    months: months.map((month) => ({
+      ...month,
+      effectiveDollarInwardUsdCents: month.rows.reduce(
+        (sum, row) =>
+          sum +
+          (row.dollarInwardUsdCents +
+            row.onboardingAdvanceUsdCents +
+            row.reimbursementUsdCents -
+            row.offboardingDeductionUsdCents),
+        0,
+      ),
+    })),
+  };
+  const flattenedRows = buildFlattenedEmployeeStatementRows(derivedSection);
   const payload = buildEmployeeStatementSavePayload({
     employeeId: props.section.employeeId,
-    invoiceRows: derivedMonths.flatMap((month) => month.rows),
-    monthSummaries: derivedMonths.map((month) => ({
+    invoiceRows: derivedSection.months.flatMap((month) => month.rows),
+    monthSummaries: derivedSection.months.map((month) => ({
       employeeId: props.section.employeeId,
       monthKey: month.monthKey,
       monthLabel: month.monthLabel,
@@ -69,28 +65,7 @@ export default function EmployeeStatementEditor(props: {
       monthlyDollarPaidUsdCents: month.monthlyDollarPaidUsdCents,
     })),
   });
-  const totals = derivedMonths.reduce(
-    (accumulator, month) => {
-      for (const row of month.rows) {
-        accumulator.dollarInwardUsdCents += row.dollarInwardUsdCents;
-        accumulator.onboardingAdvanceUsdCents += row.onboardingAdvanceUsdCents;
-        accumulator.reimbursementUsdCents += row.reimbursementUsdCents;
-        accumulator.offboardingDeductionUsdCents += row.offboardingDeductionUsdCents;
-      }
-
-      accumulator.effectiveDollarInwardUsdCents += month.effectiveDollarInwardUsdCents;
-      accumulator.monthlyDollarPaidUsdCents += month.monthlyDollarPaidUsdCents;
-      return accumulator;
-    },
-    {
-      dollarInwardUsdCents: 0,
-      onboardingAdvanceUsdCents: 0,
-      reimbursementUsdCents: 0,
-      offboardingDeductionUsdCents: 0,
-      effectiveDollarInwardUsdCents: 0,
-      monthlyDollarPaidUsdCents: 0,
-    },
-  );
+  const totals = buildEmployeeStatementTotals(derivedSection);
 
   function updateRow(
     monthKey: string,
@@ -231,237 +206,168 @@ export default function EmployeeStatementEditor(props: {
               <th className="px-4 py-3 text-right font-medium">
                 Employee reimbursements (USD)
               </th>
-              <th className="px-4 py-3 text-left font-medium">
-                Employee reimbursement labels
-              </th>
               <th className="px-4 py-3 text-right font-medium">Offboarding deduction</th>
+              <th className="px-4 py-3 text-right font-medium">Effective dollar inward</th>
+              <th className="px-4 py-3 text-right font-medium">Monthly $ paid</th>
+              <th className="px-4 py-3 text-right font-medium">Total balance</th>
             </tr>
           </thead>
           <tbody>
-            {derivedMonths.map((month) => (
-              <FragmentRows
-                key={month.monthKey}
-                month={month}
-                onRowChange={updateRow}
-                onMonthPaidChange={updateMonthPaid}
-              />
-            ))}
+            {flattenedRows.map((row) =>
+              row.kind === "spacer" ? (
+                <tr key={`spacer-${row.monthKey}`} aria-hidden="true">
+                  <td colSpan={9} className="h-4" />
+                </tr>
+              ) : (
+                <tr
+                  key={row.invoiceId}
+                  style={{ borderTop: "1px solid rgba(255, 255, 255, 0.06)" }}
+                >
+                  <td className="px-4 py-3 align-top" style={{ color: "var(--text-secondary)" }}>
+                    {row.monthLabel}
+                  </td>
+                  <td className="px-4 py-3 align-top" style={{ color: "var(--text-primary)" }}>
+                    {row.invoiceNumber}
+                  </td>
+                  <td className="px-4 py-3 align-top">
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={formatUsdInput(row.dollarInwardUsdCents)}
+                      onChange={(event) =>
+                        updateRow(
+                          row.monthKey,
+                          row.invoiceId,
+                          "dollarInwardUsdCents",
+                          event.target.value,
+                        )
+                      }
+                      className={`${inputClass} text-right`}
+                    />
+                  </td>
+                  <td className="px-4 py-3 align-top">
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={formatUsdInput(row.onboardingAdvanceUsdCents)}
+                      onChange={(event) =>
+                        updateRow(
+                          row.monthKey,
+                          row.invoiceId,
+                          "onboardingAdvanceUsdCents",
+                          event.target.value,
+                        )
+                      }
+                      className={`${inputClass} text-right`}
+                    />
+                  </td>
+                  <td className="px-4 py-3 align-top">
+                    <div className="space-y-2">
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={formatUsdInput(row.reimbursementUsdCents)}
+                        onChange={(event) =>
+                          updateRow(
+                            row.monthKey,
+                            row.invoiceId,
+                            "reimbursementUsdCents",
+                            event.target.value,
+                          )
+                        }
+                        className={`${inputClass} text-right`}
+                      />
+                      <input
+                        type="text"
+                        value={row.reimbursementLabelsText}
+                        placeholder="Labels"
+                        onChange={(event) =>
+                          updateRow(
+                            row.monthKey,
+                            row.invoiceId,
+                            "reimbursementLabelsText",
+                            event.target.value,
+                          )
+                        }
+                        className={inputClass}
+                      />
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 align-top">
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={formatUsdInput(row.offboardingDeductionUsdCents)}
+                      onChange={(event) =>
+                        updateRow(
+                          row.monthKey,
+                          row.invoiceId,
+                          "offboardingDeductionUsdCents",
+                          event.target.value,
+                        )
+                      }
+                      className={`${inputClass} text-right`}
+                    />
+                  </td>
+                  <td className="px-4 py-3 align-top text-right font-semibold" style={{ color: "var(--text-primary)" }}>
+                    {row.effectiveDollarInwardUsdCents === null
+                      ? ""
+                      : formatUsd(row.effectiveDollarInwardUsdCents)}
+                  </td>
+                  <td className="px-4 py-3 align-top">
+                    {row.monthlyDollarPaidUsdCents === null ? null : (
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={formatUsdInput(row.monthlyDollarPaidUsdCents)}
+                        onChange={(event) => updateMonthPaid(row.monthKey, event.target.value)}
+                        className={`${inputClass} text-right`}
+                      />
+                    )}
+                  </td>
+                  <td className="px-4 py-3 align-top text-right font-semibold" style={{ color: "var(--text-primary)" }}>
+                    {row.totalBalanceUsdCents === null ? "" : formatUsd(row.totalBalanceUsdCents)}
+                  </td>
+                </tr>
+              ),
+            )}
           </tbody>
+          <tfoot>
+            <tr
+              style={{
+                borderTop: "1px solid rgba(255, 255, 255, 0.1)",
+                background: "rgba(255, 255, 255, 0.04)",
+              }}
+            >
+              <td className="px-4 py-3 font-semibold" style={{ color: "var(--text-primary)" }}>
+                Totals
+              </td>
+              <td className="px-4 py-3" />
+              <td className="px-4 py-3 text-right font-semibold" style={{ color: "var(--text-primary)" }}>
+                {formatUsd(totals.dollarInwardUsdCents)}
+              </td>
+              <td className="px-4 py-3 text-right font-semibold" style={{ color: "var(--text-primary)" }}>
+                {formatUsd(totals.onboardingAdvanceUsdCents)}
+              </td>
+              <td className="px-4 py-3 text-right font-semibold" style={{ color: "var(--text-primary)" }}>
+                {formatUsd(totals.reimbursementUsdCents)}
+              </td>
+              <td className="px-4 py-3 text-right font-semibold" style={{ color: "var(--text-primary)" }}>
+                {formatUsd(totals.offboardingDeductionUsdCents)}
+              </td>
+              <td className="px-4 py-3 text-right font-semibold" style={{ color: "var(--text-primary)" }}>
+                {formatUsd(totals.effectiveDollarInwardUsdCents)}
+              </td>
+              <td className="px-4 py-3 text-right font-semibold" style={{ color: "var(--text-primary)" }}>
+                {formatUsd(totals.monthlyDollarPaidUsdCents)}
+              </td>
+              <td className="px-4 py-3 text-right font-semibold" style={{ color: "var(--text-primary)" }}>
+                {formatUsd(totals.totalBalanceUsdCents)}
+              </td>
+            </tr>
+          </tfoot>
         </table>
       </div>
-
-      <div
-        className="grid gap-3 rounded-3xl border p-5 md:grid-cols-3"
-        style={{
-          borderColor: "var(--glass-border)",
-          background: "rgba(255, 255, 255, 0.03)",
-        }}
-      >
-        <MetricCard label="Dollar inward" value={formatUsd(totals.dollarInwardUsdCents)} />
-        <MetricCard
-          label="Onboarding advance"
-          value={formatUsd(totals.onboardingAdvanceUsdCents)}
-        />
-        <MetricCard
-          label="Employee reimbursements (USD)"
-          value={formatUsd(totals.reimbursementUsdCents)}
-        />
-        <MetricCard
-          label="Offboarding deduction"
-          value={formatUsd(totals.offboardingDeductionUsdCents)}
-        />
-        <MetricCard
-          label="Effective dollar inward"
-          value={formatUsd(totals.effectiveDollarInwardUsdCents)}
-        />
-        <MetricCard
-          label="Monthly $ paid"
-          value={formatUsd(totals.monthlyDollarPaidUsdCents)}
-        />
-      </div>
     </form>
-  );
-}
-
-function FragmentRows(props: {
-  month: EmployeeStatementMonthSection;
-  onRowChange: (
-    monthKey: string,
-    invoiceId: string,
-    field:
-      | "dollarInwardUsdCents"
-      | "onboardingAdvanceUsdCents"
-      | "reimbursementUsdCents"
-      | "offboardingDeductionUsdCents"
-      | "reimbursementLabelsText",
-    value: string,
-  ) => void;
-  onMonthPaidChange: (monthKey: string, value: string) => void;
-}) {
-  return (
-    <>
-      {props.month.rows.map((row) => (
-        <tr
-          key={row.invoiceId}
-          style={{ borderTop: "1px solid rgba(255, 255, 255, 0.06)" }}
-        >
-          <td className="px-4 py-3 align-top" style={{ color: "var(--text-secondary)" }}>
-            {row.monthLabel}
-          </td>
-          <td className="px-4 py-3 align-top" style={{ color: "var(--text-primary)" }}>
-            {row.invoiceNumber}
-          </td>
-          <td className="px-4 py-3 align-top">
-            <input
-              type="number"
-              step="0.01"
-              value={formatUsdInput(row.dollarInwardUsdCents)}
-              onChange={(event) =>
-                props.onRowChange(
-                  props.month.monthKey,
-                  row.invoiceId,
-                  "dollarInwardUsdCents",
-                  event.target.value,
-                )
-              }
-              className={`${inputClass} text-right`}
-            />
-          </td>
-          <td className="px-4 py-3 align-top">
-            <input
-              type="number"
-              step="0.01"
-              value={formatUsdInput(row.onboardingAdvanceUsdCents)}
-              onChange={(event) =>
-                props.onRowChange(
-                  props.month.monthKey,
-                  row.invoiceId,
-                  "onboardingAdvanceUsdCents",
-                  event.target.value,
-                )
-              }
-              className={`${inputClass} text-right`}
-            />
-          </td>
-          <td className="px-4 py-3 align-top">
-            <input
-              type="number"
-              step="0.01"
-              value={formatUsdInput(row.reimbursementUsdCents)}
-              onChange={(event) =>
-                props.onRowChange(
-                  props.month.monthKey,
-                  row.invoiceId,
-                  "reimbursementUsdCents",
-                  event.target.value,
-                )
-              }
-              className={`${inputClass} text-right`}
-            />
-          </td>
-          <td className="px-4 py-3 align-top">
-            <input
-              type="text"
-              value={row.reimbursementLabelsText}
-              onChange={(event) =>
-                props.onRowChange(
-                  props.month.monthKey,
-                  row.invoiceId,
-                  "reimbursementLabelsText",
-                  event.target.value,
-                )
-              }
-              className={inputClass}
-            />
-          </td>
-          <td className="px-4 py-3 align-top">
-            <input
-              type="number"
-              step="0.01"
-              value={formatUsdInput(row.offboardingDeductionUsdCents)}
-              onChange={(event) =>
-                props.onRowChange(
-                  props.month.monthKey,
-                  row.invoiceId,
-                  "offboardingDeductionUsdCents",
-                  event.target.value,
-                )
-              }
-              className={`${inputClass} text-right`}
-            />
-          </td>
-        </tr>
-      ))}
-
-      <tr style={{ borderTop: "1px solid rgba(255, 255, 255, 0.08)" }}>
-        <td
-          colSpan={6}
-          className="px-4 py-3 text-sm font-semibold"
-          style={{
-            background: "rgba(255, 255, 255, 0.04)",
-            color: "var(--text-primary)",
-          }}
-        >
-          Effective dollar inward
-        </td>
-        <td
-          className="px-4 py-3 text-right text-sm font-semibold"
-          style={{
-            background: "rgba(255, 255, 255, 0.04)",
-            color: "var(--text-primary)",
-          }}
-        >
-          {formatUsd(props.month.effectiveDollarInwardUsdCents)}
-        </td>
-      </tr>
-
-      <tr style={{ borderTop: "1px solid rgba(255, 255, 255, 0.08)" }}>
-        <td
-          colSpan={6}
-          className="px-4 py-3 text-sm font-semibold"
-          style={{
-            background: "rgba(255, 255, 255, 0.04)",
-            color: "var(--text-primary)",
-          }}
-        >
-          Monthly $ paid
-        </td>
-        <td
-          className="px-4 py-3"
-          style={{
-            background: "rgba(255, 255, 255, 0.04)",
-          }}
-        >
-          <input
-            type="number"
-            step="0.01"
-            value={formatUsdInput(props.month.monthlyDollarPaidUsdCents)}
-            onChange={(event) =>
-              props.onMonthPaidChange(props.month.monthKey, event.target.value)
-            }
-            className={`${inputClass} text-right`}
-          />
-        </td>
-      </tr>
-    </>
-  );
-}
-
-function MetricCard(props: { label: string; value: string }) {
-  return (
-    <div
-      className="rounded-2xl border px-4 py-3"
-      style={{
-        borderColor: "rgba(255, 255, 255, 0.08)",
-        background: "rgba(255, 255, 255, 0.02)",
-      }}
-    >
-      <p className="text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: "var(--text-muted)" }}>
-        {props.label}
-      </p>
-      <p className="mt-2 text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
-        {props.value}
-      </p>
-    </div>
   );
 }
