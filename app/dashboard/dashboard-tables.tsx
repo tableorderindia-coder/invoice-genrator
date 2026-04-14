@@ -5,19 +5,23 @@ import { useEffect, useMemo, useState } from "react";
 import { PendingActionButton } from "../_components/pending-action-button";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
 import { inputClass } from "../_components/field";
+import {
+  buildEmployeeSectionTotals,
+  buildPeriodTotals,
+} from "../../src/features/billing/dashboard-table-totals";
 import type {
   PnDashboardData,
   PnEmployeeEditableRow,
   PnPeriodRow,
   PnPeriodType,
-} from "@/src/features/billing/types";
+} from "../../src/features/billing/types";
 import {
   formatInr,
   formatMonthYear,
   formatSignedInr,
   formatUsd,
-} from "@/src/features/billing/utils";
-import { getVisibleToggleColumns } from "@/src/features/billing/dashboard-column-visibility";
+} from "../../src/features/billing/utils";
+import { getVisibleToggleColumns } from "../../src/features/billing/dashboard-column-visibility";
 
 type DashboardTablesProps = {
   view: "employee" | "period";
@@ -107,6 +111,14 @@ function netProfitColor(cents: number) {
 
 function calculateMonthlyPaidInrCents(monthlyUsdCents: number, paidUsdInrRate: number) {
   return Math.round(monthlyUsdCents * paidUsdInrRate);
+}
+
+function formatRate(rate: number | null) {
+  if (rate === null) {
+    return "-";
+  }
+
+  return rate.toFixed(4);
 }
 
 type EmployeeTablesProps = {
@@ -504,6 +516,72 @@ function EmployeeTables({
     ...employeeSuffixColumns,
   ];
 
+  const renderEmployeeTotalCell = (
+    column: Column<PnEmployeeEditableRow>,
+    totals: ReturnType<typeof buildEmployeeSectionTotals>,
+  ) => {
+    switch (column.key) {
+      case "month":
+        return "Totals";
+      case "daysWorked":
+        return totals.daysWorked;
+      case "dollarInward":
+        return formatUsd(totals.dollarInwardUsdCents);
+      case "onboardingAdvance":
+        return formatUsd(totals.onboardingAdvanceUsdCents);
+      case "reimbursements":
+        return formatUsd(totals.reimbursementUsdCents);
+      case "reimbursementLabels":
+        return "";
+      case "reimbursementsInr":
+        return formatInr(totals.reimbursementInrCents);
+      case "appraisalAdvance":
+        return formatUsd(totals.appraisalAdvanceUsdCents);
+      case "appraisalAdvanceInr":
+        return formatInr(totals.appraisalAdvanceInrCents);
+      case "offboardingDeduction":
+        return formatUsd(totals.offboardingDeductionUsdCents);
+      case "effectiveDollarInward":
+        return formatUsd(totals.effectiveDollarInwardUsdCents);
+      case "cashoutRate":
+        return formatRate(totals.cashoutUsdInrRate);
+      case "cashIn":
+        return formatInr(totals.cashInInrCents);
+      case "monthlyUsd":
+        return formatUsd(totals.employeeMonthlyUsdCents);
+      case "paidRate":
+        return formatRate(totals.paidUsdInrRate);
+      case "monthlyPaidInr":
+        return formatInr(totals.monthlyPaidInrCents);
+      case "actualPaid":
+        return formatInr(totals.actualPaidInrCents);
+      case "pf":
+        return formatInr(totals.pfInrCents);
+      case "tds":
+        return formatInr(totals.tdsInrCents);
+      case "salaryPaid":
+        return formatInr(totals.salaryPaidInrCents);
+      case "fxCommission":
+        return formatInr(totals.fxCommissionInrCents);
+      case "totalCommission":
+        return formatUsd(totals.totalCommissionUsdCents);
+      case "commissionEarned":
+        return formatInr(totals.commissionEarnedInrCents);
+      case "grossEarnings":
+        return formatInr(totals.grossEarningsInrCents);
+      case "netProfit":
+        return (
+          <span style={{ color: netProfitColor(totals.netProfitInrCents) }}>
+            {formatSignedInr(totals.netProfitInrCents)}
+          </span>
+        );
+      case "actions":
+        return "";
+      default:
+        return "-";
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-end">{toggleButton}</div>
@@ -540,20 +618,18 @@ function EmployeeTables({
                   </tr>
                 ))}
                 <tr>
-                  <td
-                    colSpan={Math.max(columns.length - 2, 1)}
-                    className="text-right text-sm font-semibold"
-                    style={{ color: "var(--text-primary)" }}
-                  >
-                    Total Net Profit
-                  </td>
-                  <td
-                    className="text-sm font-semibold"
-                    style={{ color: netProfitColor(section.totalNetProfitInrCents) }}
-                  >
-                    {formatSignedInr(section.totalNetProfitInrCents)}
-                  </td>
-                  <td />
+                  {columns.map((column) => (
+                    <td
+                      key={`employee-total-${section.employeeId}-${column.key}`}
+                      className="text-sm font-semibold"
+                      style={{ color: "var(--text-primary)" }}
+                    >
+                      {renderEmployeeTotalCell(
+                        column,
+                        buildEmployeeSectionTotals(section.rows),
+                      )}
+                    </td>
+                  ))}
                 </tr>
               </tbody>
             </table>
@@ -772,6 +848,75 @@ function PeriodTables({
     ...financialColumns,
   ];
 
+  const periodTotals = buildPeriodTotals(data.periodRows, {
+    includeExpenses,
+    includeReimbursements,
+  });
+
+  const renderPeriodTotalCell = (
+    column: Column<PnPeriodRow>,
+    totals: ReturnType<typeof buildPeriodTotals>,
+  ) => {
+    switch (column.key) {
+      case "period":
+        return "Totals";
+      case "dollarInward":
+        return formatUsd(totals.dollarInwardUsdCents);
+      case "onboardingAdvance":
+        return formatUsd(totals.onboardingAdvanceUsdCents);
+      case "reimbursements":
+        return formatUsd(totals.reimbursementUsdCents);
+      case "reimbursementLabels":
+        return "";
+      case "reimbursementsInr":
+        return formatInr(totals.reimbursementInrCents);
+      case "appraisalAdvance":
+        return formatUsd(totals.appraisalAdvanceUsdCents);
+      case "appraisalAdvanceInr":
+        return formatInr(totals.appraisalAdvanceInrCents);
+      case "offboardingDeduction":
+        return formatUsd(totals.offboardingDeductionUsdCents);
+      case "effectiveDollarInward":
+        return formatUsd(totals.effectiveDollarInwardUsdCents);
+      case "cashoutRate":
+        return formatRate(totals.cashoutUsdInrRate);
+      case "cashIn":
+        return formatInr(totals.cashInInrCents);
+      case "monthlyUsd":
+        return formatUsd(totals.employeeMonthlyUsdCents);
+      case "paidRate":
+        return formatRate(totals.paidUsdInrRate);
+      case "pf":
+        return formatInr(totals.pfInrCents);
+      case "tds":
+        return formatInr(totals.tdsInrCents);
+      case "actualPaid":
+        return formatInr(totals.actualPaidInrCents);
+      case "fxCommission":
+        return formatInr(totals.fxCommissionInrCents);
+      case "totalCommission":
+        return formatUsd(totals.totalCommissionUsdCents);
+      case "commissionEarned":
+        return formatInr(totals.commissionEarnedInrCents);
+      case "grossEarnings":
+        return formatInr(totals.grossEarningsInrCents);
+      case "expenses":
+        return formatInr(totals.expensesInrCents);
+      case "companyReimbursementUsd":
+        return formatUsd(totals.companyReimbursementUsdCents);
+      case "companyReimbursementInr":
+        return formatInr(totals.companyReimbursementInrCents);
+      case "netPl":
+        return (
+          <span style={{ color: netProfitColor(totals.netPlInrCents), fontWeight: 600 }}>
+            {formatSignedInr(totals.netPlInrCents)}
+          </span>
+        );
+      default:
+        return "-";
+    }
+  };
+
   // Custom header rendering to inject checkboxes
   const renderHeader = (column: Column<PnPeriodRow>) => {
     if (column.key === "expenses") {
@@ -821,6 +966,19 @@ function PeriodTables({
                 ))}
               </tr>
             ))}
+            {data.periodRows.length > 0 ? (
+              <tr>
+                {columns.map((column) => (
+                  <td
+                    key={`period-total-${column.key}`}
+                    className="text-sm font-semibold"
+                    style={{ color: "var(--text-primary)" }}
+                  >
+                    {renderPeriodTotalCell(column, periodTotals)}
+                  </td>
+                ))}
+              </tr>
+            ) : null}
             {data.periodRows.length === 0 ? (
               <tr>
                 <td

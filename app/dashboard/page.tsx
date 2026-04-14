@@ -5,19 +5,19 @@ import { PendingSubmitButton } from "../_components/pending-submit-button";
 import { ChecklistFilterDropdown } from "../_components/checklist-filter-dropdown";
 import {
   updateDashboardEmployeeCashFlowEntryAction,
-} from "@/src/features/billing/actions";
+} from "../../src/features/billing/actions";
 import {
   buildDashboardFilterFieldEntries,
   formatPaymentMonthLabel,
   normalizeMultiSelectValue,
-} from "@/src/features/billing/filter-selection";
+} from "../../src/features/billing/filter-selection";
 import {
   getPnDashboardData,
   listCompanies,
   listEmployees,
   listAvailablePaymentMonths,
-} from "@/src/features/billing/store";
-import type { PnDashboardData } from "@/src/features/billing/types";
+} from "../../src/features/billing/store";
+import type { PnDashboardData } from "../../src/features/billing/types";
 import { DashboardTables } from "./dashboard-tables";
 
 export const dynamic = "force-dynamic";
