@@ -25,7 +25,6 @@ type DashboardTablesProps = {
   data: PnDashboardData;
   selectedCompanyId: string;
   returnTo: string;
-  saveDashboardExpenseAction: (formData: FormData) => Promise<void>;
   updateDashboardEmployeeCashFlowEntryAction: (formData: FormData) => Promise<void>;
 };
 
@@ -35,11 +34,11 @@ export function DashboardTables({
   data,
   selectedCompanyId,
   returnTo,
-  saveDashboardExpenseAction,
   updateDashboardEmployeeCashFlowEntryAction,
 }: DashboardTablesProps) {
   const [showDetails, setShowDetails] = useState(() => {
-    const saved = window.localStorage.getItem("dashboardShowDetails");
+    if (typeof window === "undefined") return false;
+    const saved = localStorage.getItem("dashboardShowDetails");
     if (!saved) return false;
     try {
       return JSON.parse(saved);
@@ -88,7 +87,6 @@ export function DashboardTables({
       returnTo={returnTo}
       toggleColumns={toggleColumns}
       toggleButton={toggleButton}
-      saveDashboardExpenseAction={saveDashboardExpenseAction}
     />
   );
 }
@@ -578,7 +576,6 @@ type PeriodTablesProps = {
   returnTo: string;
   toggleColumns: ToggleColumn[];
   toggleButton: ReactNode;
-  saveDashboardExpenseAction: (formData: FormData) => Promise<void>;
 };
 
 function PeriodTables({
@@ -588,8 +585,47 @@ function PeriodTables({
   returnTo,
   toggleColumns,
   toggleButton,
-  saveDashboardExpenseAction,
 }: PeriodTablesProps) {
+  const [includeExpenses, setIncludeExpenses] = useState(() => {
+    if (typeof window === "undefined") return true;
+    const saved = localStorage.getItem("dashboardIncludeExpenses");
+    if (saved === null) return true;
+    try {
+      return JSON.parse(saved);
+    } catch {
+      return true;
+    }
+  });
+  const [includeReimbursements, setIncludeReimbursements] = useState(() => {
+    if (typeof window === "undefined") return true;
+    const saved = localStorage.getItem("dashboardIncludeReimbursements");
+    if (saved === null) return true;
+    try {
+      return JSON.parse(saved);
+    } catch {
+      return true;
+    }
+  });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("dashboardIncludeExpenses", JSON.stringify(includeExpenses));
+    }
+  }, [includeExpenses]);
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("dashboardIncludeReimbursements", JSON.stringify(includeReimbursements));
+    }
+  }, [includeReimbursements]);
+
+  // Compute dynamic Net P/L for each row
+  const computeNetPl = (row: PnPeriodRow) => {
+    let net = row.netPlInrCents; // base (just employee net profit)
+    if (includeReimbursements) net += row.companyReimbursementInrCents;
+    if (includeExpenses) net -= row.expensesInrCents;
+    return net;
+  };
+
   const renderToggleCell = (key: ToggleColumn["key"], row: PnPeriodRow) => {
     const details = row as PnPeriodRow & {
       onboardingAdvanceUsdCents?: number;
@@ -632,6 +668,22 @@ function PeriodTables({
     },
   ];
 
+  // Checkbox header label helper
+  const checkboxHeader = (label: string, checked: boolean, onChange: (v: boolean) => void) => (
+    <div className="flex flex-col items-start gap-1">
+      <label className="flex items-center gap-1.5 cursor-pointer select-none" style={{ fontSize: "0.65rem", color: checked ? "#6ee7b7" : "var(--text-muted)" }}>
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked)}
+          style={{ accentColor: "var(--accent-1)", width: 13, height: 13 }}
+        />
+        In P/L
+      </label>
+      <span>{label}</span>
+    </div>
+  );
+
   const periodSuffixColumns: Column<PnPeriodRow>[] = [
     {
       key: "pf",
@@ -668,48 +720,44 @@ function PeriodTables({
       label: "Gross earnings (INR)",
       render: (row) => formatInr(row.grossEarningsInrCents),
     },
+  ];
+
+  // Expense + Reimbursement + Net P/L columns — these are always shown
+  const financialColumns: Column<PnPeriodRow>[] = [
     {
       key: "expenses",
-      label: "Expenses (INR)",
+      label: "__custom_expenses__",
       render: (row) => (
-        <form action={saveDashboardExpenseAction} className="flex items-center gap-2">
-          <input type="hidden" name="companyId" value={selectedCompanyId} />
-          <input type="hidden" name="periodType" value={periodType} />
-          <input type="hidden" name="year" value={row.year} />
-          {periodType === "monthly" ? (
-            <input type="hidden" name="month" value={row.month} />
-          ) : null}
-          <input type="hidden" name="returnTo" value={returnTo} />
-          <input
-            type="number"
-            name="amountInr"
-            min="0"
-            step="0.01"
-            defaultValue={(row.expensesInrCents / 100).toFixed(2)}
-            className={inputClass}
-            style={{
-              minWidth: "7rem",
-              border: "1px solid var(--glass-border)",
-              background: "rgba(255,255,255,0.04)",
-              color: "var(--text-primary)",
-            }}
-          />
-          <PendingSubmitButton
-            className="btn-outline"
-            defaultText="Save"
-            pendingText="Saving..."
-          />
-        </form>
+        <span style={{ color: row.expensesInrCents > 0 ? "#fca5a5" : "var(--text-primary)" }}>
+          {formatInr(row.expensesInrCents)}
+        </span>
+      ),
+    },
+    {
+      key: "companyReimbursementUsd",
+      label: "__custom_reimbursement_usd__",
+      render: (row) => formatUsd(row.companyReimbursementUsdCents),
+    },
+    {
+      key: "companyReimbursementInr",
+      label: "__custom_reimbursement_inr__",
+      render: (row) => (
+        <span style={{ color: row.companyReimbursementInrCents > 0 ? "#6ee7b7" : "var(--text-primary)" }}>
+          {formatInr(row.companyReimbursementInrCents)}
+        </span>
       ),
     },
     {
       key: "netPl",
       label: "Net P/L (INR)",
-      render: (row) => (
-        <span style={{ color: netProfitColor(row.netPlInrCents) }}>
-          {formatSignedInr(row.netPlInrCents)}
-        </span>
-      ),
+      render: (row) => {
+        const net = computeNetPl(row);
+        return (
+          <span style={{ color: netProfitColor(net), fontWeight: 600 }}>
+            {formatSignedInr(net)}
+          </span>
+        );
+      },
     },
   ];
 
@@ -721,11 +769,38 @@ function PeriodTables({
       render: (row: PnPeriodRow) => renderToggleCell(col.key, row),
     })),
     ...periodSuffixColumns,
+    ...financialColumns,
   ];
+
+  // Custom header rendering to inject checkboxes
+  const renderHeader = (column: Column<PnPeriodRow>) => {
+    if (column.key === "expenses") {
+      return checkboxHeader("Expenses (INR)", includeExpenses, setIncludeExpenses);
+    }
+    if (column.key === "companyReimbursementUsd") {
+      return checkboxHeader("Reimb. (USD)", includeReimbursements, setIncludeReimbursements);
+    }
+    if (column.key === "companyReimbursementInr") {
+      return checkboxHeader("Reimb. (INR)", includeReimbursements, setIncludeReimbursements);
+    }
+    return column.label;
+  };
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-end">{toggleButton}</div>
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-3 text-xs" style={{ color: "var(--text-muted)" }}>
+          <span className="flex items-center gap-1.5">
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: includeExpenses ? "#6ee7b7" : "#fca5a5", display: "inline-block" }} />
+            Expenses: {includeExpenses ? "in P/L" : "excluded"}
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: includeReimbursements ? "#6ee7b7" : "#fca5a5", display: "inline-block" }} />
+            Reimbursements: {includeReimbursements ? "in P/L" : "excluded"}
+          </span>
+        </div>
+        {toggleButton}
+      </div>
       <div
         className="overflow-x-auto rounded-2xl"
         style={{ border: "1px solid var(--glass-border)" }}
@@ -734,7 +809,7 @@ function PeriodTables({
           <thead>
             <tr>
               {columns.map((column) => (
-                <th key={column.key}>{column.label}</th>
+                <th key={column.key}>{renderHeader(column)}</th>
               ))}
             </tr>
           </thead>

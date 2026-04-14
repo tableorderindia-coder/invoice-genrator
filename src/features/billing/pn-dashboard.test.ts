@@ -190,7 +190,9 @@ describe("pn dashboard aggregations", () => {
     expect(monthly[0].reimbursementInrCents).toBe(1664000);
     expect(monthly[0].appraisalAdvanceUsdCents).toBe(5000);
     expect(monthly[0].appraisalAdvanceInrCents).toBe(416000);
-    expect(monthly[0].netPlInrCents).toBe(5851000);
+    expect(monthly[0].expensesInrCents).toBe(50000);
+    expect(monthly[0].companyReimbursementInrCents).toBe(832000);
+    expect(monthly[0].netPlInrCents).toBe(3821000);
 
     expect(monthly[1].month).toBe(2);
     expect(monthly[1].grossEarningsInrCents).toBe(362000);
@@ -198,7 +200,9 @@ describe("pn dashboard aggregations", () => {
     expect(monthly[1].reimbursementInrCents).toBe(835000);
     expect(monthly[1].appraisalAdvanceUsdCents).toBe(2500);
     expect(monthly[1].appraisalAdvanceInrCents).toBe(208750);
-    expect(monthly[1].netPlInrCents).toBe(7137000);
+    expect(monthly[1].expensesInrCents).toBe(90000);
+    expect(monthly[1].companyReimbursementInrCents).toBe(417500);
+    expect(monthly[1].netPlInrCents).toBe(6183250);
   });
 
   it("builds yearly period rows from cash-flow net profit even without outflow", () => {
@@ -230,7 +234,9 @@ describe("pn dashboard aggregations", () => {
       appraisalAdvanceUsdCents: 5000,
       appraisalAdvanceInrCents: 416000,
       grossEarningsInrCents: 0,
-      netPlInrCents: 2980000,
+      expensesInrCents: 0,
+      companyReimbursementInrCents: 832000,
+      netPlInrCents: 900000,
     });
   });
 

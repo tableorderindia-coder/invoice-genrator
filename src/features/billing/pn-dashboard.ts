@@ -145,6 +145,8 @@ export type PnPeriodRow = {
   commissionEarnedInrCents: number;
   grossEarningsInrCents: number;
   expensesInrCents: number;
+  companyReimbursementUsdCents: number;
+  companyReimbursementInrCents: number;
   netPlInrCents: number;
 };
 
@@ -484,10 +486,9 @@ export function buildPnPeriodRows(input: {
         commissionEarnedInrCents,
         grossEarningsInrCents,
         expensesInrCents,
-        netPlInrCents:
-          netProfitInrCents +
-          companyLevelReimbursementInrCents -
-          expensesInrCents,
+        companyReimbursementUsdCents: companyLevelReimbursementUsdCents,
+        companyReimbursementInrCents: companyLevelReimbursementInrCents,
+        netPlInrCents: netProfitInrCents,
       };
     })
     .sort((a, b) => {

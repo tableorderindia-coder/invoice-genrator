@@ -36,6 +36,7 @@ import { getDaysInMonth } from "./utils";
 import type {
   AdjustmentType,
   Company,
+  CompanyExpense,
   DashboardMetrics,
   Employee,
   EmployeePayout,
@@ -183,6 +184,17 @@ type DbDashboardExpense = {
   period_type: PnPeriodType;
   year: number;
   month: number | null;
+  amount_inr_cents: number;
+  created_at: string;
+  updated_at: string;
+};
+
+type DbCompanyExpense = {
+  id: string;
+  company_id: string;
+  year: number;
+  month: number;
+  label: string;
   amount_inr_cents: number;
   created_at: string;
   updated_at: string;
@@ -2424,22 +2436,21 @@ export async function getPnDashboardData(input: {
   }
 
   const { data: expenseRows, error: expenseError } = await supabase
-    .from("dashboard_expenses")
+    .from("company_expenses")
     .select("*")
-    .eq("company_id", input.companyId)
-    .eq("period_type", input.periodType);
+    .eq("company_id", input.companyId);
   if (expenseError) throw expenseError;
 
   const fiscalYearKey = (year: number, month: number) =>
     month >= 4 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
   const fiscalYearKeyFromYear = (year: number) => `${year}-${year + 1}`;
   const expenseByKey = new Map<string, number>();
-  for (const row of (expenseRows ?? []) as DbDashboardExpense[]) {
+  for (const row of (expenseRows ?? []) as DbCompanyExpense[]) {
     const key =
-      row.period_type === "monthly"
+      input.periodType === "monthly"
         ? `${row.year}-${String(row.month).padStart(2, "0")}`
-        : fiscalYearKeyFromYear(row.year);
-    expenseByKey.set(key, Number(row.amount_inr_cents));
+        : fiscalYearKey(row.year, row.month);
+    expenseByKey.set(key, (expenseByKey.get(key) ?? 0) + Number(row.amount_inr_cents));
   }
 
   const { data: adjustmentRows, error: adjustmentError } = await supabase
@@ -2774,3 +2785,89 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     ),
   };
 }
+
+// ───────────── Company Expenses CRUD ─────────────
+
+export async function listCompanyExpenses(input: {
+  companyId: string;
+  year?: number;
+  month?: number;
+}): Promise<CompanyExpense[]> {
+  const supabase = getSupabaseOrThrow();
+  let query = supabase
+    .from("company_expenses")
+    .select("*")
+    .eq("company_id", input.companyId)
+    .order("year", { ascending: false })
+    .order("month", { ascending: false })
+    .order("created_at", { ascending: true });
+
+  if (input.year !== undefined) {
+    query = query.eq("year", input.year);
+  }
+  if (input.month !== undefined) {
+    query = query.eq("month", input.month);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  return ((data ?? []) as DbCompanyExpense[]).map((row) => ({
+    id: String(row.id),
+    companyId: String(row.company_id),
+    year: Number(row.year),
+    month: Number(row.month),
+    label: String(row.label ?? ""),
+    amountInrCents: Number(row.amount_inr_cents),
+    createdAt: String(row.created_at),
+    updatedAt: String(row.updated_at),
+  }));
+}
+
+export async function upsertCompanyExpense(input: {
+  id?: string;
+  companyId: string;
+  year: number;
+  month: number;
+  label: string;
+  amountInrCents: number;
+}) {
+  const supabase = getSupabaseOrThrow();
+
+  if (input.id) {
+    const { error } = await supabase
+      .from("company_expenses")
+      .update({
+        label: input.label,
+        amount_inr_cents: input.amountInrCents,
+        updated_at: nowIso(),
+      })
+      .eq("id", input.id);
+    if (error) throw error;
+    return input.id;
+  }
+
+  const newId = nextId("company_expense");
+  const { error } = await supabase.from("company_expenses").insert({
+    id: newId,
+    company_id: input.companyId,
+    year: input.year,
+    month: input.month,
+    label: input.label,
+    amount_inr_cents: input.amountInrCents,
+    created_at: nowIso(),
+    updated_at: nowIso(),
+  });
+  if (error) throw error;
+  return newId;
+}
+
+export async function deleteCompanyExpense(id: string) {
+  const supabase = getSupabaseOrThrow();
+  const { error } = await supabase
+    .from("company_expenses")
+    .delete()
+    .eq("id", id);
+  if (error) throw error;
+}
+

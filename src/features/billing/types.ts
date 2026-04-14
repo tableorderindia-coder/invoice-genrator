@@ -268,6 +268,8 @@ export type PnPeriodRow = {
   commissionEarnedInrCents: number;
   grossEarningsInrCents: number;
   expensesInrCents: number;
+  companyReimbursementUsdCents: number;
+  companyReimbursementInrCents: number;
   netPlInrCents: number;
 };
 
@@ -276,4 +278,15 @@ export type PnDashboardData = {
   employeeEditableSections: PnEmployeeEditableSection[];
   employeeSections: PnEmployeeSection[];
   periodRows: PnPeriodRow[];
+};
+
+export type CompanyExpense = {
+  id: string;
+  companyId: string;
+  year: number;
+  month: number;
+  label: string;
+  amountInrCents: number;
+  createdAt: string;
+  updatedAt: string;
 };

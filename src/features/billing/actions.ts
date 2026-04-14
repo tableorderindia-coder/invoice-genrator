@@ -33,6 +33,8 @@ import {
   markEmployeePayoutPaid,
   removeEmployeePayoutRow,
   upsertDashboardExpense,
+  upsertCompanyExpense,
+  deleteCompanyExpense,
 } from "./store";
 import type { EmployeeCashFlowEntryWriteInput } from "./employee-cash-flow-types";
 import type { EmployeeCashFlowSavedEntry } from "./employee-cash-flow-types";
@@ -1059,6 +1061,87 @@ export async function saveDashboardExpenseAction(formData: FormData) {
   }
 
   redirect(buildFlashRedirect(returnTo, "success", "Expense saved."));
+}
+
+export async function saveCompanyExpenseAction(formData: FormData) {
+  const returnTo = getString(formData, "returnTo") || "/expenses";
+
+  try {
+    const companyId = getString(formData, "companyId");
+    if (!companyId) {
+      throw new Error("Select a company first.");
+    }
+
+    const year = Number.parseInt(getString(formData, "year"), 10);
+    if (!Number.isFinite(year) || year <= 0) {
+      throw new Error("Invalid year.");
+    }
+
+    const month = Number.parseInt(getString(formData, "month"), 10);
+    if (!Number.isFinite(month) || month < 1 || month > 12) {
+      throw new Error("Invalid month.");
+    }
+
+    const label = getString(formData, "label");
+    if (!label) {
+      throw new Error("Expense label is required.");
+    }
+
+    const amountInrCents = centsFromUsd(getString(formData, "amountInr"));
+    if (amountInrCents < 0) {
+      throw new Error("Expense amount cannot be negative.");
+    }
+
+    const existingId = getString(formData, "expenseId") || undefined;
+
+    await upsertCompanyExpense({
+      id: existingId,
+      companyId,
+      year,
+      month,
+      label,
+      amountInrCents,
+    });
+
+    revalidatePath("/expenses");
+    revalidatePath("/dashboard");
+  } catch (error) {
+    redirect(
+      buildFlashRedirect(
+        returnTo,
+        "error",
+        getErrorMessage(error, "Unable to save expense."),
+      ),
+    );
+  }
+
+  redirect(buildFlashRedirect(returnTo, "success", "Expense saved."));
+}
+
+export async function deleteCompanyExpenseAction(formData: FormData) {
+  const returnTo = getString(formData, "returnTo") || "/expenses";
+
+  try {
+    const expenseId = getString(formData, "expenseId");
+    if (!expenseId) {
+      throw new Error("Expense ID is required.");
+    }
+
+    await deleteCompanyExpense(expenseId);
+
+    revalidatePath("/expenses");
+    revalidatePath("/dashboard");
+  } catch (error) {
+    redirect(
+      buildFlashRedirect(
+        returnTo,
+        "error",
+        getErrorMessage(error, "Unable to delete expense."),
+      ),
+    );
+  }
+
+  redirect(buildFlashRedirect(returnTo, "success", "Expense deleted."));
 }
 
 export async function saveInvoicePaymentAction(formData: FormData) {

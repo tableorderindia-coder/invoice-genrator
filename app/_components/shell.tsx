@@ -93,6 +93,16 @@ const links = [
     ),
   },
   {
+    href: "/expenses",
+    label: "Expenses",
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M2 17l4-4 4 4 4-8 4 4 4-6" />
+        <rect x="2" y="3" width="20" height="18" rx="2" />
+      </svg>
+    ),
+  },
+  {
     href: "/dashboard",
     label: "Dashboard",
     icon: (

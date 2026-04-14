@@ -20,9 +20,9 @@ const leftFixed: ToggleColumn[] = [
 
 const middleExpandable: ToggleColumn[] = [
   { key: "onboardingAdvance", label: "Onboarding advance" },
-  { key: "reimbursements", label: "Reimbursements / Expenses" },
-  { key: "reimbursementLabels", label: "Reimbursement labels" },
-  { key: "reimbursementsInr", label: "Reimbursements (INR)" },
+  { key: "reimbursements", label: "Employee reimbursements (USD)" },
+  { key: "reimbursementLabels", label: "Employee reimbursement labels" },
+  { key: "reimbursementsInr", label: "Employee reimbursements (INR)" },
   { key: "appraisalAdvance", label: "Appraisal advance" },
   { key: "appraisalAdvanceInr", label: "Appraisal advance (INR)" },
   { key: "offboardingDeduction", label: "Offboarding deduction" },

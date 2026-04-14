@@ -3,7 +3,6 @@ import { Shell } from "../_components/shell";
 import { inputClass } from "../_components/field";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
 import {
-  saveDashboardExpenseAction,
   updateDashboardEmployeeCashFlowEntryAction,
 } from "@/src/features/billing/actions";
 import {
@@ -302,7 +301,6 @@ export default async function DashboardPage({
             data={data}
             selectedCompanyId={selectedCompanyId}
             returnTo={returnTo}
-            saveDashboardExpenseAction={saveDashboardExpenseAction}
             updateDashboardEmployeeCashFlowEntryAction={
               updateDashboardEmployeeCashFlowEntryAction
             }
@@ -342,7 +340,6 @@ export default async function DashboardPage({
             data={data}
             selectedCompanyId={selectedCompanyId}
             returnTo={returnTo}
-            saveDashboardExpenseAction={saveDashboardExpenseAction}
             updateDashboardEmployeeCashFlowEntryAction={
               updateDashboardEmployeeCashFlowEntryAction
             }
@@ -352,8 +349,8 @@ export default async function DashboardPage({
       <GlassPanel>
         <p className="text-sm" style={{ color: "var(--text-muted)" }}>
           Gross Earnings (INR) = Commission Earned (INR) + FX Commission (INR). Net P/L in
-          Monthly / Yearly view uses Employee Cash Flow net profit, plus company-level
-          reimbursements converted to INR, minus dashboard expenses.
+          Monthly / Yearly view includes Employee Cash Flow net profit, and optionally
+          company-level reimbursements and expenses (use headers toggles to include/exclude them).
         </p>
       </GlassPanel>
     </Shell>
