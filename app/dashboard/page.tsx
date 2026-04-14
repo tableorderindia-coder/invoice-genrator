@@ -120,10 +120,10 @@ export default async function DashboardPage({
     companyId: selectedCompanyId,
     periodType,
     view,
-    employeeIds: effectiveEmployeeIds,
-    paymentMonths: effectivePaymentMonths,
     allEmployees: allEffectiveEmployeeIdsSelected,
     allMonths: allEffectivePaymentMonthsSelected,
+    includeEmployeeIds: false,
+    includePaymentMonths: false,
     includeAllEmployees: false,
     includeAllMonths: false,
   });

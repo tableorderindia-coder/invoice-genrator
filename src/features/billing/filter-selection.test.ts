@@ -184,6 +184,28 @@ describe("filter selection helpers", () => {
     ]);
   });
 
+  it("omits stale employee and month selections from period filter load forms", () => {
+    expect(
+      buildDashboardFilterFieldEntries({
+        companyId: "comp_1",
+        periodType: "monthly",
+        view: "period",
+        employeeIds: ["emp_1", "emp_2"],
+        paymentMonths: ["2026-04", "2026-05"],
+        allEmployees: true,
+        allMonths: true,
+        includeEmployeeIds: false,
+        includePaymentMonths: false,
+        includeAllEmployees: false,
+        includeAllMonths: false,
+      }),
+    ).toEqual([
+      { name: "companyId", value: "comp_1" },
+      { name: "periodType", value: "monthly" },
+      { name: "view", value: "period" },
+    ]);
+  });
+
   it("labels full, empty, and partial checklist selections", () => {
     expect(
       getChecklistFilterTriggerLabel({
