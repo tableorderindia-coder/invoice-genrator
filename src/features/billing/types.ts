@@ -290,3 +290,39 @@ export type CompanyExpense = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type EmployeeStatementInvoiceRow = {
+  employeeId: string;
+  employeeName: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  monthKey: string;
+  monthLabel: string;
+  dollarInwardUsdCents: number;
+  onboardingAdvanceUsdCents: number;
+  reimbursementUsdCents: number;
+  reimbursementLabelsText: string;
+  offboardingDeductionUsdCents: number;
+};
+
+export type EmployeeStatementMonthSummary = {
+  employeeId: string;
+  monthKey: string;
+  monthLabel: string;
+  effectiveDollarInwardUsdCents: number;
+  monthlyDollarPaidUsdCents: number;
+};
+
+export type EmployeeStatementMonthSection = {
+  monthKey: string;
+  monthLabel: string;
+  rows: EmployeeStatementInvoiceRow[];
+  effectiveDollarInwardUsdCents: number;
+  monthlyDollarPaidUsdCents: number;
+};
+
+export type EmployeeStatementSection = {
+  employeeId: string;
+  employeeName: string;
+  months: EmployeeStatementMonthSection[];
+};
