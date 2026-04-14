@@ -949,6 +949,40 @@ export async function createCompany(input: {
   return mapCompany(data as DbCompany);
 }
 
+export async function updateCompany(input: {
+  companyId: string;
+  name: string;
+  billingAddress: string;
+  defaultNote: string;
+}) {
+  const supabase = getSupabaseOrThrow();
+  const { data: existingCompanyRows, error: existingCompanyError } = await supabase
+    .from("companies")
+    .select("id, name");
+  if (existingCompanyError) throw existingCompanyError;
+
+  assertNoCaseInsensitiveDuplicate({
+    existingValues: (existingCompanyRows ?? [])
+      .filter((row) => String(row.id) !== input.companyId)
+      .map((row) => String(row.name)),
+    candidateValue: input.name,
+    entityLabel: "Company",
+  });
+
+  const { data, error } = await supabase
+    .from("companies")
+    .update({
+      name: input.name,
+      billing_address: input.billingAddress,
+      default_note: input.defaultNote,
+    })
+    .eq("id", input.companyId)
+    .select()
+    .single();
+  if (error) throw error;
+  return mapCompany(data as DbCompany);
+}
+
 export async function listEmployees(companyId?: string) {
   const supabase = getSupabaseOrThrow();
   let query = supabase.from("employees").select("*").order("full_name");

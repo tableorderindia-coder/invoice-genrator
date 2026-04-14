@@ -8,6 +8,7 @@ const updateDashboardEmployeeCashFlowEntryMock = vi.fn();
 const replaceInvoicePaymentEmployeeEntriesMock = vi.fn();
 const upsertInvoicePaymentMock = vi.fn();
 const upsertEmployeeStatementSectionMock = vi.fn();
+const updateCompanyMock = vi.fn();
 
 vi.mock("next/cache", () => ({
   revalidatePath: revalidatePathMock,
@@ -39,6 +40,7 @@ vi.mock("./store", () => ({
   updateInvoiceAdjustmentAmount: vi.fn(),
   updateInvoiceNote: vi.fn(),
   updateInvoiceStatus: vi.fn(),
+  updateCompany: updateCompanyMock,
   updateEmployee: vi.fn(),
   addEmployeePayoutRow: vi.fn(),
   updateEmployeePayout: vi.fn(),
@@ -68,6 +70,8 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
     upsertInvoicePaymentMock.mockResolvedValue("pay_1");
     upsertEmployeeStatementSectionMock.mockReset();
     upsertEmployeeStatementSectionMock.mockResolvedValue(undefined);
+    updateCompanyMock.mockReset();
+    updateCompanyMock.mockResolvedValue(undefined);
   });
 
   it("passes days worked through to the dashboard cash-flow update", async () => {
@@ -226,5 +230,26 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
       ],
     });
     expect(revalidatePathMock).toHaveBeenCalledWith("/employee-statements");
+  });
+
+  it("updates company details through the company edit action", async () => {
+    const { updateCompanyAction } = await import("./actions");
+    const formData = new FormData();
+    formData.set("companyId", "comp_1");
+    formData.set("name", "Acme Inc.");
+    formData.set("billingAddress", "123 Market Street");
+    formData.set("defaultNote", "Net 15");
+
+    await expect(updateCompanyAction(formData)).rejects.toThrow(
+      "REDIRECT:/companies",
+    );
+
+    expect(updateCompanyMock).toHaveBeenCalledWith({
+      companyId: "comp_1",
+      name: "Acme Inc.",
+      billingAddress: "123 Market Street",
+      defaultNote: "Net 15",
+    });
+    expect(revalidatePathMock).toHaveBeenCalledWith("/companies");
   });
 });

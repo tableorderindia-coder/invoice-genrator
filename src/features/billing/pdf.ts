@@ -41,6 +41,11 @@ type PdfModel = {
   note: string;
 };
 
+type PdfSectionChunk = {
+  rowCount: number;
+  includesTotal: boolean;
+};
+
 const BRAND = {
   name: "EASSY ONBOARD LLP",
   addressLines: [
@@ -65,6 +70,44 @@ const PAGE = {
   margin: 40,
   footerGap: 36,
 };
+
+export function paginateInvoicePdfSectionRows(input: {
+  bodyRows: PdfSectionRow[];
+  availableRowSlots: number[];
+  minimumRowsToStartSection: number;
+}): PdfSectionChunk[] {
+  const chunks: PdfSectionChunk[] = [];
+  let remainingBodyRows = input.bodyRows.length;
+  let slotIndex = 0;
+
+  while (remainingBodyRows > 0) {
+    const availableRowSlots =
+      input.availableRowSlots[Math.min(slotIndex, input.availableRowSlots.length - 1)] ?? 0;
+
+    if (availableRowSlots < input.minimumRowsToStartSection) {
+      slotIndex += 1;
+      continue;
+    }
+
+    if (remainingBodyRows + 1 <= availableRowSlots) {
+      chunks.push({
+        rowCount: remainingBodyRows,
+        includesTotal: true,
+      });
+      break;
+    }
+
+    const rowCount = Math.max(1, Math.min(remainingBodyRows - 1, availableRowSlots - 1));
+    chunks.push({
+      rowCount,
+      includesTotal: false,
+    });
+    remainingBodyRows -= rowCount;
+    slotIndex += 1;
+  }
+
+  return chunks;
+}
 
 export function buildInvoicePdfModel(detail: InvoiceDetail): PdfModel {
   const teamSections = [...detail.teams]
@@ -278,18 +321,29 @@ export async function buildInvoicePdf(detail: InvoiceDetail) {
       doc.page.width - PAGE.margin,
     ];
     const defaultRowHeight = 24;
+    const headerRowHeight = 36;
     const sectionTitleGap = 6;
+    const minimumRowsToStartSection = 2;
 
-    ensureSpace(60, false);
-    doc.moveDown(0.05);
-    doc.font(fontName).fontSize(13.5).fillColor(COLORS.blue).text(
-      section.title,
-      PAGE.margin,
-      doc.y + 1,
-    );
-    doc.moveDown(0.05);
+    const computeAvailableRowSlots = (startY: number, titleHeight: number) =>
+      Math.floor(
+        (doc.page.height -
+          PAGE.margin -
+          PAGE.footerGap -
+          (startY + titleHeight + headerRowHeight + sectionTitleGap)) /
+          defaultRowHeight,
+      );
 
-    const startY = doc.y + sectionTitleGap;
+    const drawSectionHeading = () => {
+      doc.moveDown(0.05);
+      doc.font(fontName).fontSize(13.5).fillColor(COLORS.blue).text(
+        section.title,
+        PAGE.margin,
+        doc.y + 1,
+      );
+      doc.moveDown(0.05);
+      return doc.y + sectionTitleGap;
+    };
 
     const drawCellText = (
       text: string,
@@ -308,37 +362,60 @@ export async function buildInvoicePdf(detail: InvoiceDetail) {
         });
     };
 
-    const rows = [
-      {
-        contractorName: "Contractor Name",
-        hourlyRate: "Hourly Rate\n(USD)",
-        hrsPerWeek: "Hrs / Week",
-        total: "Total (USD) **",
-      },
-      ...section.rows,
-      {
-        contractorName: section.totalLabel,
-        hourlyRate: "",
-        hrsPerWeek: "",
-        total: section.totalAmount,
-      },
-    ];
+    const headerRow = {
+      contractorName: "Contractor Name",
+      hourlyRate: "Hourly Rate\n(USD)",
+      hrsPerWeek: "Hrs / Week",
+      total: "Total (USD) **",
+    };
+    const totalRow = {
+      contractorName: section.totalLabel,
+      hourlyRate: "",
+      hrsPerWeek: "",
+      total: section.totalAmount,
+    };
+    const initialAvailableRowSlots = computeAvailableRowSlots(doc.y, 24);
+    if (initialAvailableRowSlots < minimumRowsToStartSection) {
+      ensureSpace(9999, false);
+    }
 
-    let y = startY;
+    const sectionChunks = paginateInvoicePdfSectionRows({
+      bodyRows: section.rows,
+      availableRowSlots: [
+        computeAvailableRowSlots(doc.y, 24),
+        Math.floor(
+          (doc.page.height -
+            PAGE.margin -
+            PAGE.footerGap -
+            (PAGE.margin + 70 + 24 + headerRowHeight + sectionTitleGap)) /
+            defaultRowHeight,
+        ),
+      ],
+      minimumRowsToStartSection,
+    });
 
-    rows.forEach((row, index) => {
-      const isHeader = index === 0;
-      const isTotal = index === rows.length - 1;
-      const rowHeight = isHeader ? 36 : defaultRowHeight;
-      const lastColumnX = columnX[columnX.length - 1] ?? doc.page.width - PAGE.margin;
-
-      ensureSpace(rowHeight + 4, false);
-      if (y + rowHeight > doc.page.height - PAGE.margin - PAGE.footerGap) {
+    let bodyRowIndex = 0;
+    sectionChunks.forEach((chunk, chunkIndex) => {
+      if (chunkIndex > 0) {
         drawFooter();
         doc.addPage();
         drawHeader(false);
-        y = doc.y + 10;
       }
+
+      const startY = drawSectionHeading();
+      let y = startY;
+      const rows = [
+        headerRow,
+        ...section.rows.slice(bodyRowIndex, bodyRowIndex + chunk.rowCount),
+        ...(chunk.includesTotal ? [totalRow] : []),
+      ];
+      bodyRowIndex += chunk.rowCount;
+
+      rows.forEach((row, index) => {
+        const isHeader = index === 0;
+        const isTotal = chunk.includesTotal && index === rows.length - 1;
+        const rowHeight = isHeader ? headerRowHeight : defaultRowHeight;
+      const lastColumnX = columnX[columnX.length - 1] ?? doc.page.width - PAGE.margin;
 
       doc
         .lineWidth(0.8)
@@ -371,9 +448,10 @@ export async function buildInvoicePdf(detail: InvoiceDetail) {
       });
 
       y += rowHeight;
-    });
+      });
 
-    doc.y = y + 8;
+      doc.y = y + 8;
+    });
   };
 
   drawHeader(true);

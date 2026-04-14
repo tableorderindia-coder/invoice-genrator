@@ -27,6 +27,7 @@ import {
   updateInvoiceAdjustmentAmount,
   updateInvoiceNote,
   updateInvoiceStatus,
+  updateCompany,
   updateEmployee,
   addEmployeePayoutRow,
   updateEmployeePayout,
@@ -133,6 +134,19 @@ function parseSavedEmployeeCashFlowEntryJson(rawValue: string) {
 
 export async function createCompanyAction(formData: FormData) {
   await createCompany({
+    name: getString(formData, "name"),
+    billingAddress: getString(formData, "billingAddress"),
+    defaultNote: getString(formData, "defaultNote"),
+  });
+
+  revalidatePath("/");
+  revalidatePath("/companies");
+  redirect("/companies");
+}
+
+export async function updateCompanyAction(formData: FormData) {
+  await updateCompany({
+    companyId: getString(formData, "companyId"),
     name: getString(formData, "name"),
     billingAddress: getString(formData, "billingAddress"),
     defaultNote: getString(formData, "defaultNote"),

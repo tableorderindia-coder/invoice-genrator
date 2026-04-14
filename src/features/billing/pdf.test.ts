@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import type { InvoiceDetail } from "./types";
-import { buildInvoicePdf, buildInvoicePdfModel } from "./pdf";
+import {
+  buildInvoicePdf,
+  buildInvoicePdfModel,
+  paginateInvoicePdfSectionRows,
+} from "./pdf";
 
 function countPdfPages(buffer: Buffer) {
   return (buffer.toString("latin1").match(/\/Type \/Page\b/g) ?? []).length;
@@ -194,5 +198,22 @@ describe("branded invoice pdf model", () => {
     expect(pdfBuffer.byteLength).toBeGreaterThan(1000);
     expect(pdfBuffer.subarray(0, 4).toString("utf8")).toBe("%PDF");
     expect(countPdfPages(pdfBuffer)).toBe(1);
+  });
+
+  it("keeps a section total with the last chunk instead of orphaning it onto a new page", () => {
+    const chunks = paginateInvoicePdfSectionRows({
+      bodyRows: [
+        { contractorName: "A", hourlyRate: "$10", hrsPerWeek: "40", total: "$100" },
+        { contractorName: "B", hourlyRate: "$10", hrsPerWeek: "40", total: "$100" },
+        { contractorName: "C", hourlyRate: "$10", hrsPerWeek: "40", total: "$100" },
+      ],
+      availableRowSlots: [2, 3],
+      minimumRowsToStartSection: 2,
+    });
+
+    expect(chunks).toEqual([
+      { rowCount: 1, includesTotal: false },
+      { rowCount: 2, includesTotal: true },
+    ]);
   });
 });
