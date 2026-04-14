@@ -120,11 +120,10 @@ export default async function DashboardPage({
     companyId: selectedCompanyId,
     periodType,
     view,
+    employeeIds: effectiveEmployeeIds,
+    paymentMonths: effectivePaymentMonths,
     allEmployees: allEffectiveEmployeeIdsSelected,
     allMonths: allEffectivePaymentMonthsSelected,
-    includePeriodType: false,
-    includeEmployeeIds: false,
-    includePaymentMonths: false,
     includeAllEmployees: false,
     includeAllMonths: false,
   });
@@ -280,8 +279,8 @@ export default async function DashboardPage({
             </div>
             <PendingSubmitButton
               className="btn-outline"
-              defaultText="Apply filters"
-              pendingText="Applying..."
+              defaultText="Load"
+              pendingText="Loading..."
             />
           </form>
           <DashboardTables
@@ -328,21 +327,36 @@ export default async function DashboardPage({
                 includeSelectAll
               />
             </div>
+            <PendingSubmitButton
+              className="btn-outline"
+              defaultText="Load"
+              pendingText="Loading..."
+            />
+          </form>
+          <form action="/dashboard" className="mb-4 flex flex-wrap items-center gap-2">
+            {periodFilterFields.map((field, index) => (
+              <input
+                key={`${field.name}-${field.value}-${index}`}
+                type="hidden"
+                name={field.name}
+                value={field.value}
+              />
+            ))}
             <div className="flex flex-wrap items-center gap-2">
-            <PendingSubmitButton
-              name="periodType"
-              value="monthly"
-              className={periodType === "monthly" ? "gradient-btn" : "btn-outline"}
-              defaultText="Monthly"
-              pendingText="Loading period..."
-            />
-            <PendingSubmitButton
-              name="periodType"
-              value="yearly"
-              className={periodType === "yearly" ? "gradient-btn" : "btn-outline"}
-              defaultText="Yearly"
-              pendingText="Loading period..."
-            />
+              <PendingSubmitButton
+                name="periodType"
+                value="monthly"
+                className={periodType === "monthly" ? "gradient-btn" : "btn-outline"}
+                defaultText="Monthly"
+                pendingText="Loading period..."
+              />
+              <PendingSubmitButton
+                name="periodType"
+                value="yearly"
+                className={periodType === "yearly" ? "gradient-btn" : "btn-outline"}
+                defaultText="Yearly"
+                pendingText="Loading period..."
+              />
             </div>
           </form>
           <DashboardTables
