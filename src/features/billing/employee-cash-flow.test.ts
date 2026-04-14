@@ -22,6 +22,18 @@ describe("employee cash flow calculations", () => {
     ).toBe(140_00);
   });
 
+  it("treats negative offboarding values as deductions", () => {
+    expect(
+      calculateEffectiveDollarInwardUsdCents({
+        baseDollarInwardUsdCents: 130_00,
+        onboardingAdvanceUsdCents: 0,
+        reimbursementUsdCents: 0,
+        appraisalAdvanceUsdCents: 0,
+        offboardingDeductionUsdCents: -260_00,
+      }),
+    ).toBe(-130_00);
+  });
+
   it("converts effective inward into INR cents using the cashout rate", () => {
     expect(
       calculateCashInInrCents({

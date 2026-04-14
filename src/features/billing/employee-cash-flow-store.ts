@@ -824,11 +824,26 @@ export async function getInvoicePaymentPrefillData(input: {
           reimbursementUsdCents: row.reimbursement_usd_cents,
           reimbursementLabelsText: row.reimbursement_labels_text ?? "",
           appraisalAdvanceUsdCents: row.appraisal_advance_usd_cents,
-          offboardingDeductionUsdCents: row.offboarding_deduction_usd_cents,
-          effectiveDollarInwardUsdCents: row.effective_dollar_inward_usd_cents,
+          offboardingDeductionUsdCents: Math.abs(row.offboarding_deduction_usd_cents),
+          effectiveDollarInwardUsdCents: calculateEffectiveDollarInwardUsdCents({
+            baseDollarInwardUsdCents: row.base_dollar_inward_usd_cents,
+            onboardingAdvanceUsdCents: row.onboarding_advance_usd_cents,
+            reimbursementUsdCents: row.reimbursement_usd_cents,
+            appraisalAdvanceUsdCents: row.appraisal_advance_usd_cents,
+            offboardingDeductionUsdCents: row.offboarding_deduction_usd_cents,
+          }),
           cashoutUsdInrRate: row.cashout_usd_inr_rate,
           paidUsdInrRate: row.paid_usd_inr_rate,
-          cashInInrCents: row.cash_in_inr_cents,
+          cashInInrCents: calculateCashInInrCents({
+            effectiveDollarInwardUsdCents: calculateEffectiveDollarInwardUsdCents({
+              baseDollarInwardUsdCents: row.base_dollar_inward_usd_cents,
+              onboardingAdvanceUsdCents: row.onboarding_advance_usd_cents,
+              reimbursementUsdCents: row.reimbursement_usd_cents,
+              appraisalAdvanceUsdCents: row.appraisal_advance_usd_cents,
+              offboardingDeductionUsdCents: row.offboarding_deduction_usd_cents,
+            }),
+            cashoutUsdInrRate: row.cashout_usd_inr_rate,
+          }),
           pfInrCents: row.pf_inr_cents,
           tdsInrCents: row.tds_inr_cents,
           actualPaidInrCents: row.actual_paid_inr_cents,
@@ -856,8 +871,9 @@ export async function getInvoicePaymentPrefillData(input: {
           ].join(", ");
           const appraisalAdvanceUsdCents =
             appraisalByEmployeeName.get(employeeNameKey) ?? 0;
-          const offboardingDeductionUsdCents =
-            offboardingByEmployeeName.get(employeeNameKey) ?? 0;
+          const offboardingDeductionUsdCents = Math.abs(
+            offboardingByEmployeeName.get(employeeNameKey) ?? 0,
+          );
           const effectiveDollarInwardUsdCents = calculateEffectiveDollarInwardUsdCents({
             baseDollarInwardUsdCents: row.dollar_inward_usd_cents,
             onboardingAdvanceUsdCents,
@@ -890,8 +906,8 @@ export async function getInvoicePaymentPrefillData(input: {
             reimbursementUsdCents,
             reimbursementLabelsText,
             appraisalAdvanceUsdCents,
-            offboardingDeductionUsdCents,
-            effectiveDollarInwardUsdCents,
+          offboardingDeductionUsdCents,
+          effectiveDollarInwardUsdCents,
             cashoutUsdInrRate,
             paidUsdInrRate: row.paid_usd_inr_rate ?? 0,
             cashInInrCents: calculateCashInInrCents({
@@ -1017,13 +1033,28 @@ export async function getEmployeeCashFlowDashboardData(input: {
     employeeId: row.employee_id,
     paymentMonth: row.payment_month,
     invoicePaymentId: row.id,
-    cashInInrCents: row.cash_in_inr_cents,
-    effectiveDollarInwardUsdCents: row.effective_dollar_inward_usd_cents,
+    cashInInrCents: calculateCashInInrCents({
+      effectiveDollarInwardUsdCents: calculateEffectiveDollarInwardUsdCents({
+        baseDollarInwardUsdCents: row.base_dollar_inward_usd_cents,
+        onboardingAdvanceUsdCents: row.onboarding_advance_usd_cents,
+        reimbursementUsdCents: row.reimbursement_usd_cents,
+        appraisalAdvanceUsdCents: row.appraisal_advance_usd_cents,
+        offboardingDeductionUsdCents: row.offboarding_deduction_usd_cents,
+      }),
+      cashoutUsdInrRate: row.cashout_usd_inr_rate,
+    }),
+    effectiveDollarInwardUsdCents: calculateEffectiveDollarInwardUsdCents({
+      baseDollarInwardUsdCents: row.base_dollar_inward_usd_cents,
+      onboardingAdvanceUsdCents: row.onboarding_advance_usd_cents,
+      reimbursementUsdCents: row.reimbursement_usd_cents,
+      appraisalAdvanceUsdCents: row.appraisal_advance_usd_cents,
+      offboardingDeductionUsdCents: row.offboarding_deduction_usd_cents,
+    }),
     onboardingAdvanceUsdCents: row.onboarding_advance_usd_cents,
     reimbursementUsdCents: row.reimbursement_usd_cents,
     reimbursementLabelsText: row.reimbursement_labels_text ?? "",
     appraisalAdvanceUsdCents: row.appraisal_advance_usd_cents,
-    offboardingDeductionUsdCents: row.offboarding_deduction_usd_cents,
+    offboardingDeductionUsdCents: Math.abs(row.offboarding_deduction_usd_cents),
     monthlyPaidUsdCents: row.monthly_paid_usd_cents,
     actualPaidInrCents: row.actual_paid_inr_cents,
     daysWorked: row.days_worked,
@@ -1135,12 +1166,13 @@ export async function replaceInvoicePaymentEmployeeEntries(input: {
   }
 
   const payload = input.entries.map((entry) => {
+    const offboardingDeductionUsdCents = Math.abs(entry.offboardingDeductionUsdCents);
     const effectiveDollarInwardUsdCents = calculateEffectiveDollarInwardUsdCents({
       baseDollarInwardUsdCents: entry.baseDollarInwardUsdCents,
       onboardingAdvanceUsdCents: entry.onboardingAdvanceUsdCents,
       reimbursementUsdCents: entry.reimbursementUsdCents,
       appraisalAdvanceUsdCents: entry.appraisalAdvanceUsdCents,
-      offboardingDeductionUsdCents: entry.offboardingDeductionUsdCents,
+      offboardingDeductionUsdCents,
     });
     const payoutMetrics = calculateEmployeePayoutMetrics({
       dollarInwardUsdCents: effectiveDollarInwardUsdCents,
@@ -1166,7 +1198,7 @@ export async function replaceInvoicePaymentEmployeeEntries(input: {
       reimbursement_usd_cents: entry.reimbursementUsdCents,
       reimbursement_labels_text: entry.reimbursementLabelsText || null,
       appraisal_advance_usd_cents: entry.appraisalAdvanceUsdCents,
-      offboarding_deduction_usd_cents: entry.offboardingDeductionUsdCents,
+      offboarding_deduction_usd_cents: offboardingDeductionUsdCents,
       effective_dollar_inward_usd_cents: effectiveDollarInwardUsdCents,
       cashout_usd_inr_rate: entry.cashoutUsdInrRate,
       paid_usd_inr_rate: entry.paidUsdInrRate,
@@ -1250,7 +1282,7 @@ export async function listSavedEmployeeCashFlowEntries(input: {
     reimbursementUsdCents: row.reimbursement_usd_cents,
     reimbursementLabelsText: row.reimbursement_labels_text ?? "",
     appraisalAdvanceUsdCents: row.appraisal_advance_usd_cents,
-    offboardingDeductionUsdCents: row.offboarding_deduction_usd_cents,
+    offboardingDeductionUsdCents: Math.abs(row.offboarding_deduction_usd_cents),
     cashoutUsdInrRate: row.cashout_usd_inr_rate,
     paidUsdInrRate: row.paid_usd_inr_rate,
     pfInrCents: row.pf_inr_cents,
@@ -1271,12 +1303,13 @@ export async function updateSavedEmployeeCashFlowEntry(
   entry: EmployeeCashFlowSavedEntry,
 ) {
   const supabase = getSupabaseOrThrow();
+  const offboardingDeductionUsdCents = Math.abs(entry.offboardingDeductionUsdCents);
   const effectiveDollarInwardUsdCents = calculateEffectiveDollarInwardUsdCents({
     baseDollarInwardUsdCents: entry.baseDollarInwardUsdCents,
     onboardingAdvanceUsdCents: entry.onboardingAdvanceUsdCents,
     reimbursementUsdCents: entry.reimbursementUsdCents,
     appraisalAdvanceUsdCents: entry.appraisalAdvanceUsdCents,
-    offboardingDeductionUsdCents: entry.offboardingDeductionUsdCents,
+    offboardingDeductionUsdCents,
   });
   const { error } = await supabase
     .from("invoice_payment_employee_entries")
@@ -1289,7 +1322,7 @@ export async function updateSavedEmployeeCashFlowEntry(
       reimbursement_usd_cents: entry.reimbursementUsdCents,
       reimbursement_labels_text: entry.reimbursementLabelsText || null,
       appraisal_advance_usd_cents: entry.appraisalAdvanceUsdCents,
-      offboarding_deduction_usd_cents: entry.offboardingDeductionUsdCents,
+      offboarding_deduction_usd_cents: offboardingDeductionUsdCents,
       effective_dollar_inward_usd_cents: effectiveDollarInwardUsdCents,
       cashout_usd_inr_rate: entry.cashoutUsdInrRate,
       paid_usd_inr_rate: entry.paidUsdInrRate,
@@ -1363,12 +1396,13 @@ export async function updateDashboardEmployeeCashFlowEntry(input: {
   >;
 
   const baseDollarInwardUsdCents = input.dollarInwardUsdCents;
+  const offboardingDeductionUsdCents = Math.abs(input.offboardingDeductionUsdCents);
   const effectiveDollarInwardUsdCents = calculateEffectiveDollarInwardUsdCents({
     baseDollarInwardUsdCents,
     onboardingAdvanceUsdCents: input.onboardingAdvanceUsdCents,
     reimbursementUsdCents: input.reimbursementUsdCents,
     appraisalAdvanceUsdCents: input.appraisalAdvanceUsdCents,
-    offboardingDeductionUsdCents: input.offboardingDeductionUsdCents,
+    offboardingDeductionUsdCents,
   });
   const payoutMetrics = calculateEmployeePayoutMetrics({
     dollarInwardUsdCents: effectiveDollarInwardUsdCents,
@@ -1385,7 +1419,7 @@ export async function updateDashboardEmployeeCashFlowEntry(input: {
       reimbursement_usd_cents: input.reimbursementUsdCents,
       reimbursement_labels_text: input.reimbursementLabelsText || null,
       appraisal_advance_usd_cents: input.appraisalAdvanceUsdCents,
-      offboarding_deduction_usd_cents: input.offboardingDeductionUsdCents,
+      offboarding_deduction_usd_cents: offboardingDeductionUsdCents,
       effective_dollar_inward_usd_cents: effectiveDollarInwardUsdCents,
       monthly_paid_usd_cents: input.employeeMonthlyUsdCents,
       cashout_usd_inr_rate: input.cashoutUsdInrRate,

@@ -10,12 +10,13 @@ export function calculateEffectiveDollarInwardUsdCents(input: {
   appraisalAdvanceUsdCents: number;
   offboardingDeductionUsdCents: number;
 }) {
+  const offboardingDeductionUsdCents = Math.abs(input.offboardingDeductionUsdCents);
   return (
     input.baseDollarInwardUsdCents +
     input.onboardingAdvanceUsdCents +
     input.reimbursementUsdCents +
     input.appraisalAdvanceUsdCents -
-    input.offboardingDeductionUsdCents
+    offboardingDeductionUsdCents
   );
 }
 
