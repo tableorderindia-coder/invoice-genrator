@@ -537,87 +537,107 @@ export default async function DashboardPage({
             <table className="glass-table">
                 <thead>
                   <tr>
-                    <th>Period</th>
+                    <th>Month</th>
                     <th>Dollar inward</th>
-                    <th>Reimbursements / Expenses (USD)</th>
+                    <th>Onboarding advance</th>
+                    <th>Reimbursements / Expenses</th>
+                    <th>Reimbursement labels</th>
                     <th>Reimbursements / Expenses (INR)</th>
-                    <th>Appraisal Advance (USD)</th>
-                    <th>Appraisal Advance (INR)</th>
+                    <th>Appraisal advance</th>
+                    <th>Appraisal advance (INR)</th>
+                    <th>Offboarding deduction</th>
+                    <th>Effective dollar inward</th>
+                    <th>Cashout rate</th>
+                    <th>Cash in (INR)</th>
+                    <th>Monthly $</th>
+                    <th>Paid rate</th>
+                    <th>Monthly paid INR</th>
+                    <th>Actual paid (INR)</th>
                     <th>PF (INR)</th>
                     <th>TDS (INR)</th>
-                    <th>Actual paid (INR)</th>
-                  <th>FX commission (INR)</th>
-                  <th>Total commission (USD)</th>
-                  <th>Commission earned (INR)</th>
-                  <th>Gross earnings (INR)</th>
-                  <th>Expenses (INR)</th>
-                  <th>Net P/L (INR)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.periodRows.map((row) => {
-                  const periodLabel =
-                    periodType === "monthly"
-                      ? formatMonthYear(row.month ?? 1, row.year)
-                      : String(row.year);
+                    <th>Salary paid</th>
+                    <th>FX commission (INR)</th>
+                    <th>Total commission (USD)</th>
+                    <th>Commission earned (INR)</th>
+                    <th>Gross earnings (INR)</th>
+                    <th>Expenses (INR)</th>
+                    <th>Net P/L (INR)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.periodRows.map((row) => {
+                    const periodLabel =
+                      periodType === "monthly"
+                        ? formatMonthYear(row.month ?? 1, row.year)
+                        : row.fiscalLabel ?? String(row.year);
                     return (
                       <tr key={`${row.year}-${row.month ?? 0}`}>
                         <td>{periodLabel}</td>
                         <td>{formatUsd(row.dollarInwardUsdCents)}</td>
+                        <td>{formatUsd(row.onboardingAdvanceUsdCents)}</td>
                         <td>{formatUsd(row.reimbursementUsdCents)}</td>
+                        <td>{row.reimbursementLabelsText || "-"}</td>
                         <td>{formatInr(row.reimbursementInrCents)}</td>
                         <td>{formatUsd(row.appraisalAdvanceUsdCents)}</td>
                         <td>{formatInr(row.appraisalAdvanceInrCents)}</td>
+                        <td>{formatUsd(row.offboardingDeductionUsdCents)}</td>
+                        <td>{formatUsd(row.effectiveDollarInwardUsdCents)}</td>
+                        <td>{row.cashoutUsdInrRate ? row.cashoutUsdInrRate.toFixed(4) : "-"}</td>
+                        <td>{formatInr(row.cashInInrCents)}</td>
+                        <td>{formatUsd(row.employeeMonthlyUsdCents)}</td>
+                        <td>{row.paidUsdInrRate ? row.paidUsdInrRate.toFixed(4) : "-"}</td>
+                        <td>{formatInr(row.monthlyPaidInrCents)}</td>
+                        <td>{formatInr(row.actualPaidInrCents)}</td>
                         <td>{formatInr(row.pfInrCents)}</td>
                         <td>{formatInr(row.tdsInrCents)}</td>
-                        <td>{formatInr(row.actualPaidInrCents)}</td>
-                      <td>{formatInr(row.fxCommissionInrCents)}</td>
-                      <td>{formatUsd(row.totalCommissionUsdCents)}</td>
-                      <td>{formatInr(row.commissionEarnedInrCents)}</td>
-                      <td>{formatInr(row.grossEarningsInrCents)}</td>
-                      <td>
-                        <form action={saveDashboardExpenseAction} className="flex items-center gap-2">
-                          <input type="hidden" name="companyId" value={selectedCompanyId} />
-                          <input type="hidden" name="periodType" value={periodType} />
-                          <input type="hidden" name="year" value={row.year} />
-                          {periodType === "monthly" ? (
-                            <input type="hidden" name="month" value={row.month} />
-                          ) : null}
-                          <input type="hidden" name="returnTo" value={returnTo} />
-                          <input
-                            type="number"
-                            name="amountInr"
-                            min="0"
-                            step="0.01"
-                            defaultValue={(row.expensesInrCents / 100).toFixed(2)}
-                            className={inputClass}
-                            style={{
-                              minWidth: "7rem",
-                              border: "1px solid var(--glass-border)",
-                              background: "rgba(255,255,255,0.04)",
-                              color: "var(--text-primary)",
-                            }}
-                          />
-                          <PendingSubmitButton
-                            className="btn-outline"
-                            defaultText="Save"
-                            pendingText="Saving..."
-                          />
-                        </form>
-                      </td>
-                      <td>{formatInr(row.netPlInrCents)}</td>
-                    </tr>
-                  );
-                })}
-                {data.periodRows.length === 0 ? (
-                  <tr>
-                      <td colSpan={15} className="py-8 text-center" style={{ color: "var(--text-muted)" }}>
+                        <td>{formatInr(row.salaryPaidInrCents)}</td>
+                        <td>{formatInr(row.fxCommissionInrCents)}</td>
+                        <td>{formatUsd(row.totalCommissionUsdCents)}</td>
+                        <td>{formatInr(row.commissionEarnedInrCents)}</td>
+                        <td>{formatInr(row.grossEarningsInrCents)}</td>
+                        <td>
+                          <form action={saveDashboardExpenseAction} className="flex items-center gap-2">
+                            <input type="hidden" name="companyId" value={selectedCompanyId} />
+                            <input type="hidden" name="periodType" value={periodType} />
+                            <input type="hidden" name="year" value={row.year} />
+                            {periodType === "monthly" ? (
+                              <input type="hidden" name="month" value={row.month} />
+                            ) : null}
+                            <input type="hidden" name="returnTo" value={returnTo} />
+                            <input
+                              type="number"
+                              name="amountInr"
+                              min="0"
+                              step="0.01"
+                              defaultValue={(row.expensesInrCents / 100).toFixed(2)}
+                              className={inputClass}
+                              style={{
+                                minWidth: "7rem",
+                                border: "1px solid var(--glass-border)",
+                                background: "rgba(255,255,255,0.04)",
+                                color: "var(--text-primary)",
+                              }}
+                            />
+                            <PendingSubmitButton
+                              className="btn-outline"
+                              defaultText="Save"
+                              pendingText="Saving..."
+                            />
+                          </form>
+                        </td>
+                        <td>{formatInr(row.netPlInrCents)}</td>
+                      </tr>
+                    );
+                  })}
+                  {data.periodRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={25} className="py-8 text-center" style={{ color: "var(--text-muted)" }}>
                         No period data available for selected filters.
                       </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
           </div>
         </GlassPanel>
       )}

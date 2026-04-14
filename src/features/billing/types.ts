@@ -244,14 +244,25 @@ export type PnEmployeeEditableSection = {
 export type PnPeriodRow = {
   year: number;
   month?: number;
+  fiscalLabel?: string;
   dollarInwardUsdCents: number;
+  onboardingAdvanceUsdCents: number;
   reimbursementUsdCents: number;
+  reimbursementLabelsText: string;
   reimbursementInrCents: number;
   appraisalAdvanceUsdCents: number;
   appraisalAdvanceInrCents: number;
+  offboardingDeductionUsdCents: number;
+  effectiveDollarInwardUsdCents: number;
+  cashoutUsdInrRate: number;
+  cashInInrCents: number;
+  employeeMonthlyUsdCents: number;
+  paidUsdInrRate: number;
+  monthlyPaidInrCents: number;
   pfInrCents: number;
   tdsInrCents: number;
   actualPaidInrCents: number;
+  salaryPaidInrCents: number;
   fxCommissionInrCents: number;
   totalCommissionUsdCents: number;
   commissionEarnedInrCents: number;

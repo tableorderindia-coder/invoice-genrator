@@ -2412,12 +2412,15 @@ export async function getPnDashboardData(input: {
     .eq("period_type", input.periodType);
   if (expenseError) throw expenseError;
 
+  const fiscalYearKey = (year: number, month: number) =>
+    month >= 4 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
+  const fiscalYearKeyFromYear = (year: number) => `${year}-${year + 1}`;
   const expenseByKey = new Map<string, number>();
   for (const row of (expenseRows ?? []) as DbDashboardExpense[]) {
     const key =
       row.period_type === "monthly"
         ? `${row.year}-${String(row.month).padStart(2, "0")}`
-        : `${row.year}`;
+        : fiscalYearKeyFromYear(row.year);
     expenseByKey.set(key, Number(row.amount_inr_cents));
   }
 
@@ -2444,7 +2447,7 @@ export async function getPnDashboardData(input: {
     const key =
       input.periodType === "monthly"
         ? `${period.year}-${String(period.month).padStart(2, "0")}`
-        : `${period.year}`;
+        : fiscalYearKey(period.year, period.month);
     companyLevelReimbursementUsdByKey.set(
       key,
       (companyLevelReimbursementUsdByKey.get(key) ?? 0) + Number(row.amount_usd_cents),
@@ -2476,10 +2479,13 @@ export async function getPnDashboardData(input: {
         month,
         daysWorked: row.days_worked,
         daysInMonth: row.days_in_month,
-        dollarInwardUsdCents: effectiveDollarInwardUsdCents,
+        dollarInwardUsdCents: row.base_dollar_inward_usd_cents,
+        onboardingAdvanceUsdCents: row.onboarding_advance_usd_cents,
         reimbursementUsdCents: row.reimbursement_usd_cents,
         reimbursementLabelsText: row.reimbursement_labels_text ?? "",
         appraisalAdvanceUsdCents: row.appraisal_advance_usd_cents,
+        offboardingDeductionUsdCents: Math.abs(row.offboarding_deduction_usd_cents),
+        effectiveDollarInwardUsdCents,
         employeeMonthlyUsdCents: row.monthly_paid_usd_cents,
         cashoutUsdInrRate: row.cashout_usd_inr_rate,
         paidUsdInrRate: row.paid_usd_inr_rate,
@@ -2490,7 +2496,7 @@ export async function getPnDashboardData(input: {
         totalCommissionUsdCents: row.total_commission_usd_cents,
         commissionEarnedInrCents: row.commission_earned_inr_cents,
         cashInInrCents,
-        salaryPaidInrCents: row.actual_paid_inr_cents,
+        salaryPaidInrCents: row.actual_paid_inr_cents - row.pf_inr_cents - row.tds_inr_cents,
         netProfitInrCents: calculateEmployeeMonthNetInrCents({
           cashInInrCents,
           salaryPaidInrCents: row.actual_paid_inr_cents,

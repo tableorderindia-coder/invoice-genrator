@@ -17,9 +17,12 @@ const sampleRows: PnSourceRow[] = [
     daysWorked: 31,
     daysInMonth: 31,
     dollarInwardUsdCents: 115000,
+    onboardingAdvanceUsdCents: 0,
     reimbursementUsdCents: 10000,
     reimbursementLabelsText: "Laptop",
     appraisalAdvanceUsdCents: 5000,
+    offboardingDeductionUsdCents: 0,
+    effectiveDollarInwardUsdCents: 130000,
     employeeMonthlyUsdCents: 70000,
     cashoutUsdInrRate: 83.2,
     paidUsdInrRate: 82.1,
@@ -41,9 +44,12 @@ const sampleRows: PnSourceRow[] = [
     daysWorked: 28,
     daysInMonth: 28,
     dollarInwardUsdCents: 120000,
+    onboardingAdvanceUsdCents: 0,
     reimbursementUsdCents: 0,
     reimbursementLabelsText: "",
     appraisalAdvanceUsdCents: 0,
+    offboardingDeductionUsdCents: 0,
+    effectiveDollarInwardUsdCents: 120000,
     employeeMonthlyUsdCents: 70000,
     cashoutUsdInrRate: 83.5,
     paidUsdInrRate: 82.4,
@@ -65,9 +71,12 @@ const sampleRows: PnSourceRow[] = [
     daysWorked: 21,
     daysInMonth: 28,
     dollarInwardUsdCents: 97500,
+    onboardingAdvanceUsdCents: 0,
     reimbursementUsdCents: 5000,
     reimbursementLabelsText: "Signing bonus",
     appraisalAdvanceUsdCents: 2500,
+    offboardingDeductionUsdCents: 0,
+    effectiveDollarInwardUsdCents: 105000,
     employeeMonthlyUsdCents: 75000,
     cashoutUsdInrRate: 83.5,
     paidUsdInrRate: 82.8,
@@ -209,12 +218,12 @@ describe("pn dashboard aggregations", () => {
       ],
       periodType: "yearly",
       expenseByKey: new Map(),
-      companyLevelReimbursementUsdByKey: new Map([["2027", 10000]]),
+      companyLevelReimbursementUsdByKey: new Map([["2026-2027", 10000]]),
     });
 
     expect(yearly).toHaveLength(1);
     expect(yearly[0]).toMatchObject({
-      year: 2027,
+      year: 2026,
       month: undefined,
       reimbursementUsdCents: 20000,
       reimbursementInrCents: 1664000,
@@ -222,6 +231,61 @@ describe("pn dashboard aggregations", () => {
       appraisalAdvanceInrCents: 416000,
       grossEarningsInrCents: 0,
       netPlInrCents: 2980000,
+    });
+  });
+
+  it("groups yearly rows into Apr–Mar fiscal years", () => {
+    const yearly = buildPnPeriodRows({
+      rows: [
+        { ...sampleRows[0], year: 2025, month: 4, cashInInrCents: 1000, netProfitInrCents: 1000 },
+        { ...sampleRows[0], year: 2026, month: 3, cashInInrCents: 2000, netProfitInrCents: 2000 },
+      ],
+      periodType: "yearly",
+      expenseByKey: new Map([["2025-2026", 0]]),
+      companyLevelReimbursementUsdByKey: new Map(),
+    });
+
+    expect(yearly).toHaveLength(1);
+    expect(yearly[0]).toMatchObject({
+      year: 2025,
+      fiscalLabel: "Apr 2025–Mar 2026",
+      cashInInrCents: 3000,
+    });
+  });
+
+  it("builds period rows with full cash-flow columns", () => {
+    const monthly = buildPnPeriodRows({
+      rows: sampleRows,
+      periodType: "monthly",
+      expenseByKey: new Map(),
+      companyLevelReimbursementUsdByKey: new Map(),
+    });
+
+    expect(monthly[0]).toMatchObject({
+      dollarInwardUsdCents: expect.any(Number),
+      onboardingAdvanceUsdCents: expect.any(Number),
+      reimbursementUsdCents: expect.any(Number),
+      reimbursementLabelsText: expect.any(String),
+      reimbursementInrCents: expect.any(Number),
+      appraisalAdvanceUsdCents: expect.any(Number),
+      appraisalAdvanceInrCents: expect.any(Number),
+      offboardingDeductionUsdCents: expect.any(Number),
+      effectiveDollarInwardUsdCents: expect.any(Number),
+      cashoutUsdInrRate: expect.any(Number),
+      cashInInrCents: expect.any(Number),
+      employeeMonthlyUsdCents: expect.any(Number),
+      paidUsdInrRate: expect.any(Number),
+      monthlyPaidInrCents: expect.any(Number),
+      actualPaidInrCents: expect.any(Number),
+      pfInrCents: expect.any(Number),
+      tdsInrCents: expect.any(Number),
+      salaryPaidInrCents: expect.any(Number),
+      fxCommissionInrCents: expect.any(Number),
+      totalCommissionUsdCents: expect.any(Number),
+      commissionEarnedInrCents: expect.any(Number),
+      grossEarningsInrCents: expect.any(Number),
+      expensesInrCents: expect.any(Number),
+      netPlInrCents: expect.any(Number),
     });
   });
 

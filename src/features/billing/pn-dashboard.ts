@@ -6,9 +6,12 @@ export type PnSourceRow = {
   daysWorked: number;
   daysInMonth: number;
   dollarInwardUsdCents: number;
+  onboardingAdvanceUsdCents: number;
   reimbursementUsdCents: number;
   reimbursementLabelsText: string;
   appraisalAdvanceUsdCents: number;
+  offboardingDeductionUsdCents: number;
+  effectiveDollarInwardUsdCents: number;
   employeeMonthlyUsdCents: number;
   cashoutUsdInrRate: number;
   paidUsdInrRate: number;
@@ -118,14 +121,25 @@ export type PnPeriodType = "monthly" | "yearly";
 export type PnPeriodRow = {
   year: number;
   month?: number;
+  fiscalLabel?: string;
   dollarInwardUsdCents: number;
+  onboardingAdvanceUsdCents: number;
   reimbursementUsdCents: number;
+  reimbursementLabelsText: string;
   reimbursementInrCents: number;
   appraisalAdvanceUsdCents: number;
   appraisalAdvanceInrCents: number;
+  offboardingDeductionUsdCents: number;
+  effectiveDollarInwardUsdCents: number;
+  cashoutUsdInrRate: number;
+  cashInInrCents: number;
+  employeeMonthlyUsdCents: number;
+  paidUsdInrRate: number;
+  monthlyPaidInrCents: number;
   pfInrCents: number;
   tdsInrCents: number;
   actualPaidInrCents: number;
+  salaryPaidInrCents: number;
   fxCommissionInrCents: number;
   totalCommissionUsdCents: number;
   commissionEarnedInrCents: number;
@@ -135,7 +149,12 @@ export type PnPeriodRow = {
 };
 
 const monthKey = (year: number, month: number) => `${year}-${String(month).padStart(2, "0")}`;
-const yearKey = (year: number) => `${year}`;
+const fiscalYearKey = (year: number, month: number) =>
+  month >= 4 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
+const fiscalYearLabel = (year: number, month: number) => {
+  const startYear = month >= 4 ? year : year - 1;
+  return `Apr ${startYear}–Mar ${startYear + 1}`;
+};
 
 const averageRate = (rows: PnSourceRow[], key: "cashoutUsdInrRate" | "paidUsdInrRate") => {
   if (rows.length === 0) return 0;
@@ -372,7 +391,9 @@ export function buildPnPeriodRows(input: {
   const grouped = new Map<string, PnSourceRow[]>();
   for (const row of input.rows) {
     const key =
-      input.periodType === "monthly" ? monthKey(row.year, row.month) : yearKey(row.year);
+      input.periodType === "monthly"
+        ? monthKey(row.year, row.month)
+        : fiscalYearKey(row.year, row.month);
     const list = grouped.get(key) ?? [];
     list.push(row);
     grouped.set(key, list);
@@ -382,6 +403,16 @@ export function buildPnPeriodRows(input: {
     .map(([key, bucket]) => {
       const first = bucket[0];
       const month = input.periodType === "monthly" ? first.month : undefined;
+      const fiscalLabel =
+        input.periodType === "yearly"
+          ? fiscalYearLabel(first.year, first.month)
+          : undefined;
+      const periodYear =
+        input.periodType === "yearly"
+          ? first.month >= 4
+            ? first.year
+            : first.year - 1
+          : first.year;
       const fxCommissionInrCents = sumBy(bucket, "fxCommissionInrCents");
       const commissionEarnedInrCents = sumBy(bucket, "commissionEarnedInrCents");
       const grossEarningsInrCents = fxCommissionInrCents + commissionEarnedInrCents;
@@ -406,18 +437,48 @@ export function buildPnPeriodRows(input: {
         employeeReimbursementUsdCents + companyLevelReimbursementUsdCents;
       const reimbursementInrCents =
         employeeReimbursementInrCents + companyLevelReimbursementInrCents;
+      const reimbursementLabels = new Set<string>();
+      for (const row of bucket) {
+        if (!row.reimbursementLabelsText) continue;
+        row.reimbursementLabelsText
+          .split(",")
+          .map((label) => label.trim())
+          .filter(Boolean)
+          .forEach((label) => reimbursementLabels.add(label));
+      }
+      const cashoutUsdInrRate = averageRate(bucket, "cashoutUsdInrRate");
+      const paidUsdInrRate = averageRate(bucket, "paidUsdInrRate");
+      const monthlyPaidInrCents = bucket.reduce(
+        (sum, row) => sum + Math.round(row.employeeMonthlyUsdCents * row.paidUsdInrRate),
+        0,
+      );
+      const salaryPaidInrCents =
+        sumBy(bucket, "actualPaidInrCents") -
+        sumBy(bucket, "pfInrCents") -
+        sumBy(bucket, "tdsInrCents");
 
       return {
-        year: first.year,
+        year: periodYear,
         month,
+        fiscalLabel,
         dollarInwardUsdCents: sumBy(bucket, "dollarInwardUsdCents"),
+        onboardingAdvanceUsdCents: sumBy(bucket, "onboardingAdvanceUsdCents"),
         reimbursementUsdCents,
+        reimbursementLabelsText: [...reimbursementLabels].join(", "),
         reimbursementInrCents,
         appraisalAdvanceUsdCents,
         appraisalAdvanceInrCents,
+        offboardingDeductionUsdCents: sumBy(bucket, "offboardingDeductionUsdCents"),
+        effectiveDollarInwardUsdCents: sumBy(bucket, "effectiveDollarInwardUsdCents"),
+        cashoutUsdInrRate,
+        cashInInrCents: sumBy(bucket, "cashInInrCents"),
+        employeeMonthlyUsdCents: sumBy(bucket, "employeeMonthlyUsdCents"),
+        paidUsdInrRate,
+        monthlyPaidInrCents,
         pfInrCents: sumBy(bucket, "pfInrCents"),
         tdsInrCents: sumBy(bucket, "tdsInrCents"),
         actualPaidInrCents: sumBy(bucket, "actualPaidInrCents"),
+        salaryPaidInrCents,
         fxCommissionInrCents,
         totalCommissionUsdCents: sumBy(bucket, "totalCommissionUsdCents"),
         commissionEarnedInrCents,
