@@ -2,14 +2,16 @@
 
 import { useMemo, useState } from "react";
 
-import { inputClass } from "@/app/_components/field";
+import { inputClass } from "../../_components/field";
 import {
   deleteSavedEmployeeCashFlowEntryAction,
   updateSavedEmployeeCashFlowEntryAction,
-} from "@/src/features/billing/actions";
-import { calculateActualPaidInrCents } from "@/src/features/billing/employee-cash-flow";
-import type { EmployeeCashFlowSavedEntry } from "@/src/features/billing/employee-cash-flow-types";
-import { formatInr } from "@/src/features/billing/utils";
+} from "../../../src/features/billing/actions";
+import type { EmployeeCashFlowSavedEntry } from "../../../src/features/billing/employee-cash-flow-types";
+import {
+  buildSavedEmployeeCashFlowEntryJson,
+  formatSavedPaymentMonth,
+} from "../../../src/features/billing/employee-cash-flow-saved-rows-helpers";
 
 function toCurrencyInput(value: number) {
   const formatted = (value / 100).toFixed(2);
@@ -25,19 +27,6 @@ function fromCurrencyInput(value: string) {
 function toEditableRate(value: number) {
   const formatted = value.toFixed(4);
   return formatted.replace(/\.?0+$/, "");
-}
-
-function formatPaymentMonth(paymentMonth: string) {
-  const [year, month] = paymentMonth.split("-").map((value) => Number(value));
-  if (!year || !month) {
-    return paymentMonth;
-  }
-
-  return new Intl.DateTimeFormat("en-US", {
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(Date.UTC(year, month - 1, 1)));
 }
 
 export default function EmployeeCashFlowSavedRows({
@@ -112,7 +101,7 @@ export default function EmployeeCashFlowSavedRows({
             {employeeGroup.months.map(([month, monthRows]) => (
               <div key={`${employeeGroup.employeeId}-${month}`} className="space-y-3">
                 <p className="text-sm font-semibold" style={{ color: "var(--text-secondary)" }}>
-                  {formatPaymentMonth(month)}
+                  {formatSavedPaymentMonth(month)}
                 </p>
 
                 <div className="overflow-x-auto rounded-2xl" style={{ border: "1px solid var(--glass-border)" }}>
@@ -130,7 +119,7 @@ export default function EmployeeCashFlowSavedRows({
                         <th>Offboarding</th>
                         <th>Cashout</th>
                         <th>Paid USD/INR</th>
-                        <th>Total paid INR</th>
+                        <th>Actual paid INR</th>
                         <th>PF INR</th>
                         <th>TDS INR</th>
                         <th>Notes</th>
@@ -139,16 +128,9 @@ export default function EmployeeCashFlowSavedRows({
                     </thead>
                     <tbody>
                       {monthRows.map((row) => {
-                        const actualPaidInrCents = calculateActualPaidInrCents({
-                          daysWorked: row.daysWorked,
-                          daysInMonth: row.daysInMonth,
-                          monthlyPaidUsdCents: row.monthlyPaidUsdCents,
-                          paidUsdInrRate: row.paidUsdInrRate,
-                        });
-
                         return (
                           <tr key={row.id}>
-                            <td>{formatPaymentMonth(row.paymentMonth)}</td>
+                            <td>{formatSavedPaymentMonth(row.paymentMonth)}</td>
                             <td>
                               <input
                                 value={String(row.daysWorked)}
@@ -280,7 +262,18 @@ export default function EmployeeCashFlowSavedRows({
                                 inputMode="decimal"
                               />
                             </td>
-                            <td>{formatInr(actualPaidInrCents)}</td>
+                            <td>
+                              <input
+                                value={toCurrencyInput(row.actualPaidInrCents)}
+                                onChange={(event) =>
+                                  updateRow(row.id, {
+                                    actualPaidInrCents: fromCurrencyInput(event.target.value),
+                                  })
+                                }
+                                className={inputClass}
+                                inputMode="decimal"
+                              />
+                            </td>
                             <td>
                               <input
                                 value={toCurrencyInput(row.pfInrCents)}
@@ -323,10 +316,7 @@ export default function EmployeeCashFlowSavedRows({
                                 <input
                                   type="hidden"
                                   name="entryJson"
-                                  value={JSON.stringify({
-                                    ...row,
-                                    actualPaidInrCents,
-                                  })}
+                                  value={buildSavedEmployeeCashFlowEntryJson(row)}
                                 />
                                 <button type="submit" className="btn-outline">
                                   Update
@@ -335,8 +325,6 @@ export default function EmployeeCashFlowSavedRows({
                                   type="submit"
                                   formAction={deleteSavedEmployeeCashFlowEntryAction}
                                   className="btn-outline"
-                                  name="entryId"
-                                  value={row.id}
                                 >
                                   Remove
                                 </button>
