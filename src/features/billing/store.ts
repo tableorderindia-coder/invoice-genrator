@@ -39,6 +39,8 @@ import type {
   CompanyExpense,
   DashboardMetrics,
   Employee,
+  EmployeeStatementInvoiceRow,
+  EmployeeStatementMonthSummary,
   EmployeePayout,
   EmployeePayoutInvoice,
   Invoice,
@@ -238,6 +240,33 @@ type DbSecurityDepositLedger = {
   movement_type: "credit" | "debit";
   amount_usd_cents: number;
   created_at: string;
+};
+
+type DbEmployeeStatementInvoiceRow = {
+  id: string;
+  employee_id: string;
+  invoice_id: string;
+  month_key: string;
+  employee_name_snapshot: string;
+  invoice_number_snapshot: string;
+  dollar_inward_usd_cents: number;
+  onboarding_advance_usd_cents: number;
+  reimbursement_usd_cents: number;
+  reimbursement_labels_text: string;
+  offboarding_deduction_usd_cents: number;
+  created_at: string;
+  updated_at: string;
+};
+
+type DbEmployeeStatementMonthSummary = {
+  id: string;
+  employee_id: string;
+  month_key: string;
+  month_label_snapshot: string;
+  effective_dollar_inward_usd_cents: number;
+  monthly_dollar_paid_usd_cents: number;
+  created_at: string;
+  updated_at: string;
 };
 
 const sortInvoicesDesc = (left: Invoice, right: Invoice) =>
@@ -2336,6 +2365,59 @@ export async function removeEmployeePayoutRow(input: { payoutId: string }) {
     .delete()
     .eq("id", input.payoutId);
   if (error) throw error;
+}
+
+export async function upsertEmployeeStatementSection(input: {
+  employeeId: string;
+  invoiceRows: EmployeeStatementInvoiceRow[];
+  monthSummaries: EmployeeStatementMonthSummary[];
+}) {
+  const supabase = getSupabaseOrThrow();
+
+  if (input.invoiceRows.length > 0) {
+    const { error } = await supabase.from("employee_statement_invoice_rows").upsert(
+      input.invoiceRows.map((row) => ({
+        id: nextId("employee_statement_invoice_row"),
+        employee_id: input.employeeId,
+        invoice_id: row.invoiceId,
+        month_key: row.monthKey,
+        employee_name_snapshot: row.employeeName,
+        invoice_number_snapshot: row.invoiceNumber,
+        dollar_inward_usd_cents: row.dollarInwardUsdCents,
+        onboarding_advance_usd_cents: row.onboardingAdvanceUsdCents,
+        reimbursement_usd_cents: row.reimbursementUsdCents,
+        reimbursement_labels_text: row.reimbursementLabelsText,
+        offboarding_deduction_usd_cents: row.offboardingDeductionUsdCents,
+        updated_at: nowIso(),
+      })),
+      {
+        onConflict: "employee_id,invoice_id",
+      },
+    );
+    if (error) throw error;
+  }
+
+  if (input.monthSummaries.length > 0) {
+    const { error } = await supabase
+      .from("employee_statement_month_summaries")
+      .upsert(
+        input.monthSummaries.map((summary) => ({
+          id: nextId("employee_statement_month_summary"),
+          employee_id: input.employeeId,
+          month_key: summary.monthKey,
+          month_label_snapshot: summary.monthLabel,
+          effective_dollar_inward_usd_cents: summary.effectiveDollarInwardUsdCents,
+          monthly_dollar_paid_usd_cents: summary.monthlyDollarPaidUsdCents,
+          updated_at: nowIso(),
+        })),
+        {
+          onConflict: "employee_id,month_key",
+        },
+      );
+    if (error) throw error;
+  }
+
+  return input;
 }
 
 export async function upsertDashboardExpense(input: {

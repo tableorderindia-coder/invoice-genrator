@@ -1,4 +1,9 @@
 import { normalizeMultiSelectValue } from "./filter-selection";
+import type {
+  EmployeeStatementInvoiceRow,
+  EmployeeStatementMonthSummary,
+  EmployeeStatementSection,
+} from "./types";
 
 type SearchValue = string | string[] | undefined;
 
@@ -56,4 +61,102 @@ export function groupEmployeeStatementRows<
         left.invoiceNumber.localeCompare(right.invoiceNumber),
       ),
     }));
+}
+
+export function calculateStatementEffectiveDollarInwardUsdCents(input: {
+  dollarInwardUsdCents: number;
+  onboardingAdvanceUsdCents: number;
+  reimbursementUsdCents: number;
+  offboardingDeductionUsdCents: number;
+}) {
+  return (
+    input.dollarInwardUsdCents +
+    input.onboardingAdvanceUsdCents +
+    input.reimbursementUsdCents -
+    input.offboardingDeductionUsdCents
+  );
+}
+
+export function buildEmployeeStatementSection(input: {
+  employee: { id: string; fullName: string; payoutMonthlyUsdCents: number };
+  rows: EmployeeStatementInvoiceRow[];
+}): EmployeeStatementSection {
+  const monthGroups = groupEmployeeStatementRows(input.rows);
+
+  return {
+    employeeId: input.employee.id,
+    employeeName: input.employee.fullName,
+    months: monthGroups.map((group) => ({
+      monthKey: group.monthKey,
+      monthLabel: group.rows[0]?.monthLabel ?? group.monthKey,
+      rows: group.rows,
+      monthlyDollarPaidUsdCents: input.employee.payoutMonthlyUsdCents,
+      effectiveDollarInwardUsdCents: group.rows.reduce(
+        (sum, row) =>
+          sum +
+          calculateStatementEffectiveDollarInwardUsdCents({
+            dollarInwardUsdCents: row.dollarInwardUsdCents,
+            onboardingAdvanceUsdCents: row.onboardingAdvanceUsdCents,
+            reimbursementUsdCents: row.reimbursementUsdCents,
+            offboardingDeductionUsdCents: row.offboardingDeductionUsdCents,
+          }),
+        0,
+      ),
+    })),
+  };
+}
+
+export function buildEmployeeStatementSavePayload(input: {
+  employeeId: string;
+  invoiceRows: EmployeeStatementInvoiceRow[];
+  monthSummaries: EmployeeStatementMonthSummary[];
+}) {
+  return input;
+}
+
+export function applySavedEmployeeStatementOverrides(
+  section: EmployeeStatementSection,
+  saved: {
+    invoiceRows: EmployeeStatementInvoiceRow[];
+    monthSummaries: EmployeeStatementMonthSummary[];
+  },
+): EmployeeStatementSection {
+  const savedInvoiceRowByInvoiceId = new Map(
+    saved.invoiceRows.map((row) => [row.invoiceId, row]),
+  );
+  const savedMonthSummaryByMonthKey = new Map(
+    saved.monthSummaries.map((summary) => [summary.monthKey, summary]),
+  );
+
+  return {
+    ...section,
+    months: section.months.map((month) => {
+      const savedMonthSummary = savedMonthSummaryByMonthKey.get(month.monthKey);
+
+      return {
+        ...month,
+        rows: month.rows.map((row) => {
+          const savedRow = savedInvoiceRowByInvoiceId.get(row.invoiceId);
+          if (!savedRow) {
+            return row;
+          }
+
+          return {
+            ...row,
+            dollarInwardUsdCents: savedRow.dollarInwardUsdCents,
+            onboardingAdvanceUsdCents: savedRow.onboardingAdvanceUsdCents,
+            reimbursementUsdCents: savedRow.reimbursementUsdCents,
+            reimbursementLabelsText: savedRow.reimbursementLabelsText,
+            offboardingDeductionUsdCents: savedRow.offboardingDeductionUsdCents,
+          };
+        }),
+        effectiveDollarInwardUsdCents:
+          savedMonthSummary?.effectiveDollarInwardUsdCents ??
+          month.effectiveDollarInwardUsdCents,
+        monthlyDollarPaidUsdCents:
+          savedMonthSummary?.monthlyDollarPaidUsdCents ??
+          month.monthlyDollarPaidUsdCents,
+      };
+    }),
+  };
 }

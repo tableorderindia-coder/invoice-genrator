@@ -32,6 +32,7 @@ import {
   updateEmployeePayout,
   markEmployeePayoutPaid,
   removeEmployeePayoutRow,
+  upsertEmployeeStatementSection,
   upsertDashboardExpense,
   upsertCompanyExpense,
   deleteCompanyExpense,
@@ -1382,4 +1383,33 @@ export async function deleteSavedEmployeeCashFlowEntryAction(formData: FormData)
   }
 
   redirect(buildFlashRedirect(returnTo, "success", "Employee cash flow row deleted."));
+}
+
+export async function saveEmployeeStatementAction(formData: FormData) {
+  const returnTo = getString(formData, "returnTo") || "/employee-statements";
+
+  try {
+    const rawStatementJson = getString(formData, "statementJson");
+    if (!rawStatementJson) {
+      throw new Error("Employee statement payload is required.");
+    }
+
+    const payload = JSON.parse(rawStatementJson) as Parameters<
+      typeof upsertEmployeeStatementSection
+    >[0];
+
+    await upsertEmployeeStatementSection(payload);
+
+    revalidatePath("/employee-statements");
+  } catch (error) {
+    redirect(
+      buildFlashRedirect(
+        returnTo,
+        "error",
+        getErrorMessage(error, "Unable to save employee statement."),
+      ),
+    );
+  }
+
+  redirect(buildFlashRedirect(returnTo, "success", "Employee statement saved."));
 }

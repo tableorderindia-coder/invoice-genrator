@@ -7,6 +7,7 @@ const redirectMock = vi.fn((path: string) => {
 const updateDashboardEmployeeCashFlowEntryMock = vi.fn();
 const replaceInvoicePaymentEmployeeEntriesMock = vi.fn();
 const upsertInvoicePaymentMock = vi.fn();
+const upsertEmployeeStatementSectionMock = vi.fn();
 
 vi.mock("next/cache", () => ({
   revalidatePath: revalidatePathMock,
@@ -44,6 +45,7 @@ vi.mock("./store", () => ({
   markEmployeePayoutPaid: vi.fn(),
   removeEmployeePayoutRow: vi.fn(),
   upsertDashboardExpense: vi.fn(),
+  upsertEmployeeStatementSection: upsertEmployeeStatementSectionMock,
 }));
 
 vi.mock("./employee-cash-flow-store", () => ({
@@ -64,6 +66,8 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
     replaceInvoicePaymentEmployeeEntriesMock.mockReset();
     upsertInvoicePaymentMock.mockReset();
     upsertInvoicePaymentMock.mockResolvedValue("pay_1");
+    upsertEmployeeStatementSectionMock.mockReset();
+    upsertEmployeeStatementSectionMock.mockResolvedValue(undefined);
   });
 
   it("passes days worked through to the dashboard cash-flow update", async () => {
@@ -165,5 +169,62 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
         ],
       }),
     );
+  });
+
+  it("passes statement-only invoice rows and month summaries through employee statement saves", async () => {
+    const { saveEmployeeStatementAction } = await import("./actions");
+    const formData = new FormData();
+    formData.set("returnTo", "/employee-statements?companyId=comp_1");
+    formData.set(
+      "statementJson",
+      JSON.stringify({
+        employeeId: "emp_1",
+        invoiceRows: [
+          {
+            employeeId: "emp_1",
+            employeeName: "Asha",
+            invoiceId: "inv_1",
+            invoiceNumber: "2026/001",
+            monthKey: "2026-04",
+            monthLabel: "April 2026",
+            dollarInwardUsdCents: 120000,
+            onboardingAdvanceUsdCents: 10000,
+            reimbursementUsdCents: 5000,
+            reimbursementLabelsText: "Laptop",
+            offboardingDeductionUsdCents: 1000,
+          },
+        ],
+        monthSummaries: [
+          {
+            employeeId: "emp_1",
+            monthKey: "2026-04",
+            monthLabel: "April 2026",
+            effectiveDollarInwardUsdCents: 134000,
+            monthlyDollarPaidUsdCents: 250000,
+          },
+        ],
+      }),
+    );
+
+    await expect(saveEmployeeStatementAction(formData)).rejects.toThrow(
+      "REDIRECT:/employee-statements?companyId=comp_1&flashStatus=success&flashMessage=Employee%20statement%20saved.",
+    );
+
+    expect(upsertEmployeeStatementSectionMock).toHaveBeenCalledWith({
+      employeeId: "emp_1",
+      invoiceRows: [
+        expect.objectContaining({
+          invoiceId: "inv_1",
+          dollarInwardUsdCents: 120000,
+        }),
+      ],
+      monthSummaries: [
+        expect.objectContaining({
+          monthKey: "2026-04",
+          monthlyDollarPaidUsdCents: 250000,
+        }),
+      ],
+    });
+    expect(revalidatePathMock).toHaveBeenCalledWith("/employee-statements");
   });
 });
