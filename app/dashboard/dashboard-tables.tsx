@@ -60,7 +60,7 @@ export function DashboardTables({
   const toggleButton = (
     <button
       type="button"
-      onClick={() => setShowDetails((prev) => !prev)}
+      onClick={() => setShowDetails((prev: boolean) => !prev)}
       className="btn-outline"
       title="Toggle Details"
     >
@@ -501,7 +501,7 @@ function EmployeeTables({
     ...toggleColumns.map((col) => ({
       key: col.key,
       label: col.label,
-      render: (row) => renderToggleCell(col.key, row),
+      render: (row: PnEmployeeEditableRow) => renderToggleCell(col.key, row),
     })),
     ...employeeSuffixColumns,
   ];
@@ -714,7 +714,7 @@ function PeriodTables({
     ...toggleColumns.map((col) => ({
       key: col.key,
       label: col.label,
-      render: (row) => renderToggleCell(col.key, row),
+      render: (row: PnPeriodRow) => renderToggleCell(col.key, row),
     })),
     ...periodSuffixColumns,
   ];
