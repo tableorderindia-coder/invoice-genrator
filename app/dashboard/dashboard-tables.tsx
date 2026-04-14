@@ -3,7 +3,6 @@
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { PendingActionButton } from "../_components/pending-action-button";
-import { PendingSubmitButton } from "../_components/pending-submit-button";
 import { inputClass } from "../_components/field";
 import {
   buildEmployeeSectionTotals,
@@ -27,7 +26,6 @@ type DashboardTablesProps = {
   view: "employee" | "period";
   periodType: PnPeriodType;
   data: PnDashboardData;
-  selectedCompanyId: string;
   returnTo: string;
   updateDashboardEmployeeCashFlowEntryAction: (formData: FormData) => Promise<void>;
 };
@@ -36,7 +34,6 @@ export function DashboardTables({
   view,
   periodType,
   data,
-  selectedCompanyId,
   returnTo,
   updateDashboardEmployeeCashFlowEntryAction,
 }: DashboardTablesProps) {
@@ -87,8 +84,6 @@ export function DashboardTables({
     <PeriodTables
       data={data}
       periodType={periodType}
-      selectedCompanyId={selectedCompanyId}
-      returnTo={returnTo}
       toggleColumns={toggleColumns}
       toggleButton={toggleButton}
     />
@@ -648,8 +643,6 @@ function EmployeeTables({
 type PeriodTablesProps = {
   data: PnDashboardData;
   periodType: PnPeriodType;
-  selectedCompanyId: string;
-  returnTo: string;
   toggleColumns: ToggleColumn[];
   toggleButton: ReactNode;
 };
@@ -657,8 +650,6 @@ type PeriodTablesProps = {
 function PeriodTables({
   data,
   periodType,
-  selectedCompanyId,
-  returnTo,
   toggleColumns,
   toggleButton,
 }: PeriodTablesProps) {

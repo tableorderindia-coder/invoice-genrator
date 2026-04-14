@@ -287,7 +287,6 @@ export default async function DashboardPage({
             view="employee"
             periodType={periodType}
             data={data}
-            selectedCompanyId={selectedCompanyId}
             returnTo={returnTo}
             updateDashboardEmployeeCashFlowEntryAction={
               updateDashboardEmployeeCashFlowEntryAction
@@ -363,7 +362,6 @@ export default async function DashboardPage({
             view="period"
             periodType={periodType}
             data={data}
-            selectedCompanyId={selectedCompanyId}
             returnTo={returnTo}
             updateDashboardEmployeeCashFlowEntryAction={
               updateDashboardEmployeeCashFlowEntryAction
