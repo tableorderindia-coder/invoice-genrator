@@ -486,8 +486,7 @@ export function buildPnPeriodRows(input: {
         expensesInrCents,
         netPlInrCents:
           netProfitInrCents +
-          reimbursementInrCents +
-          appraisalAdvanceInrCents -
+          companyLevelReimbursementInrCents -
           expensesInrCents,
       };
     })
