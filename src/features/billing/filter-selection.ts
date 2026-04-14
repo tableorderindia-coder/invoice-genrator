@@ -106,3 +106,62 @@ export function buildEmployeeCashFlowFilterFieldEntries(input: {
 
   return fields;
 }
+
+export function buildDashboardFilterFieldEntries(input: {
+  companyId: string;
+  periodType: "monthly" | "yearly";
+  view: "employee" | "period";
+  employeeIds?: MultiSelectInput;
+  paymentMonths?: MultiSelectInput;
+  allEmployees?: boolean;
+  allMonths?: boolean;
+  includeCompanyId?: boolean;
+  includePeriodType?: boolean;
+  includeView?: boolean;
+  includeEmployeeIds?: boolean;
+  includePaymentMonths?: boolean;
+  includeAllEmployees?: boolean;
+  includeAllMonths?: boolean;
+}) {
+  const fields: Array<{ name: string; value: string }> = [];
+
+  if (input.includeCompanyId !== false && input.companyId) {
+    fields.push({ name: "companyId", value: input.companyId });
+  }
+
+  if (input.includePeriodType !== false && input.periodType) {
+    fields.push({ name: "periodType", value: input.periodType });
+  }
+
+  if (input.includeView !== false && input.view) {
+    fields.push({ name: "view", value: input.view });
+  }
+
+  if (input.includeEmployeeIds !== false) {
+    fields.push(
+      ...normalizeMultiSelectValue(input.employeeIds).map((value) => ({
+        name: "employeeIds",
+        value,
+      })),
+    );
+  }
+
+  if (input.includePaymentMonths !== false) {
+    fields.push(
+      ...normalizeMultiSelectValue(input.paymentMonths).map((value) => ({
+        name: "paymentMonths",
+        value,
+      })),
+    );
+  }
+
+  if (input.includeAllEmployees !== false && input.allEmployees) {
+    fields.push({ name: "allEmployees", value: "1" });
+  }
+
+  if (input.includeAllMonths !== false && input.allMonths) {
+    fields.push({ name: "allMonths", value: "1" });
+  }
+
+  return fields;
+}

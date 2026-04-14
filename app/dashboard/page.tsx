@@ -2,9 +2,15 @@ import { GlassPanel } from "../_components/glass-panel";
 import { Shell } from "../_components/shell";
 import { inputClass } from "../_components/field";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
+import { ChecklistFilterDropdown } from "../_components/checklist-filter-dropdown";
 import {
   updateDashboardEmployeeCashFlowEntryAction,
 } from "@/src/features/billing/actions";
+import {
+  buildDashboardFilterFieldEntries,
+  formatPaymentMonthLabel,
+  normalizeMultiSelectValue,
+} from "@/src/features/billing/filter-selection";
 import {
   getPnDashboardData,
   listCompanies,
@@ -15,18 +21,6 @@ import type { PnDashboardData } from "@/src/features/billing/types";
 import { DashboardTables } from "./dashboard-tables";
 
 export const dynamic = "force-dynamic";
-
-function normalizeStringArray(value?: string | string[]) {
-  if (!value) return [];
-  if (Array.isArray(value)) return value.filter(Boolean);
-  if (value.includes(",")) {
-    return value
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean);
-  }
-  return [value];
-}
 
 export default async function DashboardPage({
   searchParams,
@@ -61,7 +55,7 @@ export default async function DashboardPage({
     ? resolved.allEmployees[0]
     : resolved.allEmployees;
   const allEmployeesSelected = allEmployeesValue === "1";
-  const selectedEmployeeIds = normalizeStringArray(resolved.employeeIds);
+  const selectedEmployeeIds = normalizeMultiSelectValue(resolved.employeeIds);
 
   const [employees, availableMonths] = selectedCompanyId 
     ? await Promise.all([listEmployees(selectedCompanyId), listAvailablePaymentMonths(selectedCompanyId)])
@@ -76,12 +70,64 @@ export default async function DashboardPage({
     ? resolved.allMonths[0]
     : resolved.allMonths;
   const allMonthsSelected = allMonthsValue === "1";
-  const selectedPaymentMonths = normalizeStringArray(resolved.paymentMonths);
+  const selectedPaymentMonths = normalizeMultiSelectValue(resolved.paymentMonths);
 
   const effectivePaymentMonths =
     allMonthsSelected || selectedPaymentMonths.length === 0
       ? availableMonths
       : selectedPaymentMonths;
+
+  const allEffectiveEmployeeIdsSelected =
+    employees.length > 0 && effectiveEmployeeIds.length === employees.length;
+  const allEffectivePaymentMonthsSelected =
+    availableMonths.length > 0 &&
+    effectivePaymentMonths.length === availableMonths.length;
+
+  const dashboardFilterFields = buildDashboardFilterFieldEntries({
+    companyId: selectedCompanyId,
+    periodType,
+    view,
+    employeeIds: effectiveEmployeeIds,
+    paymentMonths: effectivePaymentMonths,
+    allEmployees: allEffectiveEmployeeIdsSelected,
+    allMonths: allEffectivePaymentMonthsSelected,
+  });
+
+  const dashboardSwitchFields = buildDashboardFilterFieldEntries({
+    companyId: selectedCompanyId,
+    periodType,
+    view,
+    employeeIds: effectiveEmployeeIds,
+    paymentMonths: effectivePaymentMonths,
+    allEmployees: allEffectiveEmployeeIdsSelected,
+    allMonths: allEffectivePaymentMonthsSelected,
+    includeView: false,
+  });
+
+  const employeeFilterFields = buildDashboardFilterFieldEntries({
+    companyId: selectedCompanyId,
+    periodType,
+    view,
+    allEmployees: allEffectiveEmployeeIdsSelected,
+    allMonths: allEffectivePaymentMonthsSelected,
+    includeEmployeeIds: false,
+    includePaymentMonths: false,
+    includeAllEmployees: false,
+    includeAllMonths: false,
+  });
+
+  const periodFilterFields = buildDashboardFilterFieldEntries({
+    companyId: selectedCompanyId,
+    periodType,
+    view,
+    allEmployees: allEffectiveEmployeeIdsSelected,
+    allMonths: allEffectivePaymentMonthsSelected,
+    includePeriodType: false,
+    includeEmployeeIds: false,
+    includePaymentMonths: false,
+    includeAllEmployees: false,
+    includeAllMonths: false,
+  });
 
   const emptyDashboardData: PnDashboardData = {
     companyId: "",
@@ -106,16 +152,8 @@ export default async function DashboardPage({
     ? resolved.flashMessage[0]
     : resolved.flashMessage;
   const filterParams = new URLSearchParams();
-  if (selectedCompanyId) filterParams.set("companyId", selectedCompanyId);
-  if (periodType) filterParams.set("periodType", periodType);
-  filterParams.set("view", view);
-  if (allEmployeesSelected) filterParams.set("allEmployees", "1");
-  for (const employeeId of effectiveEmployeeIds) {
-    filterParams.append("employeeIds", employeeId);
-  }
-  if (allMonthsSelected) filterParams.set("allMonths", "1");
-  for (const mm of effectivePaymentMonths) {
-    filterParams.append("paymentMonths", mm);
+  for (const field of dashboardFilterFields) {
+    filterParams.append(field.name, field.value);
   }
   const returnTo = `/dashboard?${filterParams.toString()}`;
 
@@ -182,16 +220,14 @@ export default async function DashboardPage({
 
       <GlassPanel gradient>
         <form action="/dashboard" className="mb-2 flex flex-wrap items-center gap-2">
-          <input type="hidden" name="companyId" value={selectedCompanyId} />
-          <input type="hidden" name="periodType" value={periodType} />
-          {effectiveEmployeeIds.map((employeeId) => (
-            <input key={employeeId} type="hidden" name="employeeIds" value={employeeId} />
+          {dashboardSwitchFields.map((field, index) => (
+            <input
+              key={`${field.name}-${field.value}-${index}`}
+              type="hidden"
+              name={field.name}
+              value={field.value}
+            />
           ))}
-          {allEmployeesSelected ? <input type="hidden" name="allEmployees" value="1" /> : null}
-          {effectivePaymentMonths.map((m) => (
-            <input key={`pm-${m}`} type="hidden" name="paymentMonths" value={m} />
-          ))}
-          {allMonthsSelected ? <input type="hidden" name="allMonths" value="1" /> : null}
           <PendingSubmitButton
             name="view"
             value="employee"
@@ -211,84 +247,37 @@ export default async function DashboardPage({
 
       {view === "employee" ? (
         <GlassPanel title="Employee" gradient>
-          <form action="/dashboard" className="mb-4 space-y-3">
-            <input type="hidden" name="companyId" value={selectedCompanyId} />
-            <input type="hidden" name="periodType" value={periodType} />
-            <input type="hidden" name="view" value={view} />
-            <label
-              className="block text-sm font-medium"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              Employees (select one or more)
-            </label>
-            <select
-              name="employeeIds"
-              multiple
-              defaultValue={effectiveEmployeeIds}
-              className={inputClass}
-              style={{
-                minHeight: "180px",
-                border: "1px solid var(--glass-border)",
-                background: "rgba(255,255,255,0.04)",
-                color: "var(--text-primary)",
-              }}
-            >
-              {employees.map((employee) => (
-                <option key={employee.id} value={employee.id}>
-                  {employee.fullName}
-                </option>
-              ))}
-            </select>
-            <label
-              className="inline-flex items-center gap-2 text-sm"
-              style={{ color: "var(--text-secondary)" }}
-            >
+          <form action="/dashboard" className="mb-4 space-y-4">
+            {employeeFilterFields.map((field, index) => (
               <input
-                type="checkbox"
-                name="allEmployees"
-                value="1"
-                defaultChecked={allEmployeesSelected}
+                key={`${field.name}-${field.value}-${index}`}
+                type="hidden"
+                name={field.name}
+                value={field.value}
               />
-              Select all employees
-            </label>
-            
-            <label
-              className="block text-sm font-medium mt-4"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              Months (select one or more)
-            </label>
-            <select
-              name="paymentMonths"
-              multiple
-              defaultValue={effectivePaymentMonths}
-              className={inputClass}
-              style={{
-                minHeight: "150px",
-                border: "1px solid var(--glass-border)",
-                background: "rgba(255,255,255,0.04)",
-                color: "var(--text-primary)",
-              }}
-            >
-              {availableMonths.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
-            <label
-              className="inline-flex items-center gap-2 text-sm"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              <input
-                type="checkbox"
-                name="allMonths"
-                value="1"
-                defaultChecked={allMonthsSelected}
+            ))}
+            <div className="flex flex-wrap gap-3">
+              <ChecklistFilterDropdown
+                name="employeeIds"
+                label="Employee"
+                options={employees.map((employee) => ({
+                  value: employee.id,
+                  label: employee.fullName,
+                }))}
+                defaultSelectedValues={effectiveEmployeeIds}
+                includeSelectAll
               />
-              Select all months
-            </label>
-
+              <ChecklistFilterDropdown
+                name="paymentMonths"
+                label="Payment month"
+                options={availableMonths.map((month) => ({
+                  value: month,
+                  label: formatPaymentMonthLabel(month),
+                }))}
+                defaultSelectedValues={effectivePaymentMonths}
+                includeSelectAll
+              />
+            </div>
             <PendingSubmitButton
               className="btn-outline"
               defaultText="Apply filters"
@@ -308,17 +297,38 @@ export default async function DashboardPage({
         </GlassPanel>
       ) : (
         <GlassPanel title="Monthly / Yearly" gradient>
-          <form action="/dashboard" className="mb-4 flex flex-wrap items-center gap-2">
-            <input type="hidden" name="companyId" value={selectedCompanyId} />
-            <input type="hidden" name="view" value={view} />
-            {effectiveEmployeeIds.map((employeeId) => (
-              <input key={employeeId} type="hidden" name="employeeIds" value={employeeId} />
+          <form action="/dashboard" className="mb-4 space-y-4">
+            {periodFilterFields.map((field, index) => (
+              <input
+                key={`${field.name}-${field.value}-${index}`}
+                type="hidden"
+                name={field.name}
+                value={field.value}
+              />
             ))}
-            {allEmployeesSelected ? <input type="hidden" name="allEmployees" value="1" /> : null}
-            {effectivePaymentMonths.map((m) => (
-              <input key={`pm-${m}`} type="hidden" name="paymentMonths" value={m} />
-            ))}
-            {allMonthsSelected ? <input type="hidden" name="allMonths" value="1" /> : null}
+            <div className="flex flex-wrap gap-3">
+              <ChecklistFilterDropdown
+                name="employeeIds"
+                label="Employee"
+                options={employees.map((employee) => ({
+                  value: employee.id,
+                  label: employee.fullName,
+                }))}
+                defaultSelectedValues={effectiveEmployeeIds}
+                includeSelectAll
+              />
+              <ChecklistFilterDropdown
+                name="paymentMonths"
+                label="Payment month"
+                options={availableMonths.map((month) => ({
+                  value: month,
+                  label: formatPaymentMonthLabel(month),
+                }))}
+                defaultSelectedValues={effectivePaymentMonths}
+                includeSelectAll
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
             <PendingSubmitButton
               name="periodType"
               value="monthly"
@@ -333,6 +343,7 @@ export default async function DashboardPage({
               defaultText="Yearly"
               pendingText="Loading period..."
             />
+            </div>
           </form>
           <DashboardTables
             view="period"

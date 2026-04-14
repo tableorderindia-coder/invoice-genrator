@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildEmployeeCashFlowFilterFieldEntries,
+  buildDashboardFilterFieldEntries,
   filterSavedCashFlowRows,
   formatPaymentMonthLabel,
   normalizeMultiSelectValue,
@@ -138,6 +139,48 @@ describe("filter selection helpers", () => {
       { name: "month", value: "2026-04" },
       { name: "employeeIds", value: "emp_1" },
       { name: "paymentMonths", value: "2026-04" },
+    ]); 
+  });
+
+  it("builds dashboard filter fields while letting view and period buttons stay unique", () => {
+    expect(
+      buildDashboardFilterFieldEntries({
+        companyId: "comp_1",
+        periodType: "monthly",
+        view: "employee",
+        employeeIds: ["emp_1", "emp_2"],
+        paymentMonths: ["2026-04"],
+        allEmployees: true,
+        allMonths: false,
+        includeView: false,
+      }),
+    ).toEqual([
+      { name: "companyId", value: "comp_1" },
+      { name: "periodType", value: "monthly" },
+      { name: "employeeIds", value: "emp_1" },
+      { name: "employeeIds", value: "emp_2" },
+      { name: "paymentMonths", value: "2026-04" },
+      { name: "allEmployees", value: "1" },
+    ]);
+  });
+
+  it("can omit stale dashboard all-selected flags from filter-apply forms", () => {
+    expect(
+      buildDashboardFilterFieldEntries({
+        companyId: "comp_1",
+        periodType: "monthly",
+        view: "employee",
+        allEmployees: true,
+        allMonths: true,
+        includeEmployeeIds: false,
+        includePaymentMonths: false,
+        includeAllEmployees: false,
+        includeAllMonths: false,
+      }),
+    ).toEqual([
+      { name: "companyId", value: "comp_1" },
+      { name: "periodType", value: "monthly" },
+      { name: "view", value: "employee" },
     ]);
   });
 
