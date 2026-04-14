@@ -5,9 +5,11 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import {
+  buildEmployeeCashFlowFilterFieldEntries,
   filterSavedCashFlowRows,
   formatPaymentMonthLabel,
   normalizeMultiSelectValue,
+  resolveSavedCashFlowFilters,
 } from "./filter-selection";
 import {
   ChecklistFilterDropdown,
@@ -88,6 +90,55 @@ describe("filter selection helpers", () => {
         paymentMonths: [],
       }),
     ).toEqual(rows);
+  });
+
+  it("normalizes saved-tab employee and month filters from search params", () => {
+    expect(
+      resolveSavedCashFlowFilters({
+        employeeIds: [" emp_1 ", "emp_2,emp_1"],
+        paymentMonths: "2026-04, 2026-05",
+      }),
+    ).toEqual({
+      employeeIds: ["emp_1", "emp_2"],
+      paymentMonths: ["2026-04", "2026-05"],
+    });
+  });
+
+  it("builds saved-flow form fields with month and tab preserved", () => {
+    expect(
+      buildEmployeeCashFlowFilterFieldEntries({
+        companyId: "comp_1",
+        month: "2026-04",
+        tab: "saved",
+        employeeIds: ["emp_1"],
+        paymentMonths: ["2026-04"],
+        includeTab: true,
+      }),
+    ).toEqual([
+      { name: "companyId", value: "comp_1" },
+      { name: "month", value: "2026-04" },
+      { name: "tab", value: "saved" },
+      { name: "employeeIds", value: "emp_1" },
+      { name: "paymentMonths", value: "2026-04" },
+    ]);
+  });
+
+  it("builds tab-switch fields without a duplicate tab field", () => {
+    expect(
+      buildEmployeeCashFlowFilterFieldEntries({
+        companyId: "comp_1",
+        month: "2026-04",
+        tab: "saved",
+        employeeIds: ["emp_1"],
+        paymentMonths: ["2026-04"],
+        includeTab: false,
+      }),
+    ).toEqual([
+      { name: "companyId", value: "comp_1" },
+      { name: "month", value: "2026-04" },
+      { name: "employeeIds", value: "emp_1" },
+      { name: "paymentMonths", value: "2026-04" },
+    ]);
   });
 
   it("labels full, empty, and partial checklist selections", () => {

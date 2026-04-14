@@ -48,3 +48,61 @@ export function filterSavedCashFlowRows<
     return paymentMonths.length === 0 || paymentMonths.includes(row.paymentMonth);
   });
 }
+
+export function resolveSavedCashFlowFilters(input: {
+  employeeIds?: MultiSelectInput;
+  paymentMonths?: MultiSelectInput;
+}) {
+  return {
+    employeeIds: normalizeMultiSelectValue(input.employeeIds),
+    paymentMonths: normalizeMultiSelectValue(input.paymentMonths),
+  };
+}
+
+export function buildEmployeeCashFlowFilterFieldEntries(input: {
+  companyId: string;
+  month: string;
+  tab: "compose" | "saved";
+  invoiceIds?: MultiSelectInput;
+  employeeIds?: MultiSelectInput;
+  paymentMonths?: MultiSelectInput;
+  includeCompanyId?: boolean;
+  includeMonth?: boolean;
+  includeTab?: boolean;
+}) {
+  const fields: Array<{ name: string; value: string }> = [];
+
+  if (input.includeCompanyId !== false && input.companyId) {
+    fields.push({ name: "companyId", value: input.companyId });
+  }
+
+  if (input.includeMonth !== false && input.month) {
+    fields.push({ name: "month", value: input.month });
+  }
+
+  if (input.includeTab) {
+    fields.push({ name: "tab", value: input.tab });
+  }
+
+  if (input.tab === "compose") {
+    fields.push(
+      ...normalizeMultiSelectValue(input.invoiceIds).map((value) => ({
+        name: "invoiceId",
+        value,
+      })),
+    );
+  } else {
+    fields.push(
+      ...normalizeMultiSelectValue(input.employeeIds).map((value) => ({
+        name: "employeeIds",
+        value,
+      })),
+      ...normalizeMultiSelectValue(input.paymentMonths).map((value) => ({
+        name: "paymentMonths",
+        value,
+      })),
+    );
+  }
+
+  return fields;
+}

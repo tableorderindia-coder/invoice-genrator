@@ -1,3 +1,4 @@
+import { ChecklistFilterDropdown } from "../_components/checklist-filter-dropdown";
 import { GlassPanel } from "../_components/glass-panel";
 import { inputClass } from "../_components/field";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
@@ -12,6 +13,12 @@ import {
   resolveEmployeeCashFlowInvoiceIds,
   resolveEmployeeCashFlowMonthKey,
 } from "@/src/features/billing/employee-cash-flow-page-state";
+import {
+  buildEmployeeCashFlowFilterFieldEntries,
+  filterSavedCashFlowRows,
+  formatPaymentMonthLabel,
+  resolveSavedCashFlowFilters,
+} from "@/src/features/billing/filter-selection";
 import { listCompanies } from "@/src/features/billing/store";
 import {
   aggregateEmployeeCashFlowEditableEntries,
@@ -31,6 +38,8 @@ export default async function EmployeeCashFlowPage({
     month?: string | string[];
     year?: string | string[];
     invoiceId?: string | string[];
+    employeeIds?: string | string[];
+    paymentMonths?: string | string[];
     tab?: string | string[];
     flashStatus?: string | string[];
     flashMessage?: string | string[];
@@ -55,7 +64,15 @@ export default async function EmployeeCashFlowPage({
 
   const selectedInvoiceIdsRaw = resolveEmployeeCashFlowInvoiceIds(resolved.invoiceId);
   const selectedInvoiceIds =
-    selectedInvoiceIdsRaw.length > 0 ? selectedInvoiceIdsRaw : invoiceOptions[0]?.id ? [invoiceOptions[0].id] : [];
+    selectedInvoiceIdsRaw.length > 0
+      ? selectedInvoiceIdsRaw
+      : invoiceOptions[0]?.id
+        ? [invoiceOptions[0].id]
+        : [];
+  const savedFilters = resolveSavedCashFlowFilters({
+    employeeIds: resolved.employeeIds,
+    paymentMonths: resolved.paymentMonths,
+  });
 
   const prefillDataList = selectedInvoiceIds.length
     ? await Promise.all(
@@ -68,42 +85,50 @@ export default async function EmployeeCashFlowPage({
       )
     : [];
 
-  const prefillData = prefillDataList.length > 0
-    ? {
-        companyId: prefillDataList[0].invoice.companyId,
-        selectedInvoices: prefillDataList.map((item) => ({
-          clientBatchId: item.invoicePaymentId || item.invoice.id,
-          batchLabel:
-            item.invoicePaymentId && item.invoicePaymentId !== item.invoice.id
-              ? `${item.invoice.invoiceNumber} • ${item.invoicePaymentId.slice(-6)}`
-              : item.invoice.invoiceNumber,
-          invoicePaymentId: item.invoicePaymentId,
-          invoiceId: item.invoice.id,
-          invoiceNumber: item.invoice.invoiceNumber,
-          invoiceUsdInrRate: item.invoice.usdInrRate,
-          availableEmployees: item.availableEmployees,
-        })),
-        entries: prefillDataList.flatMap((item) =>
-          item.entries.map((entry) => ({
-            ...entry,
+  const prefillData =
+    prefillDataList.length > 0
+      ? {
+          companyId: prefillDataList[0].invoice.companyId,
+          selectedInvoices: prefillDataList.map((item) => ({
             clientBatchId: item.invoicePaymentId || item.invoice.id,
             batchLabel:
               item.invoicePaymentId && item.invoicePaymentId !== item.invoice.id
                 ? `${item.invoice.invoiceNumber} • ${item.invoicePaymentId.slice(-6)}`
                 : item.invoice.invoiceNumber,
-            invoicePaymentId: item.invoicePaymentId || undefined,
+            invoicePaymentId: item.invoicePaymentId,
             invoiceId: item.invoice.id,
             invoiceNumber: item.invoice.invoiceNumber,
+            invoiceUsdInrRate: item.invoice.usdInrRate,
+            availableEmployees: item.availableEmployees,
           })),
-        ),
-      }
-    : undefined;
+          entries: prefillDataList.flatMap((item) =>
+            item.entries.map((entry) => ({
+              ...entry,
+              clientBatchId: item.invoicePaymentId || item.invoice.id,
+              batchLabel:
+                item.invoicePaymentId && item.invoicePaymentId !== item.invoice.id
+                  ? `${item.invoice.invoiceNumber} • ${item.invoicePaymentId.slice(-6)}`
+                  : item.invoice.invoiceNumber,
+              invoicePaymentId: item.invoicePaymentId || undefined,
+              invoiceId: item.invoice.id,
+              invoiceNumber: item.invoice.invoiceNumber,
+            })),
+          ),
+        }
+      : undefined;
 
   const savedRows = selectedCompanyId
     ? await listSavedEmployeeCashFlowEntries({
         companyId: selectedCompanyId,
       })
     : [];
+  const filteredSavedRows = filterSavedCashFlowRows(savedRows, savedFilters);
+  const savedEmployeeOptions = [...new Map(savedRows.map((row) => [row.employeeId, row.employeeNameSnapshot] as const)).entries()]
+    .map(([value, label]) => ({ value, label }))
+    .sort((left, right) => left.label.localeCompare(right.label) || left.value.localeCompare(right.value));
+  const savedPaymentMonthOptions = [...new Set(savedRows.map((row) => row.paymentMonth))]
+    .sort((left, right) => left.localeCompare(right))
+    .map((value) => ({ value, label: formatPaymentMonthLabel(value) }));
 
   const flashStatus = Array.isArray(resolved.flashStatus)
     ? resolved.flashStatus[0]
@@ -112,13 +137,32 @@ export default async function EmployeeCashFlowPage({
     ? resolved.flashMessage[0]
     : resolved.flashMessage;
 
-  const invoiceParams = selectedInvoiceIds
-    .map((invoiceId) => `invoiceId=${encodeURIComponent(invoiceId)}`)
-    .join("&");
-  const returnTo = `/employee-cash-flow?companyId=${encodeURIComponent(selectedCompanyId)}&month=${monthKey}&tab=${selectedTab}${invoiceParams ? `&${invoiceParams}` : ""}`;
+  const filterParams =
+    selectedTab === "saved"
+      ? [
+          ...savedFilters.employeeIds.map(
+            (employeeId) => `employeeIds=${encodeURIComponent(employeeId)}`,
+          ),
+          ...savedFilters.paymentMonths.map(
+            (paymentMonth) => `paymentMonths=${encodeURIComponent(paymentMonth)}`,
+          ),
+        ]
+      : selectedInvoiceIds.map((invoiceId) => `invoiceId=${encodeURIComponent(invoiceId)}`);
+  const returnTo = `/employee-cash-flow?companyId=${encodeURIComponent(selectedCompanyId)}&month=${monthKey}&tab=${selectedTab}${filterParams.length ? `&${filterParams.join("&")}` : ""}`;
   const initialEntries: EmployeeCashFlowEditableEntry[] = prefillData
     ? aggregateEmployeeCashFlowEditableEntries(prefillData.entries)
     : [];
+  const tabSwitchHiddenFields = buildEmployeeCashFlowFilterFieldEntries({
+    companyId: selectedCompanyId,
+    month: monthKey,
+    tab: selectedTab,
+    invoiceIds: selectedInvoiceIds,
+    employeeIds: savedFilters.employeeIds,
+    paymentMonths: savedFilters.paymentMonths,
+    includeCompanyId: true,
+    includeMonth: true,
+    includeTab: false,
+  });
 
   return (
     <Shell title="Employee Cash Flow" eyebrow="Cash reality dashboard">
@@ -127,7 +171,7 @@ export default async function EmployeeCashFlowPage({
           action="/employee-cash-flow"
           className={
             selectedTab === "saved"
-              ? "grid gap-3 md:grid-cols-[1.2fr_auto] md:items-end"
+              ? "grid gap-3 md:grid-cols-[1.2fr_1fr_1fr_auto] md:items-end"
               : "grid gap-3 md:grid-cols-[1.2fr_180px_1.2fr_auto] md:items-end"
           }
         >
@@ -143,6 +187,8 @@ export default async function EmployeeCashFlowPage({
               ))}
             </select>
           </label>
+          <input type="hidden" name="tab" value={selectedTab} />
+          {selectedTab === "saved" ? <input type="hidden" name="month" value={monthKey} /> : null}
           {selectedTab === "compose" ? (
             <>
               <label className="block">
@@ -151,30 +197,39 @@ export default async function EmployeeCashFlowPage({
                 </span>
                 <input name="month" type="month" defaultValue={monthKey} className={inputClass} />
               </label>
-              <label className="block">
-                <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
-                  Cashed-out invoices
-                </span>
-                <select
-                  name="invoiceId"
-                  multiple
-                  defaultValue={selectedInvoiceIds}
-                  className={inputClass}
-                  style={{ minHeight: "180px" }}
-                >
-                  {invoiceOptions.length === 0 ? (
-                    <option value="">No cashed-out invoices available</option>
-                  ) : (
-                    invoiceOptions.map((invoice) => (
-                      <option key={invoice.id} value={invoice.id}>
-                        {invoice.invoiceNumber} ({invoice.year}-{String(invoice.month).padStart(2, "0")})
-                      </option>
-                    ))
-                  )}
-                </select>
-              </label>
+              <ChecklistFilterDropdown
+                name="invoiceId"
+                label="invoice"
+                options={invoiceOptions.map((invoice) => {
+                  const paymentMonth = `${invoice.year}-${String(invoice.month).padStart(2, "0")}`;
+
+                  return {
+                    value: invoice.id,
+                    label: `${invoice.invoiceNumber} (${formatPaymentMonthLabel(paymentMonth)})`,
+                  };
+                })}
+                defaultSelectedValues={selectedInvoiceIds}
+                includeSelectAll
+              />
             </>
-          ) : null}
+          ) : (
+            <>
+              <ChecklistFilterDropdown
+                name="employeeIds"
+                label="employee"
+                options={savedEmployeeOptions}
+                defaultSelectedValues={savedFilters.employeeIds}
+                includeSelectAll
+              />
+              <ChecklistFilterDropdown
+                name="paymentMonths"
+                label="payment month"
+                options={savedPaymentMonthOptions}
+                defaultSelectedValues={savedFilters.paymentMonths}
+                includeSelectAll
+              />
+            </>
+          )}
           <PendingSubmitButton
             className="gradient-btn"
             defaultText="Load"
@@ -204,15 +259,9 @@ export default async function EmployeeCashFlowPage({
 
       <GlassPanel gradient>
         <form action="/employee-cash-flow" className="mb-2 flex flex-wrap items-center gap-2">
-          <input type="hidden" name="companyId" value={selectedCompanyId} />
-          {selectedTab === "compose" ? (
-            <>
-              <input type="hidden" name="month" value={monthKey} />
-              {selectedInvoiceIds.map((invoiceId) => (
-                <input key={invoiceId} type="hidden" name="invoiceId" value={invoiceId} />
-              ))}
-            </>
-          ) : null}
+          {tabSwitchHiddenFields.map((field) => (
+            <input key={`${field.name}:${field.value}`} type="hidden" name={field.name} value={field.value} />
+          ))}
           <PendingSubmitButton
             name="tab"
             value="compose"
@@ -235,7 +284,7 @@ export default async function EmployeeCashFlowPage({
         gradient
       >
         {selectedTab === "saved" ? (
-          <EmployeeCashFlowSavedRows initialRows={savedRows} returnTo={returnTo} />
+          <EmployeeCashFlowSavedRows initialRows={filteredSavedRows} returnTo={returnTo} />
         ) : prefillData ? (
           <EmployeeCashFlowEntryForm
             companyId={prefillData.companyId}
