@@ -705,7 +705,11 @@ function PeriodTables({
     {
       key: "netPl",
       label: "Net P/L (INR)",
-      render: (row) => formatInr(row.netPlInrCents),
+      render: (row) => (
+        <span style={{ color: netProfitColor(row.netPlInrCents) }}>
+          {formatSignedInr(row.netPlInrCents)}
+        </span>
+      ),
     },
   ];
 
