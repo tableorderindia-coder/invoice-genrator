@@ -1,3 +1,7 @@
+// @vitest-environment jsdom
+
+import { createElement } from "react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -5,6 +9,10 @@ import {
   formatPaymentMonthLabel,
   normalizeMultiSelectValue,
 } from "./filter-selection";
+import {
+  ChecklistFilterDropdown,
+  getChecklistFilterTriggerLabel,
+} from "../../../app/_components/checklist-filter-dropdown";
 
 describe("filter selection helpers", () => {
   it("normalizes repeated and comma-separated multi-select values", () => {
@@ -80,5 +88,70 @@ describe("filter selection helpers", () => {
         paymentMonths: [],
       }),
     ).toEqual(rows);
+  });
+
+  it("labels full, empty, and partial checklist selections", () => {
+    expect(
+      getChecklistFilterTriggerLabel({
+        label: "employee",
+        selectedCount: 3,
+        optionCount: 3,
+      }),
+    ).toBe("All");
+    expect(
+      getChecklistFilterTriggerLabel({
+        label: "employee",
+        selectedCount: 0,
+        optionCount: 0,
+      }),
+    ).toBe("No employees");
+    expect(
+      getChecklistFilterTriggerLabel({
+        label: "employee",
+        selectedCount: 1,
+        optionCount: 3,
+      }),
+    ).toBe("1 selected");
+    expect(
+      getChecklistFilterTriggerLabel({
+        label: "employee",
+        selectedCount: 2,
+        optionCount: 3,
+      }),
+    ).toBe("2 selected");
+  });
+
+  it("mirrors selected values into hidden inputs and expands all values when select all is checked", () => {
+    const { container } = render(
+      createElement(
+        "form",
+        null,
+        createElement(ChecklistFilterDropdown, {
+          name: "employeeIds",
+          label: "employee",
+          options: [
+            { value: "emp_1", label: "Asha" },
+            { value: "emp_2", label: "Ben" },
+          ],
+          defaultSelectedValues: ["emp_1"],
+          includeSelectAll: true,
+        }),
+      ),
+    );
+
+    expect(
+      [...container.querySelectorAll('input[type="hidden"][name="employeeIds"]')].map(
+        (input) => (input as HTMLInputElement).value,
+      ),
+    ).toEqual(["emp_1"]);
+
+    fireEvent.click(screen.getByRole("button", { name: /employee/i }));
+    fireEvent.click(screen.getByLabelText("Select all"));
+
+    expect(
+      [...container.querySelectorAll('input[type="hidden"][name="employeeIds"]')].map(
+        (input) => (input as HTMLInputElement).value,
+      ),
+    ).toEqual(["emp_1", "emp_2"]);
   });
 });
