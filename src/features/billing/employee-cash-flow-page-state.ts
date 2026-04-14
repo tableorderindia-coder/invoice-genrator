@@ -2,6 +2,7 @@ type SearchValue = string | string[] | undefined;
 
 import { calculateActualPaidInrCents } from "./employee-cash-flow";
 import type { EmployeeCashFlowEntryWriteInput } from "./employee-cash-flow-types";
+import { normalizeMultiSelectValue } from "./filter-selection";
 
 type EmployeeOption = {
   id: string;
@@ -58,16 +59,7 @@ export function buildEmployeeCashFlowInvoiceOptionsInput(companyId: string) {
 }
 
 export function resolveEmployeeCashFlowInvoiceIds(input?: SearchValue) {
-  const rawValues = Array.isArray(input) ? input : input ? [input] : [];
-
-  const invoiceIds = rawValues.flatMap((value) =>
-    String(value)
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean),
-  );
-
-  return [...new Set(invoiceIds)];
+  return normalizeMultiSelectValue(input);
 }
 
 export function resolveEmployeeToAddSelection(
