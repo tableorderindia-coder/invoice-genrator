@@ -10,6 +10,7 @@ import {
   getPnDashboardData,
   listCompanies,
   listEmployees,
+  listAvailablePaymentMonths,
 } from "@/src/features/billing/store";
 import type { PnDashboardData } from "@/src/features/billing/types";
 import { DashboardTables } from "./dashboard-tables";
@@ -39,6 +40,8 @@ export default async function DashboardPage({
     view?: string | string[];
     flashStatus?: string | string[];
     flashMessage?: string | string[];
+    allMonths?: string | string[];
+    paymentMonths?: string | string[];
   }>;
 }) {
   const resolved = await searchParams;
@@ -61,11 +64,25 @@ export default async function DashboardPage({
   const allEmployeesSelected = allEmployeesValue === "1";
   const selectedEmployeeIds = normalizeStringArray(resolved.employeeIds);
 
-  const employees = selectedCompanyId ? await listEmployees(selectedCompanyId) : [];
+  const [employees, availableMonths] = selectedCompanyId 
+    ? await Promise.all([listEmployees(selectedCompanyId), listAvailablePaymentMonths(selectedCompanyId)])
+    : [[], []];
+
   const effectiveEmployeeIds =
     allEmployeesSelected || selectedEmployeeIds.length === 0
       ? employees.map((employee) => employee.id)
       : selectedEmployeeIds;
+
+  const allMonthsValue = Array.isArray(resolved.allMonths)
+    ? resolved.allMonths[0]
+    : resolved.allMonths;
+  const allMonthsSelected = allMonthsValue === "1";
+  const selectedPaymentMonths = normalizeStringArray(resolved.paymentMonths);
+
+  const effectivePaymentMonths =
+    allMonthsSelected || selectedPaymentMonths.length === 0
+      ? availableMonths
+      : selectedPaymentMonths;
 
   const emptyDashboardData: PnDashboardData = {
     companyId: "",
@@ -79,6 +96,7 @@ export default async function DashboardPage({
         companyId: selectedCompanyId,
         periodType,
         employeeIds: effectiveEmployeeIds,
+        paymentMonths: effectivePaymentMonths,
       })
     : emptyDashboardData;
 
@@ -95,6 +113,10 @@ export default async function DashboardPage({
   if (allEmployeesSelected) filterParams.set("allEmployees", "1");
   for (const employeeId of effectiveEmployeeIds) {
     filterParams.append("employeeIds", employeeId);
+  }
+  if (allMonthsSelected) filterParams.set("allMonths", "1");
+  for (const mm of effectivePaymentMonths) {
+    filterParams.append("paymentMonths", mm);
   }
   const returnTo = `/dashboard?${filterParams.toString()}`;
 
@@ -167,6 +189,10 @@ export default async function DashboardPage({
             <input key={employeeId} type="hidden" name="employeeIds" value={employeeId} />
           ))}
           {allEmployeesSelected ? <input type="hidden" name="allEmployees" value="1" /> : null}
+          {effectivePaymentMonths.map((m) => (
+            <input key={`pm-${m}`} type="hidden" name="paymentMonths" value={m} />
+          ))}
+          {allMonthsSelected ? <input type="hidden" name="allMonths" value="1" /> : null}
           <PendingSubmitButton
             name="view"
             value="employee"
@@ -226,9 +252,47 @@ export default async function DashboardPage({
               />
               Select all employees
             </label>
+            
+            <label
+              className="block text-sm font-medium mt-4"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              Months (select one or more)
+            </label>
+            <select
+              name="paymentMonths"
+              multiple
+              defaultValue={effectivePaymentMonths}
+              className={inputClass}
+              style={{
+                minHeight: "150px",
+                border: "1px solid var(--glass-border)",
+                background: "rgba(255,255,255,0.04)",
+                color: "var(--text-primary)",
+              }}
+            >
+              {availableMonths.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+            <label
+              className="inline-flex items-center gap-2 text-sm"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              <input
+                type="checkbox"
+                name="allMonths"
+                value="1"
+                defaultChecked={allMonthsSelected}
+              />
+              Select all months
+            </label>
+
             <PendingSubmitButton
               className="btn-outline"
-              defaultText="Apply employee filter"
+              defaultText="Apply filters"
               pendingText="Applying..."
             />
           </form>
@@ -253,6 +317,10 @@ export default async function DashboardPage({
               <input key={employeeId} type="hidden" name="employeeIds" value={employeeId} />
             ))}
             {allEmployeesSelected ? <input type="hidden" name="allEmployees" value="1" /> : null}
+            {effectivePaymentMonths.map((m) => (
+              <input key={`pm-${m}`} type="hidden" name="paymentMonths" value={m} />
+            ))}
+            {allMonthsSelected ? <input type="hidden" name="allMonths" value="1" /> : null}
             <PendingSubmitButton
               name="periodType"
               value="monthly"

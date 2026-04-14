@@ -253,6 +253,19 @@ function getSupabaseOrThrow() {
   return client;
 }
 
+export async function listAvailablePaymentMonths(companyId: string): Promise<string[]> {
+  const supabase = getSupabaseOrThrow();
+  const { data, error } = await supabase
+    .from("invoice_payment_employee_entries")
+    .select("payment_month")
+    .eq("company_id", companyId);
+
+  if (error) throw error;
+  const months = [...new Set((data ?? []).map((row) => row.payment_month))].filter(Boolean) as string[];
+  months.sort((a, b) => b.localeCompare(a)); // Descending order
+  return months;
+}
+
 function normalizeInvoiceAdjustmentSchemaError(error: unknown) {
   if (
     error &&
@@ -2369,6 +2382,7 @@ export async function getPnDashboardData(input: {
   companyId: string;
   periodType: PnPeriodType;
   employeeIds?: string[];
+  paymentMonths?: string[];
 }): Promise<PnDashboardData> {
   const supabase = getSupabaseOrThrow();
   let cashFlowQuery = supabase
@@ -2380,6 +2394,10 @@ export async function getPnDashboardData(input: {
 
   if (input.employeeIds && input.employeeIds.length > 0) {
     cashFlowQuery = cashFlowQuery.in("employee_id", input.employeeIds);
+  }
+
+  if (input.paymentMonths && input.paymentMonths.length > 0) {
+    cashFlowQuery = cashFlowQuery.in("payment_month", input.paymentMonths);
   }
 
   const { data: cashFlowRows, error: cashFlowError } = await cashFlowQuery;
