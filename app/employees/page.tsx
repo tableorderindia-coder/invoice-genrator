@@ -6,8 +6,8 @@ import { Field, inputClass } from "../_components/field";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
 import { StaggerGrid } from "../_components/stagger-grid";
 import { createEmployeeAction, updateEmployeeAction } from "@/src/features/billing/actions";
-import { listCompanies, listEmployees } from "@/src/features/billing/store";
-import { formatUsd } from "@/src/features/billing/utils";
+import { listCompanies, listEmployees, getDashboardMetrics } from "@/src/features/billing/store";
+import { formatUsd, formatSignedUsd } from "@/src/features/billing/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -17,8 +17,15 @@ export default async function EmployeesPage({
   searchParams: Promise<{ tab?: string | string[]; employeeId?: string | string[] }>;
 }) {
   const resolvedSearchParams = await searchParams;
-  const companies = await listCompanies();
-  const employees = await listEmployees();
+  const [companies, employees, metrics] = await Promise.all([
+    listCompanies(),
+    listEmployees(),
+    getDashboardMetrics()
+  ]);
+
+  const employeeProfitMap = new Map(
+    metrics.realizedProfitByEmployee.map((e) => [e.employeeId, e.realizedProfitUsdCents])
+  );
   const tab = Array.isArray(resolvedSearchParams.tab)
     ? resolvedSearchParams.tab[0]
     : resolvedSearchParams.tab;
@@ -173,7 +180,10 @@ export default async function EmployeesPage({
             Employee defaults
           </h2>
           <StaggerGrid className="mt-5 space-y-4">
-            {employees.map((employee) => (
+            {employees.map((employee) => {
+              const profit = employeeProfitMap.get(employee.id) ?? 0;
+              const profitColor = profit === 0 ? "var(--text-primary)" : (profit > 0 ? "#6ee7b7" : "#fca5a5");
+              return (
               <div
                 key={employee.id}
                 className="stagger-item glass-card p-4 cursor-pointer"
@@ -190,11 +200,15 @@ export default async function EmployeesPage({
                   <div className="text-right text-sm shrink-0" style={{ fontFamily: "var(--font-jetbrains-mono), monospace" }}>
                     <p style={{ color: "var(--text-accent)" }}>
                       {formatUsd(employee.billingRateUsdCents)}
-                      <span className="text-xs ml-1" style={{ color: "var(--text-muted)" }}>billed</span>
+                      <span className="text-xs ml-1 font-sans" style={{ color: "var(--text-muted)" }}>billed</span>
                     </p>
                     <p style={{ color: "#34d399" }}>
                       {formatUsd(employee.payoutMonthlyUsdCents)}
-                      <span className="text-xs ml-1" style={{ color: "var(--text-muted)" }}>payout</span>
+                      <span className="text-xs ml-1 font-sans" style={{ color: "var(--text-muted)" }}>payout</span>
+                    </p>
+                    <p className="mt-1 font-semibold" style={{ color: profitColor }}>
+                      {formatSignedUsd(profit)}
+                      <span className="text-[10px] ml-1 uppercase tracking-wider font-sans" style={{ color: "var(--text-muted)", opacity: 0.8 }}>Net P/L</span>
                     </p>
                   </div>
                 </div>
@@ -231,7 +245,7 @@ export default async function EmployeesPage({
                   </span>
                 </div>
               </div>
-            ))}
+            )})}
             {employees.length === 0 && (
               <p className="py-6 text-center text-sm" style={{ color: "var(--text-muted)" }}>
                 No employees added yet.

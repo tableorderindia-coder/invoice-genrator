@@ -34,6 +34,16 @@ export function formatSignedInr(cents: number) {
   return formatInr(0);
 }
 
+export function formatSignedUsd(cents: number) {
+  if (cents > 0) {
+    return `+ ${formatUsd(cents)}`;
+  }
+  if (cents < 0) {
+    return `- ${formatUsd(Math.abs(cents))}`;
+  }
+  return formatUsd(0);
+}
+
 export function formatMonthYear(month: number, year: number) {
   return new Intl.DateTimeFormat("en-US", {
     month: "long",
