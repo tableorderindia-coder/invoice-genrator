@@ -30,7 +30,7 @@ export default function EmployeeCashFlowSummaryTable({
             <th>Offboarding Deduction</th>
             <th>Effective Inward $</th>
             <th>Cashout USD/INR</th>
-            <th>Paid USD/INR</th>
+            <th>Paid rate</th>
             <th>Cash In INR</th>
             <th>Salary Paid INR</th>
             <th>Pending Amount</th>

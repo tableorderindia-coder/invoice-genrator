@@ -164,4 +164,39 @@ describe("dashboard tables rendering", () => {
 
     expect(screen.getByText("+ ₹21,240.00")).not.toBeNull();
   });
+
+  it("renders monthly period columns in the requested order after effective dollar inward", () => {
+    render(
+      createElement(DashboardTables, {
+        view: "period",
+        periodType: "monthly",
+        data: baseData,
+        selectedCompanyId: "comp_1",
+        returnTo: "/dashboard",
+        updateDashboardEmployeeCashFlowEntryAction: vi.fn(async () => {}),
+      }),
+    );
+
+    const headerTexts = screen
+      .getAllByRole("columnheader")
+      .map((header) => header.textContent?.replace(/\s+/g, " ").trim() ?? "");
+
+    expect(headerTexts).toEqual([
+      "Period",
+      "Dollar inward",
+      "Effective dollar inward",
+      "Actual paid (INR)",
+      "PF (INR)",
+      "TDS (INR)",
+      "Salary paid (INR)",
+      "FX commission (INR)",
+      "Total commission (USD)",
+      "Commission earned (INR)",
+      "Gross earnings (INR)",
+      "In P/LExpenses (INR)",
+      "In P/LReimb. (USD)",
+      "In P/LReimb. (INR)",
+      "Net P/L (INR)",
+    ]);
+  });
 });

@@ -169,6 +169,11 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
         ],
       }),
     );
+    expect(upsertInvoicePaymentMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        paymentDate: "2026-04-25",
+      }),
+    );
   });
 
   it("passes statement-only invoice rows and month summaries through employee statement saves", async () => {

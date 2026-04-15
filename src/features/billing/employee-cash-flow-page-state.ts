@@ -12,6 +12,14 @@ function getTodayMonthKey(now = new Date()) {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
 
+export function defaultEmployeeCashFlowPaidDate(monthKey: string) {
+  if (/^\d{4}-\d{2}$/.test(monthKey)) {
+    return `${monthKey}-25`;
+  }
+
+  return `${monthKey}-01`;
+}
+
 export function nextCashFlowClientBatchId() {
   return `batch_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -152,6 +160,7 @@ export function buildAddedEmployeeCashFlowEntry(input: {
     grossEarningsInrCents: 0,
     isNonInvoiceEmployee: true,
     isPaid: false,
+    paidAt: defaultEmployeeCashFlowPaidDate(input.paymentMonth),
     notes: "",
   };
 }

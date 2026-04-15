@@ -118,7 +118,7 @@ export default function EmployeeCashFlowSavedRows({
                         <th>Appraisal</th>
                         <th>Offboarding</th>
                         <th>Cashout</th>
-                        <th>Paid USD/INR</th>
+                        <th>Paid rate</th>
                         <th>Actual paid INR</th>
                         <th>PF INR</th>
                         <th>TDS INR</th>

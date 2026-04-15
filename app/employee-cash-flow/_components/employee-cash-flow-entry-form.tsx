@@ -615,7 +615,7 @@ export default function EmployeeCashFlowEntryForm({
 
                 <label className="block">
                   <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
-                    Paid USD/INR
+                    Paid rate
                   </span>
                   <input
                     value={toEditableRate(entry.paidUsdInrRate)}

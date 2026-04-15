@@ -10,6 +10,7 @@ import {
 } from "@/src/features/billing/employee-cash-flow-store";
 import {
   buildEmployeeCashFlowInvoiceOptionsInput,
+  defaultEmployeeCashFlowPaidDate,
   resolveEmployeeCashFlowInvoiceIds,
   resolveEmployeeCashFlowMonthKey,
 } from "@/src/features/billing/employee-cash-flow-page-state";
@@ -150,7 +151,12 @@ export default async function EmployeeCashFlowPage({
       : selectedInvoiceIds.map((invoiceId) => `invoiceId=${encodeURIComponent(invoiceId)}`);
   const returnTo = `/employee-cash-flow?companyId=${encodeURIComponent(selectedCompanyId)}&month=${monthKey}&tab=${selectedTab}${filterParams.length ? `&${filterParams.join("&")}` : ""}`;
   const initialEntries: EmployeeCashFlowEditableEntry[] = prefillData
-    ? aggregateEmployeeCashFlowEditableEntries(prefillData.entries)
+    ? aggregateEmployeeCashFlowEditableEntries(
+        prefillData.entries.map((entry) => ({
+          ...entry,
+          paidAt: entry.paidAt ?? defaultEmployeeCashFlowPaidDate(monthKey),
+        })),
+      )
     : [];
   const tabSwitchHiddenFields = buildEmployeeCashFlowFilterFieldEntries({
     companyId: selectedCompanyId,

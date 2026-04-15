@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import { buildInvoiceAdjustmentPayload } from "./adjustments";
 import { parseInvoiceHeaderFormInput } from "./invoice-editor";
+import { defaultEmployeeCashFlowPaidDate } from "./employee-cash-flow-page-state";
 import {
   addInvoiceAdjustment,
   addInvoiceLineItem,
@@ -1105,7 +1106,7 @@ export async function saveInvoicePaymentEmployeeEntriesAction(formData: FormData
         (await upsertInvoicePayment({
           invoiceId,
           companyId,
-          paymentDate: `${paymentMonth}-01`,
+          paymentDate: defaultEmployeeCashFlowPaidDate(paymentMonth),
           paymentMonth,
           usdInrRate: firstEntry.cashoutUsdInrRate ?? 0,
         }));

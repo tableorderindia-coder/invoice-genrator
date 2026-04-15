@@ -753,6 +753,11 @@ function PeriodTables({
 
   const periodSuffixColumns: Column<PnPeriodRow>[] = [
     {
+      key: "actualPaid",
+      label: "Actual paid (INR)",
+      render: (row) => formatInr(row.actualPaidInrCents),
+    },
+    {
       key: "pf",
       label: "PF (INR)",
       render: (row) => formatInr(row.pfInrCents),
@@ -763,9 +768,9 @@ function PeriodTables({
       render: (row) => formatInr(row.tdsInrCents),
     },
     {
-      key: "actualPaid",
-      label: "Actual paid (INR)",
-      render: (row) => formatInr(row.actualPaidInrCents),
+      key: "salaryPaid",
+      label: "Salary paid (INR)",
+      render: (row) => formatInr(row.salaryPaidInrCents),
     },
     {
       key: "fxCommission",
@@ -883,6 +888,8 @@ function PeriodTables({
         return formatInr(totals.tdsInrCents);
       case "actualPaid":
         return formatInr(totals.actualPaidInrCents);
+      case "salaryPaid":
+        return formatInr(totals.salaryPaidInrCents);
       case "fxCommission":
         return formatInr(totals.fxCommissionInrCents);
       case "totalCommission":

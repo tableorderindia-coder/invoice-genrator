@@ -4,6 +4,7 @@ import {
   applyEmployeeCashFlowEntryPatch,
   buildAddedEmployeeCashFlowEntry,
   buildEmployeeCashFlowInvoiceOptionsInput,
+  defaultEmployeeCashFlowPaidDate,
   getDaysInMonthFromMonthKey,
   removeEntryFromSelections,
   resolveEmployeeToAddSelection,
@@ -42,6 +43,14 @@ describe("employee cash flow page state", () => {
     expect(getDaysInMonthFromMonthKey("2026-05")).toBe(31);
   });
 
+  it("defaults the employee cash flow paid date to the 25th of the selected month", () => {
+    expect(defaultEmployeeCashFlowPaidDate("2026-04")).toBe("2026-04-25");
+  });
+
+  it("falls back to the first of the month when the payment month key is invalid", () => {
+    expect(defaultEmployeeCashFlowPaidDate("bad-input")).toBe("bad-input-01");
+  });
+
   it("prefills added employee rows from the selected cashed-out invoice", () => {
     expect(
       buildAddedEmployeeCashFlowEntry({
@@ -68,6 +77,7 @@ describe("employee cash flow page state", () => {
       monthlyPaidUsdCents: 2_000_00,
       baseDollarInwardUsdCents: 0,
       cashoutUsdInrRate: 84.25,
+      paidAt: "2026-05-25",
       isNonInvoiceEmployee: true,
     });
   });
