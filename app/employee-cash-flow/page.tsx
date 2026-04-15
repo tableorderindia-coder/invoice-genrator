@@ -166,7 +166,7 @@ export default async function EmployeeCashFlowPage({
 
   return (
     <Shell title="Employee Cash Flow" eyebrow="Cash reality dashboard">
-      <GlassPanel gradient>
+      <GlassPanel gradient className="overflow-visible">
         <form
           action="/employee-cash-flow"
           className={
@@ -257,7 +257,7 @@ export default async function EmployeeCashFlowPage({
         ) : null}
       </GlassPanel>
 
-      <GlassPanel gradient>
+      <GlassPanel gradient className="overflow-visible">
         <form action="/employee-cash-flow" className="mb-2 flex flex-wrap items-center gap-2">
           {tabSwitchHiddenFields.map((field) => (
             <input key={`${field.name}:${field.value}`} type="hidden" name={field.name} value={field.value} />

@@ -270,4 +270,35 @@ describe("filter selection helpers", () => {
       ),
     ).toEqual(["emp_1", "emp_2"]);
   });
+
+  it("raises checklist dropdown stacking when the panel is open", () => {
+    const { container } = render(
+      createElement(ChecklistFilterDropdown, {
+        name: "employeeIds",
+        label: "employee",
+        options: [
+          { value: "emp_1", label: "Asha" },
+          { value: "emp_2", label: "Ben" },
+        ],
+        defaultSelectedValues: ["emp_1"],
+        includeSelectAll: true,
+      }),
+    );
+
+    const trigger = container.querySelector("button");
+    if (!(trigger instanceof HTMLButtonElement)) {
+      throw new Error("Expected checklist trigger button.");
+    }
+
+    fireEvent.click(trigger);
+
+    const root = container.firstElementChild;
+    const panel = container.querySelector('[role="group"][aria-label="employee filters"]');
+    if (!(panel instanceof HTMLDivElement)) {
+      throw new Error("Expected checklist filter panel.");
+    }
+
+    expect(root?.className).toContain("z-50");
+    expect(panel.className).toContain("z-[100]");
+  });
 });

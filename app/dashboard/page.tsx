@@ -157,8 +157,8 @@ export default async function DashboardPage({
   const returnTo = `/dashboard?${filterParams.toString()}`;
 
   return (
-    <Shell title="P/N Dashboard" eyebrow="Company profitability">
-      <GlassPanel gradient>
+    <Shell title="P/L Dashboard" eyebrow="Company profitability">
+      <GlassPanel gradient className="overflow-visible">
         <form
           action="/dashboard"
           className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end"
@@ -217,7 +217,7 @@ export default async function DashboardPage({
         ) : null}
       </GlassPanel>
 
-      <GlassPanel gradient>
+      <GlassPanel gradient className="overflow-visible">
         <form action="/dashboard" className="mb-2 flex flex-wrap items-center gap-2">
           {dashboardSwitchFields.map((field, index) => (
             <input
@@ -245,7 +245,7 @@ export default async function DashboardPage({
       </GlassPanel>
 
       {view === "employee" ? (
-        <GlassPanel title="Employee" gradient>
+        <GlassPanel title="Employee" gradient className="overflow-visible">
           <form action="/dashboard" className="mb-4 space-y-4">
             {employeeFilterFields.map((field, index) => (
               <input
@@ -294,7 +294,7 @@ export default async function DashboardPage({
           />
         </GlassPanel>
       ) : (
-        <GlassPanel title="Monthly / Yearly" gradient>
+        <GlassPanel title="Monthly / Yearly" gradient className="overflow-visible">
           <form action="/dashboard" className="mb-4 space-y-4">
             {periodFilterFields.map((field, index) => (
               <input

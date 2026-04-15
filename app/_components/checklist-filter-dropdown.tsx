@@ -86,7 +86,7 @@ export function ChecklistFilterDropdown({
   }
 
   return (
-    <div className="relative inline-flex min-w-[14rem] flex-col">
+    <div className={`relative inline-flex min-w-[14rem] flex-col ${open ? "z-50" : "z-10"}`}>
       {visibleSelectedValues.map((value) => (
         <input key={value} type="hidden" name={name} value={value} />
       ))}
@@ -120,7 +120,7 @@ export function ChecklistFilterDropdown({
           id={panelId}
           role="group"
           aria-label={`${label} filters`}
-          className="absolute left-0 top-full z-20 mt-2 w-72 rounded-2xl border p-3 shadow-xl"
+          className="absolute left-0 top-full z-[100] mt-2 w-72 rounded-2xl border p-3 shadow-xl"
           style={{
             borderColor: "var(--glass-border)",
             background: "rgba(15, 17, 24, 0.98)",

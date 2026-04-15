@@ -73,7 +73,7 @@ export default async function EmployeeStatementsPage({
 
   return (
     <Shell title="Employee Statements" eyebrow="Editable employee statement ledger">
-      <GlassPanel gradient>
+      <GlassPanel gradient className="overflow-visible">
         <form
           action="/employee-statements"
           className="grid gap-3 md:grid-cols-[1.2fr_1.4fr_180px_180px_auto] md:items-end"
