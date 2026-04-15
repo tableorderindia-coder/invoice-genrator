@@ -235,7 +235,7 @@ export function appendMissingAdjustmentEntries(input: {
   invoiceNumber: string;
 }) {
   const existingEmployeeIds = new Set(input.entries.map((entry) => entry.employeeId));
-  const missingAdjustmentEntries = input.availableEmployees
+  const missingAdjustmentEntries: EditableCashFlowEntry[] = input.availableEmployees
     .filter((employee) => !existingEmployeeIds.has(employee.id))
     .filter(
       (employee) =>
@@ -273,6 +273,7 @@ export function appendMissingAdjustmentEntries(input: {
       grossEarningsInrCents: 0,
       isNonInvoiceEmployee: true,
       isPaid: false,
+      paidAt: undefined,
       notes: `Imported from invoice adjustment for ${input.paymentMonth}.`,
     }));
 
