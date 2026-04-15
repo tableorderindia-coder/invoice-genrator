@@ -29,10 +29,6 @@ import {
   updateInvoiceStatus,
   updateCompany,
   updateEmployee,
-  addEmployeePayoutRow,
-  updateEmployeePayout,
-  markEmployeePayoutPaid,
-  removeEmployeePayoutRow,
   upsertEmployeeStatementSection,
   upsertDashboardExpense,
   upsertCompanyExpense,
@@ -730,7 +726,6 @@ export async function deleteInvoiceAction(formData: FormData) {
     revalidatePath(`/invoices/drafts/${invoiceId}`);
     revalidatePath("/invoices");
     revalidatePath("/cashout");
-    revalidatePath("/employee-payout");
     revalidatePath("/dashboard");
   } catch (error) {
     redirect(
@@ -772,7 +767,6 @@ export async function cashOutInvoiceAction(formData: FormData) {
     revalidatePath("/dashboard");
     revalidatePath("/invoices");
     revalidatePath("/cashout");
-    revalidatePath("/employee-payout");
   } catch (error) {
     redirect(
       buildFlashRedirect(
@@ -784,73 +778,6 @@ export async function cashOutInvoiceAction(formData: FormData) {
   }
 
   redirect(buildFlashRedirect(returnTo, "success", "Invoice marked as cashed out."));
-}
-
-export async function updateEmployeePayoutAction(formData: FormData) {
-  const payoutId = getString(formData, "payoutId");
-  const returnTo = getString(formData, "returnTo") || "/employee-payout";
-
-  try {
-    const employeeMonthlyUsdCents = centsFromUsd(getString(formData, "employeeMonthlyUsd"));
-    if (employeeMonthlyUsdCents <= 0) {
-      throw new Error("Employee monthly dollars must be greater than 0.");
-    }
-    const dollarInwardUsdCents = centsFromUsd(getString(formData, "dollarInwardUsd"));
-    if (dollarInwardUsdCents < 0) {
-      throw new Error("Dollars inward cannot be negative.");
-    }
-
-    const cashoutUsdInrRate = Number.parseFloat(getString(formData, "cashoutUsdInrRate"));
-    if (!Number.isFinite(cashoutUsdInrRate) || cashoutUsdInrRate < 0) {
-      throw new Error("Cashout USD/INR rate cannot be negative.");
-    }
-
-    const paidUsdInrRateRaw = getString(formData, "paidUsdInrRate");
-    const paidUsdInrRate = paidUsdInrRateRaw
-      ? Number.parseFloat(paidUsdInrRateRaw)
-      : 0;
-    if (!Number.isFinite(paidUsdInrRate) || paidUsdInrRate < 0) {
-      throw new Error("Paid USD/INR rate cannot be negative.");
-    }
-    const pfInrCents = centsFromUsd(getString(formData, "pfInr"));
-    if (pfInrCents < 0) {
-      throw new Error("PF cannot be negative.");
-    }
-
-    const tdsInrCents = centsFromUsd(getString(formData, "tdsInr"));
-    if (tdsInrCents < 0) {
-      throw new Error("TDS cannot be negative.");
-    }
-
-    const actualPaidInrCents = centsFromUsd(getString(formData, "actualPaidInr"));
-    if (actualPaidInrCents < 0) {
-      throw new Error("Actual paid cannot be negative.");
-    }
-
-    await updateEmployeePayout({
-      payoutId,
-      dollarInwardUsdCents,
-      employeeMonthlyUsdCents,
-      cashoutUsdInrRate,
-      paidUsdInrRate,
-      pfInrCents,
-      tdsInrCents,
-      actualPaidInrCents,
-    });
-
-    revalidatePath("/employee-payout");
-    revalidatePath("/dashboard");
-  } catch (error) {
-    redirect(
-      buildFlashRedirect(
-        returnTo,
-        "error",
-        getErrorMessage(error, "Unable to update employee payout."),
-      ),
-    );
-  }
-
-  redirect(buildFlashRedirect(returnTo, "success", "Employee payout updated."));
 }
 
 export async function updateDashboardEmployeeCashFlowEntryAction(formData: FormData) {
@@ -948,83 +875,6 @@ export async function updateDashboardEmployeeCashFlowEntryAction(formData: FormD
   }
 
   redirect(buildFlashRedirect(returnTo, "success", "Dashboard cash flow row updated."));
-}
-
-export async function markEmployeePayoutPaidAction(formData: FormData) {
-  const payoutId = getString(formData, "payoutId");
-  const returnTo = getString(formData, "returnTo") || "/employee-payout";
-
-  try {
-    await markEmployeePayoutPaid({
-      payoutId,
-      paidAt: getString(formData, "paidAt") || new Date().toISOString().slice(0, 10),
-    });
-
-    revalidatePath("/employee-payout");
-    revalidatePath("/dashboard");
-  } catch (error) {
-    redirect(
-      buildFlashRedirect(
-        returnTo,
-        "error",
-        getErrorMessage(error, "Unable to mark employee payout as paid."),
-      ),
-    );
-  }
-
-  redirect(buildFlashRedirect(returnTo, "success", "Employee payout marked as paid."));
-}
-
-export async function addEmployeePayoutRowAction(formData: FormData) {
-  const invoiceId = getString(formData, "invoiceId");
-  const returnTo = getString(formData, "returnTo") || "/employee-payout";
-
-  try {
-    const employeeId = getString(formData, "employeeId");
-    if (!employeeId) {
-      throw new Error("Select an employee to add.");
-    }
-
-    await addEmployeePayoutRow({
-      invoiceId,
-      employeeId,
-    });
-
-    revalidatePath("/employee-payout");
-    revalidatePath("/dashboard");
-  } catch (error) {
-    redirect(
-      buildFlashRedirect(
-        returnTo,
-        "error",
-        getErrorMessage(error, "Unable to add employee payout row."),
-      ),
-    );
-  }
-
-  redirect(buildFlashRedirect(returnTo, "success", "Employee added to payout list."));
-}
-
-export async function removeEmployeePayoutRowAction(formData: FormData) {
-  const payoutId = getString(formData, "payoutId");
-  const returnTo = getString(formData, "returnTo") || "/employee-payout";
-
-  try {
-    await removeEmployeePayoutRow({ payoutId });
-
-    revalidatePath("/employee-payout");
-    revalidatePath("/dashboard");
-  } catch (error) {
-    redirect(
-      buildFlashRedirect(
-        returnTo,
-        "error",
-        getErrorMessage(error, "Unable to remove employee payout."),
-      ),
-    );
-  }
-
-  redirect(buildFlashRedirect(returnTo, "success", "Employee payout removed."));
 }
 
 export async function saveDashboardExpenseAction(formData: FormData) {

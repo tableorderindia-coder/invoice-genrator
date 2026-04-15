@@ -42,10 +42,6 @@ vi.mock("./store", () => ({
   updateInvoiceStatus: vi.fn(),
   updateCompany: updateCompanyMock,
   updateEmployee: vi.fn(),
-  addEmployeePayoutRow: vi.fn(),
-  updateEmployeePayout: vi.fn(),
-  markEmployeePayoutPaid: vi.fn(),
-  removeEmployeePayoutRow: vi.fn(),
   upsertDashboardExpense: vi.fn(),
   upsertEmployeeStatementSection: upsertEmployeeStatementSectionMock,
 }));

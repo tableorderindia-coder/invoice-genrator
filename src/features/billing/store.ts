@@ -1,7 +1,6 @@
 import { createSupabaseServerClient } from "@/src/lib/supabase/server";
 import { getSupabaseMode } from "@/src/lib/supabase/config";
 import {
-  calculateEmployeePayoutMetrics,
   calculateLineItemTotals,
   createRealizationRecord,
   resolveEffectiveLineItemTotalUsdCents,
@@ -25,7 +24,6 @@ import {
   type PnEditableSourceRow,
   type PnSourceRow,
 } from "./pn-dashboard";
-import { assertEmployeePayoutRemovable } from "./employee-payout";
 import {
   calculateCashInInrCents,
   calculateEffectiveDollarInwardUsdCents,
@@ -41,8 +39,6 @@ import type {
   Employee,
   EmployeeStatementInvoiceRow,
   EmployeeStatementMonthSummary,
-  EmployeePayout,
-  EmployeePayoutInvoice,
   Invoice,
   InvoiceDetail,
   InvoiceLineItem,
@@ -154,30 +150,6 @@ type DbInvoiceRealization = {
   realized_profit_usd_cents: number;
   notes: string | null;
   created_at: string;
-};
-
-type DbEmployeePayout = {
-  id: string;
-  invoice_id: string;
-  company_id: string;
-  employee_id: string;
-  invoice_line_item_id: string | null;
-  employee_name_snapshot: string;
-  dollar_inward_usd_cents: number;
-  employee_monthly_usd_cents: number;
-  cashout_usd_inr_rate: number;
-  paid_usd_inr_rate: number | null;
-  pf_inr_cents: number | null;
-  tds_inr_cents: number | null;
-  actual_paid_inr_cents: number | null;
-  fx_commission_inr_cents: number | null;
-  total_commission_usd_cents: number;
-  commission_earned_inr_cents: number | null;
-  is_non_invoice_employee: boolean | null;
-  is_paid: boolean;
-  paid_at: string | null;
-  created_at: string;
-  updated_at: string;
 };
 
 type DbDashboardExpense = {
@@ -384,74 +356,6 @@ function getMissingSchemaColumn(
   }
 
   return undefined;
-}
-
-async function insertEmployeePayoutWithSchemaFallback(
-  payload: Record<string, unknown>,
-) {
-  const supabase = getSupabaseOrThrow();
-  const insertPayload = { ...payload };
-  let attemptsRemaining = 8;
-
-  while (attemptsRemaining > 0) {
-    attemptsRemaining -= 1;
-
-    const { data, error } = await supabase
-      .from("employee_payouts")
-      .insert(insertPayload)
-      .select()
-      .single();
-
-    if (!error) {
-      return data as DbEmployeePayout;
-    }
-
-    const missingColumn = getMissingSchemaColumn(error, "employee_payouts");
-    if (!missingColumn || !(missingColumn in insertPayload)) {
-      throw error;
-    }
-
-    delete insertPayload[missingColumn];
-  }
-
-  throw new Error(
-    "Unable to insert employee payout row because schema fallback attempts were exhausted.",
-  );
-}
-
-async function updateEmployeePayoutWithSchemaFallback(
-  payoutId: string,
-  payload: Record<string, unknown>,
-) {
-  const supabase = getSupabaseOrThrow();
-  const updatePayload = { ...payload };
-  let attemptsRemaining = 8;
-
-  while (attemptsRemaining > 0) {
-    attemptsRemaining -= 1;
-
-    const { data, error } = await supabase
-      .from("employee_payouts")
-      .update(updatePayload)
-      .eq("id", payoutId)
-      .select()
-      .single();
-
-    if (!error) {
-      return data as DbEmployeePayout;
-    }
-
-    const missingColumn = getMissingSchemaColumn(error, "employee_payouts");
-    if (!missingColumn || !(missingColumn in updatePayload)) {
-      throw error;
-    }
-
-    delete updatePayload[missingColumn];
-  }
-
-  throw new Error(
-    "Unable to update employee payout row because schema fallback attempts were exhausted.",
-  );
 }
 
 async function insertInvoiceWithSchemaFallback(payload: Record<string, unknown>) {
@@ -707,39 +611,6 @@ function mapInvoiceRealization(row: DbInvoiceRealization): InvoiceRealization {
     realizedProfitUsdCents: row.realized_profit_usd_cents,
     notes: row.notes ?? undefined,
     createdAt: row.created_at,
-  };
-}
-
-function mapEmployeePayout(row: DbEmployeePayout): EmployeePayout {
-  return {
-    id: row.id,
-    invoiceId: row.invoice_id,
-    companyId: row.company_id,
-    employeeId: row.employee_id,
-    invoiceLineItemId: row.invoice_line_item_id ?? undefined,
-    employeeNameSnapshot: row.employee_name_snapshot,
-    dollarInwardUsdCents: row.dollar_inward_usd_cents,
-    employeeMonthlyUsdCents: row.employee_monthly_usd_cents,
-    cashoutUsdInrRate: Number(row.cashout_usd_inr_rate),
-    paidUsdInrRate:
-      row.paid_usd_inr_rate === null ? undefined : Number(row.paid_usd_inr_rate),
-    pfInrCents: row.pf_inr_cents ?? 0,
-    tdsInrCents: row.tds_inr_cents ?? 0,
-    actualPaidInrCents: row.actual_paid_inr_cents ?? 0,
-    fxCommissionInrCents:
-      row.fx_commission_inr_cents === null
-        ? undefined
-        : Number(row.fx_commission_inr_cents),
-    totalCommissionUsdCents: row.total_commission_usd_cents,
-    commissionEarnedInrCents:
-      row.commission_earned_inr_cents === null
-        ? undefined
-        : Number(row.commission_earned_inr_cents),
-    isNonInvoiceEmployee: Boolean(row.is_non_invoice_employee),
-    isPaid: row.is_paid,
-    paidAt: row.paid_at ?? undefined,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
   };
 }
 
@@ -2194,259 +2065,6 @@ export async function cashOutInvoice(
 
   await updateInvoiceStatus(invoiceId, "cashed_out");
   return mapInvoiceRealization(data as DbInvoiceRealization);
-}
-
-async function ensureEmployeePayoutRows(invoiceId: string) {
-  const supabase = getSupabaseOrThrow();
-  const detail = await getInvoiceDetail(invoiceId);
-  if (!detail) {
-    throw new Error("Invoice not found");
-  }
-  if (detail.invoice.status !== "cashed_out" || !detail.realization) {
-    throw new Error("Employee payout is available only for cashed-out invoices.");
-  }
-  if (detail.realization.usdInrRate <= 0) {
-    throw new Error(
-      "This invoice is missing cashout USD/INR rate. Re-cashout this invoice with a rate.",
-    );
-  }
-
-  const { data: existingRows, error: existingError } = await supabase
-    .from("employee_payouts")
-    .select("employee_id")
-    .eq("invoice_id", invoiceId);
-  if (existingError) throw existingError;
-
-  const existingEmployeeIds = new Set(
-    (existingRows ?? []).map((row) => String(row.employee_id)),
-  );
-
-  for (const lineItem of detail.teams.flatMap((team) => team.lineItems)) {
-    if (existingEmployeeIds.has(lineItem.employeeId)) {
-      continue;
-    }
-
-    const payload = {
-      id: nextId("employee_payout"),
-      invoice_id: invoiceId,
-      company_id: detail.company.id,
-      employee_id: lineItem.employeeId,
-      invoice_line_item_id: lineItem.id,
-      employee_name_snapshot: lineItem.employeeNameSnapshot,
-      dollar_inward_usd_cents: lineItem.billedTotalUsdCents,
-      employee_monthly_usd_cents: lineItem.payoutMonthlyUsdCentsSnapshot,
-      cashout_usd_inr_rate: detail.realization.usdInrRate,
-      paid_usd_inr_rate: null,
-      pf_inr_cents: 0,
-      tds_inr_cents: 0,
-      actual_paid_inr_cents: 0,
-      fx_commission_inr_cents: null,
-      total_commission_usd_cents:
-        lineItem.billedTotalUsdCents - lineItem.payoutMonthlyUsdCentsSnapshot,
-      commission_earned_inr_cents: null,
-      is_non_invoice_employee: false,
-      is_paid: false,
-      paid_at: null,
-      created_at: nowIso(),
-      updated_at: nowIso(),
-    };
-
-    await insertEmployeePayoutWithSchemaFallback(payload);
-  }
-}
-
-export async function getEmployeePayoutInvoice(
-  invoiceId: string,
-): Promise<EmployeePayoutInvoice | undefined> {
-  await ensureEmployeePayoutRows(invoiceId);
-  const detail = await getInvoiceDetail(invoiceId);
-  if (!detail || !detail.realization) {
-    return undefined;
-  }
-
-  const supabase = getSupabaseOrThrow();
-  const { data: rows, error } = await supabase
-    .from("employee_payouts")
-    .select("*")
-    .eq("invoice_id", invoiceId)
-    .order("employee_name_snapshot");
-  if (error) throw error;
-
-  const lineItemById = new Map(
-    detail.teams
-      .flatMap((team) => team.lineItems)
-      .map((lineItem) => [lineItem.id, lineItem]),
-  );
-  const daysInMonth = getDaysInMonth(detail.invoice.month, detail.invoice.year);
-
-  return {
-    invoice: detail.invoice,
-    realization: detail.realization,
-    rows: (rows ?? []).map((row) => {
-      const payout = mapEmployeePayout(row as DbEmployeePayout);
-      const lineItem = payout.invoiceLineItemId
-        ? lineItemById.get(payout.invoiceLineItemId)
-        : undefined;
-      return {
-        ...payout,
-        daysWorked: lineItem?.daysWorked ?? daysInMonth,
-        daysInMonth,
-      };
-    }),
-  };
-}
-
-export async function updateEmployeePayout(input: {
-  payoutId: string;
-  dollarInwardUsdCents: number;
-  employeeMonthlyUsdCents: number;
-  cashoutUsdInrRate: number;
-  paidUsdInrRate: number;
-  pfInrCents: number;
-  tdsInrCents: number;
-  actualPaidInrCents: number;
-}) {
-  const supabase = getSupabaseOrThrow();
-  const { error } = await supabase
-    .from("employee_payouts")
-    .select("id")
-    .eq("id", input.payoutId)
-    .single();
-  if (error) throw error;
-
-  const computed = calculateEmployeePayoutMetrics({
-    dollarInwardUsdCents: input.dollarInwardUsdCents,
-    employeeMonthlyUsdCents: input.employeeMonthlyUsdCents,
-    cashoutUsdInrRate: input.cashoutUsdInrRate,
-    paidUsdInrRate: input.paidUsdInrRate,
-  });
-
-  const updated = await updateEmployeePayoutWithSchemaFallback(input.payoutId, {
-    dollar_inward_usd_cents: input.dollarInwardUsdCents,
-    employee_monthly_usd_cents: input.employeeMonthlyUsdCents,
-    cashout_usd_inr_rate: input.cashoutUsdInrRate,
-    paid_usd_inr_rate: input.paidUsdInrRate,
-    pf_inr_cents: input.pfInrCents,
-    tds_inr_cents: input.tdsInrCents,
-    actual_paid_inr_cents: input.actualPaidInrCents,
-    fx_commission_inr_cents: computed.fxCommissionInrCents,
-    total_commission_usd_cents: computed.totalCommissionUsdCents,
-    commission_earned_inr_cents: computed.commissionEarnedInrCents,
-    updated_at: nowIso(),
-  });
-
-  return mapEmployeePayout(updated as DbEmployeePayout);
-}
-
-export async function addEmployeePayoutRow(input: {
-  invoiceId: string;
-  employeeId: string;
-}) {
-  const supabase = getSupabaseOrThrow();
-  await ensureEmployeePayoutRows(input.invoiceId);
-
-  const detail = await getInvoiceDetail(input.invoiceId);
-  if (!detail || !detail.realization) {
-    throw new Error("Invoice not found.");
-  }
-
-  const { data: employeeRow, error: employeeError } = await supabase
-    .from("employees")
-    .select("*")
-    .eq("id", input.employeeId)
-    .single();
-  if (employeeError) throw employeeError;
-  const employee = mapEmployee(employeeRow as DbEmployee);
-
-  if (employee.companyId !== detail.company.id) {
-    throw new Error("Employee does not belong to selected invoice company.");
-  }
-
-  const { data: existing, error: existingError } = await supabase
-    .from("employee_payouts")
-    .select("id")
-    .eq("invoice_id", input.invoiceId)
-    .eq("employee_id", input.employeeId)
-    .maybeSingle();
-  if (existingError) throw existingError;
-  if (existing) {
-    throw new Error("Employee already exists in this payout invoice.");
-  }
-
-  const payload = {
-    id: nextId("employee_payout"),
-    invoice_id: input.invoiceId,
-    company_id: detail.company.id,
-    employee_id: employee.id,
-    invoice_line_item_id: null,
-    employee_name_snapshot: employee.fullName,
-    dollar_inward_usd_cents: 0,
-    employee_monthly_usd_cents: employee.payoutMonthlyUsdCents,
-    cashout_usd_inr_rate: detail.realization.usdInrRate,
-    paid_usd_inr_rate: null,
-    pf_inr_cents: 0,
-    tds_inr_cents: 0,
-    actual_paid_inr_cents: 0,
-    fx_commission_inr_cents: 0,
-    total_commission_usd_cents: 0,
-    commission_earned_inr_cents: 0,
-    is_non_invoice_employee: true,
-    is_paid: false,
-    paid_at: null,
-    created_at: nowIso(),
-    updated_at: nowIso(),
-  };
-
-  const inserted = await insertEmployeePayoutWithSchemaFallback(payload);
-
-  return mapEmployeePayout(inserted);
-}
-
-export async function markEmployeePayoutPaid(input: {
-  payoutId: string;
-  paidAt: string;
-}) {
-  const supabase = getSupabaseOrThrow();
-  const { data: currentRow, error: currentError } = await supabase
-    .from("employee_payouts")
-    .select("*")
-    .eq("id", input.payoutId)
-    .single();
-  if (currentError) throw currentError;
-
-  const current = mapEmployeePayout(currentRow as DbEmployeePayout);
-  if (!current.paidUsdInrRate || current.paidUsdInrRate <= 0) {
-    throw new Error("Enter paid USD/INR rate and update row before marking as paid.");
-  }
-
-  const { error } = await supabase
-    .from("employee_payouts")
-    .update({
-      is_paid: true,
-      paid_at: input.paidAt,
-      updated_at: nowIso(),
-    })
-    .eq("id", input.payoutId);
-  if (error) throw error;
-}
-
-export async function removeEmployeePayoutRow(input: { payoutId: string }) {
-  const supabase = getSupabaseOrThrow();
-  const { data: currentRow, error: currentError } = await supabase
-    .from("employee_payouts")
-    .select("*")
-    .eq("id", input.payoutId)
-    .single();
-  if (currentError) throw currentError;
-
-  const current = mapEmployeePayout(currentRow as DbEmployeePayout);
-  assertEmployeePayoutRemovable({ isPaid: current.isPaid });
-
-  const { error } = await supabase
-    .from("employee_payouts")
-    .delete()
-    .eq("id", input.payoutId);
-  if (error) throw error;
 }
 
 export async function upsertEmployeeStatementSection(input: {
