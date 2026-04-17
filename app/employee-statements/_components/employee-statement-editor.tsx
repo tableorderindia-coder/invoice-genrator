@@ -191,7 +191,7 @@ export default function EmployeeStatementEditor(props: {
       </div>
 
       <div className="overflow-x-auto rounded-3xl border" style={{ borderColor: "var(--glass-border)" }}>
-        <table className="min-w-full text-sm">
+        <table className="min-w-[1500px] text-sm">
           <thead>
             <tr
               style={{
@@ -223,10 +223,10 @@ export default function EmployeeStatementEditor(props: {
                   key={row.invoiceId}
                   style={{ borderTop: "1px solid rgba(255, 255, 255, 0.06)" }}
                 >
-                  <td className="px-4 py-3 align-top" style={{ color: "var(--text-secondary)" }}>
+                  <td className="px-4 py-3 align-top whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                     {row.monthLabel}
                   </td>
-                  <td className="px-4 py-3 align-top" style={{ color: "var(--text-primary)" }}>
+                  <td className="px-4 py-3 align-top whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
                     {row.invoiceNumber}
                   </td>
                   <td className="px-4 py-3 align-top">
@@ -242,7 +242,7 @@ export default function EmployeeStatementEditor(props: {
                           event.target.value,
                         )
                       }
-                      className={`${inputClass} text-right`}
+                      className={`${inputClass} min-w-[8rem] text-right`}
                     />
                   </td>
                   <td className="px-4 py-3 align-top">
@@ -258,7 +258,7 @@ export default function EmployeeStatementEditor(props: {
                           event.target.value,
                         )
                       }
-                      className={`${inputClass} text-right`}
+                      className={`${inputClass} min-w-[8rem] text-right`}
                     />
                   </td>
                   <td className="px-4 py-3 align-top">
@@ -275,7 +275,7 @@ export default function EmployeeStatementEditor(props: {
                             event.target.value,
                           )
                         }
-                        className={`${inputClass} text-right`}
+                        className={`${inputClass} min-w-[8rem] text-right`}
                       />
                       <input
                         type="text"
@@ -289,7 +289,7 @@ export default function EmployeeStatementEditor(props: {
                             event.target.value,
                           )
                         }
-                        className={inputClass}
+                        className={`${inputClass} min-w-[14rem]`}
                       />
                     </div>
                   </td>
@@ -306,7 +306,7 @@ export default function EmployeeStatementEditor(props: {
                           event.target.value,
                         )
                       }
-                      className={`${inputClass} text-right`}
+                      className={`${inputClass} min-w-[8rem] text-right`}
                     />
                   </td>
                   <td className="px-4 py-3 align-top text-right font-semibold" style={{ color: "var(--text-primary)" }}>
@@ -321,7 +321,7 @@ export default function EmployeeStatementEditor(props: {
                         step="0.01"
                         value={formatUsdInput(row.monthlyDollarPaidUsdCents)}
                         onChange={(event) => updateMonthPaid(row.monthKey, event.target.value)}
-                        className={`${inputClass} text-right`}
+                        className={`${inputClass} min-w-[8rem] text-right`}
                       />
                     )}
                   </td>

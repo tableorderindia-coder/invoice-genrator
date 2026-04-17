@@ -16,4 +16,4 @@ export function Field({ label, children }: { label: string; children: ReactNode 
 
 /** Shared className string for dark-themed form inputs */
 export const inputClass =
-  "w-full rounded-2xl border px-4 py-3 text-sm";
+  "w-full min-w-0 rounded-2xl border px-4 py-3 text-sm leading-5";

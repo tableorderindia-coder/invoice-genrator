@@ -105,7 +105,7 @@ export default function EmployeeCashFlowSavedRows({
                 </p>
 
                 <div className="overflow-x-auto rounded-2xl" style={{ border: "1px solid var(--glass-border)" }}>
-                  <table className="glass-table min-w-[1500px]">
+                  <table className="glass-table min-w-[1850px]">
                     <thead>
                       <tr>
                         <th>Month</th>
@@ -140,7 +140,7 @@ export default function EmployeeCashFlowSavedRows({
                                       Number.parseInt(event.target.value || "0", 10) || 0,
                                   })
                                 }
-                                className={inputClass}
+                                className={`${inputClass} min-w-[6rem]`}
                               />
                             </td>
                             <td>
@@ -151,7 +151,7 @@ export default function EmployeeCashFlowSavedRows({
                                     monthlyPaidUsdCents: fromCurrencyInput(event.target.value),
                                   })
                                 }
-                                className={inputClass}
+                                className={`${inputClass} min-w-[8rem]`}
                                 inputMode="decimal"
                               />
                             </td>
@@ -165,7 +165,7 @@ export default function EmployeeCashFlowSavedRows({
                                     ),
                                   })
                                 }
-                                className={inputClass}
+                                className={`${inputClass} min-w-[8rem]`}
                                 inputMode="decimal"
                               />
                             </td>
@@ -179,7 +179,7 @@ export default function EmployeeCashFlowSavedRows({
                                     ),
                                   })
                                 }
-                                className={inputClass}
+                                className={`${inputClass} min-w-[8rem]`}
                                 inputMode="decimal"
                               />
                             </td>
@@ -193,7 +193,7 @@ export default function EmployeeCashFlowSavedRows({
                                     ),
                                   })
                                 }
-                                className={inputClass}
+                                className={`${inputClass} min-w-[8rem]`}
                                 inputMode="decimal"
                               />
                             </td>
@@ -205,7 +205,7 @@ export default function EmployeeCashFlowSavedRows({
                                     reimbursementLabelsText: event.target.value,
                                   })
                                 }
-                                className={inputClass}
+                                className={`${inputClass} min-w-[14rem]`}
                               />
                             </td>
                             <td>
@@ -218,7 +218,7 @@ export default function EmployeeCashFlowSavedRows({
                                     ),
                                   })
                                 }
-                                className={inputClass}
+                                className={`${inputClass} min-w-[8rem]`}
                                 inputMode="decimal"
                               />
                             </td>
@@ -232,7 +232,7 @@ export default function EmployeeCashFlowSavedRows({
                                     ),
                                   })
                                 }
-                                className={inputClass}
+                                className={`${inputClass} min-w-[8rem]`}
                                 inputMode="decimal"
                               />
                             </td>
@@ -245,7 +245,7 @@ export default function EmployeeCashFlowSavedRows({
                                       Number.parseFloat(event.target.value || "0") || 0,
                                   })
                                 }
-                                className={inputClass}
+                                className={`${inputClass} min-w-[7rem]`}
                                 inputMode="decimal"
                               />
                             </td>
@@ -258,7 +258,7 @@ export default function EmployeeCashFlowSavedRows({
                                       Number.parseFloat(event.target.value || "0") || 0,
                                   })
                                 }
-                                className={inputClass}
+                                className={`${inputClass} min-w-[7rem]`}
                                 inputMode="decimal"
                               />
                             </td>
@@ -270,7 +270,7 @@ export default function EmployeeCashFlowSavedRows({
                                     actualPaidInrCents: fromCurrencyInput(event.target.value),
                                   })
                                 }
-                                className={inputClass}
+                                className={`${inputClass} min-w-[8rem]`}
                                 inputMode="decimal"
                               />
                             </td>
@@ -282,7 +282,7 @@ export default function EmployeeCashFlowSavedRows({
                                     pfInrCents: fromCurrencyInput(event.target.value),
                                   })
                                 }
-                                className={inputClass}
+                                className={`${inputClass} min-w-[8rem]`}
                                 inputMode="decimal"
                               />
                             </td>
@@ -294,7 +294,7 @@ export default function EmployeeCashFlowSavedRows({
                                     tdsInrCents: fromCurrencyInput(event.target.value),
                                   })
                                 }
-                                className={inputClass}
+                                className={`${inputClass} min-w-[8rem]`}
                                 inputMode="decimal"
                               />
                             </td>
@@ -306,7 +306,7 @@ export default function EmployeeCashFlowSavedRows({
                                     notes: event.target.value,
                                   })
                                 }
-                                className={inputClass}
+                                className={`${inputClass} min-w-[16rem]`}
                               />
                             </td>
                             <td>
