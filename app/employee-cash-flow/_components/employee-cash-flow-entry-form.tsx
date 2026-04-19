@@ -776,7 +776,7 @@ export default function EmployeeCashFlowEntryForm({
 
               <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
                 {[
-                  ["Effective inward", formatUsd(metrics.effectiveDollarInwardUsdCents)],
+                  ["Final effective inward $", formatUsd(metrics.effectiveDollarInwardUsdCents)],
                   ["Reimbursements / Expenses INR", formatInr(Math.round(entry.reimbursementUsdCents * entry.cashoutUsdInrRate))],
                   ["Appraisal advance INR", formatInr(Math.round(entry.appraisalAdvanceUsdCents * entry.cashoutUsdInrRate))],
                   ["Cash in INR", formatInr(metrics.cashInInrCents)],

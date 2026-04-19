@@ -7,11 +7,13 @@ import {
   deleteSavedEmployeeCashFlowEntryAction,
   updateSavedEmployeeCashFlowEntryAction,
 } from "../../../src/features/billing/actions";
+import { calculateEffectiveDollarInwardUsdCents } from "../../../src/features/billing/employee-cash-flow";
 import type { EmployeeCashFlowSavedEntry } from "../../../src/features/billing/employee-cash-flow-types";
 import {
   buildSavedEmployeeCashFlowEntryJson,
   formatSavedPaymentMonth,
 } from "../../../src/features/billing/employee-cash-flow-saved-rows-helpers";
+import { formatUsd } from "../../../src/features/billing/utils";
 
 function toCurrencyInput(value: number) {
   const formatted = (value / 100).toFixed(2);
@@ -112,11 +114,12 @@ export default function EmployeeCashFlowSavedRows({
                         <th>Days worked</th>
                         <th>Monthly Paid $</th>
                         <th>Dollar inward</th>
-                        <th>Onboarding</th>
-                        <th>Reimbursements</th>
+                        <th>Onboarding advance USD</th>
+                        <th>Reimbursements USD</th>
                         <th>Labels</th>
-                        <th>Appraisal</th>
-                        <th>Offboarding</th>
+                        <th>Appraisal advance USD</th>
+                        <th>Offboarding deduction USD</th>
+                        <th>Final effective inward $</th>
                         <th>Cashout</th>
                         <th>Paid rate</th>
                         <th>Actual paid INR</th>
@@ -128,6 +131,15 @@ export default function EmployeeCashFlowSavedRows({
                     </thead>
                     <tbody>
                       {monthRows.map((row) => {
+                        const finalEffectiveDollarInwardUsdCents =
+                          calculateEffectiveDollarInwardUsdCents({
+                            baseDollarInwardUsdCents: row.baseDollarInwardUsdCents,
+                            onboardingAdvanceUsdCents: row.onboardingAdvanceUsdCents,
+                            reimbursementUsdCents: row.reimbursementUsdCents,
+                            appraisalAdvanceUsdCents: row.appraisalAdvanceUsdCents,
+                            offboardingDeductionUsdCents: row.offboardingDeductionUsdCents,
+                          });
+
                         return (
                           <tr key={row.id}>
                             <td>{formatSavedPaymentMonth(row.paymentMonth)}</td>
@@ -235,6 +247,9 @@ export default function EmployeeCashFlowSavedRows({
                                 className={`${inputClass} min-w-[8rem]`}
                                 inputMode="decimal"
                               />
+                            </td>
+                            <td className="font-semibold">
+                              {formatUsd(finalEffectiveDollarInwardUsdCents)}
                             </td>
                             <td>
                               <input
