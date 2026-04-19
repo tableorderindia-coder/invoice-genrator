@@ -196,6 +196,31 @@ export function buildEmployeeStatementSavePayload(input: {
   return input;
 }
 
+const APPRAISAL_ADVANCE_SAVED_ROW_CUTOFF = Date.parse("2026-04-19T00:00:00.000Z");
+
+function shouldPreferDerivedAppraisalAdvance(input: {
+  derivedAppraisalAdvanceUsdCents: number;
+  savedAppraisalAdvanceUsdCents: number;
+  savedUpdatedAt?: string;
+}) {
+  if (input.derivedAppraisalAdvanceUsdCents <= 0) {
+    return false;
+  }
+
+  if (input.savedAppraisalAdvanceUsdCents !== 0) {
+    return false;
+  }
+
+  const savedUpdatedAtTimestamp = input.savedUpdatedAt
+    ? Date.parse(input.savedUpdatedAt)
+    : Number.NaN;
+
+  return (
+    !Number.isFinite(savedUpdatedAtTimestamp) ||
+    savedUpdatedAtTimestamp < APPRAISAL_ADVANCE_SAVED_ROW_CUTOFF
+  );
+}
+
 export function applySavedEmployeeStatementOverrides(
   section: EmployeeStatementSection,
   saved: {
@@ -220,13 +245,21 @@ export function applySavedEmployeeStatementOverrides(
           return row;
         }
 
+        const appraisalAdvanceUsdCents = shouldPreferDerivedAppraisalAdvance({
+          derivedAppraisalAdvanceUsdCents: row.appraisalAdvanceUsdCents,
+          savedAppraisalAdvanceUsdCents: savedRow.appraisalAdvanceUsdCents,
+          savedUpdatedAt: savedRow.updatedAt,
+        })
+          ? row.appraisalAdvanceUsdCents
+          : savedRow.appraisalAdvanceUsdCents;
+
         return {
           ...row,
           dollarInwardUsdCents: savedRow.dollarInwardUsdCents,
           onboardingAdvanceUsdCents: savedRow.onboardingAdvanceUsdCents,
           reimbursementUsdCents: savedRow.reimbursementUsdCents,
           reimbursementLabelsText: savedRow.reimbursementLabelsText,
-          appraisalAdvanceUsdCents: savedRow.appraisalAdvanceUsdCents,
+          appraisalAdvanceUsdCents,
           offboardingDeductionUsdCents: savedRow.offboardingDeductionUsdCents,
         };
       });

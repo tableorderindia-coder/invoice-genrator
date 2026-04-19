@@ -272,6 +272,7 @@ export type EmployeeStatementInvoiceRow = {
   reimbursementLabelsText: string;
   appraisalAdvanceUsdCents: number;
   offboardingDeductionUsdCents: number;
+  updatedAt?: string;
 };
 
 export type EmployeeStatementMonthSummary = {

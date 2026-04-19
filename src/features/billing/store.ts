@@ -631,6 +631,7 @@ function mapEmployeeStatementInvoiceRow(
     reimbursementLabelsText: row.reimbursement_labels_text,
     appraisalAdvanceUsdCents: row.appraisal_advance_usd_cents,
     offboardingDeductionUsdCents: row.offboarding_deduction_usd_cents,
+    updatedAt: row.updated_at,
   };
 }
 

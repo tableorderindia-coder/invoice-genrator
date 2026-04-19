@@ -191,6 +191,106 @@ describe("employee statements helpers", () => {
     expect(overridden.months[0]?.monthlyDollarPaidUsdCents).toBe(333000);
   });
 
+  it("keeps derived appraisal advance when a legacy saved row still has the default zero", () => {
+    const section = buildEmployeeStatementSection({
+      employee: {
+        id: "emp_1",
+        fullName: "Asha",
+        payoutMonthlyUsdCents: 250000,
+      },
+      rows: [
+        {
+          employeeId: "emp_1",
+          employeeName: "Asha",
+          invoiceId: "inv_1",
+          invoiceNumber: "2026/002",
+          monthKey: "2026-02",
+          monthLabel: "February 2026",
+          dollarInwardUsdCents: 100000,
+          onboardingAdvanceUsdCents: 5000,
+          reimbursementUsdCents: 0,
+          reimbursementLabelsText: "",
+          appraisalAdvanceUsdCents: 7000,
+          offboardingDeductionUsdCents: 0,
+        },
+      ],
+    });
+
+    const overridden = applySavedEmployeeStatementOverrides(section, {
+      invoiceRows: [
+        {
+          employeeId: "emp_1",
+          employeeName: "Asha",
+          invoiceId: "inv_1",
+          invoiceNumber: "2026/002",
+          monthKey: "2026-02",
+          monthLabel: "February 2026",
+          dollarInwardUsdCents: 100000,
+          onboardingAdvanceUsdCents: 5000,
+          reimbursementUsdCents: 0,
+          reimbursementLabelsText: "",
+          appraisalAdvanceUsdCents: 0,
+          offboardingDeductionUsdCents: 0,
+          updatedAt: "2026-04-18T12:00:00.000Z",
+        },
+      ],
+      monthSummaries: [],
+    });
+
+    expect(overridden.months[0]?.rows[0]?.appraisalAdvanceUsdCents).toBe(7000);
+    expect(overridden.months[0]?.effectiveDollarInwardUsdCents).toBe(112000);
+  });
+
+  it("still respects newer saved appraisal edits after appraisal support shipped", () => {
+    const section = buildEmployeeStatementSection({
+      employee: {
+        id: "emp_1",
+        fullName: "Asha",
+        payoutMonthlyUsdCents: 250000,
+      },
+      rows: [
+        {
+          employeeId: "emp_1",
+          employeeName: "Asha",
+          invoiceId: "inv_1",
+          invoiceNumber: "2026/002",
+          monthKey: "2026-02",
+          monthLabel: "February 2026",
+          dollarInwardUsdCents: 100000,
+          onboardingAdvanceUsdCents: 5000,
+          reimbursementUsdCents: 0,
+          reimbursementLabelsText: "",
+          appraisalAdvanceUsdCents: 7000,
+          offboardingDeductionUsdCents: 0,
+        },
+      ],
+    });
+
+    const overridden = applySavedEmployeeStatementOverrides(section, {
+      invoiceRows: [
+        {
+          employeeId: "emp_1",
+          employeeName: "Asha",
+          invoiceId: "inv_1",
+          invoiceNumber: "2026/002",
+          monthKey: "2026-02",
+          monthLabel: "February 2026",
+          dollarInwardUsdCents: 100000,
+          onboardingAdvanceUsdCents: 5000,
+          reimbursementUsdCents: 0,
+          reimbursementLabelsText: "",
+          appraisalAdvanceUsdCents: 0,
+          offboardingDeductionUsdCents: 0,
+          updatedAt: "2026-04-20T12:00:00.000Z",
+        },
+      ],
+      monthSummaries: [],
+    });
+
+    expect(overridden.months[0]?.rows[0]?.appraisalAdvanceUsdCents).toBe(0);
+    expect(overridden.months[0]?.effectiveDollarInwardUsdCents).toBe(105000);
+  });
+
   it("flattens month sections into a single table with summary columns and spacer rows", () => {
     const section = buildEmployeeStatementSection({
       employee: {
