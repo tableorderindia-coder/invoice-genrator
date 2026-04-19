@@ -270,6 +270,7 @@ export type EmployeeStatementInvoiceRow = {
   onboardingAdvanceUsdCents: number;
   reimbursementUsdCents: number;
   reimbursementLabelsText: string;
+  appraisalAdvanceUsdCents: number;
   offboardingDeductionUsdCents: number;
 };
 

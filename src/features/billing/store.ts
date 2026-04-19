@@ -225,6 +225,7 @@ type DbEmployeeStatementInvoiceRow = {
   onboarding_advance_usd_cents: number;
   reimbursement_usd_cents: number;
   reimbursement_labels_text: string;
+  appraisal_advance_usd_cents: number;
   offboarding_deduction_usd_cents: number;
   created_at: string;
   updated_at: string;
@@ -628,6 +629,7 @@ function mapEmployeeStatementInvoiceRow(
     onboardingAdvanceUsdCents: row.onboarding_advance_usd_cents,
     reimbursementUsdCents: row.reimbursement_usd_cents,
     reimbursementLabelsText: row.reimbursement_labels_text,
+    appraisalAdvanceUsdCents: row.appraisal_advance_usd_cents,
     offboardingDeductionUsdCents: row.offboarding_deduction_usd_cents,
   };
 }
@@ -2087,6 +2089,7 @@ export async function upsertEmployeeStatementSection(input: {
         onboarding_advance_usd_cents: row.onboardingAdvanceUsdCents,
         reimbursement_usd_cents: row.reimbursementUsdCents,
         reimbursement_labels_text: row.reimbursementLabelsText,
+        appraisal_advance_usd_cents: row.appraisalAdvanceUsdCents,
         offboarding_deduction_usd_cents: row.offboardingDeductionUsdCents,
         updated_at: nowIso(),
       })),

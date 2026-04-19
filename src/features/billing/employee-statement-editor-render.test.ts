@@ -32,6 +32,7 @@ const sectionFixture: EmployeeStatementSection = {
           onboardingAdvanceUsdCents: 0,
           reimbursementUsdCents: 0,
           reimbursementLabelsText: "Laptop reimbursement label text",
+          appraisalAdvanceUsdCents: 500_00,
           offboardingDeductionUsdCents: 0,
         },
         {
@@ -45,6 +46,7 @@ const sectionFixture: EmployeeStatementSection = {
           onboardingAdvanceUsdCents: 2600_00,
           reimbursementUsdCents: 125_00,
           reimbursementLabelsText: "Travel support",
+          appraisalAdvanceUsdCents: 0,
           offboardingDeductionUsdCents: 0,
         },
       ],
@@ -68,8 +70,10 @@ describe("employee statement editor rendering", () => {
 
     expect(screen.getByDisplayValue("2600.00").className).toContain("min-w-[8rem]");
     expect(screen.getByDisplayValue("1040.00").className).toContain("min-w-[8rem]");
+    expect(screen.getByDisplayValue("500.00").className).toContain("min-w-[8rem]");
     expect(screen.getByDisplayValue("Laptop reimbursement label text").className).toContain(
       "min-w-[14rem]",
     );
+    expect(screen.getAllByText("$4,064")).toHaveLength(2);
   });
 });

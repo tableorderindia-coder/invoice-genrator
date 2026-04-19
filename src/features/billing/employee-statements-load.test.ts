@@ -123,11 +123,20 @@ describe("employee statement loading", () => {
               {
                 id: "adj_3",
                 invoiceId: "inv_1",
+                type: "appraisal",
+                label: "Appraisal advance",
+                employeeName: "Asha",
+                amountUsdCents: 7000,
+                sortOrder: 2,
+              },
+              {
+                id: "adj_4",
+                invoiceId: "inv_1",
                 type: "offboarding",
                 label: "Recovery",
                 employeeName: "Asha",
                 amountUsdCents: -2000,
-                sortOrder: 2,
+                sortOrder: 3,
               },
             ],
     }));
@@ -157,6 +166,7 @@ describe("employee statement loading", () => {
       onboardingAdvanceUsdCents: 10000,
       reimbursementUsdCents: 5000,
       reimbursementLabelsText: "Laptop",
+      appraisalAdvanceUsdCents: 7000,
       offboardingDeductionUsdCents: 2000,
     });
     expect(sections[0]?.months[0]?.effectiveDollarInwardUsdCents).toBe(120000);

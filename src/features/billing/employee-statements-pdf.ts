@@ -13,6 +13,7 @@ type PdfTableRow =
       dollarInward: string;
       onboardingAdvance: string;
       reimbursements: string;
+      appraisalAdvance: string;
       offboardingDeduction: string;
       effectiveDollarInward: string;
       monthlyDollarPaid: string;
@@ -36,6 +37,7 @@ type PdfModel = {
     dollarInward: string;
     onboardingAdvance: string;
     reimbursements: string;
+    appraisalAdvance: string;
     offboardingDeduction: string;
     effectiveDollarInward: string;
     monthlyDollarPaid: string;
@@ -86,6 +88,7 @@ function flattenPdfRows(input: EmployeeStatementPdfInput): PdfTableRow[] {
       dollarInward: formatUsdCompact(row.dollarInwardUsdCents),
       onboardingAdvance: formatUsdCompact(row.onboardingAdvanceUsdCents),
       reimbursements: formatUsdCompact(row.reimbursementUsdCents),
+      appraisalAdvance: formatUsdCompact(row.appraisalAdvanceUsdCents),
       offboardingDeduction: formatUsdCompact(row.offboardingDeductionUsdCents),
       effectiveDollarInward:
         rowIndex === 0 ? formatUsdCompact(month.effectiveDollarInwardUsdCents) : "",
@@ -129,6 +132,7 @@ export function buildEmployeeStatementPdfModel(
       dollarInward: formatUsdCompact(input.totals.dollarInwardUsdCents),
       onboardingAdvance: formatUsdCompact(input.totals.onboardingAdvanceUsdCents),
       reimbursements: formatUsdCompact(input.totals.reimbursementUsdCents),
+      appraisalAdvance: formatUsdCompact(input.totals.appraisalAdvanceUsdCents),
       offboardingDeduction: formatUsdCompact(input.totals.offboardingDeductionUsdCents),
       effectiveDollarInward: formatUsdCompact(
         input.totals.effectiveDollarInwardUsdCents,
@@ -237,14 +241,16 @@ export async function buildEmployeeStatementPdf(input: EmployeeStatementPdfInput
 
     const columnX = [
       PAGE.margin,
-      PAGE.margin + 70,
-      PAGE.margin + 126,
-      PAGE.margin + 184,
-      PAGE.margin + 242,
-      PAGE.margin + 300,
-      PAGE.margin + 358,
-      PAGE.margin + 426,
-      PAGE.margin + 484,
+      PAGE.margin + 55,
+      PAGE.margin + 110,
+      PAGE.margin + 162,
+      PAGE.margin + 214,
+      PAGE.margin + 266,
+      PAGE.margin + 318,
+      PAGE.margin + 370,
+      PAGE.margin + 435,
+      PAGE.margin + 475,
+      PAGE.margin + 515,
       doc.page.width - PAGE.margin,
     ];
     const drawCell = (
@@ -268,6 +274,7 @@ export async function buildEmployeeStatementPdf(input: EmployeeStatementPdfInput
       "Dollar inward",
       "Onboarding",
       "Reimbursements",
+      "Appraisal",
       "Offboarding",
       "Effective dollar inward",
       "Monthly $ paid",
@@ -330,27 +337,34 @@ export async function buildEmployeeStatementPdf(input: EmployeeStatementPdfInput
         "right",
       );
       drawCell(
-        row.offboardingDeduction,
+        row.appraisalAdvance,
         columnX[5],
         y,
         columnX[6] - columnX[5],
         "right",
       );
       drawCell(
-        row.effectiveDollarInward,
+        row.offboardingDeduction,
         columnX[6],
         y,
         columnX[7] - columnX[6],
         "right",
       );
       drawCell(
-        row.monthlyDollarPaid,
+        row.effectiveDollarInward,
         columnX[7],
         y,
         columnX[8] - columnX[7],
         "right",
       );
-      drawCell(row.totalBalance, columnX[8], y, columnX[9] - columnX[8], "right");
+      drawCell(
+        row.monthlyDollarPaid,
+        columnX[8],
+        y,
+        columnX[9] - columnX[8],
+        "right",
+      );
+      drawCell(row.totalBalance, columnX[9], y, columnX[10] - columnX[9], "right");
       y += rowHeight;
     }
 
@@ -380,6 +394,7 @@ export async function buildEmployeeStatementPdf(input: EmployeeStatementPdfInput
     ["Dollar inward", model.totals.dollarInward],
     ["Onboarding advance", model.totals.onboardingAdvance],
     ["Employee reimbursements (USD)", model.totals.reimbursements],
+    ["Appraisal advance", model.totals.appraisalAdvance],
     ["Offboarding deduction", model.totals.offboardingDeduction],
     ["Effective dollar inward", model.totals.effectiveDollarInward],
     ["Monthly $ paid", model.totals.monthlyDollarPaid],

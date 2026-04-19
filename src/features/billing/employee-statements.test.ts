@@ -68,6 +68,7 @@ describe("employee statements helpers", () => {
           onboardingAdvanceUsdCents: 20000,
           reimbursementUsdCents: 5000,
           reimbursementLabelsText: "Laptop",
+          appraisalAdvanceUsdCents: 3000,
           offboardingDeductionUsdCents: 1000,
         },
         {
@@ -81,13 +82,14 @@ describe("employee statements helpers", () => {
           onboardingAdvanceUsdCents: 0,
           reimbursementUsdCents: 0,
           reimbursementLabelsText: "",
+          appraisalAdvanceUsdCents: 2000,
           offboardingDeductionUsdCents: 0,
         },
       ],
     });
 
     expect(section.months[0]?.monthlyDollarPaidUsdCents).toBe(250000);
-    expect(section.months[0]?.effectiveDollarInwardUsdCents).toBe(164000);
+    expect(section.months[0]?.effectiveDollarInwardUsdCents).toBe(169000);
   });
 
   it("serializes invoice-row edits and month-summary edits separately", () => {
@@ -105,6 +107,7 @@ describe("employee statements helpers", () => {
           onboardingAdvanceUsdCents: 10000,
           reimbursementUsdCents: 5000,
           reimbursementLabelsText: "Laptop",
+          appraisalAdvanceUsdCents: 4000,
           offboardingDeductionUsdCents: 1000,
         },
       ],
@@ -142,6 +145,7 @@ describe("employee statements helpers", () => {
           onboardingAdvanceUsdCents: 20000,
           reimbursementUsdCents: 5000,
           reimbursementLabelsText: "Default",
+          appraisalAdvanceUsdCents: 2000,
           offboardingDeductionUsdCents: 1000,
         },
       ],
@@ -160,6 +164,7 @@ describe("employee statements helpers", () => {
           onboardingAdvanceUsdCents: 1000,
           reimbursementUsdCents: 2000,
           reimbursementLabelsText: "Saved label",
+          appraisalAdvanceUsdCents: 7777,
           offboardingDeductionUsdCents: 300,
         },
       ],
@@ -180,6 +185,7 @@ describe("employee statements helpers", () => {
       monthLabel: "April 2026",
       dollarInwardUsdCents: 222000,
       reimbursementLabelsText: "Saved label",
+      appraisalAdvanceUsdCents: 7777,
     });
     expect(overridden.months[0]?.effectiveDollarInwardUsdCents).toBe(555000);
     expect(overridden.months[0]?.monthlyDollarPaidUsdCents).toBe(333000);
@@ -204,6 +210,7 @@ describe("employee statements helpers", () => {
           onboardingAdvanceUsdCents: 20000,
           reimbursementUsdCents: 5000,
           reimbursementLabelsText: "Laptop",
+          appraisalAdvanceUsdCents: 3000,
           offboardingDeductionUsdCents: 1000,
         },
         {
@@ -217,6 +224,7 @@ describe("employee statements helpers", () => {
           onboardingAdvanceUsdCents: 0,
           reimbursementUsdCents: 0,
           reimbursementLabelsText: "",
+          appraisalAdvanceUsdCents: 2000,
           offboardingDeductionUsdCents: 0,
         },
         {
@@ -230,6 +238,7 @@ describe("employee statements helpers", () => {
           onboardingAdvanceUsdCents: 10000,
           reimbursementUsdCents: 0,
           reimbursementLabelsText: "",
+          appraisalAdvanceUsdCents: 1000,
           offboardingDeductionUsdCents: 0,
         },
       ],
@@ -247,9 +256,9 @@ describe("employee statements helpers", () => {
       kind: "invoice",
       monthLabel: "January 2026",
       invoiceNumber: "2026/001",
-      effectiveDollarInwardUsdCents: 164000,
+      effectiveDollarInwardUsdCents: 169000,
       monthlyDollarPaidUsdCents: 250000,
-      totalBalanceUsdCents: -86000,
+      totalBalanceUsdCents: -81000,
     });
     expect(rows[1]).toMatchObject({
       kind: "invoice",
@@ -261,9 +270,9 @@ describe("employee statements helpers", () => {
     expect(rows[3]).toMatchObject({
       kind: "invoice",
       monthLabel: "February 2026",
-      effectiveDollarInwardUsdCents: 70000,
+      effectiveDollarInwardUsdCents: 71000,
       monthlyDollarPaidUsdCents: 250000,
-      totalBalanceUsdCents: -180000,
+      totalBalanceUsdCents: -179000,
     });
   });
 
@@ -318,6 +327,15 @@ describe("employee statements helpers", () => {
         ],
         adjustments: [
           {
+            id: "adj_0",
+            invoiceId: "invoice_onboarding3",
+            type: "appraisal",
+            label: "Appraisal advance",
+            employeeName: "Lakshay Chaudhary",
+            amountUsdCents: 15000,
+            sortOrder: 0,
+          },
+          {
             id: "adj_1",
             invoiceId: "invoice_onboarding3",
             type: "onboarding",
@@ -338,6 +356,7 @@ describe("employee statements helpers", () => {
       dollarInwardUsdCents: 0,
       onboardingAdvanceUsdCents: 260000,
       reimbursementUsdCents: 0,
+      appraisalAdvanceUsdCents: 15000,
       offboardingDeductionUsdCents: 0,
     });
   });

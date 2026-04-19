@@ -193,11 +193,12 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
             monthKey: "2026-04",
             monthLabel: "April 2026",
             dollarInwardUsdCents: 120000,
-            onboardingAdvanceUsdCents: 10000,
-            reimbursementUsdCents: 5000,
-            reimbursementLabelsText: "Laptop",
-            offboardingDeductionUsdCents: 1000,
-          },
+          onboardingAdvanceUsdCents: 10000,
+          reimbursementUsdCents: 5000,
+          reimbursementLabelsText: "Laptop",
+          appraisalAdvanceUsdCents: 7000,
+          offboardingDeductionUsdCents: 1000,
+        },
         ],
         monthSummaries: [
           {
@@ -221,6 +222,7 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
         expect.objectContaining({
           invoiceId: "inv_1",
           dollarInwardUsdCents: 120000,
+          appraisalAdvanceUsdCents: 7000,
         }),
       ],
       monthSummaries: [

@@ -10,6 +10,7 @@ import {
   buildEmployeeStatementTotals,
   buildFlattenedEmployeeStatementRows,
   buildEmployeeStatementSavePayload,
+  calculateStatementEffectiveDollarInwardUsdCents,
 } from "@/src/features/billing/employee-statements";
 import type { EmployeeStatementSection } from "@/src/features/billing/types";
 import { centsFromUsd, formatUsd } from "@/src/features/billing/utils";
@@ -45,10 +46,13 @@ export default function EmployeeStatementEditor(props: {
       effectiveDollarInwardUsdCents: month.rows.reduce(
         (sum, row) =>
           sum +
-          (row.dollarInwardUsdCents +
-            row.onboardingAdvanceUsdCents +
-            row.reimbursementUsdCents -
-            row.offboardingDeductionUsdCents),
+          calculateStatementEffectiveDollarInwardUsdCents({
+            dollarInwardUsdCents: row.dollarInwardUsdCents,
+            onboardingAdvanceUsdCents: row.onboardingAdvanceUsdCents,
+            reimbursementUsdCents: row.reimbursementUsdCents,
+            appraisalAdvanceUsdCents: row.appraisalAdvanceUsdCents,
+            offboardingDeductionUsdCents: row.offboardingDeductionUsdCents,
+          }),
         0,
       ),
     })),
@@ -74,6 +78,7 @@ export default function EmployeeStatementEditor(props: {
       | "dollarInwardUsdCents"
       | "onboardingAdvanceUsdCents"
       | "reimbursementUsdCents"
+      | "appraisalAdvanceUsdCents"
       | "offboardingDeductionUsdCents"
       | "reimbursementLabelsText",
     value: string,
@@ -206,6 +211,7 @@ export default function EmployeeStatementEditor(props: {
               <th className="px-4 py-3 text-right font-medium">
                 Employee reimbursements (USD)
               </th>
+              <th className="px-4 py-3 text-right font-medium">Appraisal advance</th>
               <th className="px-4 py-3 text-right font-medium">Offboarding deduction</th>
               <th className="px-4 py-3 text-right font-medium">Effective dollar inward</th>
               <th className="px-4 py-3 text-right font-medium">Monthly $ paid</th>
@@ -216,7 +222,7 @@ export default function EmployeeStatementEditor(props: {
             {flattenedRows.map((row) =>
               row.kind === "spacer" ? (
                 <tr key={`spacer-${row.monthKey}`} aria-hidden="true">
-                  <td colSpan={9} className="h-4" />
+                  <td colSpan={10} className="h-4" />
                 </tr>
               ) : (
                 <tr
@@ -228,6 +234,22 @@ export default function EmployeeStatementEditor(props: {
                   </td>
                   <td className="px-4 py-3 align-top whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
                     {row.invoiceNumber}
+                  </td>
+                  <td className="px-4 py-3 align-top">
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={formatUsdInput(row.appraisalAdvanceUsdCents)}
+                      onChange={(event) =>
+                        updateRow(
+                          row.monthKey,
+                          row.invoiceId,
+                          "appraisalAdvanceUsdCents",
+                          event.target.value,
+                        )
+                      }
+                      className={`${inputClass} min-w-[8rem] text-right`}
+                    />
                   </td>
                   <td className="px-4 py-3 align-top">
                     <input
@@ -351,6 +373,9 @@ export default function EmployeeStatementEditor(props: {
               </td>
               <td className="px-4 py-3 text-right font-semibold" style={{ color: "var(--text-primary)" }}>
                 {formatUsd(totals.reimbursementUsdCents)}
+              </td>
+              <td className="px-4 py-3 text-right font-semibold" style={{ color: "var(--text-primary)" }}>
+                {formatUsd(totals.appraisalAdvanceUsdCents)}
               </td>
               <td className="px-4 py-3 text-right font-semibold" style={{ color: "var(--text-primary)" }}>
                 {formatUsd(totals.offboardingDeductionUsdCents)}

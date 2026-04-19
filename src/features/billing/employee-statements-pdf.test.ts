@@ -28,10 +28,11 @@ describe("employee statement pdf", () => {
               onboardingAdvanceUsdCents: 20000,
               reimbursementUsdCents: 5000,
               reimbursementLabelsText: "Laptop",
+              appraisalAdvanceUsdCents: 3000,
               offboardingDeductionUsdCents: 1000,
             },
           ],
-          effectiveDollarInwardUsdCents: 124000,
+          effectiveDollarInwardUsdCents: 127000,
           monthlyDollarPaidUsdCents: 250000,
         },
       ],
@@ -39,10 +40,11 @@ describe("employee statement pdf", () => {
         dollarInwardUsdCents: 100000,
         onboardingAdvanceUsdCents: 20000,
         reimbursementUsdCents: 5000,
+        appraisalAdvanceUsdCents: 3000,
         offboardingDeductionUsdCents: 1000,
-        effectiveDollarInwardUsdCents: 124000,
+        effectiveDollarInwardUsdCents: 127000,
         monthlyDollarPaidUsdCents: 250000,
-        totalBalanceUsdCents: -126000,
+        totalBalanceUsdCents: -123000,
       },
     });
 
@@ -52,11 +54,12 @@ describe("employee statement pdf", () => {
       kind: "invoice",
       monthLabel: "January 2026",
       invoiceNumber: "2026/001",
-      totalBalance: "-$1,260",
+      totalBalance: "-$1,230",
     });
     expect(model.totalsTitle).toBe("Totals");
-    expect(model.totals.effectiveDollarInward).toBe("$1,240");
-    expect(model.totals.totalBalance).toBe("-$1,260");
+    expect(model.totals.appraisalAdvance).toBe("$30");
+    expect(model.totals.effectiveDollarInward).toBe("$1,270");
+    expect(model.totals.totalBalance).toBe("-$1,230");
   });
 
   it("renders a pdf buffer", async () => {
@@ -70,6 +73,7 @@ describe("employee statement pdf", () => {
         dollarInwardUsdCents: 100000,
         onboardingAdvanceUsdCents: 0,
         reimbursementUsdCents: 0,
+        appraisalAdvanceUsdCents: 0,
         offboardingDeductionUsdCents: 0,
         effectiveDollarInwardUsdCents: 100000,
         monthlyDollarPaidUsdCents: 250000,

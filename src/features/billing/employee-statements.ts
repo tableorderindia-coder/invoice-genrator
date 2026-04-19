@@ -33,6 +33,7 @@ export type EmployeeStatementPdfTotals = {
   dollarInwardUsdCents: number;
   onboardingAdvanceUsdCents: number;
   reimbursementUsdCents: number;
+  appraisalAdvanceUsdCents: number;
   offboardingDeductionUsdCents: number;
   effectiveDollarInwardUsdCents: number;
   monthlyDollarPaidUsdCents: number;
@@ -59,6 +60,7 @@ export type FlattenedEmployeeStatementRow =
       onboardingAdvanceUsdCents: number;
       reimbursementUsdCents: number;
       reimbursementLabelsText: string;
+      appraisalAdvanceUsdCents: number;
       offboardingDeductionUsdCents: number;
       effectiveDollarInwardUsdCents: number | null;
       monthlyDollarPaidUsdCents: number | null;
@@ -137,12 +139,14 @@ export function calculateStatementEffectiveDollarInwardUsdCents(input: {
   dollarInwardUsdCents: number;
   onboardingAdvanceUsdCents: number;
   reimbursementUsdCents: number;
+  appraisalAdvanceUsdCents: number;
   offboardingDeductionUsdCents: number;
 }) {
   return (
     input.dollarInwardUsdCents +
     input.onboardingAdvanceUsdCents +
-    input.reimbursementUsdCents -
+    input.reimbursementUsdCents +
+    input.appraisalAdvanceUsdCents -
     input.offboardingDeductionUsdCents
   );
 }
@@ -175,6 +179,7 @@ export function buildEmployeeStatementSection(input: {
             dollarInwardUsdCents: row.dollarInwardUsdCents,
             onboardingAdvanceUsdCents: row.onboardingAdvanceUsdCents,
             reimbursementUsdCents: row.reimbursementUsdCents,
+            appraisalAdvanceUsdCents: row.appraisalAdvanceUsdCents,
             offboardingDeductionUsdCents: row.offboardingDeductionUsdCents,
           }),
         0,
@@ -221,6 +226,7 @@ export function applySavedEmployeeStatementOverrides(
           onboardingAdvanceUsdCents: savedRow.onboardingAdvanceUsdCents,
           reimbursementUsdCents: savedRow.reimbursementUsdCents,
           reimbursementLabelsText: savedRow.reimbursementLabelsText,
+          appraisalAdvanceUsdCents: savedRow.appraisalAdvanceUsdCents,
           offboardingDeductionUsdCents: savedRow.offboardingDeductionUsdCents,
         };
       });
@@ -231,6 +237,7 @@ export function applySavedEmployeeStatementOverrides(
             dollarInwardUsdCents: row.dollarInwardUsdCents,
             onboardingAdvanceUsdCents: row.onboardingAdvanceUsdCents,
             reimbursementUsdCents: row.reimbursementUsdCents,
+            appraisalAdvanceUsdCents: row.appraisalAdvanceUsdCents,
             offboardingDeductionUsdCents: row.offboardingDeductionUsdCents,
           }),
         0,
@@ -310,6 +317,11 @@ export function buildEmployeeStatementInvoiceRowFromDetail(input: {
     input.detail.adjustments,
     employeeNames,
   );
+  const appraisalAdvanceUsdCents = sumAdjustmentAmounts(
+    input.detail.adjustments,
+    "appraisal",
+    employeeNames,
+  );
   const offboardingDeductionUsdCents = Math.abs(
     sumAdjustmentAmounts(input.detail.adjustments, "offboarding", employeeNames),
   );
@@ -327,6 +339,7 @@ export function buildEmployeeStatementInvoiceRowFromDetail(input: {
     lineItems.length === 0 &&
     onboardingAdvanceUsdCents === 0 &&
     reimbursementUsdCents === 0 &&
+    appraisalAdvanceUsdCents === 0 &&
     offboardingDeductionUsdCents === 0
   ) {
     return undefined;
@@ -351,6 +364,7 @@ export function buildEmployeeStatementInvoiceRowFromDetail(input: {
     onboardingAdvanceUsdCents,
     reimbursementUsdCents,
     reimbursementLabelsText,
+    appraisalAdvanceUsdCents,
     offboardingDeductionUsdCents,
   };
 }
@@ -369,6 +383,7 @@ export function buildFlattenedEmployeeStatementRows(
       onboardingAdvanceUsdCents: row.onboardingAdvanceUsdCents,
       reimbursementUsdCents: row.reimbursementUsdCents,
       reimbursementLabelsText: row.reimbursementLabelsText,
+      appraisalAdvanceUsdCents: row.appraisalAdvanceUsdCents,
       offboardingDeductionUsdCents: row.offboardingDeductionUsdCents,
       effectiveDollarInwardUsdCents:
         rowIndex === 0 ? month.effectiveDollarInwardUsdCents : null,
@@ -501,6 +516,7 @@ export function buildEmployeeStatementTotals(section: EmployeeStatementSection) 
         totals.dollarInwardUsdCents += row.dollarInwardUsdCents;
         totals.onboardingAdvanceUsdCents += row.onboardingAdvanceUsdCents;
         totals.reimbursementUsdCents += row.reimbursementUsdCents;
+        totals.appraisalAdvanceUsdCents += row.appraisalAdvanceUsdCents;
         totals.offboardingDeductionUsdCents += row.offboardingDeductionUsdCents;
       }
 
@@ -516,6 +532,7 @@ export function buildEmployeeStatementTotals(section: EmployeeStatementSection) 
       dollarInwardUsdCents: 0,
       onboardingAdvanceUsdCents: 0,
       reimbursementUsdCents: 0,
+      appraisalAdvanceUsdCents: 0,
       offboardingDeductionUsdCents: 0,
       effectiveDollarInwardUsdCents: 0,
       monthlyDollarPaidUsdCents: 0,

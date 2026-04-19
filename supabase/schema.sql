@@ -155,6 +155,7 @@ create table if not exists employee_statement_invoice_rows (
   onboarding_advance_usd_cents integer not null default 0,
   reimbursement_usd_cents integer not null default 0,
   reimbursement_labels_text text not null default '',
+  appraisal_advance_usd_cents integer not null default 0 check (appraisal_advance_usd_cents >= 0),
   offboarding_deduction_usd_cents integer not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
