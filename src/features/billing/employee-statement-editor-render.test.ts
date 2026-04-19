@@ -75,5 +75,20 @@ describe("employee statement editor rendering", () => {
       "min-w-[14rem]",
     );
     expect(screen.getAllByText("$4,064")).toHaveLength(2);
+
+    const firstInvoiceRow = screen.getByText("2026/003").closest("tr");
+    const orderedInputs = [...(firstInvoiceRow?.querySelectorAll("input") ?? [])].map(
+      (input) => (input as HTMLInputElement).value,
+    );
+
+    expect(orderedInputs).toEqual([
+      "839.00",
+      "0.00",
+      "0.00",
+      "Laptop reimbursement label text",
+      "500.00",
+      "0.00",
+      "1040.00",
+    ]);
   });
 });

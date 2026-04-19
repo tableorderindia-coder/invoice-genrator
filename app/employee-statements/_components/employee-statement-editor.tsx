@@ -239,22 +239,6 @@ export default function EmployeeStatementEditor(props: {
                     <input
                       type="number"
                       step="0.01"
-                      value={formatUsdInput(row.appraisalAdvanceUsdCents)}
-                      onChange={(event) =>
-                        updateRow(
-                          row.monthKey,
-                          row.invoiceId,
-                          "appraisalAdvanceUsdCents",
-                          event.target.value,
-                        )
-                      }
-                      className={`${inputClass} min-w-[8rem] text-right`}
-                    />
-                  </td>
-                  <td className="px-4 py-3 align-top">
-                    <input
-                      type="number"
-                      step="0.01"
                       value={formatUsdInput(row.dollarInwardUsdCents)}
                       onChange={(event) =>
                         updateRow(
@@ -314,6 +298,22 @@ export default function EmployeeStatementEditor(props: {
                         className={`${inputClass} min-w-[14rem]`}
                       />
                     </div>
+                  </td>
+                  <td className="px-4 py-3 align-top">
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={formatUsdInput(row.appraisalAdvanceUsdCents)}
+                      onChange={(event) =>
+                        updateRow(
+                          row.monthKey,
+                          row.invoiceId,
+                          "appraisalAdvanceUsdCents",
+                          event.target.value,
+                        )
+                      }
+                      className={`${inputClass} min-w-[8rem] text-right`}
+                    />
                   </td>
                   <td className="px-4 py-3 align-top">
                     <input
