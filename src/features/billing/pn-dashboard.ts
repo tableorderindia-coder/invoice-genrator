@@ -1,3 +1,11 @@
+import type {
+  PnEmployeeEditableSection,
+  PnEmployeeMonthRow,
+  PnEmployeeSection,
+  PnPeriodRow,
+  PnPeriodType,
+} from "./types";
+
 export type PnSourceRow = {
   employeeId: string;
   employeeName: string;
@@ -42,112 +50,6 @@ export type PnEditableSourceRow = PnSourceRow & {
   grossEarningsInrCents: number;
   netProfitInrCents: number;
   isSecurityDepositMonth?: boolean;
-};
-
-export type PnEmployeeMonthRow = {
-  year: number;
-  month: number;
-  daysWorked: number;
-  daysInMonth: number;
-  dollarInwardUsdCents: number;
-  reimbursementUsdCents: number;
-  reimbursementLabelsText: string;
-  reimbursementInrCents: number;
-  appraisalAdvanceUsdCents: number;
-  appraisalAdvanceInrCents: number;
-  employeeMonthlyUsdCents: number;
-  cashoutUsdInrRate: number;
-  paidUsdInrRate: number;
-  pfInrCents: number;
-  tdsInrCents: number;
-  actualPaidInrCents: number;
-  fxCommissionInrCents: number;
-  totalCommissionUsdCents: number;
-  commissionEarnedInrCents: number;
-  grossEarningsInrCents: number;
-};
-
-export type PnEmployeeSection = {
-  employeeId: string;
-  employeeName: string;
-  rows: PnEmployeeMonthRow[];
-  totalGrossEarningsInrCents: number;
-};
-
-export type PnEmployeeEditableRow = {
-  payoutId: string;
-  invoiceId: string;
-  invoiceNumber: string;
-  year: number;
-  month: number;
-  daysWorked: number;
-  daysInMonth: number;
-  dollarInwardUsdCents: number;
-  baseDollarInwardUsdCents: number;
-  onboardingAdvanceUsdCents: number;
-  reimbursementUsdCents: number;
-  reimbursementLabelsText: string;
-  reimbursementInrCents: number;
-  appraisalAdvanceUsdCents: number;
-  appraisalAdvanceInrCents: number;
-  offboardingDeductionUsdCents: number;
-  effectiveDollarInwardUsdCents: number;
-  cashInInrCents: number;
-  employeeMonthlyUsdCents: number;
-  cashoutUsdInrRate: number;
-  paidUsdInrRate: number;
-  salaryPaidInrCents: number;
-  pfInrCents: number;
-  tdsInrCents: number;
-  actualPaidInrCents: number;
-  fxCommissionInrCents: number;
-  totalCommissionUsdCents: number;
-  commissionEarnedInrCents: number;
-  grossEarningsInrCents: number;
-  netProfitInrCents: number;
-  isSecurityDepositMonth: boolean;
-};
-
-export type PnEmployeeEditableSection = {
-  employeeId: string;
-  employeeName: string;
-  rows: PnEmployeeEditableRow[];
-  totalGrossEarningsInrCents: number;
-  totalNetProfitInrCents: number;
-};
-
-export type PnPeriodType = "monthly" | "yearly";
-
-export type PnPeriodRow = {
-  year: number;
-  month?: number;
-  fiscalLabel?: string;
-  dollarInwardUsdCents: number;
-  onboardingAdvanceUsdCents: number;
-  reimbursementUsdCents: number;
-  reimbursementLabelsText: string;
-  reimbursementInrCents: number;
-  appraisalAdvanceUsdCents: number;
-  appraisalAdvanceInrCents: number;
-  offboardingDeductionUsdCents: number;
-  effectiveDollarInwardUsdCents: number;
-  cashoutUsdInrRate: number;
-  cashInInrCents: number;
-  employeeMonthlyUsdCents: number;
-  paidUsdInrRate: number;
-  monthlyPaidInrCents: number;
-  pfInrCents: number;
-  tdsInrCents: number;
-  actualPaidInrCents: number;
-  salaryPaidInrCents: number;
-  fxCommissionInrCents: number;
-  totalCommissionUsdCents: number;
-  commissionEarnedInrCents: number;
-  grossEarningsInrCents: number;
-  expensesInrCents: number;
-  companyReimbursementUsdCents: number;
-  companyReimbursementInrCents: number;
-  netPlInrCents: number;
 };
 
 const monthKey = (year: number, month: number) => `${year}-${String(month).padStart(2, "0")}`;

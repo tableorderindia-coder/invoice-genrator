@@ -1,8 +1,6 @@
-import type { EmployeeCashFlowEntryWriteInput } from "./employee-cash-flow-types";
+import type { EmployeeCashFlowEditableEntry } from "./employee-cash-flow-types";
 
-export type EmployeeCashFlowEditableEntry = EmployeeCashFlowEntryWriteInput & {
-  id: string;
-};
+export type { EmployeeCashFlowEditableEntry } from "./employee-cash-flow-types";
 
 export function aggregateEmployeeCashFlowEditableEntries(
   entries: EmployeeCashFlowEditableEntry[],

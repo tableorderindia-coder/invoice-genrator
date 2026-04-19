@@ -176,6 +176,21 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
     );
   });
 
+  it("rejects employee cash flow saves when the entries payload is missing", async () => {
+    const { saveInvoicePaymentEmployeeEntriesAction } = await import("./actions");
+    const formData = new FormData();
+    formData.set("companyId", "comp_1");
+    formData.set("paymentMonth", "2026-04");
+    formData.set("returnTo", "/employee-cash-flow?companyId=comp_1&paymentMonth=2026-04");
+
+    await expect(saveInvoicePaymentEmployeeEntriesAction(formData)).rejects.toThrow(
+      "REDIRECT:/employee-cash-flow?companyId=comp_1&paymentMonth=2026-04&flashStatus=error&flashMessage=Employee%20cash%20flow%20rows%20payload%20is%20required.",
+    );
+
+    expect(replaceInvoicePaymentEmployeeEntriesMock).not.toHaveBeenCalled();
+    expect(upsertInvoicePaymentMock).not.toHaveBeenCalled();
+  });
+
   it("passes statement-only invoice rows and month summaries through employee statement saves", async () => {
     const { saveEmployeeStatementAction } = await import("./actions");
     const formData = new FormData();

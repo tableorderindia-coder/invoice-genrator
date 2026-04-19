@@ -694,12 +694,7 @@ function PeriodTables({
   };
 
   const renderToggleCell = (key: ToggleColumn["key"], row: PnPeriodRow) => {
-    const details = row as PnPeriodRow & {
-      onboardingAdvanceUsdCents?: number;
-      reimbursementLabelsText?: string;
-      offboardingDeductionUsdCents?: number;
-      effectiveDollarInwardUsdCents?: number;
-    };
+    const details = row;
     switch (key) {
       case "dollarInward":
         return formatUsd(row.dollarInwardUsdCents);

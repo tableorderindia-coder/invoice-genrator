@@ -55,12 +55,15 @@ describe("employee cash flow saved rows rendering", () => {
     );
 
     const headerCells = screen.getAllByRole("columnheader");
-    expect(headerCells).toHaveLength(16);
+    expect(headerCells).toHaveLength(17);
+    expect(
+      screen.getByRole("columnheader", { name: "Final effective inward $" }),
+    ).not.toBeNull();
     expect(screen.getByRole("columnheader", { name: "Actual paid INR" })).not.toBeNull();
     expect(screen.queryByRole("columnheader", { name: "Total paid INR" })).toBeNull();
 
     const bodyRow = screen.getAllByRole("row")[1];
-    expect(bodyRow.querySelectorAll("td")).toHaveLength(16);
+    expect(bodyRow.querySelectorAll("td")).toHaveLength(17);
   });
 
   it("renders cramped saved-row editable fields with explicit minimum widths", () => {

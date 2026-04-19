@@ -97,7 +97,7 @@ function getNonNegativeNumberOrThrow(rawValue: string, fieldLabel: string) {
 
 function parseEmployeeCashFlowEntriesJson(rawValue: string) {
   if (!rawValue) {
-    return [] as EmployeeCashFlowEntryWriteInput[];
+    throw new Error("Employee cash flow rows payload is required.");
   }
 
   let parsed: unknown;

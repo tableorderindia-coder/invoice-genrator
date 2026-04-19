@@ -13,6 +13,10 @@ type InvoiceHeaderFormInput = {
 
 const invoiceStatuses: InvoiceStatus[] = ["draft", "generated", "sent", "cashed_out"];
 
+function isInvoiceStatus(value: string): value is InvoiceStatus {
+  return invoiceStatuses.includes(value as InvoiceStatus);
+}
+
 export function resolveSelectedTeam(
   teams: InvoiceDetail["teams"],
   requestedTeamId?: string,
@@ -39,7 +43,7 @@ export function parseInvoiceHeaderFormInput(input: InvoiceHeaderFormInput) {
   const year = Number.parseInt(input.year, 10);
   const billingDate = input.billingDate.trim();
   const dueDate = input.dueDate.trim();
-  const status = input.status.trim() as InvoiceStatus;
+  const status = input.status.trim();
 
   if (!companyId) {
     throw new Error("Company is required.");
@@ -62,7 +66,7 @@ export function parseInvoiceHeaderFormInput(input: InvoiceHeaderFormInput) {
   if (!dueDate) {
     throw new Error("Due date is required.");
   }
-  if (!invoiceStatuses.includes(status)) {
+  if (!isInvoiceStatus(status)) {
     throw new Error("Status is invalid.");
   }
 

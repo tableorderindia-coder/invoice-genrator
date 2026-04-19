@@ -84,6 +84,10 @@ export type EmployeeCashFlowEntryWriteInput = {
   notes?: string;
 };
 
+export type EmployeeCashFlowEditableEntry = EmployeeCashFlowEntryWriteInput & {
+  id: string;
+};
+
 export type EmployeeCashFlowSavedEntry = EmployeeCashFlowEntryWriteInput & {
   id: string;
   companyId: string;

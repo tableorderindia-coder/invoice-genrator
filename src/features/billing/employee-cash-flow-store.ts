@@ -11,6 +11,7 @@ import {
 import { calculateEmployeePayoutMetrics } from "./domain";
 import { hasMissingSchemaColumn } from "./schema-fallback";
 import type {
+  EmployeeCashFlowEditableEntry,
   EmployeeCashFlowEntryWriteInput,
   EmployeeCashFlowInvoiceOption,
   EmployeeCashFlowMonthRow,
@@ -172,10 +173,6 @@ type AdjustmentAwareEmployee = {
   offboardingDeductionUsdCents: number;
 };
 
-type EditableCashFlowEntry = EmployeeCashFlowEntryWriteInput & {
-  id: string;
-};
-
 function getSupabaseOrThrow() {
   const mode = getSupabaseMode(process.env);
   if (mode !== "supabase") {
@@ -226,7 +223,7 @@ export function normalizeEmployeeNameForMatch(name: string | null | undefined) {
 }
 
 export function appendMissingAdjustmentEntries(input: {
-  entries: EditableCashFlowEntry[];
+  entries: EmployeeCashFlowEditableEntry[];
   availableEmployees: AdjustmentAwareEmployee[];
   paymentMonth: string;
   daysInMonth: number;
@@ -235,7 +232,7 @@ export function appendMissingAdjustmentEntries(input: {
   invoiceNumber: string;
 }) {
   const existingEmployeeIds = new Set(input.entries.map((entry) => entry.employeeId));
-  const missingAdjustmentEntries: EditableCashFlowEntry[] = input.availableEmployees
+  const missingAdjustmentEntries: EmployeeCashFlowEditableEntry[] = input.availableEmployees
     .filter((employee) => !existingEmployeeIds.has(employee.id))
     .filter(
       (employee) =>

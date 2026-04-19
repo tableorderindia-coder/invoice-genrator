@@ -152,17 +152,6 @@ type DbInvoiceRealization = {
   created_at: string;
 };
 
-type DbDashboardExpense = {
-  id: string;
-  company_id: string;
-  period_type: PnPeriodType;
-  year: number;
-  month: number | null;
-  amount_inr_cents: number;
-  created_at: string;
-  updated_at: string;
-};
-
 type DbCompanyExpense = {
   id: string;
   company_id: string;
@@ -978,20 +967,6 @@ export async function listInvoices() {
   return (data ?? [])
     .map((row) => mapInvoice(row as DbInvoice))
     .sort(sortInvoicesDesc);
-}
-
-export async function findLatestInvoiceForCompany(companyId: string) {
-  const supabase = getSupabaseOrThrow();
-  const { data, error } = await supabase
-    .from("invoices")
-    .select("*")
-    .eq("company_id", companyId)
-    .order("year", { ascending: false })
-    .order("month", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (error) throw error;
-  return data ? mapInvoice(data as DbInvoice) : undefined;
 }
 
 export async function listInvoicesForCompany(companyId: string) {
@@ -2290,7 +2265,6 @@ export async function getPnDashboardData(input: {
 
   const fiscalYearKey = (year: number, month: number) =>
     month >= 4 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
-  const fiscalYearKeyFromYear = (year: number) => `${year}-${year + 1}`;
   const expenseByKey = new Map<string, number>();
   for (const row of (expenseRows ?? []) as DbCompanyExpense[]) {
     const key =
