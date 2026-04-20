@@ -9,6 +9,7 @@ import {
   normalizePermissionPage,
   type AppPermission,
 } from "@/lib/auth/authorization";
+import PasswordInput from "@/components/PasswordInput";
 
 type ResetPasswordFormProps = {
   supabaseUrl: string | null;
@@ -200,11 +201,10 @@ export function ResetPasswordForm({
             <label className="sr-only" htmlFor="reset-password">
               New password
             </label>
-            <input
+            <PasswordInput
               id="reset-password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              type="password"
               required
               minLength={12}
               autoComplete="new-password"
@@ -216,11 +216,10 @@ export function ResetPasswordForm({
             <label className="sr-only" htmlFor="reset-confirm-password">
               Confirm password
             </label>
-            <input
+            <PasswordInput
               id="reset-confirm-password"
               value={confirmPassword}
               onChange={(event) => setConfirmPassword(event.target.value)}
-              type="password"
               required
               minLength={12}
               autoComplete="new-password"

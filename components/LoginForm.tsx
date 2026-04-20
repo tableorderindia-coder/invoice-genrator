@@ -10,6 +10,7 @@ import {
   type AppPermission,
 } from "@/lib/auth/authorization";
 import { ForgotPassword } from "@/components/ForgotPassword";
+import PasswordInput from "@/components/PasswordInput";
 import {
   RiveCharacter,
   type RiveCharacterHandle,
@@ -78,60 +79,66 @@ export function LoginForm({
       return;
     }
 
-    setIsSubmitting(true);
+    try {
+      setIsSubmitting(true);
 
-    const { data, error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (signInError || !data.user) {
-      riveRef.current?.fireFail();
-      setError("Invalid email or password");
-      setIsSubmitting(false);
-      return;
-    }
-
-    riveRef.current?.fireSuccess();
-
-    const [{ data: profile }, { data: permissionRows }] = await Promise.all([
-      supabase
-        .from("profiles")
-        .select("role, must_change_password")
-        .eq("id", data.user.id)
-        .single<ProfileRow>(),
-      supabase
-        .from("permissions")
-        .select("page, can_view, can_edit")
-        .eq("user_id", data.user.id),
-    ]);
-
-    const permissions: AppPermission[] =
-      ((permissionRows ?? []) as PermissionRow[])
-        .map((permission) => {
-          const page = normalizePermissionPage(permission.page);
-          if (!page) {
-            return null;
-          }
-
-          return {
-            page,
-            canView: permission.can_view,
-            canEdit: permission.can_edit,
-          } satisfies AppPermission;
-        })
-        .filter((permission): permission is AppPermission => permission !== null);
-
-    const destination =
-      next ||
-      getDefaultRedirectPath({
-        role: profile?.role ?? "user",
-        permissions,
-        mustChangePassword: profile?.must_change_password ?? false,
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
 
-    router.push(destination);
-    router.refresh();
+      if (signInError || !data.user) {
+        riveRef.current?.fireFail();
+        setError("Invalid email or password");
+        return;
+      }
+
+      riveRef.current?.fireSuccess();
+
+      const [{ data: profile }, { data: permissionRows }] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("role, must_change_password")
+          .eq("id", data.user.id)
+          .single<ProfileRow>(),
+        supabase
+          .from("permissions")
+          .select("page, can_view, can_edit")
+          .eq("user_id", data.user.id),
+      ]);
+
+      const permissions: AppPermission[] =
+        ((permissionRows ?? []) as PermissionRow[])
+          .map((permission) => {
+            const page = normalizePermissionPage(permission.page);
+            if (!page) {
+              return null;
+            }
+
+            return {
+              page,
+              canView: permission.can_view,
+              canEdit: permission.can_edit,
+            } satisfies AppPermission;
+          })
+          .filter((permission): permission is AppPermission => permission !== null);
+
+      const destination =
+        next ||
+        getDefaultRedirectPath({
+          role: profile?.role ?? "user",
+          permissions,
+          mustChangePassword: profile?.must_change_password ?? false,
+        });
+
+      router.push(destination);
+      router.refresh();
+    } catch {
+      riveRef.current?.fireFail();
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -147,7 +154,18 @@ export function LoginForm({
           boxShadow: "0 24px 80px rgba(0,0,0,0.35)",
         }}
       >
-        <h1 className="sr-only">Login</h1>
+        <div className="mb-5 space-y-2 text-center">
+          <p className="text-sm font-medium uppercase tracking-[0.24em]" style={{ color: "#9CA3AF" }}>
+            EassyOnboard Console
+          </p>
+          <h1 className="text-2xl font-semibold" style={{ color: "#F9FAFB" }}>
+            Login
+          </h1>
+        </div>
+
+        <h2 className="mb-4 text-center text-xl font-semibold text-white">
+          EasyOnboard Console Login
+        </h2>
 
         <RiveCharacter ref={riveRef} />
 
@@ -189,13 +207,12 @@ export function LoginForm({
                 <label className="sr-only" htmlFor="login-password">
                   Password
                 </label>
-                <input
+                <PasswordInput
                   id="login-password"
                   value={password}
                   onFocus={() => riveRef.current?.setHandUp(true)}
                   onBlur={() => riveRef.current?.setHandUp(false)}
                   onChange={(event) => setPassword(event.target.value)}
-                  type="password"
                   required
                   autoComplete="current-password"
                   placeholder="Password"
@@ -214,19 +231,24 @@ export function LoginForm({
                     cursor: isSubmitting ? "not-allowed" : "pointer",
                   }}
                 >
-                  {isSubmitting ? "Signing in..." : "Login"}
+                  {isSubmitting ? "Logging in..." : "Login"}
                 </button>
               </form>
 
               <button
                 type="button"
+                disabled={isSubmitting}
                 onClick={() => {
                   setError("");
                   setSuccess("");
                   setMode("forgot");
                 }}
                 className="w-full text-sm transition-colors duration-200"
-                style={{ color: "#E5E7EB" }}
+                style={{
+                  color: "#E5E7EB",
+                  opacity: isSubmitting ? 0.7 : 1,
+                  cursor: isSubmitting ? "not-allowed" : "pointer",
+                }}
               >
                 Forgot Password?
               </button>

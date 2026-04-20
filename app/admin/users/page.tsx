@@ -6,7 +6,9 @@ import {
 } from "@/lib/auth/actions";
 import { GlassPanel } from "@/app/_components/glass-panel";
 import { inputClass } from "@/app/_components/field";
+import { PendingSubmitButton } from "@/app/_components/pending-submit-button";
 import { Shell } from "@/app/_components/shell";
+import PasswordInput from "@/components/PasswordInput";
 import { AccessMatrix } from "./_components/access-matrix";
 
 type ProfileRow = {
@@ -90,9 +92,8 @@ export default async function AdminUsersPage({
 
             <label className="block space-y-2 text-sm">
               <span style={{ color: "var(--text-secondary)" }}>Temporary password</span>
-              <input
+              <PasswordInput
                 name="tempPassword"
-                type="password"
                 required
                 minLength={12}
                 className={inputClass}
@@ -114,9 +115,11 @@ export default async function AdminUsersPage({
               <AccessMatrix pages={creatablePages} />
             </div>
 
-            <button type="submit" className="gradient-btn w-full">
-              Create user
-            </button>
+            <PendingSubmitButton
+              className="gradient-btn w-full"
+              defaultText="Create user"
+              pendingText="Creating..."
+            />
           </form>
         </GlassPanel>
 
@@ -168,9 +171,11 @@ export default async function AdminUsersPage({
                     />
                   </div>
 
-                  <button type="submit" className="btn-outline">
-                    Save access
-                  </button>
+                  <PendingSubmitButton
+                    className="btn-outline"
+                    defaultText="Save access"
+                    pendingText="Saving..."
+                  />
                 </form>
               </GlassPanel>
             );
