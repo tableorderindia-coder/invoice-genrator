@@ -4,6 +4,7 @@ import { ConfirmDeleteInvoiceButton } from "./confirm-delete-invoice-button";
 import { Shell } from "../_components/shell";
 import { GlassPanel } from "../_components/glass-panel";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
+import { requirePageAccess } from "@/lib/auth/server";
 import {
   deleteInvoiceAction,
   updateInvoiceStatusAction,
@@ -25,6 +26,7 @@ export default async function InvoicesPage({
     flashMessage?: string | string[];
   }>;
 }) {
+  await requirePageAccess("invoices");
   const resolvedSearchParams = await searchParams;
   const [invoices, companies] = await Promise.all([listInvoices(), listCompanies()]);
   const companyMap = new Map(companies.map((company) => [company.id, company.name]));

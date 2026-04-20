@@ -1,6 +1,7 @@
 import { Shell } from "../_components/shell";
 import { GlassPanel } from "../_components/glass-panel";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
+import { requirePageAccess } from "@/lib/auth/server";
 import { cashOutInvoiceAction } from "@/src/features/billing/actions";
 import { filterCashoutEligibleInvoices } from "@/src/features/billing/invoice-workflow";
 import { listCompanies, listInvoices } from "@/src/features/billing/store";
@@ -20,6 +21,7 @@ export default async function CashoutPage({
     flashMessage?: string | string[];
   }>;
 }) {
+  await requirePageAccess("cashout");
   const [allInvoices, companies] = await Promise.all([listInvoices(), listCompanies()]);
   const invoices = filterCashoutEligibleInvoices(allInvoices);
   const companyMap = new Map(companies.map((company) => [company.id, company.name]));

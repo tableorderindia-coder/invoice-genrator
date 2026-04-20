@@ -2,6 +2,7 @@ import { Shell } from "../_components/shell";
 import { GlassPanel } from "../_components/glass-panel";
 import { Field, inputClass } from "../_components/field";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
+import { requirePageAccess } from "@/lib/auth/server";
 import {
   saveCompanyExpenseAction,
   deleteCompanyExpenseAction,
@@ -31,6 +32,7 @@ export default async function ExpensesPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  await requirePageAccess("expenses");
   const params = await searchParams;
   const companies = await listCompanies();
 

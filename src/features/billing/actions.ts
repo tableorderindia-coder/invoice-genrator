@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { requirePageEditAccess } from "@/lib/auth/server";
 import { buildInvoiceAdjustmentPayload } from "./adjustments";
 import { parseInvoiceHeaderFormInput } from "./invoice-editor";
 import { defaultEmployeeCashFlowPaidDate } from "./employee-cash-flow-page-state";
@@ -130,6 +131,7 @@ function parseSavedEmployeeCashFlowEntryJson(rawValue: string) {
 }
 
 export async function createCompanyAction(formData: FormData) {
+  await requirePageEditAccess('companies');
   await createCompany({
     name: getString(formData, "name"),
     billingAddress: getString(formData, "billingAddress"),
@@ -142,6 +144,7 @@ export async function createCompanyAction(formData: FormData) {
 }
 
 export async function updateCompanyAction(formData: FormData) {
+  await requirePageEditAccess('companies');
   await updateCompany({
     companyId: getString(formData, "companyId"),
     name: getString(formData, "name"),
@@ -155,6 +158,7 @@ export async function updateCompanyAction(formData: FormData) {
 }
 
 export async function createEmployeeAction(formData: FormData) {
+  await requirePageEditAccess('employees');
   await createEmployee({
     companyId: getString(formData, "companyId"),
     fullName: getString(formData, "fullName"),
@@ -173,6 +177,7 @@ export async function createEmployeeAction(formData: FormData) {
 }
 
 export async function updateEmployeeAction(formData: FormData) {
+  await requirePageEditAccess('employees');
   await updateEmployee({
     employeeId: getString(formData, "employeeId"),
     companyId: getString(formData, "companyId"),
@@ -193,6 +198,7 @@ export async function updateEmployeeAction(formData: FormData) {
 }
 
 export async function createInvoiceDraftAction(formData: FormData) {
+  await requirePageEditAccess('invoices');
   const selectedTeamNames = formData
     .getAll("selectedTeamNames")
     .map((value) => String(value).trim())
@@ -228,6 +234,7 @@ export async function createInvoiceDraftAction(formData: FormData) {
 }
 
 export async function addInvoiceTeamAction(formData: FormData) {
+  await requirePageEditAccess('invoices');
   const invoiceId = getString(formData, "invoiceId");
   const returnTo = getDraftReturnPath(formData, invoiceId);
 
@@ -268,6 +275,7 @@ export async function addInvoiceTeamAction(formData: FormData) {
 }
 
 export async function addInvoiceLineItemAction(formData: FormData) {
+  await requirePageEditAccess('invoices');
   const invoiceId = getString(formData, "invoiceId");
   const invoiceTeamId = getString(formData, "invoiceTeamId");
   if (!invoiceTeamId) {
@@ -290,6 +298,7 @@ export async function addInvoiceLineItemAction(formData: FormData) {
 }
 
 export async function assignInvoiceMemberAction(formData: FormData) {
+  await requirePageEditAccess('invoices');
   const invoiceId = getString(formData, "invoiceId");
   const returnTo = getDraftReturnPath(formData, invoiceId);
 
@@ -323,6 +332,7 @@ export async function assignInvoiceMemberAction(formData: FormData) {
 }
 
 export async function deleteInvoiceTeamAction(formData: FormData) {
+  await requirePageEditAccess('invoices');
   const invoiceId = getString(formData, "invoiceId");
   const returnTo = getDraftReturnPath(formData, invoiceId);
 
@@ -352,6 +362,7 @@ export async function deleteInvoiceTeamAction(formData: FormData) {
 }
 
 export async function deleteInvoiceLineItemAction(formData: FormData) {
+  await requirePageEditAccess('invoices');
   const invoiceId = getString(formData, "invoiceId");
   const returnTo = getDraftReturnPath(formData, invoiceId);
 
@@ -380,6 +391,7 @@ export async function deleteInvoiceLineItemAction(formData: FormData) {
 }
 
 export async function updateInvoiceLineItemAction(formData: FormData) {
+  await requirePageEditAccess('invoices');
   const invoiceId = getString(formData, "invoiceId");
   const returnTo = getDraftReturnPath(formData, invoiceId);
 
@@ -418,6 +430,7 @@ export async function updateInvoiceLineItemAction(formData: FormData) {
 }
 
 export async function updateInvoiceLineItemTotalAction(formData: FormData) {
+  await requirePageEditAccess('invoices');
   const invoiceId = getString(formData, "invoiceId");
   const returnTo = getDraftReturnPath(formData, invoiceId);
 
@@ -451,6 +464,7 @@ export async function updateInvoiceLineItemTotalAction(formData: FormData) {
 }
 
 export async function updateInvoiceTeamTotalAction(formData: FormData) {
+  await requirePageEditAccess('invoices');
   const invoiceId = getString(formData, "invoiceId");
   const returnTo = getDraftReturnPath(formData, invoiceId);
 
@@ -484,6 +498,7 @@ export async function updateInvoiceTeamTotalAction(formData: FormData) {
 }
 
 export async function updateInvoiceGrandTotalAction(formData: FormData) {
+  await requirePageEditAccess('invoices');
   const invoiceId = getString(formData, "invoiceId");
   const returnTo = getDraftReturnPath(formData, invoiceId);
 
@@ -511,6 +526,7 @@ export async function updateInvoiceGrandTotalAction(formData: FormData) {
 }
 
 export async function updateInvoiceHeaderAction(formData: FormData) {
+  await requirePageEditAccess('invoices');
   const invoiceId = getString(formData, "invoiceId");
   const returnTo = getDraftReturnPath(formData, invoiceId);
 
@@ -550,6 +566,7 @@ export async function updateInvoiceHeaderAction(formData: FormData) {
 }
 
 export async function addInvoiceAdjustmentAction(formData: FormData) {
+  await requirePageEditAccess('invoices');
   const invoiceId = getString(formData, "invoiceId");
   const returnTo = getDraftReturnPath(formData, invoiceId);
 
@@ -602,6 +619,7 @@ export async function addInvoiceAdjustmentAction(formData: FormData) {
 }
 
 export async function deleteInvoiceAdjustmentAction(formData: FormData) {
+  await requirePageEditAccess('invoices');
   const invoiceId = getString(formData, "invoiceId");
   const returnTo = getDraftReturnPath(formData, invoiceId);
 
@@ -630,6 +648,7 @@ export async function deleteInvoiceAdjustmentAction(formData: FormData) {
 }
 
 export async function updateInvoiceAdjustmentAmountAction(formData: FormData) {
+  await requirePageEditAccess('invoices');
   const invoiceId = getString(formData, "invoiceId");
   const returnTo = getDraftReturnPath(formData, invoiceId);
 
@@ -663,6 +682,7 @@ export async function updateInvoiceAdjustmentAmountAction(formData: FormData) {
 }
 
 export async function updateInvoiceNoteAction(formData: FormData) {
+  await requirePageEditAccess('invoices');
   const invoiceId = getString(formData, "invoiceId");
   const returnTo = getDraftReturnPath(formData, invoiceId);
 
@@ -685,6 +705,7 @@ export async function updateInvoiceNoteAction(formData: FormData) {
 }
 
 export async function updateInvoiceStatusAction(formData: FormData) {
+  await requirePageEditAccess('invoices');
   const invoiceId = getString(formData, "invoiceId");
   const returnTo = getDraftReturnPath(formData, invoiceId);
 
@@ -713,6 +734,7 @@ export async function updateInvoiceStatusAction(formData: FormData) {
 }
 
 export async function deleteInvoiceAction(formData: FormData) {
+  await requirePageEditAccess('invoices');
   const invoiceId = getString(formData, "invoiceId");
   const returnTo = getString(formData, "returnTo") || "/invoices";
 
@@ -742,6 +764,7 @@ export async function deleteInvoiceAction(formData: FormData) {
 }
 
 export async function cashOutInvoiceAction(formData: FormData) {
+  await requirePageEditAccess('cashout');
   const invoiceId = getString(formData, "invoiceId");
   const returnTo = getString(formData, "returnTo") || "/cashout";
 
@@ -782,6 +805,7 @@ export async function cashOutInvoiceAction(formData: FormData) {
 }
 
 export async function updateDashboardEmployeeCashFlowEntryAction(formData: FormData) {
+  await requirePageEditAccess('dashboard');
   const entryId = getString(formData, "payoutId");
   const returnTo = getString(formData, "returnTo") || "/dashboard";
 
@@ -879,6 +903,7 @@ export async function updateDashboardEmployeeCashFlowEntryAction(formData: FormD
 }
 
 export async function saveDashboardExpenseAction(formData: FormData) {
+  await requirePageEditAccess('dashboard');
   const returnTo = getString(formData, "returnTo") || "/dashboard";
 
   try {
@@ -930,6 +955,7 @@ export async function saveDashboardExpenseAction(formData: FormData) {
 }
 
 export async function saveCompanyExpenseAction(formData: FormData) {
+  await requirePageEditAccess('expenses');
   const returnTo = getString(formData, "returnTo") || "/expenses";
 
   try {
@@ -985,6 +1011,7 @@ export async function saveCompanyExpenseAction(formData: FormData) {
 }
 
 export async function deleteCompanyExpenseAction(formData: FormData) {
+  await requirePageEditAccess('expenses');
   const returnTo = getString(formData, "returnTo") || "/expenses";
 
   try {
@@ -1011,6 +1038,7 @@ export async function deleteCompanyExpenseAction(formData: FormData) {
 }
 
 export async function saveInvoicePaymentAction(formData: FormData) {
+  await requirePageEditAccess('employee-cash-flow');
   const returnTo = getString(formData, "returnTo") || "/employee-cash-flow";
 
   try {
@@ -1069,6 +1097,7 @@ export async function saveInvoicePaymentAction(formData: FormData) {
 }
 
 export async function saveInvoicePaymentEmployeeEntriesAction(formData: FormData) {
+  await requirePageEditAccess('employee-cash-flow');
   const returnTo = getString(formData, "returnTo") || "/employee-cash-flow";
 
   try {
@@ -1151,6 +1180,7 @@ export async function saveInvoicePaymentEmployeeEntriesAction(formData: FormData
 }
 
 export async function saveEmployeeSalaryPaymentAction(formData: FormData) {
+  await requirePageEditAccess('employee-cash-flow');
   const returnTo = getString(formData, "returnTo") || "/employee-cash-flow";
 
   try {
@@ -1205,6 +1235,7 @@ export async function saveEmployeeSalaryPaymentAction(formData: FormData) {
 }
 
 export async function updateSavedEmployeeCashFlowEntryAction(formData: FormData) {
+  await requirePageEditAccess('employee-cash-flow');
   const returnTo = getString(formData, "returnTo") || "/employee-cash-flow";
 
   try {
@@ -1227,6 +1258,7 @@ export async function updateSavedEmployeeCashFlowEntryAction(formData: FormData)
 }
 
 export async function deleteSavedEmployeeCashFlowEntryAction(formData: FormData) {
+  await requirePageEditAccess('employee-cash-flow');
   const returnTo = getString(formData, "returnTo") || "/employee-cash-flow";
 
   try {
@@ -1251,6 +1283,7 @@ export async function deleteSavedEmployeeCashFlowEntryAction(formData: FormData)
 }
 
 export async function saveEmployeeStatementAction(formData: FormData) {
+  await requirePageEditAccess('employee-statements');
   const returnTo = getString(formData, "returnTo") || "/employee-statements";
 
   try {
@@ -1278,3 +1311,4 @@ export async function saveEmployeeStatementAction(formData: FormData) {
 
   redirect(buildFlashRedirect(returnTo, "success", "Employee statement saved."));
 }
+

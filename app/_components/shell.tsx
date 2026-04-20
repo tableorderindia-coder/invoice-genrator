@@ -117,6 +117,15 @@ const links = [
       </svg>
     ),
   },
+  {
+    href: "/admin/users",
+    label: "Admin",
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2l3 4 5 1-3 4 .5 5L12 14l-5.5 2 .5-5-3-4 5-1 3-4z" />
+      </svg>
+    ),
+  },
 ];
 
 export function Shell({
@@ -144,6 +153,14 @@ export function Shell({
       router.push(href);
     });
   };
+
+  const navLinkStyle = (isActive: boolean) => ({
+    color: isActive ? "var(--accent-1)" : "var(--text-secondary)",
+    background: isActive ? "rgba(99, 102, 241, 0.1)" : "transparent",
+    borderBottom: isActive
+      ? "2px solid var(--accent-1)"
+      : "2px solid transparent",
+  });
 
   return (
     <div className="min-h-screen" style={{ color: "var(--text-primary)" }}>
@@ -173,6 +190,7 @@ export function Shell({
             </div>
 
             {/* Navigation pills */}
+            <div className="flex flex-col gap-3 lg:items-end">
             <nav className="flex flex-wrap gap-1.5 text-sm">
               {links.map((link) => {
                 const isActive =
@@ -187,11 +205,7 @@ export function Shell({
                     href={link.href}
                     onClick={(e) => handleNavClick(e, link.href)}
                     className="flex items-center justify-center gap-2 rounded-xl px-3.5 py-2 font-medium transition-all relative overflow-hidden"
-                    style={{
-                      color: isActive ? "var(--accent-1)" : "var(--text-secondary)",
-                      background: isActive ? "rgba(99, 102, 241, 0.1)" : "transparent",
-                      borderBottom: isActive ? "2px solid var(--accent-1)" : "2px solid transparent",
-                    }}
+                    style={navLinkStyle(isActive)}
                   >
                     <div className={`transition-opacity ${isNavigatingToThis ? 'opacity-0 scale-95' : 'opacity-100 scale-100'} flex items-center gap-2`}>
                       {link.icon}
@@ -208,7 +222,30 @@ export function Shell({
                   </Link>
                 );
               })}
+
+              <a
+                href="/logout"
+                className="flex items-center justify-center gap-2 rounded-xl px-3.5 py-2 font-medium transition-all relative overflow-hidden"
+                style={navLinkStyle(false)}
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+                <span className="hidden sm:inline">Sign out</span>
+              </a>
             </nav>
+            </div>
           </div>
         </header>
 

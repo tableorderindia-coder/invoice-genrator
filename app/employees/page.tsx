@@ -5,6 +5,7 @@ import { GlassPanel } from "../_components/glass-panel";
 import { Field, inputClass } from "../_components/field";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
 import { StaggerGrid } from "../_components/stagger-grid";
+import { requirePageAccess } from "@/lib/auth/server";
 import { createEmployeeAction, updateEmployeeAction } from "@/src/features/billing/actions";
 import { listCompanies, listEmployees, getDashboardMetrics } from "@/src/features/billing/store";
 import { formatUsd, formatSignedUsd } from "@/src/features/billing/utils";
@@ -16,6 +17,7 @@ export default async function EmployeesPage({
 }: {
   searchParams: Promise<{ tab?: string | string[]; employeeId?: string | string[] }>;
 }) {
+  await requirePageAccess("employees");
   const resolvedSearchParams = await searchParams;
   const [companies, employees, metrics] = await Promise.all([
     listCompanies(),

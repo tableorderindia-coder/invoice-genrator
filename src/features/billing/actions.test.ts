@@ -18,6 +18,10 @@ vi.mock("next/navigation", () => ({
   redirect: redirectMock,
 }));
 
+vi.mock("@/lib/auth/server", () => ({
+  requirePageEditAccess: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock("./store", () => ({
   addInvoiceAdjustment: vi.fn(),
   addInvoiceLineItem: vi.fn(),

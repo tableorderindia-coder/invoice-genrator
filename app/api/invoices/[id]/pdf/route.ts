@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { requireApiAccess } from "@/lib/auth/api";
 import { buildInvoicePdf } from "@/src/features/billing/pdf";
 import { getInvoiceDetail } from "@/src/features/billing/store";
 import { sanitizeDownloadFilename } from "@/src/features/billing/utils";
@@ -10,6 +11,14 @@ export async function GET(
   _request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
+  const access = await requireApiAccess({
+    page: "invoices",
+    pathname: "/api/invoices/pdf",
+  });
+  if (!access.ok) {
+    return access.response;
+  }
+
   const { id } = await context.params;
   const detail = await getInvoiceDetail(id);
 

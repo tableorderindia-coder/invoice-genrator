@@ -1,5 +1,4 @@
-import { createSupabaseServerClient } from "@/src/lib/supabase/server";
-import { getSupabaseMode } from "@/src/lib/supabase/config";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   calculateLineItemTotals,
   createRealizationRecord,
@@ -240,24 +239,19 @@ const nextId = (prefix: string) =>
     .toString(36)
     .slice(2, 8)}`;
 
-function getSupabaseOrThrow() {
-  const mode = getSupabaseMode(process.env);
-  if (mode !== "supabase") {
-    throw new Error(
-      "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, and SUPABASE_SECRET_KEY before running the app.",
-    );
-  }
-
-  const client = createSupabaseServerClient();
+async function getSupabaseOrThrow() {
+  const client = await createSupabaseServerClient();
   if (!client) {
-    throw new Error("Supabase client could not be created from the current environment.");
+    throw new Error(
+      "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY before running the app.",
+    );
   }
 
   return client;
 }
 
 export async function listAvailablePaymentMonths(companyId: string): Promise<string[]> {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const { data, error } = await supabase
     .from("invoice_payment_employee_entries")
     .select("payment_month")
@@ -349,7 +343,7 @@ function getMissingSchemaColumn(
 }
 
 async function insertInvoiceWithSchemaFallback(payload: Record<string, unknown>) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const insertPayload = { ...payload };
   let attemptsRemaining = 8;
 
@@ -470,7 +464,7 @@ function mapInvoiceLineItem(row: DbInvoiceLineItem): InvoiceLineItem {
 async function insertInvoiceLineItemWithSchemaFallback(
   payload: Record<string, unknown>,
 ) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const insertPayload = { ...payload };
   let attemptsRemaining = 3;
 
@@ -504,7 +498,7 @@ async function updateInvoiceLineItemWithSchemaFallback(
   lineItemId: string,
   payload: Record<string, unknown>,
 ) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const updatePayload = { ...payload };
   let attemptsRemaining = 3;
 
@@ -658,7 +652,7 @@ async function recomputeSupabaseInvoice(
   invoiceId: string,
   options?: { clearTeamManualTotals?: boolean; clearGrandManualTotal?: boolean },
 ) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const { data: teamRows, error: teamError } = await supabase
     .from("invoice_teams")
     .select("*")
@@ -770,7 +764,7 @@ async function recomputeSupabaseInvoice(
 }
 
 export async function listCompanies() {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const { data, error } = await supabase
     .from("companies")
     .select("*")
@@ -784,7 +778,7 @@ export async function createCompany(input: {
   billingAddress: string;
   defaultNote: string;
 }) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const { data: existingCompanyRows, error: existingCompanyError } = await supabase
     .from("companies")
     .select("name");
@@ -818,7 +812,7 @@ export async function updateCompany(input: {
   billingAddress: string;
   defaultNote: string;
 }) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const { data: existingCompanyRows, error: existingCompanyError } = await supabase
     .from("companies")
     .select("id, name");
@@ -847,7 +841,7 @@ export async function updateCompany(input: {
 }
 
 export async function listEmployees(companyId?: string) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   let query = supabase.from("employees").select("*").order("full_name");
   if (companyId) {
     query = query.eq("company_id", companyId);
@@ -858,7 +852,7 @@ export async function listEmployees(companyId?: string) {
 }
 
 export async function listTeams(companyId?: string) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   let query = supabase.from("teams").select("*").order("name");
   if (companyId) {
     query = query.eq("company_id", companyId);
@@ -884,7 +878,7 @@ export async function createTeam(input: {
   companyId: string;
   name: string;
 }) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const existingTeamNames = await listAvailableTeamNames(input.companyId);
 
   assertNoCaseInsensitiveDuplicate({
@@ -920,7 +914,7 @@ export async function createEmployee(input: {
   activeFrom: string;
   activeTo?: string;
 }) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const { data: existingEmployeeRows, error: existingEmployeeError } = await supabase
     .from("employees")
     .select("full_name")
@@ -957,7 +951,7 @@ export async function createEmployee(input: {
 }
 
 export async function listInvoices() {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const { data, error } = await supabase
     .from("invoices")
     .select("*")
@@ -969,8 +963,21 @@ export async function listInvoices() {
     .sort(sortInvoicesDesc);
 }
 
+export async function findLatestInvoiceForCompany(companyId: string) {
+  const supabase = await getSupabaseOrThrow();
+  const { data, error } = await supabase
+    .from("invoices")
+    .select("*")
+    .eq("company_id", companyId)
+    .order("year", { ascending: false })
+    .order("month", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? mapInvoice(data as DbInvoice) : undefined;
+}
 export async function listInvoicesForCompany(companyId: string) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const { data, error } = await supabase
     .from("invoices")
     .select("*")
@@ -995,7 +1002,7 @@ export async function createInvoiceDraft(input: {
   duplicateSourceId?: string;
   selectedTeamNames?: string[];
 }) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const { data: existingInvoiceRows, error: existingInvoiceError } = await supabase
     .from("invoices")
     .select("invoice_number");
@@ -1103,7 +1110,7 @@ async function resolveEmployeeForSecurityDeposit(input: {
   companyId: string;
   employeeName: string;
 }) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const normalizedEmployeeName = normalizeEmployeeNameForMatch(input.employeeName);
   if (!normalizedEmployeeName) {
     throw new Error("Employee is required for security deposit adjustments.");
@@ -1133,7 +1140,7 @@ async function getSecurityDepositBalanceUsdCents(input: {
   companyId: string;
   employeeId: string;
 }) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const { data: rows, error } = await supabase
     .from("security_deposit_ledger")
     .select("movement_type, amount_usd_cents")
@@ -1160,7 +1167,7 @@ async function recordSecurityDepositMovement(input: {
   movementType: "credit" | "debit";
   amountUsdCents: number;
 }) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const payload = {
     id: nextId("deposit_ledger"),
     company_id: input.companyId,
@@ -1187,7 +1194,7 @@ export async function getCompanySecurityDepositBalances(companyId: string) {
     return {} as Record<string, number>;
   }
 
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const employeeIds = employees.map((employee) => employee.id);
   const { data: rows, error } = await supabase
     .from("security_deposit_ledger")
@@ -1225,7 +1232,7 @@ export async function addInvoiceTeam(
   teamName: string,
   options?: { autoIncludeMembers?: boolean; recomputeInvoice?: boolean },
 ) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const { data: existingTeamRows, error: existingTeamError } = await supabase
     .from("invoice_teams")
     .select("team_name")
@@ -1297,7 +1304,7 @@ export async function addInvoiceTeam(
 }
 
 export async function deleteInvoiceTeam(invoiceId: string, invoiceTeamId: string) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const { error } = await supabase
     .from("invoice_teams")
     .delete()
@@ -1321,7 +1328,7 @@ export async function addInvoiceLineItem(input: {
   payoutMonthlyUsdCents?: number;
   recomputeInvoice?: boolean;
 }) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const [
     { data: employeeRow, error: employeeError },
     { data: teamRow, error: teamError },
@@ -1408,7 +1415,7 @@ export async function addInvoiceLineItem(input: {
 }
 
 export async function deleteInvoiceLineItem(invoiceId: string, lineItemId: string) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const { error } = await supabase
     .from("invoice_line_items")
     .delete()
@@ -1428,7 +1435,7 @@ export async function updateInvoiceLineItem(input: {
   daysWorked: number;
   billingRateUsdCents: number;
 }) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const [{ data: lineRow, error: lineError }, { data: invoiceRow, error: invoiceError }] =
     await Promise.all([
       supabase
@@ -1491,7 +1498,7 @@ export async function assignEmployeeToInvoiceTeam(input: {
   invoiceTeamId: string;
   employeeId: string;
 }) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const [
     detail,
     { data: targetTeamRow, error: targetTeamError },
@@ -1607,7 +1614,7 @@ export async function addInvoiceAdjustment(input: {
   amountUsdCents: number;
   recomputeInvoice?: boolean;
 }) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const { data: invoiceRow, error: invoiceError } = await supabase
     .from("invoices")
     .select("company_id")
@@ -1715,7 +1722,7 @@ export async function addInvoiceAdjustment(input: {
 }
 
 export async function deleteInvoiceAdjustment(invoiceId: string, adjustmentId: string) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const { error: deleteLedgerError } = await supabase
     .from("security_deposit_ledger")
     .delete()
@@ -1742,7 +1749,7 @@ export async function updateInvoiceLineItemTotal(input: {
   lineItemId: string;
   billedTotalUsdCents: number;
 }) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const { data: lineRow, error: lineError } = await supabase
     .from("invoice_line_items")
     .select("*")
@@ -1774,7 +1781,7 @@ export async function updateInvoiceTeamTotal(input: {
   invoiceTeamId: string;
   totalUsdCents: number;
 }) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const { error } = await supabase
     .from("invoice_teams")
     .update({
@@ -1793,7 +1800,7 @@ export async function updateInvoiceGrandTotal(input: {
   invoiceId: string;
   grandTotalUsdCents: number;
 }) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const { error } = await supabase
     .from("invoices")
     .update({
@@ -1816,7 +1823,7 @@ export async function updateInvoiceHeader(input: {
   dueDate: string;
   status: InvoiceStatus;
 }) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const normalizedInvoiceNumber = input.invoiceNumber.trim();
   const normalizedCompanyName = input.companyName.trim();
 
@@ -1860,7 +1867,7 @@ export async function updateInvoiceAdjustmentAmount(input: {
   adjustmentId: string;
   amountUsdCents: number;
 }) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const { error } = await supabase
     .from("invoice_adjustments")
     .update({ amount_usd_cents: input.amountUsdCents })
@@ -1887,7 +1894,7 @@ export async function updateEmployee(input: {
   activeTo?: string;
   isActive: boolean;
 }) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const payload = {
     company_id: input.companyId,
     full_name: input.fullName,
@@ -1912,7 +1919,7 @@ export async function updateEmployee(input: {
 }
 
 export async function updateInvoiceNote(invoiceId: string, noteText: string) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const { data, error } = await supabase
     .from("invoices")
     .update({
@@ -1927,7 +1934,7 @@ export async function updateInvoiceNote(invoiceId: string, noteText: string) {
 }
 
 export async function updateInvoiceStatus(invoiceId: string, status: InvoiceStatus) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const { data, error } = await supabase
     .from("invoices")
     .update({
@@ -1942,7 +1949,7 @@ export async function updateInvoiceStatus(invoiceId: string, status: InvoiceStat
 }
 
 export async function deleteInvoice(invoiceId: string) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
 
   const { data: invoiceRow, error: invoiceError } = await supabase
     .from("invoices")
@@ -1988,7 +1995,7 @@ export async function cashOutInvoice(
     usdInrRate,
   });
 
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const payload = {
     id: nextId("realization"),
     invoice_id: invoiceId,
@@ -2050,7 +2057,7 @@ export async function upsertEmployeeStatementSection(input: {
   invoiceRows: EmployeeStatementInvoiceRow[];
   monthSummaries: EmployeeStatementMonthSummary[];
 }) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
 
   if (input.invoiceRows.length > 0) {
     const { error } = await supabase.from("employee_statement_invoice_rows").upsert(
@@ -2108,7 +2115,7 @@ export async function listEmployeeStatementInvoiceRows(input: {
     return [] as EmployeeStatementInvoiceRow[];
   }
 
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   let query = supabase
     .from("employee_statement_invoice_rows")
     .select("*")
@@ -2139,7 +2146,7 @@ export async function listEmployeeStatementMonthSummaries(input: {
     return [] as EmployeeStatementMonthSummary[];
   }
 
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   let query = supabase
     .from("employee_statement_month_summaries")
     .select("*")
@@ -2167,7 +2174,7 @@ export async function upsertDashboardExpense(input: {
   month?: number;
   amountInrCents: number;
 }) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   if (input.periodType === "monthly" && !input.month) {
     throw new Error("Month is required for monthly expenses.");
   }
@@ -2218,7 +2225,7 @@ export async function getPnDashboardData(input: {
   employeeIds?: string[];
   paymentMonths?: string[];
 }): Promise<PnDashboardData> {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   let cashFlowQuery = supabase
     .from("invoice_payment_employee_entries")
     .select(
@@ -2440,7 +2447,7 @@ export async function getPnDashboardData(input: {
 export async function getInvoiceDetail(
   invoiceId: string,
 ): Promise<InvoiceDetail | undefined> {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const { data: invoiceRow, error: invoiceError } = await supabase
     .from("invoices")
     .select("*")
@@ -2614,7 +2621,7 @@ export async function listCompanyExpenses(input: {
   year?: number;
   month?: number;
 }): Promise<CompanyExpense[]> {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   let query = supabase
     .from("company_expenses")
     .select("*")
@@ -2653,7 +2660,7 @@ export async function upsertCompanyExpense(input: {
   label: string;
   amountInrCents: number;
 }) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
 
   if (input.id) {
     const { error } = await supabase
@@ -2684,11 +2691,12 @@ export async function upsertCompanyExpense(input: {
 }
 
 export async function deleteCompanyExpense(id: string) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const { error } = await supabase
     .from("company_expenses")
     .delete()
     .eq("id", id);
   if (error) throw error;
 }
+
 

@@ -11,6 +11,8 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@rive-app/react-canvas": "^4.28.1",
+    "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.57.4",
     "gsap": "^3.14.2",
     "next": "16.2.2",

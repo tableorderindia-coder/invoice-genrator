@@ -1,5 +1,6 @@
 import { Shell } from "../../_components/shell";
 import { GlassPanel } from "../../_components/glass-panel";
+import { requirePageAccess } from "@/lib/auth/server";
 import { createInvoiceDraftAction } from "@/src/features/billing/actions";
 import { CreateInvoiceForm } from "./create-invoice-form";
 import { CreateInvoiceSubmitButton } from "./submit-button";
@@ -19,6 +20,7 @@ export default async function CreateInvoicePage({
     flashMessage?: string | string[];
   }>;
 }) {
+  await requirePageAccess("invoices");
   const companies = await listCompanies();
   const resolvedSearchParams = await searchParams;
   const flashStatus = Array.isArray(resolvedSearchParams.flashStatus)

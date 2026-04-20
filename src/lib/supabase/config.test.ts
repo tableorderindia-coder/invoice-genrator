@@ -24,7 +24,7 @@ describe("supabase config", () => {
     expect(getSupabaseMode(env)).toBe("supabase");
   });
 
-  it("falls back to anon key and uses secret key on the server when provided", () => {
+  it("falls back to anon key for both browser and server clients", () => {
     expect(
       getSupabaseBrowserCredentials({
         NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
@@ -42,7 +42,7 @@ describe("supabase config", () => {
       }),
     ).toEqual({
       url: "https://example.supabase.co",
-      key: "secret",
+      key: "anon",
     });
 
     expect(

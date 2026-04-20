@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 
+import { requireApiAccess } from "@/lib/auth/api";
 import {
   buildEmployeeStatementPdfInput,
-  listEmployeeStatementSections,
 } from "@/src/features/billing/employee-statements";
+import { listEmployeeStatementSections } from "@/src/features/billing/employee-statements-load";
 import { buildEmployeeStatementPdf } from "@/src/features/billing/employee-statements-pdf";
 import { listCompanies } from "@/src/features/billing/store";
 import { sanitizeDownloadFilename, formatDate } from "@/src/features/billing/utils";
@@ -14,6 +15,14 @@ export async function GET(
   request: Request,
   context: { params: Promise<{ employeeId: string }> },
 ) {
+  const access = await requireApiAccess({
+    page: "employee-statements",
+    pathname: "/api/employee-statements/pdf",
+  });
+  if (!access.ok) {
+    return access.response;
+  }
+
   const { employeeId } = await context.params;
   const url = new URL(request.url);
   const companyId = url.searchParams.get("companyId") ?? "";

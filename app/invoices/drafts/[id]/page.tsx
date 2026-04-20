@@ -5,6 +5,7 @@ import { GlassPanel } from "../../../_components/glass-panel";
 import { inputClass } from "../../../_components/field";
 import { PendingActionButton } from "../../../_components/pending-action-button";
 import { PendingSubmitButton } from "../../../_components/pending-submit-button";
+import { requirePageAccess } from "@/lib/auth/server";
 import { AdjustmentForms } from "./adjustment-forms";
 import {
   addInvoiceAdjustmentAction,
@@ -43,6 +44,7 @@ export default async function DraftInvoicePage({
     flashMessage?: string | string[];
   }>;
 }) {
+  await requirePageAccess("invoices");
   const { id } = await params;
   const resolvedSearchParams = await searchParams;
   const detail = await getInvoiceDetail(id);

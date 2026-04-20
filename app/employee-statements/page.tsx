@@ -3,11 +3,12 @@ import { GlassPanel } from "../_components/glass-panel";
 import { inputClass } from "../_components/field";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
 import { Shell } from "../_components/shell";
+import { requirePageAccess } from "@/lib/auth/server";
 import EmployeeStatementEditor from "./_components/employee-statement-editor";
 import {
-  listEmployeeStatementSections,
   parseEmployeeStatementFilters,
 } from "@/src/features/billing/employee-statements";
+import { listEmployeeStatementSections } from "@/src/features/billing/employee-statements-load";
 import { listCompanies, listEmployees, listInvoicesForCompany } from "@/src/features/billing/store";
 import { formatDate } from "@/src/features/billing/utils";
 
@@ -29,6 +30,7 @@ export default async function EmployeeStatementsPage({
     flashMessage?: string | string[];
   }>;
 }) {
+  await requirePageAccess("employee-statements");
   const resolved = await searchParams;
   const filters = parseEmployeeStatementFilters(resolved);
   const companies = await listCompanies();

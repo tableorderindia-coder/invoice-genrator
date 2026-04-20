@@ -1,5 +1,4 @@
-import { createSupabaseServerClient } from "../../lib/supabase/server";
-import { getSupabaseMode } from "../../lib/supabase/config";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 import {
   calculateActualPaidInrCents,
@@ -173,17 +172,20 @@ type AdjustmentAwareEmployee = {
   offboardingDeductionUsdCents: number;
 };
 
-function getSupabaseOrThrow() {
-  const mode = getSupabaseMode(process.env);
-  if (mode !== "supabase") {
-    throw new Error(
-      "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, and SUPABASE_SECRET_KEY before running the app.",
-    );
-  }
+type EditableCashFlowEntry = EmployeeCashFlowEntryWriteInput & {
+  id: string;
+};
 
-  const client = createSupabaseServerClient();
+type SupabaseServerClient = Awaited<
+  ReturnType<typeof createSupabaseServerClient>
+>;
+
+async function getSupabaseOrThrow() {
+  const client = await createSupabaseServerClient();
   if (!client) {
-    throw new Error("Supabase client could not be created from the current environment.");
+    throw new Error(
+      "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY before running the app.",
+    );
   }
 
   return client;
@@ -278,7 +280,7 @@ export function appendMissingAdjustmentEntries(input: {
 }
 
 async function listInvoiceLineItemsForCashFlow(
-  supabase: ReturnType<typeof createSupabaseServerClient>,
+  supabase: SupabaseServerClient,
   input: {
     invoiceLineItemIds?: string[];
     invoiceId?: string;
@@ -609,7 +611,7 @@ export function buildEmployeeCashFlowMonthRows(input: {
 export async function listCashFlowInvoiceOptions(input: {
   companyId: string;
 }): Promise<EmployeeCashFlowInvoiceOption[]> {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const { data, error } = await supabase
     .from("invoices")
     .select("id, invoice_number, company_id, month, year")
@@ -632,7 +634,7 @@ export async function getInvoicePaymentPrefillData(input: {
   invoiceId: string;
   paymentMonth: string;
 }) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const [{ data: invoiceRow, error: invoiceError }, { data: payoutRows, error: payoutError }] =
     await Promise.all([
       supabase
@@ -979,7 +981,7 @@ export async function getEmployeeCashFlowDashboardData(input: {
   month?: string;
   employeeIds?: string[];
 }) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
 
   let entryQuery = supabase
     .from("invoice_payment_employee_entries")
@@ -1115,7 +1117,7 @@ export async function upsertInvoicePayment(input: {
   usdInrRate: number;
   notes?: string;
 }) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const payload = {
     invoice_id: input.invoiceId,
     company_id: input.companyId,
@@ -1152,7 +1154,7 @@ export async function replaceInvoicePaymentEmployeeEntries(input: {
   paymentMonth: string;
   entries: EmployeeCashFlowEntryWriteInput[];
 }) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const { error: deleteError } = await supabase
     .from("invoice_payment_employee_entries")
     .delete()
@@ -1231,7 +1233,7 @@ export async function listSavedEmployeeCashFlowEntries(input: {
   companyId: string;
   paymentMonth?: string;
 }) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   let query = supabase
     .from("invoice_payment_employee_entries")
     .select(
@@ -1300,7 +1302,7 @@ export async function listSavedEmployeeCashFlowEntries(input: {
 export async function updateSavedEmployeeCashFlowEntry(
   entry: EmployeeCashFlowSavedEntry,
 ) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const offboardingDeductionUsdCents = Math.abs(entry.offboardingDeductionUsdCents);
   const effectiveDollarInwardUsdCents = calculateEffectiveDollarInwardUsdCents({
     baseDollarInwardUsdCents: entry.baseDollarInwardUsdCents,
@@ -1346,7 +1348,7 @@ export async function updateSavedEmployeeCashFlowEntry(
 }
 
 export async function deleteSavedEmployeeCashFlowEntry(entryId: string) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const { error } = await supabase
     .from("invoice_payment_employee_entries")
     .delete()
@@ -1370,7 +1372,7 @@ export async function updateDashboardEmployeeCashFlowEntry(input: {
   tdsInrCents: number;
   actualPaidInrCents: number;
 }) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const { data: currentRow, error: currentError } = await supabase
     .from("invoice_payment_employee_entries")
     .select(
@@ -1451,7 +1453,7 @@ export async function upsertEmployeeSalaryPayment(input: {
   paidDate?: string;
   notes?: string;
 }) {
-  const supabase = getSupabaseOrThrow();
+  const supabase = await getSupabaseOrThrow();
   const salaryPaidInrCents = calculateCashInInrCents({
     effectiveDollarInwardUsdCents: input.salaryUsdCents,
     cashoutUsdInrRate: input.paidUsdInrRate,
@@ -1497,3 +1499,4 @@ export async function upsertEmployeeSalaryPayment(input: {
   if (error) throw error;
   return id;
 }
+

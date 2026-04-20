@@ -3,6 +3,7 @@ import { Shell } from "../_components/shell";
 import { inputClass } from "../_components/field";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
 import { ChecklistFilterDropdown } from "../_components/checklist-filter-dropdown";
+import { requirePageAccess } from "@/lib/auth/server";
 import {
   updateDashboardEmployeeCashFlowEntryAction,
 } from "../../src/features/billing/actions";
@@ -37,6 +38,7 @@ export default async function DashboardPage({
     paymentMonths?: string | string[];
   }>;
 }) {
+  await requirePageAccess("dashboard");
   const resolved = await searchParams;
   const companies = await listCompanies();
   const selectedCompanyIdRaw = Array.isArray(resolved.companyId)

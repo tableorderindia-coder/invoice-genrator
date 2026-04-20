@@ -4,12 +4,14 @@ import { Shell } from "./_components/shell";
 import { MetricCard } from "./_components/metric-card";
 import { GlassPanel } from "./_components/glass-panel";
 import { StaggerGrid } from "./_components/stagger-grid";
+import { requirePageAccess } from "@/lib/auth/server";
 import { getDashboardMetrics, listCompanies, listInvoices } from "@/src/features/billing/store";
 import { formatMonthYear, formatUsd } from "@/src/features/billing/utils";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
+  await requirePageAccess("overview");
   const companies = await listCompanies();
   const invoices = (await listInvoices()).slice(0, 3);
   const metrics = await getDashboardMetrics();

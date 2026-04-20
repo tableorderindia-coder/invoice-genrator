@@ -5,6 +5,7 @@ import { GlassPanel } from "../_components/glass-panel";
 import { Field, inputClass } from "../_components/field";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
 import { StaggerGrid } from "../_components/stagger-grid";
+import { requirePageAccess } from "@/lib/auth/server";
 import { createCompanyAction, updateCompanyAction } from "@/src/features/billing/actions";
 import { listCompanies, getDashboardMetrics } from "@/src/features/billing/store";
 import { formatSignedUsd } from "@/src/features/billing/utils";
@@ -16,6 +17,7 @@ export default async function CompaniesPage({
 }: {
   searchParams: Promise<{ tab?: string | string[]; companyId?: string | string[] }>;
 }) {
+  await requirePageAccess("companies");
   const resolvedSearchParams = await searchParams;
   const [companies, metrics] = await Promise.all([
     listCompanies(),

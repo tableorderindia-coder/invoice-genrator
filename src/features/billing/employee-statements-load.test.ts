@@ -151,7 +151,7 @@ describe("employee statement loading", () => {
       },
     ]);
 
-    const { listEmployeeStatementSections } = await import("./employee-statements");
+    const { listEmployeeStatementSections } = await import("./employee-statements-load");
     const sections = await listEmployeeStatementSections({
       companyId: "comp_1",
       startMonth: "2026-04",

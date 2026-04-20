@@ -3,6 +3,7 @@ import { GlassPanel } from "../_components/glass-panel";
 import { inputClass } from "../_components/field";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
 import { Shell } from "../_components/shell";
+import { requirePageAccess } from "@/lib/auth/server";
 import {
   getInvoicePaymentPrefillData,
   listSavedEmployeeCashFlowEntries,
@@ -46,6 +47,7 @@ export default async function EmployeeCashFlowPage({
     flashMessage?: string | string[];
   }>;
 }) {
+  await requirePageAccess("employee-cash-flow");
   const resolved = await searchParams;
   const companies = await listCompanies();
 
