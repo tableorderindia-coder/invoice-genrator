@@ -82,7 +82,7 @@ describe("employee cash flow page state", () => {
     });
   });
 
-  it("keeps formula-based actual paid in sync until manually overridden", () => {
+  it("keeps employee default actual paid when formula inputs change", () => {
     expect(
       applyEmployeeCashFlowEntryPatch(
         {
@@ -98,7 +98,7 @@ describe("employee cash flow page state", () => {
       ),
     ).toMatchObject({
       daysWorked: 15,
-      actualPaidInrCents: 12_000_000,
+      actualPaidInrCents: 8_000_000,
     });
   });
 
@@ -119,6 +119,26 @@ describe("employee cash flow page state", () => {
     ).toMatchObject({
       daysWorked: 15,
       actualPaidInrCents: 950_000,
+    });
+  });
+
+  it("does not recalculate actual paid when monthly dollars change", () => {
+    expect(
+      applyEmployeeCashFlowEntryPatch(
+        {
+          daysWorked: 10,
+          daysInMonth: 30,
+          monthlyPaidUsdCents: 3_000_00,
+          paidUsdInrRate: 80,
+          actualPaidInrCents: 0,
+        },
+        {
+          monthlyPaidUsdCents: 4_000_00,
+        },
+      ),
+    ).toMatchObject({
+      monthlyPaidUsdCents: 4_000_00,
+      actualPaidInrCents: 0,
     });
   });
 

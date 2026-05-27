@@ -1,6 +1,5 @@
 type SearchValue = string | string[] | undefined;
 
-import { calculateActualPaidInrCents } from "./employee-cash-flow";
 import type { EmployeeCashFlowEntryWriteInput } from "./employee-cash-flow-types";
 import { normalizeMultiSelectValue } from "./filter-selection";
 
@@ -179,43 +178,5 @@ export function applyEmployeeCashFlowEntryPatch<
     | "actualPaidInrCents"
   >,
 >(entry: TEntry, patch: Partial<TEntry>) {
-  const nextEntry = { ...entry, ...patch } as TEntry;
-
-  if (patch.actualPaidInrCents !== undefined) {
-    return nextEntry;
-  }
-
-  const touchesCalculatedInputs =
-    patch.daysWorked !== undefined ||
-    patch.daysInMonth !== undefined ||
-    patch.monthlyPaidUsdCents !== undefined ||
-    patch.paidUsdInrRate !== undefined;
-
-  if (!touchesCalculatedInputs) {
-    return nextEntry;
-  }
-
-  const previousCalculatedActualPaid = calculateActualPaidInrCents({
-    daysWorked: entry.daysWorked,
-    daysInMonth: entry.daysInMonth,
-    monthlyPaidUsdCents: entry.monthlyPaidUsdCents,
-    paidUsdInrRate: entry.paidUsdInrRate,
-  });
-
-  if (
-    entry.actualPaidInrCents !== 0 &&
-    entry.actualPaidInrCents !== previousCalculatedActualPaid
-  ) {
-    return nextEntry;
-  }
-
-  return {
-    ...nextEntry,
-    actualPaidInrCents: calculateActualPaidInrCents({
-      daysWorked: nextEntry.daysWorked,
-      daysInMonth: nextEntry.daysInMonth,
-      monthlyPaidUsdCents: nextEntry.monthlyPaidUsdCents,
-      paidUsdInrRate: nextEntry.paidUsdInrRate,
-    }),
-  };
+  return { ...entry, ...patch } as TEntry;
 }
