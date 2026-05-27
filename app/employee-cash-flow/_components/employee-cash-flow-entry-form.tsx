@@ -30,6 +30,10 @@ type AvailableEmployee = {
   fullName: string;
   companyId: string;
   payoutMonthlyUsdCents: number;
+  defaultPaidUsdInrRate?: number;
+  defaultActualPaidInrCents?: number;
+  defaultPfInrCents?: number;
+  defaultTdsInrCents?: number;
   onboardingAdvanceUsdCents: number;
   reimbursementUsdCents: number;
   reimbursementLabelsText: string;

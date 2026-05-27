@@ -86,6 +86,10 @@ type DbEmployee = {
   default_team: string;
   billing_rate_usd_cents: number;
   payout_monthly_usd_cents: number;
+  default_paid_usd_inr_rate?: number | null;
+  default_actual_paid_inr_cents?: number | null;
+  default_pf_inr_cents?: number | null;
+  default_tds_inr_cents?: number | null;
   hrs_per_week: number;
   active_from: string;
   active_to: string | null;
@@ -392,6 +396,10 @@ function mapEmployee(row: DbEmployee): Employee {
     defaultTeam: row.default_team,
     billingRateUsdCents: row.billing_rate_usd_cents,
     payoutMonthlyUsdCents: row.payout_monthly_usd_cents,
+    defaultPaidUsdInrRate: Number(row.default_paid_usd_inr_rate ?? 0),
+    defaultActualPaidInrCents: Number(row.default_actual_paid_inr_cents ?? 0),
+    defaultPfInrCents: Number(row.default_pf_inr_cents ?? 0),
+    defaultTdsInrCents: Number(row.default_tds_inr_cents ?? 0),
     hrsPerWeek: Number(row.hrs_per_week),
     activeFrom: row.active_from,
     activeTo: row.active_to ?? undefined,
@@ -910,6 +918,10 @@ export async function createEmployee(input: {
   defaultTeam: string;
   billingRateUsdCents: number;
   payoutMonthlyUsdCents: number;
+  defaultPaidUsdInrRate?: number;
+  defaultActualPaidInrCents?: number;
+  defaultPfInrCents?: number;
+  defaultTdsInrCents?: number;
   hrsPerWeek: number;
   activeFrom: string;
   activeTo?: string;
@@ -935,6 +947,10 @@ export async function createEmployee(input: {
     default_team: input.defaultTeam,
     billing_rate_usd_cents: input.billingRateUsdCents,
     payout_monthly_usd_cents: input.payoutMonthlyUsdCents,
+    default_paid_usd_inr_rate: input.defaultPaidUsdInrRate ?? 0,
+    default_actual_paid_inr_cents: input.defaultActualPaidInrCents ?? 0,
+    default_pf_inr_cents: input.defaultPfInrCents ?? 0,
+    default_tds_inr_cents: input.defaultTdsInrCents ?? 0,
     hrs_per_week: input.hrsPerWeek,
     active_from: input.activeFrom,
     active_to: input.activeTo ?? null,
@@ -1889,6 +1905,10 @@ export async function updateEmployee(input: {
   defaultTeam: string;
   billingRateUsdCents: number;
   payoutMonthlyUsdCents: number;
+  defaultPaidUsdInrRate?: number;
+  defaultActualPaidInrCents?: number;
+  defaultPfInrCents?: number;
+  defaultTdsInrCents?: number;
   hrsPerWeek: number;
   activeFrom: string;
   activeTo?: string;
@@ -1902,6 +1922,10 @@ export async function updateEmployee(input: {
     default_team: input.defaultTeam,
     billing_rate_usd_cents: input.billingRateUsdCents,
     payout_monthly_usd_cents: input.payoutMonthlyUsdCents,
+    default_paid_usd_inr_rate: input.defaultPaidUsdInrRate ?? 0,
+    default_actual_paid_inr_cents: input.defaultActualPaidInrCents ?? 0,
+    default_pf_inr_cents: input.defaultPfInrCents ?? 0,
+    default_tds_inr_cents: input.defaultTdsInrCents ?? 0,
     hrs_per_week: input.hrsPerWeek,
     active_from: input.activeFrom,
     active_to: input.activeTo ?? null,

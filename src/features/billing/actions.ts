@@ -96,6 +96,14 @@ function getNonNegativeNumberOrThrow(rawValue: string, fieldLabel: string) {
   return value;
 }
 
+function getNonNegativeCentsOrThrow(rawValue: string, fieldLabel: string) {
+  const cents = centsFromUsd(rawValue);
+  if (cents < 0) {
+    throw new Error(`${fieldLabel} cannot be negative.`);
+  }
+  return cents;
+}
+
 function parseEmployeeCashFlowEntriesJson(rawValue: string) {
   if (!rawValue) {
     throw new Error("Employee cash flow rows payload is required.");
@@ -166,6 +174,22 @@ export async function createEmployeeAction(formData: FormData) {
     defaultTeam: getString(formData, "defaultTeam"),
     billingRateUsdCents: centsFromUsd(getString(formData, "billingRateUsd")),
     payoutMonthlyUsdCents: centsFromUsd(getString(formData, "payoutMonthlyUsd")),
+    defaultPaidUsdInrRate: getNonNegativeNumberOrThrow(
+      getString(formData, "defaultPaidUsdInrRate") || "0",
+      "Paid rate",
+    ),
+    defaultActualPaidInrCents: getNonNegativeCentsOrThrow(
+      getString(formData, "defaultActualPaidInr"),
+      "Actual paid",
+    ),
+    defaultPfInrCents: getNonNegativeCentsOrThrow(
+      getString(formData, "defaultPfInr"),
+      "PF",
+    ),
+    defaultTdsInrCents: getNonNegativeCentsOrThrow(
+      getString(formData, "defaultTdsInr"),
+      "TDS",
+    ),
     hrsPerWeek: Number.parseFloat(getString(formData, "hrsPerWeek")),
     activeFrom: getString(formData, "activeFrom"),
     activeTo: getString(formData, "activeTo") || undefined,
@@ -186,6 +210,22 @@ export async function updateEmployeeAction(formData: FormData) {
     defaultTeam: getString(formData, "defaultTeam"),
     billingRateUsdCents: centsFromUsd(getString(formData, "billingRateUsd")),
     payoutMonthlyUsdCents: centsFromUsd(getString(formData, "payoutMonthlyUsd")),
+    defaultPaidUsdInrRate: getNonNegativeNumberOrThrow(
+      getString(formData, "defaultPaidUsdInrRate") || "0",
+      "Paid rate",
+    ),
+    defaultActualPaidInrCents: getNonNegativeCentsOrThrow(
+      getString(formData, "defaultActualPaidInr"),
+      "Actual paid",
+    ),
+    defaultPfInrCents: getNonNegativeCentsOrThrow(
+      getString(formData, "defaultPfInr"),
+      "PF",
+    ),
+    defaultTdsInrCents: getNonNegativeCentsOrThrow(
+      getString(formData, "defaultTdsInr"),
+      "TDS",
+    ),
     hrsPerWeek: Number.parseFloat(getString(formData, "hrsPerWeek")),
     activeFrom: getString(formData, "activeFrom"),
     activeTo: getString(formData, "activeTo") || undefined,

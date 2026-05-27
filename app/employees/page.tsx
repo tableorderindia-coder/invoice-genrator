@@ -8,7 +8,7 @@ import { StaggerGrid } from "../_components/stagger-grid";
 import { requirePageAccess } from "@/lib/auth/server";
 import { createEmployeeAction, updateEmployeeAction } from "@/src/features/billing/actions";
 import { listCompanies, listEmployees, getDashboardMetrics } from "@/src/features/billing/store";
-import { formatUsd, formatSignedUsd } from "@/src/features/billing/utils";
+import { formatUsd, formatSignedUsd, formatInr } from "@/src/features/billing/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -81,6 +81,18 @@ export default async function EmployeesPage({
                 <Field label="Payout $/month">
                   <input name="payoutMonthlyUsd" type="number" min="0" step="0.01" required className={inputClass} placeholder="0.00" />
                 </Field>
+                <Field label="Paid rate">
+                  <input name="defaultPaidUsdInrRate" type="number" min="0" step="0.0001" className={inputClass} placeholder="0" defaultValue="0" />
+                </Field>
+                <Field label="Actual paid (INR)">
+                  <input name="defaultActualPaidInr" type="number" min="0" step="0.01" className={inputClass} placeholder="0.00" defaultValue="0" />
+                </Field>
+                <Field label="PF (INR)">
+                  <input name="defaultPfInr" type="number" min="0" step="0.01" className={inputClass} placeholder="0.00" defaultValue="0" />
+                </Field>
+                <Field label="TDS (INR)">
+                  <input name="defaultTdsInr" type="number" min="0" step="0.01" className={inputClass} placeholder="0.00" defaultValue="0" />
+                </Field>
                 <Field label="Hrs per week">
                   <input name="hrsPerWeek" type="number" min="0" step="0.01" required className={inputClass} placeholder="40" />
                 </Field>
@@ -98,11 +110,10 @@ export default async function EmployeesPage({
               />
             </form>
           ) : (
-            <form action={updateEmployeeAction}>
+            <>
               <h2 className="mt-4 text-xl font-semibold" style={{ color: "var(--text-primary)" }}>
                 Edit employee
               </h2>
-              {selectedEmployee ? <input type="hidden" name="employeeId" value={selectedEmployee.id} /> : null}
               <div className="mt-4">
                 <form action="/employees" className="flex items-end gap-2">
                   <input type="hidden" name="tab" value="edit" />
@@ -126,54 +137,69 @@ export default async function EmployeesPage({
                   />
                 </form>
               </div>
-              <div className="mt-5 grid gap-4 md:grid-cols-2">
-                <Field label="Company">
-                  <select name="companyId" required className={inputClass} defaultValue={selectedEmployee?.companyId}>
-                    {companies.map((company) => (
-                      <option key={company.id} value={company.id}>
-                        {company.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="Name">
-                  <input name="fullName" required className={inputClass} defaultValue={selectedEmployee?.fullName} />
-                </Field>
-                <Field label="Designation">
-                  <input name="designation" required className={inputClass} defaultValue={selectedEmployee?.designation} />
-                </Field>
-                <Field label="Default team">
-                  <input name="defaultTeam" required className={inputClass} defaultValue={selectedEmployee?.defaultTeam} />
-                </Field>
-                <Field label="Billing rate (USD/hr)">
-                  <input name="billingRateUsd" type="number" min="0" step="0.01" required className={inputClass} defaultValue={selectedEmployee ? (selectedEmployee.billingRateUsdCents / 100).toFixed(2) : ""} />
-                </Field>
-                <Field label="Payout $/month">
-                  <input name="payoutMonthlyUsd" type="number" min="0" step="0.01" required className={inputClass} defaultValue={selectedEmployee ? (selectedEmployee.payoutMonthlyUsdCents / 100).toFixed(2) : ""} />
-                </Field>
-                <Field label="Hrs per week">
-                  <input name="hrsPerWeek" type="number" min="0" step="0.01" required className={inputClass} defaultValue={selectedEmployee?.hrsPerWeek} />
-                </Field>
-                <Field label="Active from">
-                  <input name="activeFrom" type="date" required className={inputClass} defaultValue={selectedEmployee?.activeFrom} />
-                </Field>
-                <Field label="Active to">
-                  <input name="activeTo" type="date" className={inputClass} defaultValue={selectedEmployee?.activeTo} />
-                </Field>
-                <Field label="Is active">
-                  <select name="isActive" className={inputClass} defaultValue={selectedEmployee?.isActive ? "true" : "false"}>
-                    <option value="true">Active</option>
-                    <option value="false">Inactive</option>
-                  </select>
-                </Field>
-              </div>
-              <PendingSubmitButton
-                className="gradient-btn mt-5"
-                defaultText="Update employee"
-                pendingText="Updating..."
-                disabled={!selectedEmployee}
-              />
-            </form>
+              <form action={updateEmployeeAction}>
+                {selectedEmployee ? <input type="hidden" name="employeeId" value={selectedEmployee.id} /> : null}
+                <div className="mt-5 grid gap-4 md:grid-cols-2">
+                  <Field label="Company">
+                    <select name="companyId" required className={inputClass} defaultValue={selectedEmployee?.companyId}>
+                      {companies.map((company) => (
+                        <option key={company.id} value={company.id}>
+                          {company.name}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="Name">
+                    <input name="fullName" required className={inputClass} defaultValue={selectedEmployee?.fullName} />
+                  </Field>
+                  <Field label="Designation">
+                    <input name="designation" required className={inputClass} defaultValue={selectedEmployee?.designation} />
+                  </Field>
+                  <Field label="Default team">
+                    <input name="defaultTeam" required className={inputClass} defaultValue={selectedEmployee?.defaultTeam} />
+                  </Field>
+                  <Field label="Billing rate (USD/hr)">
+                    <input name="billingRateUsd" type="number" min="0" step="0.01" required className={inputClass} defaultValue={selectedEmployee ? (selectedEmployee.billingRateUsdCents / 100).toFixed(2) : ""} />
+                  </Field>
+                  <Field label="Payout $/month">
+                    <input name="payoutMonthlyUsd" type="number" min="0" step="0.01" required className={inputClass} defaultValue={selectedEmployee ? (selectedEmployee.payoutMonthlyUsdCents / 100).toFixed(2) : ""} />
+                  </Field>
+                  <Field label="Paid rate">
+                    <input name="defaultPaidUsdInrRate" type="number" min="0" step="0.0001" className={inputClass} defaultValue={selectedEmployee?.defaultPaidUsdInrRate ?? 0} />
+                  </Field>
+                  <Field label="Actual paid (INR)">
+                    <input name="defaultActualPaidInr" type="number" min="0" step="0.01" className={inputClass} defaultValue={selectedEmployee ? (selectedEmployee.defaultActualPaidInrCents / 100).toFixed(2) : "0"} />
+                  </Field>
+                  <Field label="PF (INR)">
+                    <input name="defaultPfInr" type="number" min="0" step="0.01" className={inputClass} defaultValue={selectedEmployee ? (selectedEmployee.defaultPfInrCents / 100).toFixed(2) : "0"} />
+                  </Field>
+                  <Field label="TDS (INR)">
+                    <input name="defaultTdsInr" type="number" min="0" step="0.01" className={inputClass} defaultValue={selectedEmployee ? (selectedEmployee.defaultTdsInrCents / 100).toFixed(2) : "0"} />
+                  </Field>
+                  <Field label="Hrs per week">
+                    <input name="hrsPerWeek" type="number" min="0" step="0.01" required className={inputClass} defaultValue={selectedEmployee?.hrsPerWeek} />
+                  </Field>
+                  <Field label="Active from">
+                    <input name="activeFrom" type="date" required className={inputClass} defaultValue={selectedEmployee?.activeFrom} />
+                  </Field>
+                  <Field label="Active to">
+                    <input name="activeTo" type="date" className={inputClass} defaultValue={selectedEmployee?.activeTo} />
+                  </Field>
+                  <Field label="Is active">
+                    <select name="isActive" className={inputClass} defaultValue={selectedEmployee?.isActive ? "true" : "false"}>
+                      <option value="true">Active</option>
+                      <option value="false">Inactive</option>
+                    </select>
+                  </Field>
+                </div>
+                <PendingSubmitButton
+                  className="gradient-btn mt-5"
+                  defaultText="Update employee"
+                  pendingText="Updating..."
+                  disabled={!selectedEmployee}
+                />
+              </form>
+            </>
           )}
         </GlassPanel>
 
@@ -208,6 +234,10 @@ export default async function EmployeesPage({
                       {formatUsd(employee.payoutMonthlyUsdCents)}
                       <span className="text-xs ml-1 font-sans" style={{ color: "var(--text-muted)" }}>payout</span>
                     </p>
+                    <p style={{ color: "var(--text-accent)" }}>
+                      {employee.defaultPaidUsdInrRate.toFixed(4).replace(/\.?0+$/, "") || "0"}
+                      <span className="text-xs ml-1 font-sans" style={{ color: "var(--text-muted)" }}>paid rate</span>
+                    </p>
                     <p className="mt-1 font-semibold" style={{ color: profitColor }}>
                       {formatSignedUsd(profit)}
                       <span className="text-[10px] ml-1 uppercase tracking-wider font-sans" style={{ color: "var(--text-muted)", opacity: 0.8 }}>Net P/L</span>
@@ -234,6 +264,36 @@ export default async function EmployeesPage({
                     }}
                   >
                     {employee.hrsPerWeek} hrs/week
+                  </span>
+                  <span
+                    className="rounded-full px-3 py-1 text-xs font-medium"
+                    style={{
+                      background: "rgba(255,255,255,0.04)",
+                      color: "var(--text-muted)",
+                      border: "1px solid var(--glass-border)",
+                    }}
+                  >
+                    Paid {formatInr(employee.defaultActualPaidInrCents)}
+                  </span>
+                  <span
+                    className="rounded-full px-3 py-1 text-xs font-medium"
+                    style={{
+                      background: "rgba(255,255,255,0.04)",
+                      color: "var(--text-muted)",
+                      border: "1px solid var(--glass-border)",
+                    }}
+                  >
+                    PF {formatInr(employee.defaultPfInrCents)}
+                  </span>
+                  <span
+                    className="rounded-full px-3 py-1 text-xs font-medium"
+                    style={{
+                      background: "rgba(255,255,255,0.04)",
+                      color: "var(--text-muted)",
+                      border: "1px solid var(--glass-border)",
+                    }}
+                  >
+                    TDS {formatInr(employee.defaultTdsInrCents)}
                   </span>
                   <span
                     className="rounded-full px-3 py-1 text-xs font-medium"

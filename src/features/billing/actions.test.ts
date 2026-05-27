@@ -9,6 +9,8 @@ const replaceInvoicePaymentEmployeeEntriesMock = vi.fn();
 const upsertInvoicePaymentMock = vi.fn();
 const upsertEmployeeStatementSectionMock = vi.fn();
 const updateCompanyMock = vi.fn();
+const createEmployeeMock = vi.fn();
+const updateEmployeeMock = vi.fn();
 
 vi.mock("next/cache", () => ({
   revalidatePath: revalidatePathMock,
@@ -29,7 +31,7 @@ vi.mock("./store", () => ({
   addInvoiceTeam: vi.fn(),
   cashOutInvoice: vi.fn(),
   createCompany: vi.fn(),
-  createEmployee: vi.fn(),
+  createEmployee: createEmployeeMock,
   createInvoiceDraft: vi.fn(),
   createTeam: vi.fn(),
   deleteInvoice: vi.fn(),
@@ -45,7 +47,7 @@ vi.mock("./store", () => ({
   updateInvoiceNote: vi.fn(),
   updateInvoiceStatus: vi.fn(),
   updateCompany: updateCompanyMock,
-  updateEmployee: vi.fn(),
+  updateEmployee: updateEmployeeMock,
   upsertDashboardExpense: vi.fn(),
   upsertEmployeeStatementSection: upsertEmployeeStatementSectionMock,
 }));
@@ -72,6 +74,72 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
     upsertEmployeeStatementSectionMock.mockResolvedValue(undefined);
     updateCompanyMock.mockReset();
     updateCompanyMock.mockResolvedValue(undefined);
+    createEmployeeMock.mockReset();
+    createEmployeeMock.mockResolvedValue(undefined);
+    updateEmployeeMock.mockReset();
+    updateEmployeeMock.mockResolvedValue(undefined);
+  });
+
+  it("passes employee cash-flow defaults through employee creation", async () => {
+    const { createEmployeeAction } = await import("./actions");
+    const formData = new FormData();
+    formData.set("companyId", "comp_1");
+    formData.set("fullName", "Asha Rao");
+    formData.set("designation", "Engineer");
+    formData.set("defaultTeam", "Data");
+    formData.set("billingRateUsd", "25");
+    formData.set("payoutMonthlyUsd", "3000");
+    formData.set("hrsPerWeek", "40");
+    formData.set("activeFrom", "2026-04-01");
+    formData.set("defaultPaidUsdInrRate", "82.75");
+    formData.set("defaultActualPaidInr", "210000");
+    formData.set("defaultPfInr", "1800");
+    formData.set("defaultTdsInr", "2500");
+
+    await expect(createEmployeeAction(formData)).rejects.toThrow(
+      "REDIRECT:/employees",
+    );
+
+    expect(createEmployeeMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        defaultPaidUsdInrRate: 82.75,
+        defaultActualPaidInrCents: 21000000,
+        defaultPfInrCents: 180000,
+        defaultTdsInrCents: 250000,
+      }),
+    );
+  });
+
+  it("passes employee cash-flow defaults through employee updates", async () => {
+    const { updateEmployeeAction } = await import("./actions");
+    const formData = new FormData();
+    formData.set("employeeId", "emp_1");
+    formData.set("companyId", "comp_1");
+    formData.set("fullName", "Asha Rao");
+    formData.set("designation", "Engineer");
+    formData.set("defaultTeam", "Data");
+    formData.set("billingRateUsd", "25");
+    formData.set("payoutMonthlyUsd", "3000");
+    formData.set("hrsPerWeek", "40");
+    formData.set("activeFrom", "2026-04-01");
+    formData.set("isActive", "true");
+    formData.set("defaultPaidUsdInrRate", "81.5");
+    formData.set("defaultActualPaidInr", "190000");
+    formData.set("defaultPfInr", "1600");
+    formData.set("defaultTdsInr", "2200");
+
+    await expect(updateEmployeeAction(formData)).rejects.toThrow(
+      "REDIRECT:/employees",
+    );
+
+    expect(updateEmployeeMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        defaultPaidUsdInrRate: 81.5,
+        defaultActualPaidInrCents: 19000000,
+        defaultPfInrCents: 160000,
+        defaultTdsInrCents: 220000,
+      }),
+    );
   });
 
   it("passes days worked through to the dashboard cash-flow update", async () => {

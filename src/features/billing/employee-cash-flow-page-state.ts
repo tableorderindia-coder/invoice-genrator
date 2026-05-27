@@ -121,6 +121,10 @@ export function buildAddedEmployeeCashFlowEntry(input: {
     id: string;
     fullName: string;
     payoutMonthlyUsdCents: number;
+    defaultPaidUsdInrRate?: number;
+    defaultActualPaidInrCents?: number;
+    defaultPfInrCents?: number;
+    defaultTdsInrCents?: number;
     onboardingAdvanceUsdCents?: number;
     reimbursementUsdCents?: number;
     reimbursementLabelsText?: string;
@@ -150,10 +154,10 @@ export function buildAddedEmployeeCashFlowEntry(input: {
     appraisalAdvanceUsdCents: input.employee.appraisalAdvanceUsdCents ?? 0,
     offboardingDeductionUsdCents: input.employee.offboardingDeductionUsdCents ?? 0,
     cashoutUsdInrRate: input.invoiceUsdInrRate,
-    paidUsdInrRate: 0,
-    pfInrCents: 0,
-    tdsInrCents: 0,
-    actualPaidInrCents: 0,
+    paidUsdInrRate: input.employee.defaultPaidUsdInrRate ?? 0,
+    pfInrCents: input.employee.defaultPfInrCents ?? 0,
+    tdsInrCents: input.employee.defaultTdsInrCents ?? 0,
+    actualPaidInrCents: input.employee.defaultActualPaidInrCents ?? 0,
     fxCommissionInrCents: 0,
     totalCommissionUsdCents: 0,
     commissionEarnedInrCents: 0,

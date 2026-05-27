@@ -23,6 +23,10 @@ export type Employee = {
   defaultTeam: string;
   billingRateUsdCents: number;
   payoutMonthlyUsdCents: number;
+  defaultPaidUsdInrRate: number;
+  defaultActualPaidInrCents: number;
+  defaultPfInrCents: number;
+  defaultTdsInrCents: number;
   hrsPerWeek: number;
   activeFrom: string;
   activeTo?: string;
