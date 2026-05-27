@@ -6,6 +6,7 @@ import {
   calculateCashInInrCents,
   calculateEffectiveDollarInwardUsdCents,
   calculateEmployeeMonthNetInrCents,
+  calculateMonthlyPaidInrCents,
   resolveEmployeeCashFlowStatus,
 } from "./employee-cash-flow";
 
@@ -102,5 +103,14 @@ describe("employee cash flow calculations", () => {
     };
 
     expect(row.status).toBe("profit");
+  });
+
+  it("calculates monthly paid INR from monthly dollars and paid rate", () => {
+    expect(
+      calculateMonthlyPaidInrCents({
+        monthlyPaidUsdCents: 2_000_00,
+        paidUsdInrRate: 82.5,
+      }),
+    ).toBe(16_500_000);
   });
 });

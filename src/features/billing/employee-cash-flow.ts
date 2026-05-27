@@ -51,6 +51,13 @@ export function calculateActualPaidInrCents(input: {
   );
 }
 
+export function calculateMonthlyPaidInrCents(input: {
+  monthlyPaidUsdCents: number;
+  paidUsdInrRate: number;
+}) {
+  return Math.round(input.monthlyPaidUsdCents * input.paidUsdInrRate);
+}
+
 export function resolveEmployeeCashFlowStatus(input: {
   effectiveDollarInwardUsdCents: number;
   salaryPaidInrCents: number;

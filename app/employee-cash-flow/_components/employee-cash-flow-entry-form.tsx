@@ -10,6 +10,7 @@ import {
   calculateCashInInrCents,
   calculateEffectiveDollarInwardUsdCents,
   calculateEmployeeMonthNetInrCents,
+  calculateMonthlyPaidInrCents,
   resolveEmployeeCashFlowStatus,
 } from "@/src/features/billing/employee-cash-flow";
 import {
@@ -76,6 +77,10 @@ function deriveCardMetrics(entry: EmployeeCashFlowEditableEntry) {
     paidUsdInrRate: entry.paidUsdInrRate,
   });
   const actualPaidInrCents = entry.actualPaidInrCents;
+  const monthlyPaidInrCents = calculateMonthlyPaidInrCents({
+    monthlyPaidUsdCents: entry.monthlyPaidUsdCents,
+    paidUsdInrRate: entry.paidUsdInrRate,
+  });
   const netInrCents = calculateEmployeeMonthNetInrCents({
     cashInInrCents,
     salaryPaidInrCents: actualPaidInrCents,
@@ -84,6 +89,7 @@ function deriveCardMetrics(entry: EmployeeCashFlowEditableEntry) {
   return {
     effectiveDollarInwardUsdCents,
     cashInInrCents,
+    monthlyPaidInrCents,
     salaryPaidInrCents: actualPaidInrCents,
     fxCommissionInrCents: payoutMetrics.fxCommissionInrCents,
     totalCommissionUsdCents: payoutMetrics.totalCommissionUsdCents,
@@ -629,6 +635,17 @@ export default function EmployeeCashFlowEntryForm({
                       })
                     }
                     className={cardInputClass()}
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
+                    Monthly paid INR
+                  </span>
+                  <input
+                    value={toCurrencyInput(metrics.monthlyPaidInrCents)}
+                    className={cardInputClass()}
+                    readOnly
                   />
                 </label>
 
