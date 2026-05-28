@@ -28,14 +28,6 @@ function formatInputAmount(cents: number) {
   return (cents / 100).toFixed(2);
 }
 
-function formatUpdatedAt(value?: string) {
-  if (!value) return "-";
-  return new Intl.DateTimeFormat("en-IN", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
-
 function FounderWithdrawalInput({
   name,
   defaultValue,
@@ -151,12 +143,10 @@ export function FoundersBalanceTable({
               </th>
               <th>P&L Month</th>
               <th>Company Net P/L</th>
-              <th>Founder’s Share</th>
               <th>Each Founder Share</th>
               {FOUNDER_BALANCE_FOUNDERS.map((founder) => (
                 <th key={founder.key}>{founder.name}</th>
               ))}
-              <th>Updated at</th>
             </tr>
           </thead>
           <tbody>
@@ -178,9 +168,6 @@ export function FoundersBalanceTable({
                   <td style={{ color: amountColor(row.netPlInrCents), fontWeight: 600 }}>
                     {formatSignedInr(row.netPlInrCents)}
                   </td>
-                  <td style={{ color: amountColor(row.founderShareInrCents), fontWeight: 600 }}>
-                    {formatSignedInr(row.founderShareInrCents)}
-                  </td>
                   <td style={{ color: amountColor(row.founderEntitlementInrCents) }}>
                     {formatSignedInr(row.founderEntitlementInrCents)}
                   </td>
@@ -192,7 +179,6 @@ export function FoundersBalanceTable({
                       />
                     </td>
                   ))}
-                  <td>{formatUpdatedAt(row.updatedAt)}</td>
                 </tr>
               );
             })}
@@ -209,12 +195,6 @@ export function FoundersBalanceTable({
                   </td>
                   <td
                     className="font-semibold"
-                    style={{ color: amountColor(data.totals.founderShareInrCents) }}
-                  >
-                    {formatSignedInr(data.totals.founderShareInrCents)}
-                  </td>
-                  <td
-                    className="font-semibold"
                     style={{ color: amountColor(data.totals.founderEntitlementInrCents) }}
                   >
                     {formatSignedInr(data.totals.founderEntitlementInrCents)}
@@ -224,12 +204,10 @@ export function FoundersBalanceTable({
                       {formatInr(data.totals.withdrawals[founder.key])}
                     </td>
                   ))}
-                  <td />
                 </tr>
                 <tr>
                   <td />
                   <td className="font-semibold">Available for withdrawal</td>
-                  <td />
                   <td />
                   <td />
                   {FOUNDER_BALANCE_FOUNDERS.map((founder) => (
@@ -241,13 +219,12 @@ export function FoundersBalanceTable({
                       {formatSignedInr(data.available[founder.key])}
                     </td>
                   ))}
-                  <td />
                 </tr>
               </>
             ) : (
               <tr>
                 <td
-                  colSpan={9}
+                  colSpan={7}
                   className="py-8 text-center"
                   style={{ color: "var(--text-muted)" }}
                 >
