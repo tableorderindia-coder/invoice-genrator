@@ -118,6 +118,17 @@ const links = [
     ),
   },
   {
+    href: "/founders-balance",
+    label: "Founder’s Balance",
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 3l8 4-8 4-8-4 8-4z" />
+        <path d="M4 11l8 4 8-4" />
+        <path d="M4 15l8 4 8-4" />
+      </svg>
+    ),
+  },
+  {
     href: "/admin/users",
     label: "Admin",
     icon: (

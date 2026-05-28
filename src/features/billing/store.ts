@@ -28,6 +28,14 @@ import {
   calculateEffectiveDollarInwardUsdCents,
   calculateEmployeeMonthNetInrCents,
 } from "./employee-cash-flow";
+import {
+  FOUNDER_BALANCE_FOUNDERS,
+  buildFounderBalanceModel,
+  type FounderBalanceModel,
+  type FounderBalanceSourceRow,
+  type FounderWithdrawal,
+  type ParsedFounderWithdrawalRow,
+} from "./founders-balance";
 import { normalizeEmployeeNameForMatch } from "./employee-cash-flow-store";
 import { getDaysInMonth } from "./utils";
 import type {
@@ -162,6 +170,18 @@ type DbCompanyExpense = {
   month: number;
   label: string;
   amount_inr_cents: number;
+  created_at: string;
+  updated_at: string;
+};
+
+type DbFounderWithdrawal = {
+  id: string;
+  company_id: string | null;
+  year: number;
+  month: number;
+  founder_key: string;
+  founder_name_snapshot: string;
+  withdrawal_inr_cents: number;
   created_at: string;
   updated_at: string;
 };
@@ -2466,6 +2486,146 @@ export async function getPnDashboardData(input: {
       companyLevelReimbursementUsdByKey,
     }),
   };
+}
+
+function toFounderBalanceSourceRows(input: {
+  companyId: string;
+  data: PnDashboardData;
+}): FounderBalanceSourceRow[] {
+  return input.data.periodRows
+    .filter((row) => row.month !== undefined)
+    .map((row) => ({
+      companyId: input.companyId,
+      year: row.year,
+      month: row.month ?? 1,
+      netPlInrCents:
+        row.netPlInrCents + row.companyReimbursementInrCents - row.expensesInrCents,
+    }));
+}
+
+function isFounderKey(value: string): value is FounderWithdrawal["founderKey"] {
+  return FOUNDER_BALANCE_FOUNDERS.some((founder) => founder.key === value);
+}
+
+function mapFounderWithdrawal(row: DbFounderWithdrawal): FounderWithdrawal | undefined {
+  const founderKey = String(row.founder_key);
+  if (!isFounderKey(founderKey)) return undefined;
+  return {
+    companyId: row.company_id ? String(row.company_id) : null,
+    year: Number(row.year),
+    month: Number(row.month),
+    founderKey,
+    withdrawalInrCents: Number(row.withdrawal_inr_cents),
+    updatedAt: String(row.updated_at),
+  };
+}
+
+function isMissingFounderWithdrawalsTableError(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+  const code = "code" in error ? String(error.code) : "";
+  const message = "message" in error ? String(error.message) : "";
+  return (
+    code === "42P01" ||
+    code === "PGRST205" ||
+    message.includes("founder_withdrawals")
+  );
+}
+
+export async function listFounderWithdrawals(companyId: string | null) {
+  const supabase = await getSupabaseOrThrow();
+  let query = supabase.from("founder_withdrawals").select("*");
+  query = companyId ? query.eq("company_id", companyId) : query.is("company_id", null);
+  const { data, error } = await query.order("year").order("month");
+  if (error) {
+    if (isMissingFounderWithdrawalsTableError(error)) return [];
+    throw error;
+  }
+  return ((data ?? []) as DbFounderWithdrawal[])
+    .map(mapFounderWithdrawal)
+    .filter(Boolean) as FounderWithdrawal[];
+}
+
+export async function getFounderBalanceData(input: {
+  companyId: string | null;
+}): Promise<FounderBalanceModel> {
+  const companies = await listCompanies();
+  const selectedCompanies = input.companyId
+    ? companies.filter((company) => company.id === input.companyId)
+    : companies;
+
+  const dashboardData = await Promise.all(
+    selectedCompanies.map(async (company) => ({
+      companyId: company.id,
+      data: await getPnDashboardData({
+        companyId: company.id,
+        periodType: "monthly",
+      }),
+    })),
+  );
+
+  const sourceRows = dashboardData.flatMap(toFounderBalanceSourceRows);
+  const withdrawals = await listFounderWithdrawals(input.companyId);
+
+  return buildFounderBalanceModel({
+    companyId: input.companyId,
+    sourceRows,
+    withdrawals,
+  });
+}
+
+export async function upsertFounderWithdrawals(input: {
+  companyId: string | null;
+  rows: ParsedFounderWithdrawalRow[];
+}) {
+  const supabase = await getSupabaseOrThrow();
+  const timestamp = nowIso();
+
+  for (const row of input.rows) {
+    for (const founder of FOUNDER_BALANCE_FOUNDERS) {
+      const withdrawalInrCents = row.withdrawals[founder.key];
+      let existingQuery = supabase
+        .from("founder_withdrawals")
+        .select("id")
+        .eq("year", row.year)
+        .eq("month", row.month)
+        .eq("founder_key", founder.key);
+      existingQuery = input.companyId
+        ? existingQuery.eq("company_id", input.companyId)
+        : existingQuery.is("company_id", null);
+      const { data: existing, error: existingError } = await existingQuery.maybeSingle();
+      if (existingError) {
+        if (isMissingFounderWithdrawalsTableError(existingError)) {
+          throw new Error("Run the founder_withdrawals Supabase migration before saving.");
+        }
+        throw existingError;
+      }
+
+      if (existing?.id) {
+        const { error } = await supabase
+          .from("founder_withdrawals")
+          .update({
+            founder_name_snapshot: founder.name,
+            withdrawal_inr_cents: withdrawalInrCents,
+            updated_at: timestamp,
+          })
+          .eq("id", String(existing.id));
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("founder_withdrawals").insert({
+          id: nextId("founder_withdrawal"),
+          company_id: input.companyId,
+          year: row.year,
+          month: row.month,
+          founder_key: founder.key,
+          founder_name_snapshot: founder.name,
+          withdrawal_inr_cents: withdrawalInrCents,
+          created_at: timestamp,
+          updated_at: timestamp,
+        });
+        if (error) throw error;
+      }
+    }
+  }
 }
 
 export async function getInvoiceDetail(

@@ -148,6 +148,30 @@ create table if not exists company_expenses (
 create index if not exists company_expenses_company_period_idx
   on company_expenses (company_id, year, month);
 
+create table if not exists founder_withdrawals (
+  id text primary key,
+  company_id text references companies(id) on delete cascade,
+  year integer not null,
+  month integer not null check (month between 1 and 12),
+  founder_key text not null check (
+    founder_key in (
+      'nirbhay_kumar_giri',
+      'pawan_kumar_beesetti',
+      'vishal_savaliya'
+    )
+  ),
+  founder_name_snapshot text not null,
+  withdrawal_inr_cents bigint not null default 0 check (withdrawal_inr_cents >= 0),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create unique index if not exists founder_withdrawals_company_period_founder_unique
+  on founder_withdrawals (company_id, year, month, founder_key) nulls not distinct;
+
+create index if not exists founder_withdrawals_period_idx
+  on founder_withdrawals (year, month);
+
 create table if not exists employee_statement_invoice_rows (
   id text primary key,
   employee_id text not null references employees (id) on delete cascade,

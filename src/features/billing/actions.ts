@@ -35,6 +35,7 @@ import {
   upsertDashboardExpense,
   upsertCompanyExpense,
   deleteCompanyExpense,
+  upsertFounderWithdrawals,
 } from "./store";
 import type { EmployeeCashFlowEntryWriteInput } from "./employee-cash-flow-types";
 import type { EmployeeCashFlowSavedEntry } from "./employee-cash-flow-types";
@@ -47,6 +48,7 @@ import {
   upsertInvoicePayment,
 } from "./employee-cash-flow-store";
 import { centsFromUsd } from "./utils";
+import { parseFounderWithdrawalRows } from "./founders-balance";
 
 function getString(formData: FormData, key: string) {
   return String(formData.get(key) || "").trim();
@@ -1048,6 +1050,34 @@ export async function saveCompanyExpenseAction(formData: FormData) {
   }
 
   redirect(buildFlashRedirect(returnTo, "success", "Expense saved."));
+}
+
+export async function saveFounderWithdrawalsAction(formData: FormData) {
+  await requirePageEditAccess("dashboard");
+  const returnTo = getString(formData, "returnTo") || "/founders-balance";
+
+  try {
+    const companyIdRaw = getString(formData, "companyId");
+    const companyId = !companyIdRaw || companyIdRaw === "all" ? null : companyIdRaw;
+    const rows = parseFounderWithdrawalRows(formData);
+
+    await upsertFounderWithdrawals({
+      companyId,
+      rows,
+    });
+
+    revalidatePath("/founders-balance");
+  } catch (error) {
+    redirect(
+      buildFlashRedirect(
+        returnTo,
+        "error",
+        getErrorMessage(error, "Unable to update founder withdrawals."),
+      ),
+    );
+  }
+
+  redirect(buildFlashRedirect(returnTo, "success", "Founder withdrawals updated."));
 }
 
 export async function deleteCompanyExpenseAction(formData: FormData) {

@@ -11,6 +11,7 @@ const upsertEmployeeStatementSectionMock = vi.fn();
 const updateCompanyMock = vi.fn();
 const createEmployeeMock = vi.fn();
 const updateEmployeeMock = vi.fn();
+const upsertFounderWithdrawalsMock = vi.fn();
 
 vi.mock("next/cache", () => ({
   revalidatePath: revalidatePathMock,
@@ -50,6 +51,7 @@ vi.mock("./store", () => ({
   updateEmployee: updateEmployeeMock,
   upsertDashboardExpense: vi.fn(),
   upsertEmployeeStatementSection: upsertEmployeeStatementSectionMock,
+  upsertFounderWithdrawals: upsertFounderWithdrawalsMock,
 }));
 
 vi.mock("./employee-cash-flow-store", () => ({
@@ -78,6 +80,8 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
     createEmployeeMock.mockResolvedValue(undefined);
     updateEmployeeMock.mockReset();
     updateEmployeeMock.mockResolvedValue(undefined);
+    upsertFounderWithdrawalsMock.mockReset();
+    upsertFounderWithdrawalsMock.mockResolvedValue(undefined);
   });
 
   it("passes employee cash-flow defaults through employee creation", async () => {
@@ -341,5 +345,86 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
       defaultNote: "Net 15",
     });
     expect(revalidatePathMock).toHaveBeenCalledWith("/companies");
+  });
+
+  it("saves selected founder withdrawal rows", async () => {
+    const { saveFounderWithdrawalsAction } = await import("./actions");
+    const formData = new FormData();
+    formData.set("companyId", "comp_1");
+    formData.set("returnTo", "/founders-balance?companyId=comp_1");
+    formData.set("rowKey", "2026-01");
+    formData.set("rowKey", "2026-02");
+    formData.set("selectedRow", "2026-02");
+    formData.set("withdrawal__2026-01__nirbhay_kumar_giri", "10");
+    formData.set("withdrawal__2026-01__pawan_kumar_beesetti", "20");
+    formData.set("withdrawal__2026-01__vishal_savaliya", "30");
+    formData.set("withdrawal__2026-02__nirbhay_kumar_giri", "100.50");
+    formData.set("withdrawal__2026-02__pawan_kumar_beesetti", "200");
+    formData.set("withdrawal__2026-02__vishal_savaliya", "300");
+
+    await expect(saveFounderWithdrawalsAction(formData)).rejects.toThrow(
+      "REDIRECT:/founders-balance?companyId=comp_1&flashStatus=success&flashMessage=Founder%20withdrawals%20updated.",
+    );
+
+    expect(upsertFounderWithdrawalsMock).toHaveBeenCalledWith({
+      companyId: "comp_1",
+      rows: [
+        {
+          year: 2026,
+          month: 2,
+          withdrawals: {
+            nirbhay_kumar_giri: 10050,
+            pawan_kumar_beesetti: 20000,
+            vishal_savaliya: 30000,
+          },
+        },
+      ],
+    });
+    expect(revalidatePathMock).toHaveBeenCalledWith("/founders-balance");
+  });
+
+  it("saves all-company founder withdrawals with a null company id", async () => {
+    const { saveFounderWithdrawalsAction } = await import("./actions");
+    const formData = new FormData();
+    formData.set("companyId", "all");
+    formData.set("returnTo", "/founders-balance?companyId=all");
+    formData.set("rowKey", "2026-01");
+    formData.set("selectedRow", "2026-01");
+    formData.set("withdrawal__2026-01__nirbhay_kumar_giri", "1");
+
+    await expect(saveFounderWithdrawalsAction(formData)).rejects.toThrow(
+      "REDIRECT:/founders-balance?companyId=all&flashStatus=success&flashMessage=Founder%20withdrawals%20updated.",
+    );
+
+    expect(upsertFounderWithdrawalsMock).toHaveBeenCalledWith({
+      companyId: null,
+      rows: [
+        {
+          year: 2026,
+          month: 1,
+          withdrawals: {
+            nirbhay_kumar_giri: 100,
+            pawan_kumar_beesetti: 0,
+            vishal_savaliya: 0,
+          },
+        },
+      ],
+    });
+  });
+
+  it("rejects negative founder withdrawals", async () => {
+    const { saveFounderWithdrawalsAction } = await import("./actions");
+    const formData = new FormData();
+    formData.set("companyId", "all");
+    formData.set("returnTo", "/founders-balance?companyId=all");
+    formData.set("rowKey", "2026-01");
+    formData.set("selectedRow", "2026-01");
+    formData.set("withdrawal__2026-01__nirbhay_kumar_giri", "-1");
+
+    await expect(saveFounderWithdrawalsAction(formData)).rejects.toThrow(
+      "REDIRECT:/founders-balance?companyId=all&flashStatus=error&flashMessage=Withdrawal%20amounts%20cannot%20be%20negative.",
+    );
+
+    expect(upsertFounderWithdrawalsMock).not.toHaveBeenCalled();
   });
 });
