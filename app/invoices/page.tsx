@@ -7,6 +7,7 @@ import { PendingSubmitButton } from "../_components/pending-submit-button";
 import { requirePageAccess } from "@/lib/auth/server";
 import {
   deleteInvoiceAction,
+  syncInvoiceToEorPortalAction,
   updateInvoiceStatusAction,
 } from "@/src/features/billing/actions";
 import { listCompanies, listInvoices } from "@/src/features/billing/store";
@@ -119,6 +120,17 @@ export default async function InvoicesPage({
                       <Link href={`/invoices/${invoice.id}`} className="btn-outline">
                         Open editor
                       </Link>
+                      {invoice.status !== "draft" ? (
+                        <form action={syncInvoiceToEorPortalAction}>
+                          <input type="hidden" name="invoiceId" value={invoice.id} />
+                          <input type="hidden" name="returnTo" value="/invoices" />
+                          <PendingSubmitButton
+                            className="btn-outline"
+                            defaultText="Sync to EOR Portal"
+                            pendingText="Syncing..."
+                          />
+                        </form>
+                      ) : null}
                       <form action={deleteInvoiceAction}>
                         <input type="hidden" name="invoiceId" value={invoice.id} />
                         <input type="hidden" name="returnTo" value="/invoices" />

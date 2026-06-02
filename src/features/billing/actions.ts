@@ -47,6 +47,7 @@ import {
   upsertEmployeeSalaryPayment,
   upsertInvoicePayment,
 } from "./employee-cash-flow-store";
+import { syncInvoiceToEorPortal } from "./eor-sync";
 import { centsFromUsd } from "./utils";
 import { parseFounderWithdrawalRows } from "./founders-balance";
 
@@ -237,6 +238,28 @@ export async function updateEmployeeAction(formData: FormData) {
   revalidatePath("/employees");
   revalidatePath("/invoices");
   redirect("/employees");
+}
+
+export async function syncInvoiceToEorPortalAction(formData: FormData) {
+  await requirePageEditAccess("invoices");
+  const invoiceId = getString(formData, "invoiceId");
+  const returnTo = getString(formData, "returnTo") || "/invoices";
+  let redirectTo = returnTo;
+
+  try {
+    const result = await syncInvoiceToEorPortal(invoiceId);
+    revalidatePath("/invoices");
+    redirectTo = buildFlashRedirect(
+      returnTo,
+      result.unmappedCompanies.length || result.unmappedEmployees.length ? "error" : "success",
+      result.unmappedCompanies.length || result.unmappedEmployees.length
+        ? `Synced, but mapping is needed in EOR Portal (${result.unmappedCompanies.length} company, ${result.unmappedEmployees.length} employee).`
+        : `Synced to EOR Portal. Created ${result.created}, updated ${result.updated}.`,
+    );
+  } catch (error) {
+    redirectTo = buildFlashRedirect(returnTo, "error", getErrorMessage(error, "EOR sync failed."));
+  }
+  redirect(redirectTo);
 }
 
 export async function createInvoiceDraftAction(formData: FormData) {
