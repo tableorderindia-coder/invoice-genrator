@@ -2,10 +2,49 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-import { getSupabaseServerCredentials } from "@/lib/supabase/config";
-import { getDefaultRedirectPath, shouldForcePasswordReset } from "@/lib/auth/authorization";
-
 const PUBLIC_PATHS = ["/login", "/auth/callback", "/reset-password"];
+const PASSWORD_RESET_ALLOWED_PATHS = ["/reset-password", "/logout"];
+
+function getSupabaseServerCredentials(env: Record<string, string | undefined>) {
+  const url = env.NEXT_PUBLIC_SUPABASE_URL;
+  const key =
+    env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+    env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || !key) {
+    return null;
+  }
+
+  return { url, key };
+}
+
+function shouldForcePasswordReset(input: {
+  mustChangePassword: boolean;
+  pathname: string;
+}) {
+  if (!input.mustChangePassword) {
+    return false;
+  }
+
+  return !PASSWORD_RESET_ALLOWED_PATHS.some((path) =>
+    input.pathname.startsWith(path),
+  );
+}
+
+function getDefaultRedirectPath(input: {
+  role: "admin" | "user";
+  mustChangePassword: boolean;
+}) {
+  if (input.mustChangePassword) {
+    return "/reset-password";
+  }
+
+  if (input.role === "admin") {
+    return "/admin/users";
+  }
+
+  return "/dashboard";
+}
 
 function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.some(
@@ -86,7 +125,6 @@ export async function middleware(request: NextRequest) {
     const redirectUrl = new URL(
       getDefaultRedirectPath({
         role: profile?.role ?? "user",
-        permissions: [],
         mustChangePassword: profile?.must_change_password ?? false,
       }),
       request.url,

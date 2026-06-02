@@ -43,3 +43,5 @@ New Text Document.txt
 *.tsbuildinfo
 next-env.d.ts
 .worktrees
+
+.vercel
