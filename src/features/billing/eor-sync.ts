@@ -44,14 +44,17 @@ export async function buildEorFinanceSyncPayload(invoiceId: string) {
     { data: invoiceTeams, error: teamsError },
     { data: invoicePayments, error: paymentsError },
     { data: salaryPayments, error: salaryError },
+    { data: cashFlowEntries, error: cashFlowError },
   ] = await Promise.all([
     supabase.from("invoice_teams").select("*").eq("invoice_id", invoiceId),
     supabase.from("invoice_payments").select("*").eq("invoice_id", invoiceId),
     supabase.from("employee_salary_payments").select("*").eq("company_id", invoice.company_id).eq("month", monthKey(invoice.year, invoice.month)),
+    supabase.from("invoice_payment_employee_entries").select("*").eq("company_id", invoice.company_id).eq("payment_month", monthKey(invoice.year, invoice.month)),
   ]);
   if (teamsError) throw teamsError;
   if (paymentsError) throw paymentsError;
   if (salaryError) throw salaryError;
+  if (cashFlowError) throw cashFlowError;
 
   const teamIds = (invoiceTeams ?? []).map((team: any) => team.id);
   const { data: lineItems, error: lineItemError } = teamIds.length
@@ -75,6 +78,7 @@ export async function buildEorFinanceSyncPayload(invoiceId: string) {
   if (employeeError) throw employeeError;
   if (statementRowError) throw statementRowError;
   if (summaryError) throw summaryError;
+  const cashFlowByEmployee = new Map((cashFlowEntries ?? []).map((entry: any) => [entry.employee_id, entry]));
 
   return {
     source: "invoice_generator",
@@ -130,6 +134,14 @@ export async function buildEorFinanceSyncPayload(invoiceId: string) {
       notes: payment.notes ?? null,
     })),
     salaryPayments: (salaryPayments ?? []).map((payment: any) => ({
+      ...(() => {
+        const cashFlow = cashFlowByEmployee.get(payment.employee_id) as any;
+        return {
+          pfInrCents: Number(cashFlow?.pf_inr_cents ?? 0),
+          tdsInrCents: Number(cashFlow?.tds_inr_cents ?? 0),
+          actualPaidInrCents: Number(cashFlow?.actual_paid_inr_cents ?? payment.salary_paid_inr_cents ?? 0),
+        };
+      })(),
       id: payment.id,
       employeeId: payment.employee_id,
       companyId: payment.company_id,

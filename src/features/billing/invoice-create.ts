@@ -14,8 +14,10 @@ function formatInvoiceStatus(status: InvoiceStatus) {
     case "draft":
       return "Draft";
     case "generated":
-      return "Generated";
+      return "Raised / Sent";
     case "sent":
-      return "Sent";
+      return "Raised / Sent";
+    case "received":
+      return "Payment received";
   }
 }

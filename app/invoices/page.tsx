@@ -7,6 +7,7 @@ import { PendingSubmitButton } from "../_components/pending-submit-button";
 import { requirePageAccess } from "@/lib/auth/server";
 import {
   deleteInvoiceAction,
+  syncCompanyToEorPortalAction,
   syncInvoiceToEorPortalAction,
   updateInvoiceStatusAction,
 } from "@/src/features/billing/actions";
@@ -17,6 +18,13 @@ export const dynamic = "force-dynamic";
 
 function getStatusClass(status: string) {
   return `status-badge status-${status.replace("_", "-")}`;
+}
+
+function formatInvoiceStatus(status: string) {
+  if (status === "generated" || status === "sent") return "Raised / Sent";
+  if (status === "received") return "Payment received";
+  if (status === "cashed_out") return "Cashed out";
+  return "Draft";
 }
 
 export default async function InvoicesPage({
@@ -53,6 +61,19 @@ export default async function InvoicesPage({
           <Link href="/invoices/create" className="btn-outline">
             Go to create invoice
           </Link>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {companies.map((company) => (
+            <form key={company.id} action={syncCompanyToEorPortalAction}>
+              <input type="hidden" name="companyId" value={company.id} />
+              <input type="hidden" name="returnTo" value="/invoices" />
+              <PendingSubmitButton
+                className="btn-outline"
+                defaultText={`Sync ${company.name} to EOR`}
+                pendingText="Syncing company..."
+              />
+            </form>
+          ))}
         </div>
 
         {flashMessage ? (
@@ -98,7 +119,7 @@ export default async function InvoicesPage({
                         className="inline-block w-1.5 h-1.5 rounded-full"
                         style={{ background: "currentColor" }}
                       />
-                      {invoice.status.replace("_", " ")}
+                      {formatInvoiceStatus(invoice.status)}
                     </span>
                   </td>
                   <td
@@ -139,17 +160,17 @@ export default async function InvoicesPage({
                           message={`Delete invoice ${invoice.invoiceNumber}? This permanently removes all linked invoice data.`}
                         />
                       </form>
-                      {invoice.status === "generated" ? (
+                      {invoice.status === "generated" || invoice.status === "sent" ? (
                         <form action={updateInvoiceStatusAction}>
                           <input type="hidden" name="invoiceId" value={invoice.id} />
-                          <input type="hidden" name="status" value="sent" />
+                          <input type="hidden" name="status" value="received" />
                           <PendingSubmitButton
                             className="gradient-btn"
-                            defaultText="Mark sent"
-                            pendingText="Marking sent..."
+                            defaultText="Mark payment received"
+                            pendingText="Marking received..."
                           />
                         </form>
-                      ) : invoice.status === "sent" ? (
+                      ) : invoice.status === "received" ? (
                         <span
                           className="rounded-full px-3 py-2 text-xs font-semibold"
                           style={{
@@ -157,7 +178,7 @@ export default async function InvoicesPage({
                             color: "var(--text-muted)",
                           }}
                         >
-                          Sent
+                          Payment received
                         </span>
                       ) : invoice.status === "cashed_out" ? (
                         <span

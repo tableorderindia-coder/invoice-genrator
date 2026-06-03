@@ -41,7 +41,7 @@ export default async function CashoutPage({
             Ready for cashout
           </h2>
           <p className="mt-1 text-sm" style={{ color: "var(--text-secondary)" }}>
-            Mark generated or sent invoices as cashed out from this separate workflow.
+            Mark payment received invoices as cashed out after the admin settles FX.
           </p>
         </div>
         {flashMessage ? (
@@ -93,7 +93,7 @@ export default async function CashoutPage({
                         className="inline-block w-1.5 h-1.5 rounded-full"
                         style={{ background: "currentColor" }}
                       />
-                      {invoice.status.replace("_", " ")}
+                      Payment received
                     </span>
                   </td>
                   <td

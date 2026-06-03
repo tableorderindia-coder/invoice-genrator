@@ -40,7 +40,7 @@ create table if not exists invoices (
   invoice_number text not null,
   billing_date date not null,
   due_date date not null,
-  status text not null check (status in ('draft', 'generated', 'sent', 'cashed_out')),
+  status text not null check (status in ('draft', 'generated', 'sent', 'received', 'cashed_out')),
   note_text text not null,
   subtotal_usd_cents integer not null default 0,
   adjustments_usd_cents integer not null default 0,

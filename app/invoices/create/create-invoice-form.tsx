@@ -17,7 +17,7 @@ type CreateInvoiceFormProps = {
     companyId: string;
     invoiceId: string;
     invoiceNumber: string;
-    status: "draft" | "generated" | "sent" | "cashed_out";
+    status: "draft" | "generated" | "sent" | "received" | "cashed_out";
   }>;
   availableTeamNamesByCompany: Record<string, string[]>;
 };

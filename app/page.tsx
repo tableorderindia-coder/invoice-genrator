@@ -24,7 +24,7 @@ export default async function HomePage() {
           <MetricCard label="Companies" value={String(companies.length)} helper="Active billing relationships" />
         </div>
         <div className="stagger-item">
-          <MetricCard label="Pending cash-out" value={String(metrics.pendingCashOutCount)} helper="Operational follow-up queue" />
+          <MetricCard label="Ready for cashout" value={String(metrics.pendingCashOutCount)} helper="Payment received, waiting for FX" />
         </div>
         <div className="stagger-item">
           <MetricCard label="Realized profit" value={formatUsd(metrics.realizedProfitUsdCents)} helper="USD only in phase 1" />
@@ -43,7 +43,7 @@ export default async function HomePage() {
                 Monthly workflow
               </p>
               <h2 className="mt-1 text-2xl font-semibold" style={{ color: "var(--text-primary)" }}>
-                Create, send, then cash out
+                Raise, receive payment, then cash out
               </h2>
             </div>
             <Link
@@ -58,7 +58,7 @@ export default async function HomePage() {
             {[
               { num: "01", text: "Start invoice from a company or duplicate last month." },
               { num: "02", text: "Add teams, candidates, hours, and adjustments." },
-              { num: "03", text: "Generate PDF, send it, then cash out when money lands." },
+              { num: "03", text: "Generate PDF, mark payment received when money lands, then cash out after FX settlement." },
             ].map((step) => (
               <div
                 key={step.num}

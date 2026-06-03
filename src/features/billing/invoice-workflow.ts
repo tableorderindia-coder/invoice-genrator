@@ -4,6 +4,10 @@ function isIssuedInvoice(invoice: Invoice) {
   return invoice.status === "generated" || invoice.status === "sent";
 }
 
+function isCashoutEligibleInvoice(invoice: Invoice) {
+  return invoice.status === "received";
+}
+
 export function filterDraftInvoices(invoices: Invoice[]) {
   return invoices.filter((invoice) => invoice.status === "draft");
 }
@@ -13,5 +17,5 @@ export function filterIssuedInvoices(invoices: Invoice[]) {
 }
 
 export function filterCashoutEligibleInvoices(invoices: Invoice[]) {
-  return invoices.filter(isIssuedInvoice);
+  return invoices.filter(isCashoutEligibleInvoice);
 }

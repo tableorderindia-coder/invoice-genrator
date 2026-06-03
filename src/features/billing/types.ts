@@ -1,4 +1,4 @@
-export type InvoiceStatus = "draft" | "generated" | "sent" | "cashed_out";
+export type InvoiceStatus = "draft" | "generated" | "sent" | "received" | "cashed_out";
 
 export type Company = {
   id: string;

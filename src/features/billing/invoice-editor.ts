@@ -11,7 +11,7 @@ type InvoiceHeaderFormInput = {
   status: string;
 };
 
-const invoiceStatuses: InvoiceStatus[] = ["draft", "generated", "sent", "cashed_out"];
+const invoiceStatuses: InvoiceStatus[] = ["draft", "generated", "sent", "received", "cashed_out"];
 
 function isInvoiceStatus(value: string): value is InvoiceStatus {
   return invoiceStatuses.includes(value as InvoiceStatus);

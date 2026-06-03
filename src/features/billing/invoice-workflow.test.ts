@@ -72,6 +72,22 @@ const invoices: Invoice[] = [
     createdAt: "2026-04-01T00:00:00.000Z",
     updatedAt: "2026-04-01T00:00:00.000Z",
   },
+  {
+    id: "received_1",
+    companyId: "company_1",
+    month: 4,
+    year: 2026,
+    invoiceNumber: "REC-001",
+    billingDate: "2026-04-30",
+    dueDate: "2026-05-15",
+    status: "received",
+    noteText: "",
+    subtotalUsdCents: 0,
+    adjustmentsUsdCents: 0,
+    grandTotalUsdCents: 0,
+    createdAt: "2026-04-01T00:00:00.000Z",
+    updatedAt: "2026-04-01T00:00:00.000Z",
+  },
 ];
 
 describe("invoice workflow filters", () => {
@@ -88,9 +104,9 @@ describe("invoice workflow filters", () => {
     ]);
   });
 
-  it("keeps only generated and sent invoices for cashout", () => {
+  it("keeps only payment received invoices for cashout", () => {
     expect(
       filterCashoutEligibleInvoices(invoices).map((invoice) => invoice.id),
-    ).toEqual(["generated_1", "sent_1"]);
+    ).toEqual(["received_1"]);
   });
 });

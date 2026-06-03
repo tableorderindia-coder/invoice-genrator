@@ -2029,6 +2029,9 @@ export async function cashOutInvoice(
   if (!detail) {
     throw new Error("Invoice not found");
   }
+  if (detail.invoice.status !== "received") {
+    throw new Error("Only payment received invoices can be cashed out.");
+  }
 
   const realization = createRealizationRecord({
     invoiceId,
@@ -2734,6 +2737,7 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     draft: 0,
     generated: 0,
     sent: 0,
+    received: 0,
     cashed_out: 0,
   };
 
@@ -2741,9 +2745,7 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     invoiceStatusCounts[invoice.status] += 1;
   }
 
-  const pendingCashOutCount = invoices.filter(
-    (invoice) => invoice.status !== "cashed_out",
-  ).length;
+  const pendingCashOutCount = invoices.filter((invoice) => invoice.status === "received").length;
   const companyMap = new Map(companies.map((company) => [company.id, company.name]));
   const employeeMap = new Map(
     employees.map((employee) => [employee.id, employee.fullName]),

@@ -189,6 +189,7 @@ export default async function DraftInvoicePage({
                     <option value="draft">draft</option>
                     <option value="generated">generated</option>
                     <option value="sent">sent</option>
+                    <option value="received">received</option>
                     <option value="cashed_out">cashed_out</option>
                   </select>
                 </label>
@@ -223,6 +224,18 @@ export default async function DraftInvoicePage({
                       className="btn-outline"
                       defaultText="Mark generated"
                       pendingText="Marking..."
+                    />
+                  </form>
+                ) : null}
+                {detail.invoice.status === "generated" || detail.invoice.status === "sent" ? (
+                  <form action={updateInvoiceStatusAction}>
+                    <input type="hidden" name="invoiceId" value={detail.invoice.id} />
+                    <input type="hidden" name="status" value="received" />
+                    <input type="hidden" name="returnTo" value={returnTo} />
+                    <PendingSubmitButton
+                      className="gradient-btn"
+                      defaultText="Mark payment received"
+                      pendingText="Marking received..."
                     />
                   </form>
                 ) : null}
