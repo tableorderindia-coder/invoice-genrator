@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { updateInvoiceStatus } from "@/src/features/billing/store";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { InvoiceStatus } from "@/src/features/billing/types";
 
 const allowedStatuses = new Set<InvoiceStatus>(["received"]);
@@ -25,7 +25,19 @@ export async function POST(request: Request) {
       throw new Error("Only payment received status can be synced from EOR Portal.");
     }
 
-    const invoice = await updateInvoiceStatus(invoiceId, status);
+    const supabase = createSupabaseAdminClient();
+    if (!supabase) {
+      throw new Error("Supabase admin client is not configured.");
+    }
+
+    const { data: invoice, error } = await supabase
+      .from("invoices")
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq("id", invoiceId)
+      .select("id, status")
+      .single();
+    if (error) throw error;
+
     return NextResponse.json({
       created: 0,
       updated: 1,
