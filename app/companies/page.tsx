@@ -6,23 +6,81 @@ import { Field, inputClass } from "../_components/field";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
 import { StaggerGrid } from "../_components/stagger-grid";
 import { requirePageAccess } from "@/lib/auth/server";
-import { createCompanyAction, updateCompanyAction } from "@/src/features/billing/actions";
+import { canEditPage } from "@/lib/auth/authorization";
+import { createCompanyAction, syncCompanyToEorPortalAction, updateCompanyAction } from "@/src/features/billing/actions";
 import { listCompanies, getDashboardMetrics } from "@/src/features/billing/store";
 import { formatSignedUsd } from "@/src/features/billing/utils";
 
 export const dynamic = "force-dynamic";
 
+function FlashMessage({ status, message }: { status?: string; message?: string }) {
+  if (!message) return null;
+
+  return (
+    <div
+      className="mt-4 rounded-2xl px-4 py-3 text-sm font-medium"
+      style={{
+        background: status === "error" ? "rgba(248, 113, 113, 0.08)" : "rgba(16, 185, 129, 0.08)",
+        border: status === "error" ? "1px solid rgba(248, 113, 113, 0.25)" : "1px solid rgba(16, 185, 129, 0.25)",
+        color: status === "error" ? "#fca5a5" : "#6ee7b7",
+      }}
+    >
+      {message}
+    </div>
+  );
+}
+
+function CompanySyncControl({
+  canSync,
+  companyId,
+  returnTo,
+}: {
+  canSync: boolean;
+  companyId: string;
+  returnTo: string;
+}) {
+  if (!canSync) {
+    return (
+      <p className="rounded-2xl px-3 py-2 text-xs font-semibold" style={{ border: "1px solid var(--glass-border)", color: "var(--text-muted)" }}>
+        Invoice edit access is required to sync finance data.
+      </p>
+    );
+  }
+
+  return (
+    <form action={syncCompanyToEorPortalAction}>
+      <input type="hidden" name="companyId" value={companyId} />
+      <input type="hidden" name="returnTo" value={returnTo} />
+      <PendingSubmitButton
+        className="btn-outline"
+        defaultText="Sync all details to EOR Portal"
+        pendingText="Syncing company..."
+      />
+    </form>
+  );
+}
+
 export default async function CompaniesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string | string[]; companyId?: string | string[] }>;
+  searchParams: Promise<{
+    tab?: string | string[];
+    companyId?: string | string[];
+    flashStatus?: string | string[];
+    flashMessage?: string | string[];
+  }>;
 }) {
-  await requirePageAccess("companies");
+  const context = await requirePageAccess("companies");
   const resolvedSearchParams = await searchParams;
   const [companies, metrics] = await Promise.all([
     listCompanies(),
     getDashboardMetrics()
   ]);
+  const canSyncToEor = canEditPage({
+    role: context.profile.role,
+    page: "invoices",
+    permissions: context.permissions,
+  });
   const tab = Array.isArray(resolvedSearchParams.tab)
     ? resolvedSearchParams.tab[0]
     : resolvedSearchParams.tab;
@@ -32,6 +90,12 @@ export default async function CompaniesPage({
     : resolvedSearchParams.companyId;
   const selectedCompany =
     companies.find((company) => company.id === selectedCompanyIdRaw) ?? companies[0];
+  const flashStatus = Array.isArray(resolvedSearchParams.flashStatus)
+    ? resolvedSearchParams.flashStatus[0]
+    : resolvedSearchParams.flashStatus;
+  const flashMessage = Array.isArray(resolvedSearchParams.flashMessage)
+    ? resolvedSearchParams.flashMessage[0]
+    : resolvedSearchParams.flashMessage;
 
   const profitMap = new Map(
     metrics.realizedProfitByCompany.map((c) => [c.companyId, c.realizedProfitUsdCents])
@@ -49,6 +113,7 @@ export default async function CompaniesPage({
               Edit company
             </Link>
           </div>
+          <FlashMessage status={flashStatus} message={flashMessage} />
 
           {activeTab === "add" ? (
             <form action={createCompanyAction}>
@@ -73,69 +138,74 @@ export default async function CompaniesPage({
               />
             </form>
           ) : (
-            <form action={updateCompanyAction}>
+            <div>
               <h2 className="mt-4 text-xl font-semibold" style={{ color: "var(--text-primary)" }}>
                 Edit company
               </h2>
-              {selectedCompany ? <input type="hidden" name="companyId" value={selectedCompany.id} /> : null}
-              <div className="mt-4">
-                <form action="/companies" className="flex items-end gap-2">
-                  <input type="hidden" name="tab" value="edit" />
-                  <Field label="Select company">
-                    <select
-                      name="companyId"
+              <form action="/companies" className="mt-4 flex items-end gap-2">
+                <input type="hidden" name="tab" value="edit" />
+                <Field label="Select company">
+                  <select
+                    name="companyId"
+                    className={inputClass}
+                    defaultValue={selectedCompany?.id}
+                  >
+                    {companies.map((company) => (
+                      <option key={company.id} value={company.id}>
+                        {company.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <PendingSubmitButton
+                  className="btn-outline"
+                  defaultText="Load"
+                  pendingText="Loading..."
+                />
+              </form>
+              {selectedCompany ? (
+                <div className="mt-4">
+                  <CompanySyncControl canSync={canSyncToEor} companyId={selectedCompany.id} returnTo="/companies?tab=edit" />
+                </div>
+              ) : null}
+              <form action={updateCompanyAction}>
+                {selectedCompany ? <input type="hidden" name="companyId" value={selectedCompany.id} /> : null}
+                <div className="mt-5 space-y-4">
+                  <Field label="Company name">
+                    <input
+                      name="name"
+                      required
                       className={inputClass}
-                      defaultValue={selectedCompany?.id}
-                    >
-                      {companies.map((company) => (
-                        <option key={company.id} value={company.id}>
-                          {company.name}
-                        </option>
-                      ))}
-                    </select>
+                      defaultValue={selectedCompany?.name}
+                    />
                   </Field>
-                  <PendingSubmitButton
-                    className="btn-outline"
-                    defaultText="Load"
-                    pendingText="Loading..."
-                  />
-                </form>
-              </div>
-              <div className="mt-5 space-y-4">
-                <Field label="Company name">
-                  <input
-                    name="name"
-                    required
-                    className={inputClass}
-                    defaultValue={selectedCompany?.name}
-                  />
-                </Field>
-                <Field label="Billing address">
-                  <textarea
-                    name="billingAddress"
-                    required
-                    rows={3}
-                    className={inputClass}
-                    defaultValue={selectedCompany?.billingAddress}
-                  />
-                </Field>
-                <Field label="Default note">
-                  <textarea
-                    name="defaultNote"
-                    required
-                    rows={4}
-                    className={inputClass}
-                    defaultValue={selectedCompany?.defaultNote}
-                  />
-                </Field>
-              </div>
-              <PendingSubmitButton
-                className="gradient-btn mt-5"
-                defaultText="Update company"
-                pendingText="Updating..."
-                disabled={!selectedCompany}
-              />
-            </form>
+                  <Field label="Billing address">
+                    <textarea
+                      name="billingAddress"
+                      required
+                      rows={3}
+                      className={inputClass}
+                      defaultValue={selectedCompany?.billingAddress}
+                    />
+                  </Field>
+                  <Field label="Default note">
+                    <textarea
+                      name="defaultNote"
+                      required
+                      rows={4}
+                      className={inputClass}
+                      defaultValue={selectedCompany?.defaultNote}
+                    />
+                  </Field>
+                </div>
+                <PendingSubmitButton
+                  className="gradient-btn mt-5"
+                  defaultText="Update company"
+                  pendingText="Updating..."
+                  disabled={!selectedCompany}
+                />
+              </form>
+            </div>
           )}
         </GlassPanel>
 
@@ -175,6 +245,12 @@ export default async function CompaniesPage({
                         </p>
                       </div>
                     </div>
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Link href={`/companies?tab=edit&companyId=${company.id}`} className="btn-outline">
+                      Edit company
+                    </Link>
+                    <CompanySyncControl canSync={canSyncToEor} companyId={company.id} returnTo="/companies" />
                   </div>
                 </div>
               );

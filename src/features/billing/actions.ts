@@ -276,29 +276,35 @@ export async function syncCompanyToEorPortalAction(formData: FormData) {
     }
 
     const invoices = (await listInvoicesForCompany(companyId)).filter((invoice) => invoice.status !== "draft");
-    let created = 0;
-    let updated = 0;
-    let unmappedCompanies = 0;
-    let unmappedEmployees = 0;
+    if (invoices.length === 0) {
+      revalidatePath("/companies");
+      redirectTo = buildFlashRedirect(returnTo, "success", "No generated invoices found to sync for this company.");
+    } else {
+      let created = 0;
+      let updated = 0;
+      let unmappedCompanies = 0;
+      let unmappedEmployees = 0;
 
-    for (const invoice of invoices) {
-      const result = await syncInvoiceToEorPortal(invoice.id);
-      created += result.created;
-      updated += result.updated;
-      unmappedCompanies += result.unmappedCompanies.length;
-      unmappedEmployees += result.unmappedEmployees.length;
+      for (const invoice of invoices) {
+        const result = await syncInvoiceToEorPortal(invoice.id);
+        created += result.created;
+        updated += result.updated;
+        unmappedCompanies += result.unmappedCompanies.length;
+        unmappedEmployees += result.unmappedEmployees.length;
+      }
+
+      revalidatePath("/invoices");
+      revalidatePath("/companies");
+      redirectTo = buildFlashRedirect(
+        returnTo,
+        unmappedCompanies || unmappedEmployees ? "error" : "success",
+        `Company synced to EOR Portal. ${invoices.length} invoices checked, ${created} created, ${updated} updated${
+          unmappedCompanies || unmappedEmployees
+            ? `, mapping needed for ${unmappedCompanies} company and ${unmappedEmployees} employee records`
+            : ""
+        }.`,
+      );
     }
-
-    revalidatePath("/invoices");
-    redirectTo = buildFlashRedirect(
-      returnTo,
-      unmappedCompanies || unmappedEmployees ? "error" : "success",
-      `Company synced to EOR Portal. ${invoices.length} invoices checked, ${created} created, ${updated} updated${
-        unmappedCompanies || unmappedEmployees
-          ? `, mapping needed for ${unmappedCompanies} company and ${unmappedEmployees} employee records`
-          : ""
-      }.`,
-    );
   } catch (error) {
     redirectTo = buildFlashRedirect(returnTo, "error", getErrorMessage(error, "Company EOR sync failed."));
   }
