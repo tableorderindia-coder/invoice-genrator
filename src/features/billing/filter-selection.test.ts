@@ -10,6 +10,7 @@ import {
   filterSavedCashFlowRows,
   formatPaymentMonthLabel,
   normalizeMultiSelectValue,
+  resolveSelectedCompanyId,
   resolveSavedCashFlowFilters,
 } from "./filter-selection";
 import {
@@ -23,6 +24,33 @@ describe("filter selection helpers", () => {
       "emp_1",
       "emp_2",
     ]);
+  });
+
+  it("resolves a selected company from search params when it exists", () => {
+    expect(
+      resolveSelectedCompanyId({
+        companyId: "comp_2",
+        companies: [{ id: "comp_1" }, { id: "comp_2" }],
+      }),
+    ).toBe("comp_2");
+  });
+
+  it("falls back to the first company when the selected company is missing", () => {
+    expect(
+      resolveSelectedCompanyId({
+        companyId: "missing",
+        companies: [{ id: "comp_1" }, { id: "comp_2" }],
+      }),
+    ).toBe("comp_1");
+  });
+
+  it("returns an empty company selection when no companies exist", () => {
+    expect(
+      resolveSelectedCompanyId({
+        companyId: undefined,
+        companies: [],
+      }),
+    ).toBe("");
   });
 
   it("formats payment months as readable labels", () => {
