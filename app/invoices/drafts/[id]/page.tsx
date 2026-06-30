@@ -22,8 +22,6 @@ import {
   updateInvoiceAdjustmentAmountAction,
   updateInvoiceLineItemAction,
   updateInvoiceStatusAction,
-  syncCompanyToEorPortalAction,
-  syncInvoiceToEorPortalAction,
 } from "@/src/features/billing/actions";
 import {
   getInvoiceDetail,
@@ -229,19 +227,19 @@ export default async function DraftInvoicePage({
                     />
                   </form>
                 ) : null}
-                {detail.invoice.status === "generated" || detail.invoice.status === "sent" ? (
+                {detail.invoice.status === "generated" ? (
                   <form action={updateInvoiceStatusAction}>
                     <input type="hidden" name="invoiceId" value={detail.invoice.id} />
-                    <input type="hidden" name="status" value="received" />
+                    <input type="hidden" name="status" value="sent" />
                     <input type="hidden" name="returnTo" value={returnTo} />
                     <PendingSubmitButton
                       className="gradient-btn"
-                      defaultText="Mark payment received"
-                      pendingText="Marking received..."
+                      defaultText="Mark sent"
+                      pendingText="Marking sent..."
                     />
                   </form>
                 ) : null}
-                {detail.invoice.status === "draft" ? (
+                {detail.invoice.status === "sent" ? (
                   <span
                     className="rounded-full px-3 py-2 text-xs font-semibold"
                     style={{
@@ -249,28 +247,9 @@ export default async function DraftInvoicePage({
                       color: "var(--text-muted)",
                     }}
                   >
-                    Generate invoice before syncing
+                    Sent
                   </span>
-                ) : (
-                  <form action={syncInvoiceToEorPortalAction}>
-                    <input type="hidden" name="invoiceId" value={detail.invoice.id} />
-                    <input type="hidden" name="returnTo" value={returnTo} />
-                    <PendingSubmitButton
-                      className="btn-outline"
-                      defaultText="Sync invoice to EOR Portal"
-                      pendingText="Syncing invoice..."
-                    />
-                  </form>
-                )}
-                <form action={syncCompanyToEorPortalAction}>
-                  <input type="hidden" name="companyId" value={detail.company.id} />
-                  <input type="hidden" name="returnTo" value={returnTo} />
-                  <PendingSubmitButton
-                    className="btn-outline"
-                    defaultText="Sync company to EOR Portal"
-                    pendingText="Syncing company..."
-                  />
-                </form>
+                ) : null}
                 <form action={updateInvoiceGrandTotalAction} className="flex items-center gap-2">
                   <input type="hidden" name="invoiceId" value={detail.invoice.id} />
                   <input type="hidden" name="returnTo" value={returnTo} />

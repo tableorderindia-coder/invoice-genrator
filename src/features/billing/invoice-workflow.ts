@@ -5,7 +5,7 @@ function isIssuedInvoice(invoice: Invoice) {
 }
 
 function isCashoutEligibleInvoice(invoice: Invoice) {
-  return invoice.status === "received";
+  return invoice.status === "sent";
 }
 
 export function filterDraftInvoices(invoices: Invoice[]) {

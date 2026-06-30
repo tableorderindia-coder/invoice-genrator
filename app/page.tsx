@@ -24,7 +24,7 @@ export default async function HomePage() {
           <MetricCard label="Companies" value={String(companies.length)} helper="Active billing relationships" />
         </div>
         <div className="stagger-item">
-          <MetricCard label="Ready for cashout" value={String(metrics.pendingCashOutCount)} helper="Payment received, waiting for FX" />
+          <MetricCard label="Ready for cashout" value={String(metrics.pendingCashOutCount)} helper="Sent, waiting for FX" />
         </div>
         <div className="stagger-item">
           <MetricCard label="Realized profit" value={formatUsd(metrics.realizedProfitUsdCents)} helper="USD only in phase 1" />

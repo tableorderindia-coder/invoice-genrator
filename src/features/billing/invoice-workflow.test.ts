@@ -104,9 +104,9 @@ describe("invoice workflow filters", () => {
     ]);
   });
 
-  it("keeps only payment received invoices for cashout", () => {
+  it("keeps only sent invoices for cashout", () => {
     expect(
       filterCashoutEligibleInvoices(invoices).map((invoice) => invoice.id),
-    ).toEqual(["received_1"]);
+    ).toEqual(["sent_1"]);
   });
 });

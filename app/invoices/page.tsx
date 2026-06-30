@@ -163,17 +163,27 @@ export default async function InvoicesPage({
                           message={`Delete invoice ${invoice.invoiceNumber}? This permanently removes all linked invoice data.`}
                         />
                       </form>
-                      {invoice.status === "generated" || invoice.status === "sent" ? (
+                      {invoice.status === "generated" ? (
                         <form action={updateInvoiceStatusAction}>
                           <input type="hidden" name="invoiceId" value={invoice.id} />
-                          <input type="hidden" name="status" value="received" />
+                          <input type="hidden" name="status" value="sent" />
                           <input type="hidden" name="returnTo" value={filteredInvoicesPath} />
                           <PendingSubmitButton
                             className="gradient-btn"
-                            defaultText="Mark payment received"
-                            pendingText="Marking received..."
+                            defaultText="Mark sent"
+                            pendingText="Marking sent..."
                           />
                         </form>
+                      ) : invoice.status === "sent" ? (
+                        <span
+                          className="rounded-full px-3 py-2 text-xs font-semibold"
+                          style={{
+                            border: "1px solid var(--glass-border)",
+                            color: "var(--text-muted)",
+                          }}
+                        >
+                          Sent
+                        </span>
                       ) : invoice.status === "received" ? (
                         <span
                           className="rounded-full px-3 py-2 text-xs font-semibold"
