@@ -1,9 +1,12 @@
 import { Shell } from "../../_components/shell";
 import { GlassPanel } from "../../_components/glass-panel";
+import { Field, inputClass } from "../../_components/field";
+import { PendingSubmitButton } from "../../_components/pending-submit-button";
 import { requirePageAccess } from "@/lib/auth/server";
 import { createInvoiceDraftAction } from "@/src/features/billing/actions";
 import { CreateInvoiceForm } from "./create-invoice-form";
 import { CreateInvoiceSubmitButton } from "./submit-button";
+import { resolveSelectedCompanyId } from "@/src/features/billing/filter-selection";
 import {
   listAvailableTeamNames,
   listCompanies,
@@ -16,6 +19,7 @@ export default async function CreateInvoicePage({
   searchParams,
 }: {
   searchParams: Promise<{
+    companyId?: string | string[];
     flashStatus?: string | string[];
     flashMessage?: string | string[];
   }>;
@@ -23,27 +27,26 @@ export default async function CreateInvoicePage({
   await requirePageAccess("invoices");
   const companies = await listCompanies();
   const resolvedSearchParams = await searchParams;
+  const selectedCompanyId = resolveSelectedCompanyId({
+    companyId: resolvedSearchParams.companyId,
+    companies,
+  });
+  const selectedCompany = companies.find((company) => company.id === selectedCompanyId);
   const flashStatus = Array.isArray(resolvedSearchParams.flashStatus)
     ? resolvedSearchParams.flashStatus[0]
     : resolvedSearchParams.flashStatus;
   const flashMessage = Array.isArray(resolvedSearchParams.flashMessage)
     ? resolvedSearchParams.flashMessage[0]
     : resolvedSearchParams.flashMessage;
-  const previousInvoices = await Promise.all(
-    companies.map(async (company) => ({
-      company,
-      invoices: await listInvoicesForCompany(company.id),
-    })),
-  );
-  const teamCatalog = await Promise.all(
-    companies.map(async (company) => ({
-      companyId: company.id,
-      teamNames: await listAvailableTeamNames(company.id),
-    })),
-  );
-  const availableTeamNamesByCompany = Object.fromEntries(
-    teamCatalog.map((item) => [item.companyId, item.teamNames]),
-  );
+  const [previousInvoices, availableTeamNames] = selectedCompanyId
+    ? await Promise.all([
+        listInvoicesForCompany(selectedCompanyId),
+        listAvailableTeamNames(selectedCompanyId),
+      ])
+    : [[], []];
+  const availableTeamNamesByCompany = selectedCompanyId
+    ? { [selectedCompanyId]: availableTeamNames }
+    : {};
 
   return (
     <Shell title="Create invoice" eyebrow="Billing workflow">
@@ -66,20 +69,35 @@ export default async function CreateInvoicePage({
             {flashMessage}
           </div>
         ) : null}
+        <form action="/invoices/create" className="mb-5 flex flex-wrap items-end gap-3">
+          <Field label="Filter company">
+            <select name="companyId" className={inputClass} defaultValue={selectedCompanyId}>
+              {companies.map((company) => (
+                <option key={company.id} value={company.id}>
+                  {company.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <PendingSubmitButton
+            className="btn-outline"
+            defaultText="Load company"
+            pendingText="Loading..."
+          />
+        </form>
         <form action={createInvoiceDraftAction}>
           <CreateInvoiceForm
-            companies={companies.map((company) => ({
+            initialCompanyId={selectedCompanyId}
+            companies={(selectedCompany ? [selectedCompany] : []).map((company) => ({
               id: company.id,
               name: company.name,
             }))}
-            previousInvoices={previousInvoices.flatMap(({ company, invoices }) =>
-              invoices.map((invoice) => ({
-                companyId: company.id,
-                invoiceId: invoice.id,
-                invoiceNumber: invoice.invoiceNumber,
-                status: invoice.status,
-              })),
-            )}
+            previousInvoices={previousInvoices.map((invoice) => ({
+              companyId: selectedCompanyId,
+              invoiceId: invoice.id,
+              invoiceNumber: invoice.invoiceNumber,
+              status: invoice.status,
+            }))}
             availableTeamNamesByCompany={availableTeamNamesByCompany}
           />
           <CreateInvoiceSubmitButton />

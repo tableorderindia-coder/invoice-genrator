@@ -2,6 +2,10 @@ import { formatMonthYear } from "./utils";
 
 type MultiSelectInput = string | string[] | undefined;
 
+type CompanySelectionOption = {
+  id: string;
+};
+
 export function normalizeMultiSelectValue(input?: MultiSelectInput) {
   const values = Array.isArray(input) ? input : input ? [input] : [];
   const normalized = values.flatMap((value) =>
@@ -12,6 +16,20 @@ export function normalizeMultiSelectValue(input?: MultiSelectInput) {
   );
 
   return [...new Set(normalized)];
+}
+
+export function resolveSelectedCompanyId(input: {
+  companyId?: MultiSelectInput;
+  companies: CompanySelectionOption[];
+}) {
+  const requestedCompanyId = normalizeMultiSelectValue(input.companyId)[0] ?? "";
+  const companyIds = new Set(input.companies.map((company) => company.id));
+
+  if (requestedCompanyId && companyIds.has(requestedCompanyId)) {
+    return requestedCompanyId;
+  }
+
+  return input.companies[0]?.id ?? "";
 }
 
 export function formatPaymentMonthLabel(paymentMonth: string) {

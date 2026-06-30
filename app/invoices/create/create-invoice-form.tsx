@@ -12,6 +12,7 @@ type CompanyOption = {
 };
 
 type CreateInvoiceFormProps = {
+  initialCompanyId: string;
   companies: CompanyOption[];
   previousInvoices: Array<{
     companyId: string;
@@ -23,7 +24,10 @@ type CreateInvoiceFormProps = {
 };
 
 export function CreateInvoiceForm(props: CreateInvoiceFormProps) {
-  const initialCompanyId = props.companies[0]?.id ?? "";
+  const initialCompanyId =
+    props.companies.some((company) => company.id === props.initialCompanyId)
+      ? props.initialCompanyId
+      : props.companies[0]?.id ?? "";
   const [companyId, setCompanyId] = useState(initialCompanyId);
   const [month, setMonth] = useState("4");
   const [year, setYear] = useState("2026");

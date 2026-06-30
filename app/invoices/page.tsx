@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ConfirmDeleteInvoiceButton } from "./confirm-delete-invoice-button";
 import { Shell } from "../_components/shell";
 import { GlassPanel } from "../_components/glass-panel";
+import { Field, inputClass } from "../_components/field";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
 import { requirePageAccess } from "@/lib/auth/server";
 import {
@@ -11,7 +12,8 @@ import {
   syncInvoiceToEorPortalAction,
   updateInvoiceStatusAction,
 } from "@/src/features/billing/actions";
-import { listCompanies, listInvoices } from "@/src/features/billing/store";
+import { resolveSelectedCompanyId } from "@/src/features/billing/filter-selection";
+import { listCompanies, listInvoicesForCompany } from "@/src/features/billing/store";
 import { formatDate, formatMonthYear, formatUsd } from "@/src/features/billing/utils";
 
 export const dynamic = "force-dynamic";
@@ -31,14 +33,27 @@ export default async function InvoicesPage({
   searchParams,
 }: {
   searchParams: Promise<{
+    companyId?: string | string[];
     flashStatus?: string | string[];
     flashMessage?: string | string[];
   }>;
 }) {
   await requirePageAccess("invoices");
   const resolvedSearchParams = await searchParams;
-  const [invoices, companies] = await Promise.all([listInvoices(), listCompanies()]);
+  const companies = await listCompanies();
+  const selectedCompanyId = resolveSelectedCompanyId({
+    companyId: resolvedSearchParams.companyId,
+    companies,
+  });
+  const invoices = selectedCompanyId ? await listInvoicesForCompany(selectedCompanyId) : [];
+  const selectedCompany = companies.find((company) => company.id === selectedCompanyId);
   const companyMap = new Map(companies.map((company) => [company.id, company.name]));
+  const filteredInvoicesPath = selectedCompanyId
+    ? `/invoices?companyId=${encodeURIComponent(selectedCompanyId)}`
+    : "/invoices";
+  const createInvoiceHref = selectedCompanyId
+    ? `/invoices/create?companyId=${encodeURIComponent(selectedCompanyId)}`
+    : "/invoices/create";
   const flashStatus = Array.isArray(resolvedSearchParams.flashStatus)
     ? resolvedSearchParams.flashStatus[0]
     : resolvedSearchParams.flashStatus;
@@ -58,22 +73,38 @@ export default async function InvoicesPage({
               All invoices live here for daily operations.
             </p>
           </div>
-          <Link href="/invoices/create" className="btn-outline">
+          <Link href={createInvoiceHref} className="btn-outline">
             Go to create invoice
           </Link>
         </div>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {companies.map((company) => (
-            <form key={company.id} action={syncCompanyToEorPortalAction}>
-              <input type="hidden" name="companyId" value={company.id} />
-              <input type="hidden" name="returnTo" value="/invoices" />
+        <div className="mt-4 flex flex-wrap items-end gap-3">
+          <form action="/invoices" className="flex flex-wrap items-end gap-3">
+            <Field label="Filter company">
+              <select name="companyId" className={inputClass} defaultValue={selectedCompanyId}>
+                {companies.map((company) => (
+                  <option key={company.id} value={company.id}>
+                    {company.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <PendingSubmitButton
+              className="btn-outline"
+              defaultText="Load company"
+              pendingText="Loading..."
+            />
+          </form>
+          {selectedCompany ? (
+            <form action={syncCompanyToEorPortalAction}>
+              <input type="hidden" name="companyId" value={selectedCompany.id} />
+              <input type="hidden" name="returnTo" value={filteredInvoicesPath} />
               <PendingSubmitButton
                 className="btn-outline"
-                defaultText={`Sync ${company.name} to EOR`}
+                defaultText={`Sync ${selectedCompany.name} to EOR`}
                 pendingText="Syncing company..."
               />
             </form>
-          ))}
+          ) : null}
         </div>
 
         {flashMessage ? (
@@ -144,7 +175,7 @@ export default async function InvoicesPage({
                       {invoice.status !== "draft" ? (
                         <form action={syncInvoiceToEorPortalAction}>
                           <input type="hidden" name="invoiceId" value={invoice.id} />
-                          <input type="hidden" name="returnTo" value="/invoices" />
+                          <input type="hidden" name="returnTo" value={filteredInvoicesPath} />
                           <PendingSubmitButton
                             className="btn-outline"
                             defaultText="Sync to EOR Portal"
@@ -154,7 +185,7 @@ export default async function InvoicesPage({
                       ) : null}
                       <form action={deleteInvoiceAction}>
                         <input type="hidden" name="invoiceId" value={invoice.id} />
-                        <input type="hidden" name="returnTo" value="/invoices" />
+                        <input type="hidden" name="returnTo" value={filteredInvoicesPath} />
                         <ConfirmDeleteInvoiceButton
                           className="btn-outline"
                           message={`Delete invoice ${invoice.invoiceNumber}? This permanently removes all linked invoice data.`}
@@ -164,6 +195,7 @@ export default async function InvoicesPage({
                         <form action={updateInvoiceStatusAction}>
                           <input type="hidden" name="invoiceId" value={invoice.id} />
                           <input type="hidden" name="status" value="received" />
+                          <input type="hidden" name="returnTo" value={filteredInvoicesPath} />
                           <PendingSubmitButton
                             className="gradient-btn"
                             defaultText="Mark payment received"
@@ -208,7 +240,7 @@ export default async function InvoicesPage({
               {invoices.length === 0 && (
                 <tr>
                   <td colSpan={7} className="text-center py-8" style={{ color: "var(--text-muted)" }}>
-                    No invoices yet.
+                    No invoices for this company yet.
                   </td>
                 </tr>
               )}
