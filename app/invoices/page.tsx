@@ -8,8 +8,6 @@ import { PendingSubmitButton } from "../_components/pending-submit-button";
 import { requirePageAccess } from "@/lib/auth/server";
 import {
   deleteInvoiceAction,
-  syncCompanyToEorPortalAction,
-  syncInvoiceToEorPortalAction,
   updateInvoiceStatusAction,
 } from "@/src/features/billing/actions";
 import { resolveSelectedCompanyId } from "@/src/features/billing/filter-selection";
@@ -46,7 +44,6 @@ export default async function InvoicesPage({
     companies,
   });
   const invoices = selectedCompanyId ? await listInvoicesForCompany(selectedCompanyId) : [];
-  const selectedCompany = companies.find((company) => company.id === selectedCompanyId);
   const companyMap = new Map(companies.map((company) => [company.id, company.name]));
   const filteredInvoicesPath = selectedCompanyId
     ? `/invoices?companyId=${encodeURIComponent(selectedCompanyId)}`
@@ -91,17 +88,6 @@ export default async function InvoicesPage({
               pendingText="Loading..."
             />
           </form>
-          {selectedCompany ? (
-            <form action={syncCompanyToEorPortalAction}>
-              <input type="hidden" name="companyId" value={selectedCompany.id} />
-              <input type="hidden" name="returnTo" value={filteredInvoicesPath} />
-              <PendingSubmitButton
-                className="btn-outline"
-                defaultText={`Sync ${selectedCompany.name} to EOR`}
-                pendingText="Syncing company..."
-              />
-            </form>
-          ) : null}
         </div>
 
         {flashMessage ? (
@@ -169,17 +155,6 @@ export default async function InvoicesPage({
                       <Link href={`/invoices/${invoice.id}`} className="btn-outline">
                         Open editor
                       </Link>
-                      {invoice.status !== "draft" ? (
-                        <form action={syncInvoiceToEorPortalAction}>
-                          <input type="hidden" name="invoiceId" value={invoice.id} />
-                          <input type="hidden" name="returnTo" value={filteredInvoicesPath} />
-                          <PendingSubmitButton
-                            className="btn-outline"
-                            defaultText="Sync to EOR Portal"
-                            pendingText="Syncing..."
-                          />
-                        </form>
-                      ) : null}
                       <form action={deleteInvoiceAction}>
                         <input type="hidden" name="invoiceId" value={invoice.id} />
                         <input type="hidden" name="returnTo" value={filteredInvoicesPath} />
