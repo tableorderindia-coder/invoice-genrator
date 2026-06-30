@@ -8,7 +8,6 @@ import { StaggerGrid } from "../_components/stagger-grid";
 import { requirePageAccess } from "@/lib/auth/server";
 import { createEmployeeAction, updateEmployeeAction } from "@/src/features/billing/actions";
 import { listCompanies, listEmployees, getDashboardMetrics } from "@/src/features/billing/store";
-import { resolveSelectedCompanyId } from "@/src/features/billing/filter-selection";
 import { formatUsd, formatSignedUsd, formatInr } from "@/src/features/billing/utils";
 
 export const dynamic = "force-dynamic";
@@ -16,24 +15,15 @@ export const dynamic = "force-dynamic";
 export default async function EmployeesPage({
   searchParams,
 }: {
-  searchParams: Promise<{
-    tab?: string | string[];
-    companyId?: string | string[];
-    employeeId?: string | string[];
-  }>;
+  searchParams: Promise<{ tab?: string | string[]; employeeId?: string | string[] }>;
 }) {
   await requirePageAccess("employees");
   const resolvedSearchParams = await searchParams;
-  const [companies, metrics] = await Promise.all([
+  const [companies, employees, metrics] = await Promise.all([
     listCompanies(),
+    listEmployees(),
     getDashboardMetrics()
   ]);
-  const selectedCompanyId = resolveSelectedCompanyId({
-    companyId: resolvedSearchParams.companyId,
-    companies,
-  });
-  const employees = selectedCompanyId ? await listEmployees(selectedCompanyId) : [];
-  const selectedCompany = companies.find((company) => company.id === selectedCompanyId);
 
   const employeeProfitMap = new Map(
     metrics.realizedProfitByEmployee.map((e) => [e.employeeId, e.realizedProfitUsdCents])
@@ -47,42 +37,19 @@ export default async function EmployeesPage({
     : resolvedSearchParams.employeeId;
   const selectedEmployee =
     employees.find((employee) => employee.id === selectedEmployeeIdRaw) ?? employees[0];
-  const companyQuery = selectedCompanyId
-    ? `companyId=${encodeURIComponent(selectedCompanyId)}`
-    : "";
-  const addHref = companyQuery ? `/employees?tab=add&${companyQuery}` : "/employees?tab=add";
-  const editHref = companyQuery ? `/employees?tab=edit&${companyQuery}` : "/employees?tab=edit";
 
   return (
     <Shell title="Employees" eyebrow="Defaults for billing">
       <section className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
         <GlassPanel gradient>
           <div className="flex items-center gap-2">
-            <Link href={addHref} className={activeTab === "add" ? "gradient-btn" : "btn-outline"}>
+            <Link href="/employees?tab=add" className={activeTab === "add" ? "gradient-btn" : "btn-outline"}>
               Add employee
             </Link>
-            <Link href={editHref} className={activeTab === "edit" ? "gradient-btn" : "btn-outline"}>
+            <Link href="/employees?tab=edit" className={activeTab === "edit" ? "gradient-btn" : "btn-outline"}>
               Edit employee
             </Link>
           </div>
-
-          <form action="/employees" className="mt-5 flex flex-wrap items-end gap-3">
-            <input type="hidden" name="tab" value={activeTab} />
-            <Field label="Filter company">
-              <select name="companyId" className={inputClass} defaultValue={selectedCompanyId}>
-                {companies.map((company) => (
-                  <option key={company.id} value={company.id}>
-                    {company.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <PendingSubmitButton
-              className="btn-outline"
-              defaultText="Load company"
-              pendingText="Loading..."
-            />
-          </form>
 
           {activeTab === "add" ? (
             <form action={createEmployeeAction}>
@@ -91,7 +58,7 @@ export default async function EmployeesPage({
               </h2>
               <div className="mt-5 grid gap-4 md:grid-cols-2">
                 <Field label="Company">
-                  <select name="companyId" required className={inputClass} defaultValue={selectedCompanyId}>
+                  <select name="companyId" required className={inputClass}>
                     {companies.map((company) => (
                       <option key={company.id} value={company.id}>
                         {company.name}
@@ -150,7 +117,6 @@ export default async function EmployeesPage({
               <div className="mt-4">
                 <form action="/employees" className="flex items-end gap-2">
                   <input type="hidden" name="tab" value="edit" />
-                  <input type="hidden" name="companyId" value={selectedCompanyId} />
                   <Field label="Select employee">
                     <select
                       name="employeeId"
@@ -241,9 +207,6 @@ export default async function EmployeesPage({
           <h2 className="text-xl font-semibold" style={{ color: "var(--text-primary)" }}>
             Employee defaults
           </h2>
-          <p className="mt-1 text-sm" style={{ color: "var(--text-secondary)" }}>
-            {selectedCompany ? selectedCompany.name : "No company selected"}
-          </p>
           <StaggerGrid className="mt-5 space-y-4">
             {employees.map((employee) => {
               const profit = employeeProfitMap.get(employee.id) ?? 0;
