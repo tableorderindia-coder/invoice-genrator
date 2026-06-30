@@ -70,9 +70,9 @@ export default async function DraftInvoicePage({
 
   return (
     <Shell title={detail.invoice.invoiceNumber} eyebrow="Draft editor">
-      <section className="flex min-w-0 flex-col gap-6 xl:flex-row xl:items-start">
+      <section className="flex min-w-0 flex-col gap-6">
         <div
-          className="min-w-0 flex-1 space-y-6 overflow-x-auto"
+          className="min-w-0 space-y-6"
           data-testid="invoice-table-section"
           style={{ scrollBehavior: "smooth" }}
         >
@@ -273,7 +273,7 @@ export default async function DraftInvoicePage({
           </GlassPanel>
 
           <GlassPanel>
-            <div className="flex items-center justify-between gap-3 mb-4">
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] gradient-text">
                   Invoice teams
@@ -281,6 +281,76 @@ export default async function DraftInvoicePage({
                 <h3 className="mt-1 text-xl font-semibold" style={{ color: "var(--text-primary)" }}>
                   {detail.teams.length > 0 ? `${detail.teams.length} teams selected` : "No teams selected"}
                 </h3>
+              </div>
+              <div className="grid w-full gap-3 lg:w-auto lg:grid-cols-2">
+                <div
+                  className="rounded-2xl p-4"
+                  style={{
+                    background: "rgba(255,255,255,0.02)",
+                    border: "1px solid var(--glass-border)",
+                  }}
+                >
+                  <h4 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+                    Add existing team
+                  </h4>
+                  <form action={addInvoiceTeamAction} className="mt-3 flex flex-wrap items-center gap-2">
+                    <input type="hidden" name="invoiceId" value={detail.invoice.id} />
+                    <input type="hidden" name="companyId" value={detail.company.id} />
+                    <input type="hidden" name="returnTo" value={returnTo} />
+                    <select
+                      name="selectedTeamName"
+                      className={inputClass}
+                      disabled={remainingTeamNames.length === 0}
+                      defaultValue={remainingTeamNames[0] ?? ""}
+                      style={{ minWidth: "14rem" }}
+                    >
+                      {remainingTeamNames.length === 0 ? (
+                        <option value="">All available teams are already on this invoice</option>
+                      ) : (
+                        remainingTeamNames.map((teamName) => (
+                          <option key={teamName} value={teamName}>
+                            {teamName}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                    <PendingSubmitButton
+                      className="gradient-btn"
+                      disabled={remainingTeamNames.length === 0}
+                      style={remainingTeamNames.length === 0 ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
+                      defaultText="Add selected team"
+                      pendingText="Adding team..."
+                    />
+                  </form>
+                </div>
+                <div
+                  className="rounded-2xl p-4"
+                  style={{
+                    background: "rgba(255,255,255,0.02)",
+                    border: "1px solid var(--glass-border)",
+                  }}
+                >
+                  <h4 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+                    Create new team
+                  </h4>
+                  <form action={addInvoiceTeamAction} className="mt-3 flex flex-wrap items-center gap-2">
+                    <input type="hidden" name="invoiceId" value={detail.invoice.id} />
+                    <input type="hidden" name="companyId" value={detail.company.id} />
+                    <input type="hidden" name="returnTo" value={returnTo} />
+                    <input
+                      name="newTeamName"
+                      required
+                      placeholder="Operations"
+                      className={inputClass}
+                      style={{ minWidth: "12rem" }}
+                    />
+                    <PendingSubmitButton
+                      className="gradient-btn"
+                      defaultText="Create team"
+                      pendingText="Creating team..."
+                    />
+                  </form>
+                </div>
               </div>
             </div>
 
@@ -530,64 +600,6 @@ export default async function DraftInvoicePage({
             </div>
           </GlassPanel>
 
-        </div>
-
-        <aside
-          className="min-w-0 space-y-6 xl:sticky xl:top-4 xl:h-[calc(100vh-2rem)] xl:w-[340px] xl:min-w-[340px] xl:flex-none xl:overflow-y-auto xl:border-l xl:pl-4"
-          data-testid="invoice-sidebar-section"
-          style={{ borderColor: "rgba(255,255,255,0.1)" }}
-        >
-          <GlassPanel gradient>
-            <h3 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
-              Add existing team
-            </h3>
-            <form action={addInvoiceTeamAction} className="mt-4 space-y-3">
-              <input type="hidden" name="invoiceId" value={detail.invoice.id} />
-              <input type="hidden" name="companyId" value={detail.company.id} />
-              <input type="hidden" name="returnTo" value={returnTo} />
-              <select
-                name="selectedTeamName"
-                className={inputClass}
-                disabled={remainingTeamNames.length === 0}
-                defaultValue={remainingTeamNames[0] ?? ""}
-              >
-                {remainingTeamNames.length === 0 ? (
-                  <option value="">All available teams are already on this invoice</option>
-                ) : (
-                  remainingTeamNames.map((teamName) => (
-                    <option key={teamName} value={teamName}>
-                      {teamName}
-                    </option>
-                  ))
-                )}
-              </select>
-              <PendingSubmitButton
-                className="gradient-btn w-full"
-                disabled={remainingTeamNames.length === 0}
-                style={remainingTeamNames.length === 0 ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
-                defaultText="Add selected team"
-                pendingText="Adding team..."
-              />
-            </form>
-          </GlassPanel>
-
-          <GlassPanel gradient>
-            <h3 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
-              Create new team
-            </h3>
-            <form action={addInvoiceTeamAction} className="mt-4 space-y-3">
-              <input type="hidden" name="invoiceId" value={detail.invoice.id} />
-              <input type="hidden" name="companyId" value={detail.company.id} />
-              <input type="hidden" name="returnTo" value={returnTo} />
-              <input name="newTeamName" required placeholder="Operations" className={inputClass} />
-              <PendingSubmitButton
-                className="gradient-btn w-full"
-                defaultText="Create team and add to invoice"
-                pendingText="Creating team..."
-              />
-            </form>
-          </GlassPanel>
-
           <GlassPanel gradient>
             <h3 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
               Add adjustments
@@ -620,13 +632,14 @@ export default async function DraftInvoicePage({
               <input type="hidden" name="returnTo" value={returnTo} />
               <textarea name="noteText" defaultValue={detail.invoice.noteText} rows={5} className={inputClass} />
               <PendingSubmitButton
-                className="btn-outline w-full"
+                className="btn-outline"
                 defaultText="Save note"
                 pendingText="Saving note..."
               />
             </form>
           </GlassPanel>
-        </aside>
+
+        </div>
       </section>
     </Shell>
   );
