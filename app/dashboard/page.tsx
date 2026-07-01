@@ -14,17 +14,17 @@ import {
   resolveDashboardColumnSelection,
 } from "../../src/features/billing/filter-selection";
 import {
+  EMPLOYEE_DASHBOARD_COLUMN_OPTIONS,
+  PERIOD_DASHBOARD_COLUMN_OPTIONS,
+} from "../../src/features/billing/dashboard-column-options";
+import {
   getPnDashboardData,
   listCompanies,
   listEmployees,
   listAvailablePaymentMonths,
 } from "../../src/features/billing/store";
 import type { PnDashboardData } from "../../src/features/billing/types";
-import {
-  DashboardTables,
-  EMPLOYEE_DASHBOARD_COLUMN_OPTIONS,
-  PERIOD_DASHBOARD_COLUMN_OPTIONS,
-} from "./dashboard-tables";
+import { DashboardTables } from "./dashboard-tables";
 
 export const dynamic = "force-dynamic";
 

@@ -33,62 +33,6 @@ type DashboardTablesProps = {
   updateDashboardEmployeeCashFlowEntryAction: (formData: FormData) => Promise<void>;
 };
 
-export const EMPLOYEE_DASHBOARD_COLUMN_OPTIONS = [
-  { value: "daysWorked", label: "Days worked" },
-  { value: "dollarInward", label: "Dollar inward" },
-  { value: "onboardingAdvance", label: "Onboarding advance" },
-  { value: "reimbursements", label: "Employee reimbursements (USD)" },
-  { value: "reimbursementLabels", label: "Employee reimbursement labels" },
-  { value: "reimbursementsInr", label: "Employee reimbursements (INR)" },
-  { value: "appraisalAdvance", label: "Appraisal advance" },
-  { value: "appraisalAdvanceInr", label: "Appraisal advance (INR)" },
-  { value: "offboardingDeduction", label: "Offboarding deduction" },
-  { value: "effectiveDollarInward", label: "Effective dollar inward" },
-  { value: "cashoutRate", label: "Cashout rate" },
-  { value: "cashIn", label: "Total Cash Inward (INR)" },
-  { value: "monthlyUsd", label: "Monthly $" },
-  { value: "paidRate", label: "Paid rate" },
-  { value: "monthlyPaidInr", label: "Monthly paid INR" },
-  { value: "actualPaid", label: "Actual paid (INR)" },
-  { value: "pf", label: "PF (INR)" },
-  { value: "tds", label: "TDS (INR)" },
-  { value: "salaryPaid", label: "Salary paid" },
-  { value: "fxCommission", label: "FX commission (INR)" },
-  { value: "totalCommission", label: "Total commission (USD)" },
-  { value: "commissionEarned", label: "Commission earned (INR)" },
-  { value: "grossEarnings", label: "Gross earnings (INR)" },
-  { value: "netProfit", label: "Net Profit (INR)" },
-];
-
-export const PERIOD_DASHBOARD_COLUMN_OPTIONS = [
-  { value: "dollarInward", label: "Dollar inward" },
-  { value: "onboardingAdvance", label: "Onboarding advance" },
-  { value: "reimbursements", label: "Employee reimbursements (USD)" },
-  { value: "reimbursementLabels", label: "Employee reimbursement labels" },
-  { value: "reimbursementsInr", label: "Employee reimbursements (INR)" },
-  { value: "appraisalAdvance", label: "Appraisal advance" },
-  { value: "appraisalAdvanceInr", label: "Appraisal advance (INR)" },
-  { value: "offboardingDeduction", label: "Offboarding deduction" },
-  { value: "effectiveDollarInward", label: "Effective dollar inward" },
-  { value: "cashoutRate", label: "Cashout rate" },
-  { value: "cashIn", label: "Total Cash Inward (INR)" },
-  { value: "monthlyUsd", label: "Monthly $" },
-  { value: "paidRate", label: "Paid rate" },
-  { value: "monthlyPaidInr", label: "Monthly paid INR" },
-  { value: "actualPaid", label: "Actual paid (INR)" },
-  { value: "pf", label: "PF (INR)" },
-  { value: "tds", label: "TDS (INR)" },
-  { value: "salaryPaid", label: "Salary paid (INR)" },
-  { value: "fxCommission", label: "FX commission (INR)" },
-  { value: "totalCommission", label: "Total commission (USD)" },
-  { value: "commissionEarned", label: "Commission earned (INR)" },
-  { value: "grossEarnings", label: "Gross earnings (INR)" },
-  { value: "expenses", label: "Expenses (INR)" },
-  { value: "companyReimbursementUsd", label: "Reimb. (USD)" },
-  { value: "companyReimbursementInr", label: "Reimb. (INR)" },
-  { value: "netPl", label: "Net P/L (INR)" },
-];
-
 const EMPLOYEE_ALWAYS_VISIBLE_COLUMN_KEYS = new Set(["month", "actions"]);
 const PERIOD_ALWAYS_VISIBLE_COLUMN_KEYS = new Set(["period"]);
 

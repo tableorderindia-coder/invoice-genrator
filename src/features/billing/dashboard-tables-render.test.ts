@@ -4,11 +4,11 @@ import { createElement } from "react";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { DashboardTables } from "../../../app/dashboard/dashboard-tables";
 import {
-  DashboardTables,
   EMPLOYEE_DASHBOARD_COLUMN_OPTIONS,
   PERIOD_DASHBOARD_COLUMN_OPTIONS,
-} from "../../../app/dashboard/dashboard-tables";
+} from "./dashboard-column-options";
 import type { PnDashboardData, PnEmployeeEditableRow, PnPeriodRow } from "./types";
 
 const allEmployeeColumnKeys = EMPLOYEE_DASHBOARD_COLUMN_OPTIONS.map(
