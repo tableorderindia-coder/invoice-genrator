@@ -10,6 +10,7 @@ create table if not exists employees (
   id text primary key,
   company_id text not null references companies (id) on delete cascade,
   full_name text not null,
+  phone_number text,
   designation text not null,
   default_team text not null,
   billing_rate_usd_cents integer not null,

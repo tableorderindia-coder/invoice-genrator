@@ -90,6 +90,7 @@ type DbEmployee = {
   id: string;
   company_id: string;
   full_name: string;
+  phone_number?: string | null;
   designation: string;
   default_team: string;
   billing_rate_usd_cents: number;
@@ -412,6 +413,7 @@ function mapEmployee(row: DbEmployee): Employee {
     id: row.id,
     companyId: row.company_id,
     fullName: row.full_name,
+    phoneNumber: row.phone_number ?? undefined,
     designation: row.designation,
     defaultTeam: row.default_team,
     billingRateUsdCents: row.billing_rate_usd_cents,
@@ -934,6 +936,7 @@ export async function createTeam(input: {
 export async function createEmployee(input: {
   companyId: string;
   fullName: string;
+  phoneNumber?: string;
   designation: string;
   defaultTeam: string;
   billingRateUsdCents: number;
@@ -963,6 +966,7 @@ export async function createEmployee(input: {
     id: nextId("employee"),
     company_id: input.companyId,
     full_name: input.fullName,
+    phone_number: input.phoneNumber || null,
     designation: input.designation,
     default_team: input.defaultTeam,
     billing_rate_usd_cents: input.billingRateUsdCents,
@@ -1921,6 +1925,7 @@ export async function updateEmployee(input: {
   employeeId: string;
   companyId: string;
   fullName: string;
+  phoneNumber?: string;
   designation: string;
   defaultTeam: string;
   billingRateUsdCents: number;
@@ -1938,6 +1943,7 @@ export async function updateEmployee(input: {
   const payload = {
     company_id: input.companyId,
     full_name: input.fullName,
+    phone_number: input.phoneNumber || null,
     designation: input.designation,
     default_team: input.defaultTeam,
     billing_rate_usd_cents: input.billingRateUsdCents,
@@ -2375,6 +2381,8 @@ export async function getPnDashboardData(input: {
         effectiveDollarInwardUsdCents,
         cashoutUsdInrRate: row.cashout_usd_inr_rate,
       });
+      const salaryPaidInrCents =
+        row.actual_paid_inr_cents - row.pf_inr_cents - row.tds_inr_cents;
 
       return {
         employeeId: row.employee_id,
@@ -2400,7 +2408,7 @@ export async function getPnDashboardData(input: {
         totalCommissionUsdCents: row.total_commission_usd_cents,
         commissionEarnedInrCents: row.commission_earned_inr_cents,
         cashInInrCents,
-        salaryPaidInrCents: row.actual_paid_inr_cents - row.pf_inr_cents - row.tds_inr_cents,
+        salaryPaidInrCents,
         netProfitInrCents: calculateEmployeeMonthNetInrCents({
           cashInInrCents,
           salaryPaidInrCents: row.actual_paid_inr_cents,
@@ -2438,6 +2446,8 @@ export async function getPnDashboardData(input: {
         effectiveDollarInwardUsdCents,
         cashoutUsdInrRate: row.cashout_usd_inr_rate,
       });
+      const salaryPaidInrCents =
+        row.actual_paid_inr_cents - row.pf_inr_cents - row.tds_inr_cents;
 
       return {
         rowId: row.id,
@@ -2461,7 +2471,7 @@ export async function getPnDashboardData(input: {
         employeeMonthlyUsdCents: row.monthly_paid_usd_cents,
         cashoutUsdInrRate: row.cashout_usd_inr_rate,
         paidUsdInrRate: row.paid_usd_inr_rate,
-        salaryPaidInrCents: row.actual_paid_inr_cents,
+        salaryPaidInrCents,
         pfInrCents: row.pf_inr_cents,
         tdsInrCents: row.tds_inr_cents,
         actualPaidInrCents: row.actual_paid_inr_cents,

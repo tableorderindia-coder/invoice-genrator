@@ -139,9 +139,51 @@ describe("dashboard tables rendering", () => {
     const table = screen.getByRole("table");
     const headers = within(table).getAllByRole("columnheader");
     const totalsRow = within(table).getByText("Totals").closest("tr");
+    const headerTexts = headers.map((header) =>
+      header.textContent?.replace(/\s+/g, " ").trim(),
+    );
 
     expect(totalsRow).not.toBeNull();
     expect(within(totalsRow as HTMLElement).getAllByRole("cell")).toHaveLength(headers.length);
+    expect(headerTexts).toContain("Total Cash Inward (INR)");
+  });
+
+  it("totals employee salary paid from the displayed salary paid rows", () => {
+    render(
+      createElement(DashboardTables, {
+        view: "employee",
+        periodType: "monthly",
+        data: {
+          ...baseData,
+          employeeEditableSections: [
+            {
+              ...baseData.employeeEditableSections[0],
+              rows: [
+                {
+                  ...employeeRow,
+                  salaryPaidInrCents: employeeRow.actualPaidInrCents,
+                },
+              ],
+            },
+          ],
+        },
+        returnTo: "/dashboard",
+        updateDashboardEmployeeCashFlowEntryAction: vi.fn(async () => {}),
+      }),
+    );
+
+    const table = screen.getByRole("table");
+    const headers = within(table).getAllByRole("columnheader");
+    const salaryPaidIndex = headers.findIndex(
+      (header) => header.textContent?.replace(/\s+/g, " ").trim() === "Salary paid",
+    );
+    const totalsRow = within(table).getByText("Totals").closest("tr");
+
+    expect(salaryPaidIndex).toBeGreaterThan(-1);
+    expect(totalsRow).not.toBeNull();
+    expect(
+      within(totalsRow as HTMLElement).getAllByRole("cell")[salaryPaidIndex]?.textContent,
+    ).toBe("₹14,500.00");
   });
 
   it("updates the period totals net p/l when expenses are excluded", () => {

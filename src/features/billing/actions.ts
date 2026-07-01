@@ -175,6 +175,7 @@ export async function createEmployeeAction(formData: FormData) {
   await createEmployee({
     companyId: getString(formData, "companyId"),
     fullName: getString(formData, "fullName"),
+    phoneNumber: getString(formData, "phoneNumber") || undefined,
     designation: getString(formData, "designation"),
     defaultTeam: getString(formData, "defaultTeam"),
     billingRateUsdCents: centsFromUsd(getString(formData, "billingRateUsd")),
@@ -211,6 +212,7 @@ export async function updateEmployeeAction(formData: FormData) {
     employeeId: getString(formData, "employeeId"),
     companyId: getString(formData, "companyId"),
     fullName: getString(formData, "fullName"),
+    phoneNumber: getString(formData, "phoneNumber") || undefined,
     designation: getString(formData, "designation"),
     defaultTeam: getString(formData, "defaultTeam"),
     billingRateUsdCents: centsFromUsd(getString(formData, "billingRateUsd")),

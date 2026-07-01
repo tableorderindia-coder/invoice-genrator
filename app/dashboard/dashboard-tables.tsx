@@ -108,6 +108,10 @@ function calculateMonthlyPaidInrCents(monthlyUsdCents: number, paidUsdInrRate: n
   return Math.round(monthlyUsdCents * paidUsdInrRate);
 }
 
+function getSalaryPaidInrCents(row: PnEmployeeEditableRow) {
+  return row.actualPaidInrCents - row.pfInrCents - row.tdsInrCents;
+}
+
 function formatRate(rate: number | null) {
   if (rate === null) {
     return "-";
@@ -325,7 +329,7 @@ function EmployeeTables({
     },
     {
       key: "cashIn",
-      label: "Cash in (INR)",
+      label: "Total Cash Inward (INR)",
       render: (row) => formatInr(row.cashInInrCents),
     },
     {
@@ -455,8 +459,7 @@ function EmployeeTables({
     {
       key: "salaryPaid",
       label: "Salary paid",
-      render: (row) =>
-        formatInr(row.actualPaidInrCents - row.pfInrCents - row.tdsInrCents),
+      render: (row) => formatInr(getSalaryPaidInrCents(row)),
     },
     {
       key: "fxCommission",
@@ -555,7 +558,9 @@ function EmployeeTables({
       case "tds":
         return formatInr(totals.tdsInrCents);
       case "salaryPaid":
-        return formatInr(totals.salaryPaidInrCents);
+        return formatInr(
+          totals.actualPaidInrCents - totals.pfInrCents - totals.tdsInrCents,
+        );
       case "fxCommission":
         return formatInr(totals.fxCommissionInrCents);
       case "totalCommission":

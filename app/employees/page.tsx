@@ -8,6 +8,7 @@ import { StaggerGrid } from "../_components/stagger-grid";
 import { requirePageAccess } from "@/lib/auth/server";
 import { createEmployeeAction, updateEmployeeAction } from "@/src/features/billing/actions";
 import { listCompanies, listEmployees, getDashboardMetrics } from "@/src/features/billing/store";
+import { buildWhatsAppHref } from "@/src/features/billing/employee-contact";
 import { resolveSelectedCompanyId } from "@/src/features/billing/filter-selection";
 import { formatUsd, formatSignedUsd, formatInr } from "@/src/features/billing/utils";
 
@@ -102,6 +103,9 @@ export default async function EmployeesPage({
                 <Field label="Name">
                   <input name="fullName" required className={inputClass} placeholder="Jane Doe" />
                 </Field>
+                <Field label="Phone number">
+                  <input name="phoneNumber" type="tel" className={inputClass} placeholder="+91 98765 43210" />
+                </Field>
                 <Field label="Designation">
                   <input name="designation" required className={inputClass} placeholder="Senior Engineer" />
                 </Field>
@@ -186,6 +190,9 @@ export default async function EmployeesPage({
                   <Field label="Name">
                     <input name="fullName" required className={inputClass} defaultValue={selectedEmployee?.fullName} />
                   </Field>
+                  <Field label="Phone number">
+                    <input name="phoneNumber" type="tel" className={inputClass} defaultValue={selectedEmployee?.phoneNumber ?? ""} />
+                  </Field>
                   <Field label="Designation">
                     <input name="designation" required className={inputClass} defaultValue={selectedEmployee?.designation} />
                   </Field>
@@ -248,6 +255,7 @@ export default async function EmployeesPage({
             {employees.map((employee) => {
               const profit = employeeProfitMap.get(employee.id) ?? 0;
               const profitColor = profit === 0 ? "var(--text-primary)" : (profit > 0 ? "#6ee7b7" : "#fca5a5");
+              const whatsappHref = buildWhatsAppHref(employee.phoneNumber);
               return (
               <div
                 key={employee.id}
@@ -281,6 +289,30 @@ export default async function EmployeesPage({
                     </p>
                   </div>
                 </div>
+                {employee.phoneNumber ? (
+                  <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+                    <span style={{ color: "var(--text-muted)" }}>Phone</span>
+                    <span
+                      className="font-medium"
+                      style={{
+                        color: "var(--text-primary)",
+                        fontFamily: "var(--font-jetbrains-mono), monospace",
+                      }}
+                    >
+                      {employee.phoneNumber}
+                    </span>
+                    {whatsappHref ? (
+                      <a
+                        href={whatsappHref}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="btn-outline px-3 py-1 text-xs"
+                      >
+                        WhatsApp
+                      </a>
+                    ) : null}
+                  </div>
+                ) : null}
                 <div className="mt-3 flex flex-wrap gap-2">
                   <span
                     className="rounded-full px-3 py-1 text-xs font-medium"

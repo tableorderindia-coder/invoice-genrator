@@ -19,6 +19,7 @@ export type Employee = {
   id: string;
   companyId: string;
   fullName: string;
+  phoneNumber?: string;
   designation: string;
   defaultTeam: string;
   billingRateUsdCents: number;
