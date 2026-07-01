@@ -140,6 +140,12 @@ export type DashboardMetrics = {
   }>;
 };
 
+export type CompanyPnSummary = {
+  companyId: string;
+  companyName: string;
+  netPlInrCents: number;
+};
+
 export type PnPeriodType = "monthly" | "yearly";
 
 export type PnEmployeeMonthRow = {

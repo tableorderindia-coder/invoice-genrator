@@ -8,8 +8,8 @@ import { StaggerGrid } from "../_components/stagger-grid";
 import { requirePageAccess } from "@/lib/auth/server";
 import { canEditPage } from "@/lib/auth/authorization";
 import { createCompanyAction, syncCompanyToEorPortalAction, updateCompanyAction } from "@/src/features/billing/actions";
-import { listCompanies, getDashboardMetrics } from "@/src/features/billing/store";
-import { formatSignedUsd } from "@/src/features/billing/utils";
+import { getCompanyPnSummaries, listCompanies } from "@/src/features/billing/store";
+import { formatSignedInr } from "@/src/features/billing/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -72,9 +72,9 @@ export default async function CompaniesPage({
 }) {
   const context = await requirePageAccess("companies");
   const resolvedSearchParams = await searchParams;
-  const [companies, metrics] = await Promise.all([
+  const [companies, companyPnSummaries] = await Promise.all([
     listCompanies(),
-    getDashboardMetrics()
+    getCompanyPnSummaries()
   ]);
   const canSyncToEor = canEditPage({
     role: context.profile.role,
@@ -98,7 +98,7 @@ export default async function CompaniesPage({
     : resolvedSearchParams.flashMessage;
 
   const profitMap = new Map(
-    metrics.realizedProfitByCompany.map((c) => [c.companyId, c.realizedProfitUsdCents])
+    companyPnSummaries.map((c) => [c.companyId, c.netPlInrCents])
   );
 
   return (
@@ -239,9 +239,9 @@ export default async function CompaniesPage({
                         {company.name.charAt(0).toUpperCase()}
                       </div>
                       <div className="text-right mt-1">
-                        <p className="text-[10px] uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Net P/L</p>
+                        <p className="text-[10px] uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Net P/L (INR)</p>
                         <p className="text-sm font-semibold" style={{ color: profitColor }}>
-                          {formatSignedUsd(profit)}
+                          {formatSignedInr(profit)}
                         </p>
                       </div>
                     </div>

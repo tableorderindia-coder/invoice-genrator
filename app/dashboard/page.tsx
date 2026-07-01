@@ -11,6 +11,7 @@ import {
   buildDashboardFilterFieldEntries,
   formatPaymentMonthLabel,
   normalizeMultiSelectValue,
+  resolveDashboardColumnSelection,
 } from "../../src/features/billing/filter-selection";
 import {
   getPnDashboardData,
@@ -19,7 +20,11 @@ import {
   listAvailablePaymentMonths,
 } from "../../src/features/billing/store";
 import type { PnDashboardData } from "../../src/features/billing/types";
-import { DashboardTables } from "./dashboard-tables";
+import {
+  DashboardTables,
+  EMPLOYEE_DASHBOARD_COLUMN_OPTIONS,
+  PERIOD_DASHBOARD_COLUMN_OPTIONS,
+} from "./dashboard-tables";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +41,8 @@ export default async function DashboardPage({
     flashMessage?: string | string[];
     allMonths?: string | string[];
     paymentMonths?: string | string[];
+    employeeColumns?: string | string[];
+    periodColumns?: string | string[];
   }>;
 }) {
   await requirePageAccess("dashboard");
@@ -84,6 +91,14 @@ export default async function DashboardPage({
   const allEffectivePaymentMonthsSelected =
     availableMonths.length > 0 &&
     effectivePaymentMonths.length === availableMonths.length;
+  const employeeColumnKeys = resolveDashboardColumnSelection({
+    selectedColumns: resolved.employeeColumns,
+    allowedColumns: EMPLOYEE_DASHBOARD_COLUMN_OPTIONS.map((option) => option.value),
+  });
+  const periodColumnKeys = resolveDashboardColumnSelection({
+    selectedColumns: resolved.periodColumns,
+    allowedColumns: PERIOD_DASHBOARD_COLUMN_OPTIONS.map((option) => option.value),
+  });
 
   const dashboardFilterFields = buildDashboardFilterFieldEntries({
     companyId: selectedCompanyId,
@@ -93,6 +108,8 @@ export default async function DashboardPage({
     paymentMonths: effectivePaymentMonths,
     allEmployees: allEffectiveEmployeeIdsSelected,
     allMonths: allEffectivePaymentMonthsSelected,
+    employeeColumns: employeeColumnKeys,
+    periodColumns: periodColumnKeys,
   });
 
   const dashboardSwitchFields = buildDashboardFilterFieldEntries({
@@ -103,6 +120,8 @@ export default async function DashboardPage({
     paymentMonths: effectivePaymentMonths,
     allEmployees: allEffectiveEmployeeIdsSelected,
     allMonths: allEffectivePaymentMonthsSelected,
+    employeeColumns: employeeColumnKeys,
+    periodColumns: periodColumnKeys,
     includeView: false,
   });
 
@@ -112,10 +131,13 @@ export default async function DashboardPage({
     view,
     allEmployees: allEffectiveEmployeeIdsSelected,
     allMonths: allEffectivePaymentMonthsSelected,
+    employeeColumns: employeeColumnKeys,
+    periodColumns: periodColumnKeys,
     includeEmployeeIds: false,
     includePaymentMonths: false,
     includeAllEmployees: false,
     includeAllMonths: false,
+    includeEmployeeColumns: false,
   });
 
   const periodFilterFields = buildDashboardFilterFieldEntries({
@@ -124,6 +146,35 @@ export default async function DashboardPage({
     view,
     allEmployees: allEffectiveEmployeeIdsSelected,
     allMonths: allEffectivePaymentMonthsSelected,
+    employeeColumns: employeeColumnKeys,
+    periodColumns: periodColumnKeys,
+    includeEmployeeIds: false,
+    includePaymentMonths: false,
+    includeAllEmployees: false,
+    includeAllMonths: false,
+    includePeriodColumns: false,
+  });
+
+  const periodTypeSwitchFields = buildDashboardFilterFieldEntries({
+    companyId: selectedCompanyId,
+    periodType,
+    view,
+    employeeIds: effectiveEmployeeIds,
+    paymentMonths: effectivePaymentMonths,
+    allEmployees: allEffectiveEmployeeIdsSelected,
+    allMonths: allEffectivePaymentMonthsSelected,
+    employeeColumns: employeeColumnKeys,
+    periodColumns: periodColumnKeys,
+    includePeriodType: false,
+  });
+
+  const companyLoadFields = buildDashboardFilterFieldEntries({
+    companyId: selectedCompanyId,
+    periodType,
+    view,
+    employeeColumns: employeeColumnKeys,
+    periodColumns: periodColumnKeys,
+    includeCompanyId: false,
     includeEmployeeIds: false,
     includePaymentMonths: false,
     includeAllEmployees: false,
@@ -190,8 +241,14 @@ export default async function DashboardPage({
             </select>
           </label>
           <div className="flex gap-2">
-            <input type="hidden" name="periodType" value={periodType} />
-            <input type="hidden" name="view" value={view} />
+            {companyLoadFields.map((field, index) => (
+              <input
+                key={`${field.name}-${field.value}-${index}`}
+                type="hidden"
+                name={field.name}
+                value={field.value}
+              />
+            ))}
             <PendingSubmitButton
               className="gradient-btn"
               defaultText="Load company"
@@ -278,6 +335,13 @@ export default async function DashboardPage({
                 defaultSelectedValues={effectivePaymentMonths}
                 includeSelectAll
               />
+              <ChecklistFilterDropdown
+                name="employeeColumns"
+                label="Columns"
+                options={EMPLOYEE_DASHBOARD_COLUMN_OPTIONS}
+                defaultSelectedValues={employeeColumnKeys}
+                includeSelectAll
+              />
             </div>
             <PendingSubmitButton
               className="btn-outline"
@@ -290,6 +354,8 @@ export default async function DashboardPage({
             periodType={periodType}
             data={data}
             returnTo={returnTo}
+            employeeColumnKeys={employeeColumnKeys}
+            periodColumnKeys={periodColumnKeys}
             updateDashboardEmployeeCashFlowEntryAction={
               updateDashboardEmployeeCashFlowEntryAction
             }
@@ -327,6 +393,13 @@ export default async function DashboardPage({
                 defaultSelectedValues={effectivePaymentMonths}
                 includeSelectAll
               />
+              <ChecklistFilterDropdown
+                name="periodColumns"
+                label="Columns"
+                options={PERIOD_DASHBOARD_COLUMN_OPTIONS}
+                defaultSelectedValues={periodColumnKeys}
+                includeSelectAll
+              />
             </div>
             <PendingSubmitButton
               className="btn-outline"
@@ -335,7 +408,7 @@ export default async function DashboardPage({
             />
           </form>
           <form action="/dashboard" className="mb-4 flex flex-wrap items-center gap-2">
-            {periodFilterFields.map((field, index) => (
+            {periodTypeSwitchFields.map((field, index) => (
               <input
                 key={`${field.name}-${field.value}-${index}`}
                 type="hidden"
@@ -365,6 +438,8 @@ export default async function DashboardPage({
             periodType={periodType}
             data={data}
             returnTo={returnTo}
+            employeeColumnKeys={employeeColumnKeys}
+            periodColumnKeys={periodColumnKeys}
             updateDashboardEmployeeCashFlowEntryAction={
               updateDashboardEmployeeCashFlowEntryAction
             }

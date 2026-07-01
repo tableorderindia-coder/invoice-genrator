@@ -10,6 +10,7 @@ import {
   filterSavedCashFlowRows,
   formatPaymentMonthLabel,
   normalizeMultiSelectValue,
+  resolveDashboardColumnSelection,
   resolveSelectedCompanyId,
   resolveSavedCashFlowFilters,
 } from "./filter-selection";
@@ -210,6 +211,44 @@ describe("filter selection helpers", () => {
       { name: "periodType", value: "monthly" },
       { name: "view", value: "employee" },
     ]);
+  });
+
+  it("preserves selected dashboard columns in filter fields", () => {
+    expect(
+      buildDashboardFilterFieldEntries({
+        companyId: "comp_1",
+        periodType: "monthly",
+        view: "employee",
+        employeeColumns: ["cashIn", "salaryPaid"],
+        periodColumns: ["cashIn", "netPl"],
+      }),
+    ).toEqual([
+      { name: "companyId", value: "comp_1" },
+      { name: "periodType", value: "monthly" },
+      { name: "view", value: "employee" },
+      { name: "employeeColumns", value: "cashIn" },
+      { name: "employeeColumns", value: "salaryPaid" },
+      { name: "periodColumns", value: "cashIn" },
+      { name: "periodColumns", value: "netPl" },
+    ]);
+  });
+
+  it("resolves dashboard column selections against allowed keys", () => {
+    expect(
+      resolveDashboardColumnSelection({
+        selectedColumns: [" cashIn ", "missing", "salaryPaid,cashIn"],
+        allowedColumns: ["cashIn", "salaryPaid", "netProfit"],
+      }),
+    ).toEqual(["cashIn", "salaryPaid"]);
+  });
+
+  it("treats an empty dashboard column selection as all columns", () => {
+    expect(
+      resolveDashboardColumnSelection({
+        selectedColumns: undefined,
+        allowedColumns: ["cashIn", "salaryPaid", "netProfit"],
+      }),
+    ).toEqual(["cashIn", "salaryPaid", "netProfit"]);
   });
 
   it("omits stale employee and month selections from period filter load forms", () => {

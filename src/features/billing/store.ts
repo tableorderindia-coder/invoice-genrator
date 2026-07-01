@@ -20,6 +20,8 @@ import {
   buildPnEmployeeEditableSections,
   buildPnEmployeeSections,
   buildPnPeriodRows,
+  calculatePnPeriodNetPlInrCents,
+  sumPnPeriodNetPlInrCents,
   type PnEditableSourceRow,
   type PnSourceRow,
 } from "./pn-dashboard";
@@ -42,6 +44,7 @@ import type {
   AdjustmentType,
   Company,
   CompanyExpense,
+  CompanyPnSummary,
   DashboardMetrics,
   Employee,
   EmployeeStatementInvoiceRow,
@@ -2511,9 +2514,26 @@ function toFounderBalanceSourceRows(input: {
       companyId: input.companyId,
       year: row.year,
       month: row.month ?? 1,
-      netPlInrCents:
-        row.netPlInrCents + row.companyReimbursementInrCents - row.expensesInrCents,
+      netPlInrCents: calculatePnPeriodNetPlInrCents(row),
     }));
+}
+
+export async function getCompanyPnSummaries(): Promise<CompanyPnSummary[]> {
+  const companies = await listCompanies();
+  return Promise.all(
+    companies.map(async (company) => {
+      const data = await getPnDashboardData({
+        companyId: company.id,
+        periodType: "monthly",
+      });
+
+      return {
+        companyId: company.id,
+        companyName: company.name,
+        netPlInrCents: sumPnPeriodNetPlInrCents(data.periodRows),
+      };
+    }),
+  );
 }
 
 function isFounderKey(value: string): value is FounderWithdrawal["founderKey"] {

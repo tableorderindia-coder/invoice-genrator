@@ -77,6 +77,18 @@ export function resolveSavedCashFlowFilters(input: {
   };
 }
 
+export function resolveDashboardColumnSelection(input: {
+  selectedColumns?: MultiSelectInput;
+  allowedColumns: string[];
+}) {
+  const allowedColumnSet = new Set(input.allowedColumns);
+  const selectedColumns = normalizeMultiSelectValue(input.selectedColumns).filter((value) =>
+    allowedColumnSet.has(value),
+  );
+
+  return selectedColumns.length > 0 ? selectedColumns : input.allowedColumns;
+}
+
 export function buildEmployeeCashFlowFilterFieldEntries(input: {
   companyId: string;
   month: string;
@@ -133,6 +145,8 @@ export function buildDashboardFilterFieldEntries(input: {
   paymentMonths?: MultiSelectInput;
   allEmployees?: boolean;
   allMonths?: boolean;
+  employeeColumns?: MultiSelectInput;
+  periodColumns?: MultiSelectInput;
   includeCompanyId?: boolean;
   includePeriodType?: boolean;
   includeView?: boolean;
@@ -140,6 +154,8 @@ export function buildDashboardFilterFieldEntries(input: {
   includePaymentMonths?: boolean;
   includeAllEmployees?: boolean;
   includeAllMonths?: boolean;
+  includeEmployeeColumns?: boolean;
+  includePeriodColumns?: boolean;
 }) {
   const fields: Array<{ name: string; value: string }> = [];
 
@@ -179,6 +195,24 @@ export function buildDashboardFilterFieldEntries(input: {
 
   if (input.includeAllMonths !== false && input.allMonths) {
     fields.push({ name: "allMonths", value: "1" });
+  }
+
+  if (input.includeEmployeeColumns !== false) {
+    fields.push(
+      ...normalizeMultiSelectValue(input.employeeColumns).map((value) => ({
+        name: "employeeColumns",
+        value,
+      })),
+    );
+  }
+
+  if (input.includePeriodColumns !== false) {
+    fields.push(
+      ...normalizeMultiSelectValue(input.periodColumns).map((value) => ({
+        name: "periodColumns",
+        value,
+      })),
+    );
   }
 
   return fields;

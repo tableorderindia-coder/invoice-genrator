@@ -8,6 +8,7 @@ import {
   buildEmployeeSectionTotals,
   buildPeriodTotals,
 } from "../../src/features/billing/dashboard-table-totals";
+import { calculatePnPeriodNetPlInrCents } from "../../src/features/billing/pn-dashboard";
 import type {
   PnDashboardData,
   PnEmployeeEditableRow,
@@ -27,14 +28,89 @@ type DashboardTablesProps = {
   periodType: PnPeriodType;
   data: PnDashboardData;
   returnTo: string;
+  employeeColumnKeys: string[];
+  periodColumnKeys: string[];
   updateDashboardEmployeeCashFlowEntryAction: (formData: FormData) => Promise<void>;
 };
+
+export const EMPLOYEE_DASHBOARD_COLUMN_OPTIONS = [
+  { value: "daysWorked", label: "Days worked" },
+  { value: "dollarInward", label: "Dollar inward" },
+  { value: "onboardingAdvance", label: "Onboarding advance" },
+  { value: "reimbursements", label: "Employee reimbursements (USD)" },
+  { value: "reimbursementLabels", label: "Employee reimbursement labels" },
+  { value: "reimbursementsInr", label: "Employee reimbursements (INR)" },
+  { value: "appraisalAdvance", label: "Appraisal advance" },
+  { value: "appraisalAdvanceInr", label: "Appraisal advance (INR)" },
+  { value: "offboardingDeduction", label: "Offboarding deduction" },
+  { value: "effectiveDollarInward", label: "Effective dollar inward" },
+  { value: "cashoutRate", label: "Cashout rate" },
+  { value: "cashIn", label: "Total Cash Inward (INR)" },
+  { value: "monthlyUsd", label: "Monthly $" },
+  { value: "paidRate", label: "Paid rate" },
+  { value: "monthlyPaidInr", label: "Monthly paid INR" },
+  { value: "actualPaid", label: "Actual paid (INR)" },
+  { value: "pf", label: "PF (INR)" },
+  { value: "tds", label: "TDS (INR)" },
+  { value: "salaryPaid", label: "Salary paid" },
+  { value: "fxCommission", label: "FX commission (INR)" },
+  { value: "totalCommission", label: "Total commission (USD)" },
+  { value: "commissionEarned", label: "Commission earned (INR)" },
+  { value: "grossEarnings", label: "Gross earnings (INR)" },
+  { value: "netProfit", label: "Net Profit (INR)" },
+];
+
+export const PERIOD_DASHBOARD_COLUMN_OPTIONS = [
+  { value: "dollarInward", label: "Dollar inward" },
+  { value: "onboardingAdvance", label: "Onboarding advance" },
+  { value: "reimbursements", label: "Employee reimbursements (USD)" },
+  { value: "reimbursementLabels", label: "Employee reimbursement labels" },
+  { value: "reimbursementsInr", label: "Employee reimbursements (INR)" },
+  { value: "appraisalAdvance", label: "Appraisal advance" },
+  { value: "appraisalAdvanceInr", label: "Appraisal advance (INR)" },
+  { value: "offboardingDeduction", label: "Offboarding deduction" },
+  { value: "effectiveDollarInward", label: "Effective dollar inward" },
+  { value: "cashoutRate", label: "Cashout rate" },
+  { value: "cashIn", label: "Total Cash Inward (INR)" },
+  { value: "monthlyUsd", label: "Monthly $" },
+  { value: "paidRate", label: "Paid rate" },
+  { value: "monthlyPaidInr", label: "Monthly paid INR" },
+  { value: "actualPaid", label: "Actual paid (INR)" },
+  { value: "pf", label: "PF (INR)" },
+  { value: "tds", label: "TDS (INR)" },
+  { value: "salaryPaid", label: "Salary paid (INR)" },
+  { value: "fxCommission", label: "FX commission (INR)" },
+  { value: "totalCommission", label: "Total commission (USD)" },
+  { value: "commissionEarned", label: "Commission earned (INR)" },
+  { value: "grossEarnings", label: "Gross earnings (INR)" },
+  { value: "expenses", label: "Expenses (INR)" },
+  { value: "companyReimbursementUsd", label: "Reimb. (USD)" },
+  { value: "companyReimbursementInr", label: "Reimb. (INR)" },
+  { value: "netPl", label: "Net P/L (INR)" },
+];
+
+const EMPLOYEE_ALWAYS_VISIBLE_COLUMN_KEYS = new Set(["month", "actions"]);
+const PERIOD_ALWAYS_VISIBLE_COLUMN_KEYS = new Set(["period"]);
+
+function filterColumns<Row>(
+  columns: Column<Row>[],
+  selectedColumnKeys: string[],
+  alwaysVisibleColumnKeys: Set<string>,
+) {
+  const selectedColumnKeySet = new Set(selectedColumnKeys);
+  return columns.filter(
+    (column) =>
+      alwaysVisibleColumnKeys.has(column.key) || selectedColumnKeySet.has(column.key),
+  );
+}
 
 export function DashboardTables({
   view,
   periodType,
   data,
   returnTo,
+  employeeColumnKeys,
+  periodColumnKeys,
   updateDashboardEmployeeCashFlowEntryAction,
 }: DashboardTablesProps) {
   const [showDetails, setShowDetails] = useState(() => {
@@ -73,6 +149,7 @@ export function DashboardTables({
       <EmployeeTables
         data={data}
         returnTo={returnTo}
+        selectedColumnKeys={employeeColumnKeys}
         toggleColumns={toggleColumns}
         toggleButton={toggleButton}
         updateDashboardEmployeeCashFlowEntryAction={updateDashboardEmployeeCashFlowEntryAction}
@@ -84,6 +161,7 @@ export function DashboardTables({
     <PeriodTables
       data={data}
       periodType={periodType}
+      selectedColumnKeys={periodColumnKeys}
       toggleColumns={toggleColumns}
       toggleButton={toggleButton}
     />
@@ -123,6 +201,7 @@ function formatRate(rate: number | null) {
 type EmployeeTablesProps = {
   data: PnDashboardData;
   returnTo: string;
+  selectedColumnKeys: string[];
   toggleColumns: ToggleColumn[];
   toggleButton: ReactNode;
   updateDashboardEmployeeCashFlowEntryAction: (formData: FormData) => Promise<void>;
@@ -131,6 +210,7 @@ type EmployeeTablesProps = {
 function EmployeeTables({
   data,
   returnTo,
+  selectedColumnKeys,
   toggleColumns,
   toggleButton,
   updateDashboardEmployeeCashFlowEntryAction,
@@ -504,7 +584,7 @@ function EmployeeTables({
     },
   ];
 
-  const columns: Column<PnEmployeeEditableRow>[] = [
+  const allColumns: Column<PnEmployeeEditableRow>[] = [
     ...employeePrefixColumns,
     ...toggleColumns.map((col) => ({
       key: col.key,
@@ -513,6 +593,11 @@ function EmployeeTables({
     })),
     ...employeeSuffixColumns,
   ];
+  const columns = filterColumns(
+    allColumns,
+    selectedColumnKeys,
+    EMPLOYEE_ALWAYS_VISIBLE_COLUMN_KEYS,
+  );
 
   const renderEmployeeTotalCell = (
     column: Column<PnEmployeeEditableRow>,
@@ -648,6 +733,7 @@ function EmployeeTables({
 type PeriodTablesProps = {
   data: PnDashboardData;
   periodType: PnPeriodType;
+  selectedColumnKeys: string[];
   toggleColumns: ToggleColumn[];
   toggleButton: ReactNode;
 };
@@ -655,6 +741,7 @@ type PeriodTablesProps = {
 function PeriodTables({
   data,
   periodType,
+  selectedColumnKeys,
   toggleColumns,
   toggleButton,
 }: PeriodTablesProps) {
@@ -692,10 +779,10 @@ function PeriodTables({
 
   // Compute dynamic Net P/L for each row
   const computeNetPl = (row: PnPeriodRow) => {
-    let net = row.netPlInrCents; // base (just employee net profit)
-    if (includeReimbursements) net += row.companyReimbursementInrCents;
-    if (includeExpenses) net -= row.expensesInrCents;
-    return net;
+    return calculatePnPeriodNetPlInrCents(row, {
+      includeExpenses,
+      includeReimbursements,
+    });
   };
 
   const renderToggleCell = (key: ToggleColumn["key"], row: PnPeriodRow) => {
@@ -753,6 +840,31 @@ function PeriodTables({
 
   const periodSuffixColumns: Column<PnPeriodRow>[] = [
     {
+      key: "cashoutRate",
+      label: "Cashout rate",
+      render: (row) => formatRate(row.cashoutUsdInrRate),
+    },
+    {
+      key: "cashIn",
+      label: "Total Cash Inward (INR)",
+      render: (row) => formatInr(row.cashInInrCents),
+    },
+    {
+      key: "monthlyUsd",
+      label: "Monthly $",
+      render: (row) => formatUsd(row.employeeMonthlyUsdCents),
+    },
+    {
+      key: "paidRate",
+      label: "Paid rate",
+      render: (row) => formatRate(row.paidUsdInrRate),
+    },
+    {
+      key: "monthlyPaidInr",
+      label: "Monthly paid INR",
+      render: (row) => formatInr(row.monthlyPaidInrCents),
+    },
+    {
       key: "actualPaid",
       label: "Actual paid (INR)",
       render: (row) => formatInr(row.actualPaidInrCents),
@@ -794,7 +906,7 @@ function PeriodTables({
     },
   ];
 
-  // Expense + Reimbursement + Net P/L columns — these are always shown
+  // Expense, reimbursement, and net P/L columns keep their header controls when selected.
   const financialColumns: Column<PnPeriodRow>[] = [
     {
       key: "expenses",
@@ -833,7 +945,7 @@ function PeriodTables({
     },
   ];
 
-  const columns: Column<PnPeriodRow>[] = [
+  const allColumns: Column<PnPeriodRow>[] = [
     ...periodPrefixColumns,
     ...toggleColumns.map((col) => ({
       key: col.key,
@@ -843,6 +955,11 @@ function PeriodTables({
     ...periodSuffixColumns,
     ...financialColumns,
   ];
+  const columns = filterColumns(
+    allColumns,
+    selectedColumnKeys,
+    PERIOD_ALWAYS_VISIBLE_COLUMN_KEYS,
+  );
 
   const periodTotals = buildPeriodTotals(data.periodRows, {
     includeExpenses,
@@ -882,6 +999,8 @@ function PeriodTables({
         return formatUsd(totals.employeeMonthlyUsdCents);
       case "paidRate":
         return formatRate(totals.paidUsdInrRate);
+      case "monthlyPaidInr":
+        return formatInr(totals.monthlyPaidInrCents);
       case "pf":
         return formatInr(totals.pfInrCents);
       case "tds":

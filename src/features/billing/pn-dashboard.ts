@@ -73,6 +73,37 @@ const sumBy = (rows: PnSourceRow[], key: keyof PnSourceRow) =>
 const sumEditableBy = (rows: PnEditableSourceRow[], key: keyof PnEditableSourceRow) =>
   rows.reduce((sum, row) => sum + Number(row[key]), 0);
 
+export function calculatePnPeriodNetPlInrCents(
+  row: Pick<
+    PnPeriodRow,
+    "netPlInrCents" | "companyReimbursementInrCents" | "expensesInrCents"
+  >,
+  options: { includeExpenses?: boolean; includeReimbursements?: boolean } = {},
+) {
+  const includeExpenses = options.includeExpenses ?? true;
+  const includeReimbursements = options.includeReimbursements ?? true;
+  return (
+    row.netPlInrCents +
+    (includeReimbursements ? row.companyReimbursementInrCents : 0) -
+    (includeExpenses ? row.expensesInrCents : 0)
+  );
+}
+
+export function sumPnPeriodNetPlInrCents(
+  rows: Array<
+    Pick<
+      PnPeriodRow,
+      "netPlInrCents" | "companyReimbursementInrCents" | "expensesInrCents"
+    >
+  >,
+  options: { includeExpenses?: boolean; includeReimbursements?: boolean } = {},
+) {
+  return rows.reduce(
+    (sum, row) => sum + calculatePnPeriodNetPlInrCents(row, options),
+    0,
+  );
+}
+
 const toEmployeeMonthRow = (rows: PnSourceRow[]): PnEmployeeMonthRow => {
   const first = rows[0];
   const fxCommissionInrCents = sumBy(rows, "fxCommissionInrCents");

@@ -4,6 +4,7 @@ import {
   buildPnEmployeeEditableSections,
   buildPnEmployeeSections,
   buildPnPeriodRows,
+  sumPnPeriodNetPlInrCents,
   type PnEditableSourceRow,
   type PnSourceRow,
 } from "./pn-dashboard";
@@ -158,6 +159,37 @@ const editableSampleRows: PnEditableSourceRow[] = [
     netProfitInrCents: 2373250,
   },
 ];
+
+const periodRowBase = {
+  year: 2026,
+  month: 1,
+  dollarInwardUsdCents: 0,
+  onboardingAdvanceUsdCents: 0,
+  reimbursementUsdCents: 0,
+  reimbursementLabelsText: "",
+  reimbursementInrCents: 0,
+  appraisalAdvanceUsdCents: 0,
+  appraisalAdvanceInrCents: 0,
+  offboardingDeductionUsdCents: 0,
+  effectiveDollarInwardUsdCents: 0,
+  cashoutUsdInrRate: 0,
+  cashInInrCents: 0,
+  employeeMonthlyUsdCents: 0,
+  paidUsdInrRate: 0,
+  monthlyPaidInrCents: 0,
+  pfInrCents: 0,
+  tdsInrCents: 0,
+  actualPaidInrCents: 0,
+  salaryPaidInrCents: 0,
+  fxCommissionInrCents: 0,
+  totalCommissionUsdCents: 0,
+  commissionEarnedInrCents: 0,
+  grossEarningsInrCents: 0,
+  expensesInrCents: 0,
+  companyReimbursementUsdCents: 0,
+  companyReimbursementInrCents: 0,
+  netPlInrCents: 0,
+};
 
 describe("pn dashboard aggregations", () => {
   it("builds employee sections with gross totals per employee", () => {
@@ -428,5 +460,22 @@ describe("pn dashboard aggregations", () => {
       -100000,
     ]);
     expect(sections[0]?.totalNetProfitInrCents).toBe(150000);
+  });
+
+  it("sums company P/L with the same default period dashboard inclusions", () => {
+    expect(sumPnPeriodNetPlInrCents([
+      {
+        ...periodRowBase,
+        netPlInrCents: 1_000_00,
+        companyReimbursementInrCents: 250_00,
+        expensesInrCents: 100_00,
+      },
+      {
+        ...periodRowBase,
+        netPlInrCents: 500_00,
+        companyReimbursementInrCents: 50_00,
+        expensesInrCents: 25_00,
+      },
+    ])).toBe(1_675_00);
   });
 });

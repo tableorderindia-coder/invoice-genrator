@@ -4,8 +4,17 @@ import { createElement } from "react";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { DashboardTables } from "../../../app/dashboard/dashboard-tables";
+import {
+  DashboardTables,
+  EMPLOYEE_DASHBOARD_COLUMN_OPTIONS,
+  PERIOD_DASHBOARD_COLUMN_OPTIONS,
+} from "../../../app/dashboard/dashboard-tables";
 import type { PnDashboardData, PnEmployeeEditableRow, PnPeriodRow } from "./types";
+
+const allEmployeeColumnKeys = EMPLOYEE_DASHBOARD_COLUMN_OPTIONS.map(
+  (option) => option.value,
+);
+const allPeriodColumnKeys = PERIOD_DASHBOARD_COLUMN_OPTIONS.map((option) => option.value);
 
 const employeeRow: PnEmployeeEditableRow = {
   payoutId: "payout_1",
@@ -132,6 +141,8 @@ describe("dashboard tables rendering", () => {
         periodType: "monthly",
         data: baseData,
         returnTo: "/dashboard",
+        employeeColumnKeys: allEmployeeColumnKeys,
+        periodColumnKeys: allPeriodColumnKeys,
         updateDashboardEmployeeCashFlowEntryAction: vi.fn(async () => {}),
       }),
     );
@@ -168,6 +179,8 @@ describe("dashboard tables rendering", () => {
           ],
         },
         returnTo: "/dashboard",
+        employeeColumnKeys: allEmployeeColumnKeys,
+        periodColumnKeys: allPeriodColumnKeys,
         updateDashboardEmployeeCashFlowEntryAction: vi.fn(async () => {}),
       }),
     );
@@ -193,6 +206,8 @@ describe("dashboard tables rendering", () => {
         periodType: "monthly",
         data: baseData,
         returnTo: "/dashboard",
+        employeeColumnKeys: allEmployeeColumnKeys,
+        periodColumnKeys: allPeriodColumnKeys,
         updateDashboardEmployeeCashFlowEntryAction: vi.fn(async () => {}),
       }),
     );
@@ -212,6 +227,8 @@ describe("dashboard tables rendering", () => {
         periodType: "monthly",
         data: baseData,
         returnTo: "/dashboard",
+        employeeColumnKeys: allEmployeeColumnKeys,
+        periodColumnKeys: allPeriodColumnKeys,
         updateDashboardEmployeeCashFlowEntryAction: vi.fn(async () => {}),
       }),
     );
@@ -224,6 +241,11 @@ describe("dashboard tables rendering", () => {
       "Period",
       "Dollar inward",
       "Effective dollar inward",
+      "Cashout rate",
+      "Total Cash Inward (INR)",
+      "Monthly $",
+      "Paid rate",
+      "Monthly paid INR",
       "Actual paid (INR)",
       "PF (INR)",
       "TDS (INR)",
@@ -237,5 +259,50 @@ describe("dashboard tables rendering", () => {
       "In P/LReimb. (INR)",
       "Net P/L (INR)",
     ]);
+  });
+
+  it("renders only selected employee columns plus fixed columns", () => {
+    render(
+      createElement(DashboardTables, {
+        view: "employee",
+        periodType: "monthly",
+        data: baseData,
+        returnTo: "/dashboard",
+        employeeColumnKeys: ["cashIn", "netProfit"],
+        periodColumnKeys: allPeriodColumnKeys,
+        updateDashboardEmployeeCashFlowEntryAction: vi.fn(async () => {}),
+      }),
+    );
+
+    const headerTexts = screen
+      .getAllByRole("columnheader")
+      .map((header) => header.textContent?.replace(/\s+/g, " ").trim() ?? "");
+
+    expect(headerTexts).toEqual([
+      "Month",
+      "Total Cash Inward (INR)",
+      "Net Profit (INR)",
+      "Actions",
+    ]);
+  });
+
+  it("renders only selected monthly period columns plus the period column", () => {
+    render(
+      createElement(DashboardTables, {
+        view: "period",
+        periodType: "monthly",
+        data: baseData,
+        returnTo: "/dashboard",
+        employeeColumnKeys: allEmployeeColumnKeys,
+        periodColumnKeys: ["cashIn", "netPl"],
+        updateDashboardEmployeeCashFlowEntryAction: vi.fn(async () => {}),
+      }),
+    );
+
+    const headerTexts = screen
+      .getAllByRole("columnheader")
+      .map((header) => header.textContent?.replace(/\s+/g, " ").trim() ?? "");
+
+    expect(headerTexts).toEqual(["Period", "Total Cash Inward (INR)", "Net P/L (INR)"]);
   });
 });
