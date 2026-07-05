@@ -6,59 +6,11 @@ import { Field, inputClass } from "../_components/field";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
 import { StaggerGrid } from "../_components/stagger-grid";
 import { requirePageAccess } from "@/lib/auth/server";
-import { canEditPage } from "@/lib/auth/authorization";
-import { createCompanyAction, syncCompanyToEorPortalAction, updateCompanyAction } from "@/src/features/billing/actions";
+import { createCompanyAction, updateCompanyAction } from "@/src/features/billing/actions";
 import { getCompanyPnSummaries, listCompanies } from "@/src/features/billing/store";
 import { formatSignedInr } from "@/src/features/billing/utils";
 
 export const dynamic = "force-dynamic";
-
-function FlashMessage({ status, message }: { status?: string; message?: string }) {
-  if (!message) return null;
-
-  return (
-    <div
-      className="mt-4 rounded-2xl px-4 py-3 text-sm font-medium"
-      style={{
-        background: status === "error" ? "rgba(248, 113, 113, 0.08)" : "rgba(16, 185, 129, 0.08)",
-        border: status === "error" ? "1px solid rgba(248, 113, 113, 0.25)" : "1px solid rgba(16, 185, 129, 0.25)",
-        color: status === "error" ? "#fca5a5" : "#6ee7b7",
-      }}
-    >
-      {message}
-    </div>
-  );
-}
-
-function CompanySyncControl({
-  canSync,
-  companyId,
-  returnTo,
-}: {
-  canSync: boolean;
-  companyId: string;
-  returnTo: string;
-}) {
-  if (!canSync) {
-    return (
-      <p className="rounded-2xl px-3 py-2 text-xs font-semibold" style={{ border: "1px solid var(--glass-border)", color: "var(--text-muted)" }}>
-        Invoice edit access is required to sync finance data.
-      </p>
-    );
-  }
-
-  return (
-    <form action={syncCompanyToEorPortalAction}>
-      <input type="hidden" name="companyId" value={companyId} />
-      <input type="hidden" name="returnTo" value={returnTo} />
-      <PendingSubmitButton
-        className="btn-outline"
-        defaultText="Sync all details to EOR Portal"
-        pendingText="Syncing company..."
-      />
-    </form>
-  );
-}
 
 export default async function CompaniesPage({
   searchParams,
@@ -66,21 +18,14 @@ export default async function CompaniesPage({
   searchParams: Promise<{
     tab?: string | string[];
     companyId?: string | string[];
-    flashStatus?: string | string[];
-    flashMessage?: string | string[];
   }>;
 }) {
-  const context = await requirePageAccess("companies");
+  await requirePageAccess("companies");
   const resolvedSearchParams = await searchParams;
   const [companies, companyPnSummaries] = await Promise.all([
     listCompanies(),
     getCompanyPnSummaries()
   ]);
-  const canSyncToEor = canEditPage({
-    role: context.profile.role,
-    page: "invoices",
-    permissions: context.permissions,
-  });
   const tab = Array.isArray(resolvedSearchParams.tab)
     ? resolvedSearchParams.tab[0]
     : resolvedSearchParams.tab;
@@ -90,12 +35,6 @@ export default async function CompaniesPage({
     : resolvedSearchParams.companyId;
   const selectedCompany =
     companies.find((company) => company.id === selectedCompanyIdRaw) ?? companies[0];
-  const flashStatus = Array.isArray(resolvedSearchParams.flashStatus)
-    ? resolvedSearchParams.flashStatus[0]
-    : resolvedSearchParams.flashStatus;
-  const flashMessage = Array.isArray(resolvedSearchParams.flashMessage)
-    ? resolvedSearchParams.flashMessage[0]
-    : resolvedSearchParams.flashMessage;
 
   const profitMap = new Map(
     companyPnSummaries.map((c) => [c.companyId, c.netPlInrCents])
@@ -113,7 +52,6 @@ export default async function CompaniesPage({
               Edit company
             </Link>
           </div>
-          <FlashMessage status={flashStatus} message={flashMessage} />
 
           {activeTab === "add" ? (
             <form action={createCompanyAction}>
@@ -163,11 +101,6 @@ export default async function CompaniesPage({
                   pendingText="Loading..."
                 />
               </form>
-              {selectedCompany ? (
-                <div className="mt-4">
-                  <CompanySyncControl canSync={canSyncToEor} companyId={selectedCompany.id} returnTo="/companies?tab=edit" />
-                </div>
-              ) : null}
               <form action={updateCompanyAction}>
                 {selectedCompany ? <input type="hidden" name="companyId" value={selectedCompany.id} /> : null}
                 <div className="mt-5 space-y-4">
@@ -250,7 +183,6 @@ export default async function CompaniesPage({
                     <Link href={`/companies?tab=edit&companyId=${company.id}`} className="btn-outline">
                       Edit company
                     </Link>
-                    <CompanySyncControl canSync={canSyncToEor} companyId={company.id} returnTo="/companies" />
                   </div>
                 </div>
               );

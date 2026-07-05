@@ -45,7 +45,6 @@ import type {
   Company,
   CompanyExpense,
   CompanyPnSummary,
-  DashboardMetrics,
   Employee,
   EmployeeStatementInvoiceRow,
   EmployeeStatementMonthSummary,
@@ -131,13 +130,10 @@ type DbInvoiceLineItem = {
   designation_snapshot: string;
   team_name_snapshot: string;
   billing_rate_usd_cents: number;
-  payout_monthly_usd_cents_snapshot?: number | null;
   hrs_per_week: number;
   days_worked: number | null;
   billed_total_usd_cents: number;
   manual_total_usd_cents: number | null;
-  payout_total_usd_cents: number;
-  profit_total_usd_cents: number;
 };
 
 type DbInvoiceAdjustment = {
@@ -159,9 +155,6 @@ type DbInvoiceRealization = {
   realized_at: string;
   dollar_inbound_usd_cents?: number;
   usd_inr_rate?: number | null;
-  realized_revenue_usd_cents: number;
-  realized_payout_usd_cents: number;
-  realized_profit_usd_cents: number;
   notes: string | null;
   created_at: string;
 };
@@ -481,13 +474,10 @@ function mapInvoiceLineItem(row: DbInvoiceLineItem): InvoiceLineItem {
     designationSnapshot: row.designation_snapshot,
     teamNameSnapshot: row.team_name_snapshot,
     billingRateUsdCents: row.billing_rate_usd_cents,
-    payoutMonthlyUsdCentsSnapshot: row.payout_monthly_usd_cents_snapshot ?? 0,
     hrsPerWeek: Number(row.hrs_per_week),
     daysWorked: Number(row.days_worked ?? 0),
     billedTotalUsdCents: row.billed_total_usd_cents,
     manualTotalUsdCents: row.manual_total_usd_cents ?? undefined,
-    payoutTotalUsdCents: row.payout_total_usd_cents,
-    profitTotalUsdCents: row.profit_total_usd_cents,
   };
 }
 
@@ -611,17 +601,12 @@ function mapInvoiceAdjustment(row: DbInvoiceAdjustment) {
 }
 
 function mapInvoiceRealization(row: DbInvoiceRealization): InvoiceRealization {
-  const inboundUsdCents =
-    row.dollar_inbound_usd_cents ?? row.realized_revenue_usd_cents;
   return {
     id: row.id,
     invoiceId: row.invoice_id,
     realizedAt: row.realized_at,
-    dollarInboundUsdCents: inboundUsdCents,
+    dollarInboundUsdCents: row.dollar_inbound_usd_cents ?? 0,
     usdInrRate: Number(row.usd_inr_rate ?? 0),
-    realizedRevenueUsdCents: row.realized_revenue_usd_cents,
-    realizedPayoutUsdCents: row.realized_payout_usd_cents,
-    realizedProfitUsdCents: row.realized_profit_usd_cents,
     notes: row.notes ?? undefined,
     createdAt: row.created_at,
   };
@@ -1412,8 +1397,6 @@ async function addInvoiceLineItem(input: {
     hrs_per_week: input.hrsPerWeek,
     days_worked: normalizedDaysWorked,
     billed_total_usd_cents: calculated.billedTotalUsdCents,
-    payout_total_usd_cents: calculated.payoutTotalUsdCents,
-    profit_total_usd_cents: calculated.profitTotalUsdCents,
   };
 
   const data = await insertInvoiceLineItemWithSchemaFallback(payload);
@@ -1491,8 +1474,6 @@ export async function updateInvoiceLineItem(input: {
     days_worked: normalizedDaysWorked,
     billed_total_usd_cents: calculated.billedTotalUsdCents,
     manual_total_usd_cents: null,
-    payout_total_usd_cents: calculated.payoutTotalUsdCents,
-    profit_total_usd_cents: calculated.profitTotalUsdCents,
   });
 
   const { error: employeeUpdateError } = await supabase
@@ -1765,23 +1746,11 @@ export async function updateInvoiceLineItemTotal(input: {
   billedTotalUsdCents: number;
 }) {
   const supabase = await getSupabaseOrThrow();
-  const { data: lineRow, error: lineError } = await supabase
-    .from("invoice_line_items")
-    .select("*")
-    .eq("id", input.lineItemId)
-    .single();
-  if (lineError) throw lineError;
-
-  const existingLineItem = mapInvoiceLineItem(lineRow as DbInvoiceLineItem);
-  const profitTotalUsdCents =
-    input.billedTotalUsdCents - existingLineItem.payoutTotalUsdCents;
-
   const { error: updateError } = await supabase
     .from("invoice_line_items")
     .update({
       billed_total_usd_cents: input.billedTotalUsdCents,
       manual_total_usd_cents: input.billedTotalUsdCents,
-      profit_total_usd_cents: profitTotalUsdCents,
     })
     .eq("id", input.lineItemId);
   if (updateError) throw updateError;
@@ -2015,7 +1984,6 @@ export async function cashOutInvoice(
   const realization = createRealizationRecord({
     invoiceId,
     alreadyRealized: Boolean(detail.realization),
-    lineItems: detail.teams.flatMap((team) => team.lineItems),
     realizedAt,
     dollarInboundUsdCents,
     usdInrRate,
@@ -2028,9 +1996,6 @@ export async function cashOutInvoice(
     realized_at: realizedAt,
     dollar_inbound_usd_cents: realization.dollarInboundUsdCents,
     usd_inr_rate: realization.usdInrRate,
-    realized_revenue_usd_cents: realization.realizedRevenueUsdCents,
-    realized_payout_usd_cents: realization.realizedPayoutUsdCents,
-    realized_profit_usd_cents: realization.realizedProfitUsdCents,
     notes: null,
     created_at: nowIso(),
   };
@@ -2041,37 +2006,7 @@ export async function cashOutInvoice(
     .select()
     .single();
   if (error) {
-    const message =
-      typeof error === "object" && error && "message" in error
-        ? String(error.message)
-        : "";
-    const missingInboundColumn = message.includes("dollar_inbound_usd_cents");
-    const missingRateColumn = message.includes("usd_inr_rate");
-
-    if (!missingInboundColumn && !missingRateColumn) {
-      throw error;
-    }
-
-    const fallbackPayload = {
-      id: payload.id,
-      invoice_id: payload.invoice_id,
-      realized_at: payload.realized_at,
-      realized_revenue_usd_cents: payload.realized_revenue_usd_cents,
-      realized_payout_usd_cents: payload.realized_payout_usd_cents,
-      realized_profit_usd_cents: payload.realized_profit_usd_cents,
-      notes: payload.notes,
-      created_at: payload.created_at,
-    };
-
-    const { data: fallbackData, error: fallbackError } = await supabase
-      .from("invoice_realizations")
-      .insert(fallbackPayload)
-      .select()
-      .single();
-    if (fallbackError) throw fallbackError;
-
-    await updateInvoiceStatus(invoiceId, "cashed_out");
-    return mapInvoiceRealization(fallbackData as DbInvoiceRealization);
+    throw error;
   }
 
   await updateInvoiceStatus(invoiceId, "cashed_out");
@@ -2665,84 +2600,6 @@ export async function getInvoiceDetail(
     realization: realizationRow
       ? mapInvoiceRealization(realizationRow as DbInvoiceRealization)
       : undefined,
-  };
-}
-
-export async function getDashboardMetrics(): Promise<DashboardMetrics> {
-  const [invoices, companies, employees, details] = await Promise.all([
-    listInvoices(),
-    listCompanies(),
-    listEmployees(),
-    (async () => {
-      const invoiceList = await listInvoices();
-      return Promise.all(invoiceList.map((invoice) => getInvoiceDetail(invoice.id)));
-    })(),
-  ]);
-
-  const invoiceStatusCounts: Record<InvoiceStatus, number> = {
-    draft: 0,
-    generated: 0,
-    sent: 0,
-    received: 0,
-    cashed_out: 0,
-  };
-
-  for (const invoice of invoices) {
-    invoiceStatusCounts[invoice.status] += 1;
-  }
-
-  const pendingCashOutCount = invoices.filter((invoice) => invoice.status === "sent").length;
-  const companyMap = new Map(companies.map((company) => [company.id, company.name]));
-  const employeeMap = new Map(
-    employees.map((employee) => [employee.id, employee.fullName]),
-  );
-  const companyProfitMap = new Map<string, number>();
-  const employeeProfitMap = new Map<string, number>();
-  let realizedRevenueUsdCents = 0;
-  let bankChargesUsdCents = 0;
-  let realizedProfitUsdCents = 0;
-
-  for (const detail of details.filter(Boolean) as InvoiceDetail[]) {
-    if (!detail.realization) continue;
-    realizedRevenueUsdCents += detail.realization.realizedRevenueUsdCents;
-    realizedProfitUsdCents += detail.realization.realizedProfitUsdCents;
-    bankChargesUsdCents +=
-      detail.invoice.grandTotalUsdCents - detail.realization.dollarInboundUsdCents;
-    companyProfitMap.set(
-      detail.company.id,
-      (companyProfitMap.get(detail.company.id) ?? 0) +
-        detail.realization.realizedProfitUsdCents,
-    );
-
-    for (const lineItem of detail.teams.flatMap((team) => team.lineItems)) {
-      employeeProfitMap.set(
-        lineItem.employeeId,
-        (employeeProfitMap.get(lineItem.employeeId) ?? 0) +
-          lineItem.profitTotalUsdCents,
-      );
-    }
-  }
-
-  return {
-    invoiceStatusCounts,
-    pendingCashOutCount,
-    realizedRevenueUsdCents,
-    bankChargesUsdCents,
-    realizedProfitUsdCents,
-    realizedProfitByCompany: [...companyProfitMap.entries()].map(
-      ([companyId, profit]) => ({
-        companyId,
-        companyName: companyMap.get(companyId) ?? companyId,
-        realizedProfitUsdCents: profit,
-      }),
-    ),
-    realizedProfitByEmployee: [...employeeProfitMap.entries()].map(
-      ([employeeId, profit]) => ({
-        employeeId,
-        employeeName: employeeMap.get(employeeId) ?? employeeId,
-        realizedProfitUsdCents: profit,
-      }),
-    ),
   };
 }
 

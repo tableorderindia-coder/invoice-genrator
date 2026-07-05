@@ -72,13 +72,10 @@ export type InvoiceLineItem = {
   designationSnapshot: string;
   teamNameSnapshot: string;
   billingRateUsdCents: number;
-  payoutMonthlyUsdCentsSnapshot: number;
   hrsPerWeek: number;
   daysWorked: number;
   billedTotalUsdCents: number;
   manualTotalUsdCents?: number;
-  payoutTotalUsdCents: number;
-  profitTotalUsdCents: number;
 };
 
 export type AdjustmentType =
@@ -106,9 +103,6 @@ export type InvoiceRealization = {
   realizedAt: string;
   dollarInboundUsdCents: number;
   usdInrRate: number;
-  realizedRevenueUsdCents: number;
-  realizedPayoutUsdCents: number;
-  realizedProfitUsdCents: number;
   notes?: string;
   createdAt: string;
 };
@@ -119,24 +113,6 @@ export type InvoiceDetail = {
   teams: Array<InvoiceTeam & { lineItems: InvoiceLineItem[] }>;
   adjustments: InvoiceAdjustment[];
   realization?: InvoiceRealization;
-};
-
-export type DashboardMetrics = {
-  invoiceStatusCounts: Record<InvoiceStatus, number>;
-  pendingCashOutCount: number;
-  realizedRevenueUsdCents: number;
-  bankChargesUsdCents: number;
-  realizedProfitUsdCents: number;
-  realizedProfitByCompany: Array<{
-    companyId: string;
-    companyName: string;
-    realizedProfitUsdCents: number;
-  }>;
-  realizedProfitByEmployee: Array<{
-    employeeId: string;
-    employeeName: string;
-    realizedProfitUsdCents: number;
-  }>;
 };
 
 export type CompanyPnSummary = {

@@ -7,13 +7,13 @@ import { PendingSubmitButton } from "../_components/pending-submit-button";
 import { StaggerGrid } from "../_components/stagger-grid";
 import { requirePageAccess } from "@/lib/auth/server";
 import { createEmployeeAction, updateEmployeeAction } from "@/src/features/billing/actions";
-import { listCompanies, listEmployees, getDashboardMetrics } from "@/src/features/billing/store";
+import { getPnDashboardData, listCompanies, listEmployees } from "@/src/features/billing/store";
 import { buildWhatsAppHref } from "@/src/features/billing/employee-contact";
 import { resolveSelectedCompanyId } from "@/src/features/billing/filter-selection";
 import {
   formatInr,
   formatRate,
-  formatSignedUsd,
+  formatSignedInr,
   formatUsd,
   formatWholeRateInput,
 } from "@/src/features/billing/utils";
@@ -31,19 +31,24 @@ export default async function EmployeesPage({
 }) {
   await requirePageAccess("employees");
   const resolvedSearchParams = await searchParams;
-  const [companies, metrics] = await Promise.all([
-    listCompanies(),
-    getDashboardMetrics()
-  ]);
+  const companies = await listCompanies();
   const selectedCompanyId = resolveSelectedCompanyId({
     companyId: resolvedSearchParams.companyId,
     companies,
   });
-  const employees = selectedCompanyId ? await listEmployees(selectedCompanyId) : [];
+  const [employees, pnDashboardData] = selectedCompanyId
+    ? await Promise.all([
+        listEmployees(selectedCompanyId),
+        getPnDashboardData({ companyId: selectedCompanyId, periodType: "monthly" }),
+      ])
+    : [[], null];
   const selectedCompany = companies.find((company) => company.id === selectedCompanyId);
 
   const employeeProfitMap = new Map(
-    metrics.realizedProfitByEmployee.map((e) => [e.employeeId, e.realizedProfitUsdCents])
+    (pnDashboardData?.employeeEditableSections ?? []).map((section) => [
+      section.employeeId,
+      section.totalNetProfitInrCents,
+    ]),
   );
   const tab = Array.isArray(resolvedSearchParams.tab)
     ? resolvedSearchParams.tab[0]
@@ -280,8 +285,8 @@ export default async function EmployeesPage({
                       <span className="text-xs ml-1 font-sans" style={{ color: "var(--text-muted)" }}>peg rate</span>
                     </p>
                     <p className="mt-1 font-semibold" style={{ color: profitColor }}>
-                      {formatSignedUsd(profit)}
-                      <span className="text-[10px] ml-1 uppercase tracking-wider font-sans" style={{ color: "var(--text-muted)", opacity: 0.8 }}>Net P/L</span>
+                      {formatSignedInr(profit)}
+                      <span className="text-[10px] ml-1 uppercase tracking-wider font-sans" style={{ color: "var(--text-muted)", opacity: 0.8 }}>Net P/L (INR)</span>
                     </p>
                   </div>
                 </div>

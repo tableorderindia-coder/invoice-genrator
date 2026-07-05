@@ -100,13 +100,10 @@ create table if not exists invoice_line_items (
   designation_snapshot text not null,
   team_name_snapshot text not null,
   billing_rate_usd_cents integer not null,
-  payout_monthly_usd_cents_snapshot integer not null default 0,
   hrs_per_week numeric(8,2) not null,
   days_worked integer not null default 0 check (days_worked >= 0),
   billed_total_usd_cents integer not null,
-  manual_total_usd_cents integer,
-  payout_total_usd_cents integer not null default 0,
-  profit_total_usd_cents integer not null default 0
+  manual_total_usd_cents integer
 );
 
 create table if not exists invoice_adjustments (
@@ -128,9 +125,6 @@ create table if not exists invoice_realizations (
   realized_at date not null,
   dollar_inbound_usd_cents integer not null,
   usd_inr_rate numeric(12,4) check (usd_inr_rate is null or usd_inr_rate > 0),
-  realized_revenue_usd_cents integer not null,
-  realized_payout_usd_cents integer not null,
-  realized_profit_usd_cents integer not null,
   notes text,
   created_at timestamptz not null default now()
 );
@@ -154,17 +148,6 @@ create table if not exists employee_payouts (
   is_non_invoice_employee boolean not null default false,
   is_paid boolean not null default false,
   paid_at date,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-create table if not exists dashboard_expenses (
-  id text primary key,
-  company_id text not null references companies (id) on delete cascade,
-  period_type text not null check (period_type in ('monthly', 'yearly')),
-  year integer not null,
-  month integer check (month is null or month between 1 and 12),
-  amount_inr_cents bigint not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -370,9 +353,6 @@ create unique index if not exists invoice_line_items_team_employee_unique
 
 create unique index if not exists employee_payouts_invoice_employee_unique
   on employee_payouts (invoice_id, employee_id);
-
-create unique index if not exists dashboard_expenses_company_period_unique
-  on dashboard_expenses (company_id, period_type, year, coalesce(month, 0));
 
 create index if not exists security_deposit_ledger_company_employee_idx
   on security_deposit_ledger (company_id, employee_id, created_at desc);
@@ -728,14 +708,6 @@ for all
 to authenticated
 using ((select private.has_any_page_permission(array['invoices', 'cashout', 'dashboard'], 'view')))
 with check ((select private.has_any_page_permission(array['invoices', 'cashout'], 'edit')));
-
-drop policy if exists "dashboard_expenses_all" on public.dashboard_expenses;
-create policy "dashboard_expenses_all"
-on public.dashboard_expenses
-for all
-to authenticated
-using ((select private.has_page_permission('dashboard', 'view')))
-with check ((select private.has_page_permission('dashboard', 'edit')));
 
 drop policy if exists "company_expenses_all" on public.company_expenses;
 create policy "company_expenses_all"
