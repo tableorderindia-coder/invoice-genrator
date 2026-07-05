@@ -179,10 +179,9 @@ export async function createEmployeeAction(formData: FormData) {
     designation: getString(formData, "designation"),
     defaultTeam: getString(formData, "defaultTeam"),
     billingRateUsdCents: centsFromUsd(getString(formData, "billingRateUsd")),
-    payoutMonthlyUsdCents: centsFromUsd(getString(formData, "payoutMonthlyUsd")),
     defaultPaidUsdInrRate: getNonNegativeNumberOrThrow(
       getString(formData, "defaultPaidUsdInrRate") || "0",
-      "Paid rate",
+      "Peg rate",
     ),
     defaultActualPaidInrCents: getNonNegativeCentsOrThrow(
       getString(formData, "defaultActualPaidInr"),
@@ -216,10 +215,9 @@ export async function updateEmployeeAction(formData: FormData) {
     designation: getString(formData, "designation"),
     defaultTeam: getString(formData, "defaultTeam"),
     billingRateUsdCents: centsFromUsd(getString(formData, "billingRateUsd")),
-    payoutMonthlyUsdCents: centsFromUsd(getString(formData, "payoutMonthlyUsd")),
     defaultPaidUsdInrRate: getNonNegativeNumberOrThrow(
       getString(formData, "defaultPaidUsdInrRate") || "0",
-      "Paid rate",
+      "Peg rate",
     ),
     defaultActualPaidInrCents: getNonNegativeCentsOrThrow(
       getString(formData, "defaultActualPaidInr"),
@@ -932,10 +930,6 @@ export async function updateDashboardEmployeeCashFlowEntryAction(formData: FormD
       throw new Error("Days worked must be greater than 0.");
     }
 
-    const employeeMonthlyUsdCents = centsFromUsd(getString(formData, "employeeMonthlyUsd"));
-    if (employeeMonthlyUsdCents <= 0) {
-      throw new Error("Employee monthly dollars must be greater than 0.");
-    }
     const dollarInwardUsdCents = centsFromUsd(getString(formData, "dollarInwardUsd"));
     if (dollarInwardUsdCents < 0) {
       throw new Error("Dollars inward cannot be negative.");
@@ -996,7 +990,6 @@ export async function updateDashboardEmployeeCashFlowEntryAction(formData: FormD
       reimbursementLabelsText,
       appraisalAdvanceUsdCents,
       offboardingDeductionUsdCents,
-      employeeMonthlyUsdCents,
       cashoutUsdInrRate,
       paidUsdInrRate,
       pfInrCents,
@@ -1302,7 +1295,7 @@ export async function saveInvoicePaymentEmployeeEntriesAction(formData: FormData
         employeeId: entry.employeeId,
         companyId,
         month: paymentMonth,
-        salaryUsdCents: entry.monthlyPaidUsdCents,
+        salaryUsdCents: 0,
         paidUsdInrRate: entry.paidUsdInrRate,
         paidStatus: entry.isPaid,
         paidDate: entry.paidAt,

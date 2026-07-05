@@ -27,19 +27,15 @@ export function buildEmployeeSectionTotals(rows: PnEmployeeEditableRow[]) {
     offboardingDeductionUsdCents: sumBy(rows, (row) => row.offboardingDeductionUsdCents),
     effectiveDollarInwardUsdCents: sumBy(rows, (row) => row.effectiveDollarInwardUsdCents),
     cashInInrCents: sumBy(rows, (row) => row.cashInInrCents),
-    employeeMonthlyUsdCents: sumBy(rows, (row) => row.employeeMonthlyUsdCents),
     cashoutUsdInrRate:
-      weightedAverage(rows, (row) => row.cashoutUsdInrRate, (row) => row.employeeMonthlyUsdCents) ??
+      weightedAverage(rows, (row) => row.cashoutUsdInrRate, (row) => row.effectiveDollarInwardUsdCents) ??
       null,
     paidUsdInrRate:
       weightedAverage(
         rows.filter((row) => row.paidUsdInrRate > 0),
         (row) => row.paidUsdInrRate,
-        (row) => row.employeeMonthlyUsdCents,
+        (row) => row.effectiveDollarInwardUsdCents,
       ) ?? null,
-    monthlyPaidInrCents: sumBy(rows, (row) =>
-      Math.round(row.employeeMonthlyUsdCents * row.paidUsdInrRate),
-    ),
     actualPaidInrCents: sumBy(rows, (row) => row.actualPaidInrCents),
     pfInrCents: sumBy(rows, (row) => row.pfInrCents),
     tdsInrCents: sumBy(rows, (row) => row.tdsInrCents),
@@ -71,17 +67,15 @@ export function buildPeriodTotals(
     offboardingDeductionUsdCents: sumBy(rows, (row) => row.offboardingDeductionUsdCents),
     effectiveDollarInwardUsdCents: sumBy(rows, (row) => row.effectiveDollarInwardUsdCents),
     cashoutUsdInrRate:
-      weightedAverage(rows, (row) => row.cashoutUsdInrRate, (row) => row.employeeMonthlyUsdCents) ??
+      weightedAverage(rows, (row) => row.cashoutUsdInrRate, (row) => row.effectiveDollarInwardUsdCents) ??
       null,
     cashInInrCents: sumBy(rows, (row) => row.cashInInrCents),
-    employeeMonthlyUsdCents: sumBy(rows, (row) => row.employeeMonthlyUsdCents),
     paidUsdInrRate:
       weightedAverage(
         rows.filter((row) => row.paidUsdInrRate > 0),
         (row) => row.paidUsdInrRate,
-        (row) => row.employeeMonthlyUsdCents,
+        (row) => row.effectiveDollarInwardUsdCents,
       ) ?? null,
-    monthlyPaidInrCents: sumBy(rows, (row) => row.monthlyPaidInrCents),
     actualPaidInrCents: sumBy(rows, (row) => row.actualPaidInrCents),
     pfInrCents: sumBy(rows, (row) => row.pfInrCents),
     tdsInrCents: sumBy(rows, (row) => row.tdsInrCents),

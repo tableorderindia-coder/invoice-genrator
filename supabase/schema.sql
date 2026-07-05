@@ -14,7 +14,6 @@ create table if not exists employees (
   designation text not null,
   default_team text not null,
   billing_rate_usd_cents integer not null,
-  payout_monthly_usd_cents integer not null,
   default_paid_usd_inr_rate numeric(12,4) not null default 0 check (default_paid_usd_inr_rate >= 0),
   default_actual_paid_inr_cents bigint not null default 0,
   default_pf_inr_cents bigint not null default 0,
@@ -67,11 +66,11 @@ create table if not exists invoice_line_items (
   designation_snapshot text not null,
   team_name_snapshot text not null,
   billing_rate_usd_cents integer not null,
-  payout_monthly_usd_cents_snapshot integer not null,
+  payout_monthly_usd_cents_snapshot integer not null default 0,
   hrs_per_week numeric(8,2) not null,
   billed_total_usd_cents integer not null,
-  payout_total_usd_cents integer not null,
-  profit_total_usd_cents integer not null
+  payout_total_usd_cents integer not null default 0,
+  profit_total_usd_cents integer not null default 0
 );
 
 create table if not exists invoice_adjustments (
@@ -108,7 +107,6 @@ create table if not exists employee_payouts (
   invoice_line_item_id text references invoice_line_items (id),
   employee_name_snapshot text not null,
   dollar_inward_usd_cents integer not null,
-  employee_monthly_usd_cents integer not null,
   cashout_usd_inr_rate numeric(12,4) not null check (cashout_usd_inr_rate >= 0),
   paid_usd_inr_rate numeric(12,4) check (paid_usd_inr_rate is null or paid_usd_inr_rate > 0),
   pf_inr_cents bigint not null default 0,

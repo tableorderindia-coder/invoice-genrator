@@ -11,7 +11,6 @@ export type EmployeeCashFlowMonthRow = {
   batchLabel?: string;
   daysWorked: number;
   daysInMonth: number;
-  monthlyPaidUsdCents: number;
   baseDollarInwardUsdCents: number;
   onboardingAdvanceUsdCents: number;
   reimbursementUsdCents: number;
@@ -62,7 +61,6 @@ export type EmployeeCashFlowEntryWriteInput = {
   invoiceLineItemId?: string;
   daysWorked: number;
   daysInMonth: number;
-  monthlyPaidUsdCents: number;
   baseDollarInwardUsdCents: number;
   onboardingAdvanceUsdCents: number;
   reimbursementUsdCents: number;

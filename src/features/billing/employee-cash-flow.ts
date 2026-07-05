@@ -36,28 +36,6 @@ export function calculateEmployeeMonthNetInrCents(input: {
   return input.cashInInrCents - input.salaryPaidInrCents;
 }
 
-export function calculateActualPaidInrCents(input: {
-  daysWorked: number;
-  daysInMonth: number;
-  monthlyPaidUsdCents: number;
-  paidUsdInrRate: number;
-}) {
-  const normalizedDaysInMonth = Math.max(1, Math.round(input.daysInMonth));
-  return Math.round(
-    (input.daysWorked *
-      input.monthlyPaidUsdCents *
-      input.paidUsdInrRate) /
-      normalizedDaysInMonth,
-  );
-}
-
-export function calculateMonthlyPaidInrCents(input: {
-  monthlyPaidUsdCents: number;
-  paidUsdInrRate: number;
-}) {
-  return Math.round(input.monthlyPaidUsdCents * input.paidUsdInrRate);
-}
-
 export function resolveEmployeeCashFlowStatus(input: {
   effectiveDollarInwardUsdCents: number;
   salaryPaidInrCents: number;

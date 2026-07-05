@@ -19,7 +19,7 @@ const sectionFixture: EmployeeStatementSection = {
       monthKey: "2026-01",
       monthLabel: "January 2026",
       effectiveDollarInwardUsdCents: 3439_00,
-      monthlyDollarPaidUsdCents: 1040_00,
+      monthlyDollarPaidUsdCents: 4064_00,
       rows: [
         {
           employeeId: "emp_1",
@@ -69,12 +69,12 @@ describe("employee statement editor rendering", () => {
     );
 
     expect(screen.getByDisplayValue("2600.00").className).toContain("min-w-[8rem]");
-    expect(screen.getByDisplayValue("1040.00").className).toContain("min-w-[8rem]");
+    expect(screen.getByDisplayValue("4064.00").className).toContain("min-w-[8rem]");
     expect(screen.getByDisplayValue("500.00").className).toContain("min-w-[8rem]");
     expect(screen.getByDisplayValue("Laptop reimbursement label text").className).toContain(
       "min-w-[14rem]",
     );
-    expect(screen.getAllByText("$4,064")).toHaveLength(2);
+    expect(screen.getAllByText("$4,064")).toHaveLength(3);
 
     const firstInvoiceRow = screen.getByText("2026/003").closest("tr");
     const orderedInputs = [...(firstInvoiceRow?.querySelectorAll("input") ?? [])].map(
@@ -88,7 +88,7 @@ describe("employee statement editor rendering", () => {
       "Laptop reimbursement label text",
       "500.00",
       "0.00",
-      "1040.00",
+      "4064.00",
     ]);
   });
 });

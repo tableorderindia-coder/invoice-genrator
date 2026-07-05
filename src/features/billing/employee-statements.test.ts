@@ -54,7 +54,6 @@ describe("employee statements helpers", () => {
       employee: {
         id: "emp_1",
         fullName: "Asha",
-        payoutMonthlyUsdCents: 250000,
       },
       rows: [
         {
@@ -88,7 +87,6 @@ describe("employee statements helpers", () => {
       ],
     });
 
-    expect(section.months[0]?.monthlyDollarPaidUsdCents).toBe(250000);
     expect(section.months[0]?.effectiveDollarInwardUsdCents).toBe(169000);
   });
 
@@ -117,7 +115,7 @@ describe("employee statements helpers", () => {
           monthKey: "2026-04",
           monthLabel: "April 2026",
           effectiveDollarInwardUsdCents: 134000,
-          monthlyDollarPaidUsdCents: 250000,
+          monthlyDollarPaidUsdCents: 134000,
         },
       ],
     });
@@ -131,7 +129,6 @@ describe("employee statements helpers", () => {
       employee: {
         id: "emp_1",
         fullName: "Asha",
-        payoutMonthlyUsdCents: 250000,
       },
       rows: [
         {
@@ -196,7 +193,6 @@ describe("employee statements helpers", () => {
       employee: {
         id: "emp_1",
         fullName: "Asha",
-        payoutMonthlyUsdCents: 250000,
       },
       rows: [
         {
@@ -246,7 +242,6 @@ describe("employee statements helpers", () => {
       employee: {
         id: "emp_1",
         fullName: "Asha",
-        payoutMonthlyUsdCents: 250000,
       },
       rows: [
         {
@@ -296,7 +291,6 @@ describe("employee statements helpers", () => {
       employee: {
         id: "emp_1",
         fullName: "Asha",
-        payoutMonthlyUsdCents: 250000,
       },
       rows: [
         {
@@ -357,22 +351,19 @@ describe("employee statements helpers", () => {
       monthLabel: "January 2026",
       invoiceNumber: "2026/001",
       effectiveDollarInwardUsdCents: 169000,
-      monthlyDollarPaidUsdCents: 250000,
-      totalBalanceUsdCents: -81000,
+      totalBalanceUsdCents: 0,
     });
     expect(rows[1]).toMatchObject({
       kind: "invoice",
       invoiceNumber: "2026/002",
       effectiveDollarInwardUsdCents: null,
-      monthlyDollarPaidUsdCents: null,
       totalBalanceUsdCents: null,
     });
     expect(rows[3]).toMatchObject({
       kind: "invoice",
       monthLabel: "February 2026",
       effectiveDollarInwardUsdCents: 71000,
-      monthlyDollarPaidUsdCents: 250000,
-      totalBalanceUsdCents: -179000,
+      totalBalanceUsdCents: 0,
     });
   });
 
@@ -385,7 +376,6 @@ describe("employee statements helpers", () => {
         designation: "Operations Specialist",
         defaultTeam: "Operations",
         billingRateUsdCents: 250000,
-        payoutMonthlyUsdCents: 106950,
         defaultPaidUsdInrRate: 0,
         defaultActualPaidInrCents: 0,
         defaultPfInrCents: 0,

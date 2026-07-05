@@ -152,7 +152,7 @@ export function calculateEmployeeStatementTotalBalanceUsdCents(input: {
 }
 
 export function buildEmployeeStatementSection(input: {
-  employee: { id: string; fullName: string; payoutMonthlyUsdCents: number };
+  employee: { id: string; fullName: string };
   rows: EmployeeStatementInvoiceRow[];
 }): EmployeeStatementSection {
   const monthGroups = groupEmployeeStatementRows(input.rows);
@@ -160,12 +160,8 @@ export function buildEmployeeStatementSection(input: {
   return {
     employeeId: input.employee.id,
     employeeName: input.employee.fullName,
-    months: monthGroups.map((group) => ({
-      monthKey: group.monthKey,
-      monthLabel: group.rows[0]?.monthLabel ?? group.monthKey,
-      rows: group.rows,
-      monthlyDollarPaidUsdCents: input.employee.payoutMonthlyUsdCents,
-      effectiveDollarInwardUsdCents: group.rows.reduce(
+    months: monthGroups.map((group) => {
+      const effectiveDollarInwardUsdCents = group.rows.reduce(
         (sum, row) =>
           sum +
           calculateStatementEffectiveDollarInwardUsdCents({
@@ -176,8 +172,16 @@ export function buildEmployeeStatementSection(input: {
             offboardingDeductionUsdCents: row.offboardingDeductionUsdCents,
           }),
         0,
-      ),
-    })),
+      );
+
+      return {
+        monthKey: group.monthKey,
+        monthLabel: group.rows[0]?.monthLabel ?? group.monthKey,
+        rows: group.rows,
+        effectiveDollarInwardUsdCents,
+        monthlyDollarPaidUsdCents: effectiveDollarInwardUsdCents,
+      };
+    }),
   };
 }
 
@@ -277,7 +281,7 @@ export function applySavedEmployeeStatementOverrides(
           calculatedEffectiveDollarInwardUsdCents,
         monthlyDollarPaidUsdCents:
           savedMonthSummary?.monthlyDollarPaidUsdCents ??
-          month.monthlyDollarPaidUsdCents,
+          calculatedEffectiveDollarInwardUsdCents,
       };
     }),
   };

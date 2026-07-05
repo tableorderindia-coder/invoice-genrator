@@ -32,7 +32,6 @@ describe("employee statement loading", () => {
         designation: "Engineer",
         defaultTeam: "Team A",
         billingRateUsdCents: 10000,
-        payoutMonthlyUsdCents: 250000,
         hrsPerWeek: 40,
         activeFrom: "2026-01-01",
         isActive: true,
@@ -147,7 +146,6 @@ describe("employee statement loading", () => {
         monthKey: "2026-04",
         monthLabel: "April 2026",
         effectiveDollarInwardUsdCents: 120000,
-        monthlyDollarPaidUsdCents: 260000,
       },
     ]);
 
@@ -170,7 +168,6 @@ describe("employee statement loading", () => {
       offboardingDeductionUsdCents: 2000,
     });
     expect(sections[0]?.months[0]?.effectiveDollarInwardUsdCents).toBe(120000);
-    expect(sections[0]?.months[0]?.monthlyDollarPaidUsdCents).toBe(260000);
     expect(sections[0]?.months[0]?.rows).toHaveLength(1);
     expect(getInvoiceDetailMock).toHaveBeenCalledTimes(1);
   });

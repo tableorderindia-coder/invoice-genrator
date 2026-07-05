@@ -115,10 +115,7 @@ export default async function EmployeesPage({
                 <Field label="Billing rate (USD/hr)">
                   <input name="billingRateUsd" type="number" min="0" step="0.01" required className={inputClass} placeholder="0.00" />
                 </Field>
-                <Field label="Payout $/month">
-                  <input name="payoutMonthlyUsd" type="number" min="0" step="0.01" required className={inputClass} placeholder="0.00" />
-                </Field>
-                <Field label="Paid rate">
+                <Field label="Peg rate">
                   <input name="defaultPaidUsdInrRate" type="number" min="0" step="0.0001" className={inputClass} placeholder="0" defaultValue="0" />
                 </Field>
                 <Field label="Actual paid (INR)">
@@ -202,10 +199,7 @@ export default async function EmployeesPage({
                   <Field label="Billing rate (USD/hr)">
                     <input name="billingRateUsd" type="number" min="0" step="0.01" required className={inputClass} defaultValue={selectedEmployee ? (selectedEmployee.billingRateUsdCents / 100).toFixed(2) : ""} />
                   </Field>
-                  <Field label="Payout $/month">
-                    <input name="payoutMonthlyUsd" type="number" min="0" step="0.01" required className={inputClass} defaultValue={selectedEmployee ? (selectedEmployee.payoutMonthlyUsdCents / 100).toFixed(2) : ""} />
-                  </Field>
-                  <Field label="Paid rate">
+                  <Field label="Peg rate">
                     <input name="defaultPaidUsdInrRate" type="number" min="0" step="0.0001" className={inputClass} defaultValue={selectedEmployee?.defaultPaidUsdInrRate ?? 0} />
                   </Field>
                   <Field label="Actual paid (INR)">
@@ -275,13 +269,9 @@ export default async function EmployeesPage({
                       {formatUsd(employee.billingRateUsdCents)}
                       <span className="text-xs ml-1 font-sans" style={{ color: "var(--text-muted)" }}>billed</span>
                     </p>
-                    <p style={{ color: "#34d399" }}>
-                      {formatUsd(employee.payoutMonthlyUsdCents)}
-                      <span className="text-xs ml-1 font-sans" style={{ color: "var(--text-muted)" }}>payout</span>
-                    </p>
                     <p style={{ color: "var(--text-accent)" }}>
                       {employee.defaultPaidUsdInrRate.toFixed(4).replace(/\.?0+$/, "") || "0"}
-                      <span className="text-xs ml-1 font-sans" style={{ color: "var(--text-muted)" }}>paid rate</span>
+                      <span className="text-xs ml-1 font-sans" style={{ color: "var(--text-muted)" }}>peg rate</span>
                     </p>
                     <p className="mt-1 font-semibold" style={{ color: profitColor }}>
                       {formatSignedUsd(profit)}

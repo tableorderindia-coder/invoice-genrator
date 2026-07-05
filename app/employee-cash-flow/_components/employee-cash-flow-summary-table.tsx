@@ -24,13 +24,12 @@ export default function EmployeeCashFlowSummaryTable({
             <th>Month</th>
             <th>Invoice</th>
             <th>Days Worked</th>
-            <th>Monthly Paid $</th>
             <th>Dollar Inward</th>
             <th>Onboarding Advance</th>
             <th>Offboarding Deduction</th>
             <th>Effective Inward $</th>
-            <th>Cashout USD/INR</th>
-            <th>Paid rate</th>
+            <th>Received / exchanged rate</th>
+            <th>Peg rate</th>
             <th>Cash In INR</th>
             <th>Salary Paid INR</th>
             <th>Pending Amount</th>
@@ -58,7 +57,6 @@ export default function EmployeeCashFlowSummaryTable({
               <td>{row.paymentMonth}</td>
               <td>{row.invoiceNumber || "-"}</td>
               <td>{`${row.daysWorked}/${row.daysInMonth}`}</td>
-              <td>{formatUsd(row.monthlyPaidUsdCents)}</td>
               <td>{formatUsd(row.baseDollarInwardUsdCents)}</td>
               <td>{formatUsd(row.onboardingAdvanceUsdCents)}</td>
               <td>{formatUsd(row.offboardingDeductionUsdCents)}</td>
@@ -80,7 +78,7 @@ export default function EmployeeCashFlowSummaryTable({
           ))}
           {rows.length === 0 ? (
             <tr>
-              <td colSpan={16} className="py-8 text-center" style={{ color: "var(--text-muted)" }}>
+              <td colSpan={15} className="py-8 text-center" style={{ color: "var(--text-muted)" }}>
                 No employee cash flow rows for the selected filters.
               </td>
             </tr>

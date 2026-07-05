@@ -23,7 +23,6 @@ export type Employee = {
   designation: string;
   defaultTeam: string;
   billingRateUsdCents: number;
-  payoutMonthlyUsdCents: number;
   defaultPaidUsdInrRate: number;
   defaultActualPaidInrCents: number;
   defaultPfInrCents: number;
@@ -159,7 +158,6 @@ export type PnEmployeeMonthRow = {
   reimbursementInrCents: number;
   appraisalAdvanceUsdCents: number;
   appraisalAdvanceInrCents: number;
-  employeeMonthlyUsdCents: number;
   cashoutUsdInrRate: number;
   paidUsdInrRate: number;
   pfInrCents: number;
@@ -197,7 +195,6 @@ export type PnEmployeeEditableRow = {
   offboardingDeductionUsdCents: number;
   effectiveDollarInwardUsdCents: number;
   cashInInrCents: number;
-  employeeMonthlyUsdCents: number;
   cashoutUsdInrRate: number;
   paidUsdInrRate: number;
   salaryPaidInrCents: number;
@@ -235,9 +232,7 @@ export type PnPeriodRow = {
   effectiveDollarInwardUsdCents: number;
   cashoutUsdInrRate: number;
   cashInInrCents: number;
-  employeeMonthlyUsdCents: number;
   paidUsdInrRate: number;
-  monthlyPaidInrCents: number;
   pfInrCents: number;
   tdsInrCents: number;
   actualPaidInrCents: number;
