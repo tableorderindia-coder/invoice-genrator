@@ -119,7 +119,6 @@ export function buildAddedEmployeeCashFlowEntry(input: {
   employee: {
     id: string;
     fullName: string;
-    payoutMonthlyUsdCents: number;
     defaultPaidUsdInrRate?: number;
     defaultActualPaidInrCents?: number;
     defaultPfInrCents?: number;
@@ -145,7 +144,6 @@ export function buildAddedEmployeeCashFlowEntry(input: {
     employeeNameSnapshot: input.employee.fullName,
     daysWorked: 0,
     daysInMonth: getDaysInMonthFromMonthKey(input.paymentMonth),
-    monthlyPaidUsdCents: input.employee.payoutMonthlyUsdCents,
     baseDollarInwardUsdCents: 0,
     onboardingAdvanceUsdCents: input.employee.onboardingAdvanceUsdCents ?? 0,
     reimbursementUsdCents: input.employee.reimbursementUsdCents ?? 0,
@@ -173,7 +171,6 @@ export function applyEmployeeCashFlowEntryPatch<
     EmployeeCashFlowEntryWriteInput,
     | "daysWorked"
     | "daysInMonth"
-    | "monthlyPaidUsdCents"
     | "paidUsdInrRate"
     | "actualPaidInrCents"
   >,

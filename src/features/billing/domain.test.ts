@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   calculateEmployeePayoutMetrics,
+  calculatePegRateMarginMetrics,
   calculateInvoiceTotals,
   calculateLineItemTotals,
   createRealizationRecord,
@@ -11,17 +12,16 @@ import {
 } from "./domain";
 
 describe("billing domain", () => {
-  it("calculates line-item billed, payout, and profit totals in cents", () => {
+  it("calculates line-item billed totals without employee monthly USD", () => {
     expect(
       calculateLineItemTotals({
         billingRateUsdCents: 4500,
-        payoutMonthlyUsdCents: 300000,
         hrsPerWeek: 12.5,
       }),
     ).toEqual({
       billedTotalUsdCents: 243800,
-      payoutTotalUsdCents: 300000,
-      profitTotalUsdCents: -56200,
+      payoutTotalUsdCents: 0,
+      profitTotalUsdCents: 243800,
     });
   });
 
@@ -29,15 +29,14 @@ describe("billing domain", () => {
     expect(
       calculateLineItemTotals({
         billingRateUsdCents: 5000,
-        payoutMonthlyUsdCents: 300000,
         hrsPerWeek: 10,
         daysWorked: 15,
         daysInMonth: 30,
       }),
     ).toEqual({
       billedTotalUsdCents: 108400,
-      payoutTotalUsdCents: 300000,
-      profitTotalUsdCents: -191600,
+      payoutTotalUsdCents: 0,
+      profitTotalUsdCents: 108400,
     });
   });
 
@@ -45,15 +44,14 @@ describe("billing domain", () => {
     expect(
       calculateLineItemTotals({
         billingRateUsdCents: 5000,
-        payoutMonthlyUsdCents: 300000,
         hrsPerWeek: 10,
         daysWorked: 60,
         daysInMonth: 30,
       }),
     ).toEqual({
       billedTotalUsdCents: 433400,
-      payoutTotalUsdCents: 300000,
-      profitTotalUsdCents: 133400,
+      payoutTotalUsdCents: 0,
+      profitTotalUsdCents: 433400,
     });
   });
 
@@ -153,18 +151,18 @@ describe("billing domain", () => {
     });
   });
 
-  it("calculates employee payout commission metrics", () => {
+  it("maps employee payout metrics to peg-rate margin fields", () => {
     expect(
       calculateEmployeePayoutMetrics({
         dollarInwardUsdCents: 500000,
-        employeeMonthlyUsdCents: 300000,
-        cashoutUsdInrRate: 83.25,
-        paidUsdInrRate: 82.1,
+        actualPaidInrCents: 300000,
+        receivedUsdInrRate: 83.25,
+        pegUsdInrRate: 82.1,
       }),
     ).toEqual({
-      totalCommissionUsdCents: 200000,
-      fxCommissionInrCents: 345000,
-      commissionEarnedInrCents: 16650000,
+      totalCommissionUsdCents: 500000,
+      fxCommissionInrCents: 575000,
+      commissionEarnedInrCents: 40750000,
     });
   });
 
@@ -226,5 +224,23 @@ describe("billing domain", () => {
       "Ariana",
       "Bella",
     ]);
+  });
+});
+
+describe("calculatePegRateMarginMetrics", () => {
+  it("separates operating margin from forex gain using peg and received rates", () => {
+    expect(
+      calculatePegRateMarginMetrics({
+        dollarInwardUsdCents: 294_700,
+        pegUsdInrRate: 86,
+        receivedUsdInrRate: 92.4,
+        actualPaidInrCents: 21_350_000,
+      }),
+    ).toEqual({
+      totalInwardInrCents: 27_230_280,
+      operatingMarginInrCents: 3_994_200,
+      forexGainInrCents: 1_886_080,
+      totalEarningInrCents: 5_880_280,
+    });
   });
 });

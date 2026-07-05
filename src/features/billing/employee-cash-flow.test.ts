@@ -2,11 +2,9 @@ import { describe, expect, it } from "vitest";
 import type { EmployeeCashFlowMonthRow } from "./employee-cash-flow-types";
 
 import {
-  calculateActualPaidInrCents,
   calculateCashInInrCents,
   calculateEffectiveDollarInwardUsdCents,
   calculateEmployeeMonthNetInrCents,
-  calculateMonthlyPaidInrCents,
   resolveEmployeeCashFlowStatus,
 } from "./employee-cash-flow";
 
@@ -53,17 +51,6 @@ describe("employee cash flow calculations", () => {
     ).toBe(-50_000_00);
   });
 
-  it("derives actual paid INR by prorating monthly paid dollars over days in month", () => {
-    expect(
-      calculateActualPaidInrCents({
-        daysWorked: 3,
-        daysInMonth: 30,
-        monthlyPaidUsdCents: 100_00,
-        paidUsdInrRate: 84.5,
-      }),
-    ).toBe(84_500);
-  });
-
   it("flags waiting-for-payment when salary is paid and inward is zero", () => {
     expect(
       resolveEmployeeCashFlowStatus({
@@ -83,7 +70,6 @@ describe("employee cash flow calculations", () => {
       invoiceNumber: "INV-1",
       daysWorked: 20,
       daysInMonth: 30,
-      monthlyPaidUsdCents: 100_000,
       baseDollarInwardUsdCents: 100_000,
       onboardingAdvanceUsdCents: 10_000,
       reimbursementUsdCents: 5_000,
@@ -103,14 +89,5 @@ describe("employee cash flow calculations", () => {
     };
 
     expect(row.status).toBe("profit");
-  });
-
-  it("calculates monthly paid INR from monthly dollars and paid rate", () => {
-    expect(
-      calculateMonthlyPaidInrCents({
-        monthlyPaidUsdCents: 2_000_00,
-        paidUsdInrRate: 82.5,
-      }),
-    ).toBe(16_500_000);
   });
 });

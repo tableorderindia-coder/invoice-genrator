@@ -21,7 +21,6 @@ describe("employee cash flow saved rows helpers", () => {
         clientBatchId: "batch_1",
         daysWorked: 10,
         daysInMonth: 30,
-        monthlyPaidUsdCents: 100_00,
         baseDollarInwardUsdCents: 0,
         onboardingAdvanceUsdCents: 0,
         reimbursementUsdCents: 0,

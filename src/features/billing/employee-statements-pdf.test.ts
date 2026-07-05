@@ -33,7 +33,7 @@ describe("employee statement pdf", () => {
             },
           ],
           effectiveDollarInwardUsdCents: 127000,
-          monthlyDollarPaidUsdCents: 250000,
+          monthlyDollarPaidUsdCents: 127000,
         },
       ],
       totals: {
@@ -43,8 +43,8 @@ describe("employee statement pdf", () => {
         appraisalAdvanceUsdCents: 3000,
         offboardingDeductionUsdCents: 1000,
         effectiveDollarInwardUsdCents: 127000,
-        monthlyDollarPaidUsdCents: 250000,
-        totalBalanceUsdCents: -123000,
+        monthlyDollarPaidUsdCents: 127000,
+        totalBalanceUsdCents: 0,
       },
     });
 
@@ -54,12 +54,13 @@ describe("employee statement pdf", () => {
       kind: "invoice",
       monthLabel: "January 2026",
       invoiceNumber: "2026/001",
-      totalBalance: "-$1,230",
+      totalBalance: "$0",
     });
     expect(model.totalsTitle).toBe("Totals");
     expect(model.totals.appraisalAdvance).toBe("$30");
     expect(model.totals.effectiveDollarInward).toBe("$1,270");
-    expect(model.totals.totalBalance).toBe("-$1,230");
+    expect(model.totals.monthlyDollarPaid).toBe("$1,270");
+    expect(model.totals.totalBalance).toBe("$0");
   });
 
   it("renders a pdf buffer", async () => {
@@ -76,7 +77,7 @@ describe("employee statement pdf", () => {
         appraisalAdvanceUsdCents: 0,
         offboardingDeductionUsdCents: 0,
         effectiveDollarInwardUsdCents: 100000,
-        monthlyDollarPaidUsdCents: 250000,
+        monthlyDollarPaidUsdCents: 100000,
         totalBalanceUsdCents: -150000,
       },
     });

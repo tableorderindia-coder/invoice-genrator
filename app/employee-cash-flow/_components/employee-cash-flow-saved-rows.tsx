@@ -107,12 +107,11 @@ export default function EmployeeCashFlowSavedRows({
                 </p>
 
                 <div className="overflow-x-auto rounded-2xl" style={{ border: "1px solid var(--glass-border)" }}>
-                  <table className="glass-table min-w-[1850px]">
+                  <table className="glass-table min-w-[1700px]">
                     <thead>
                       <tr>
                         <th>Month</th>
                         <th>Days worked</th>
-                        <th>Monthly Paid $</th>
                         <th>Dollar inward</th>
                         <th>Onboarding advance USD</th>
                         <th>Reimbursements USD</th>
@@ -120,8 +119,8 @@ export default function EmployeeCashFlowSavedRows({
                         <th>Appraisal advance USD</th>
                         <th>Offboarding deduction USD</th>
                         <th>Final effective inward $</th>
-                        <th>Cashout</th>
-                        <th>Paid rate</th>
+                        <th>Received / exchanged rate</th>
+                        <th>Peg rate</th>
                         <th>Actual paid INR</th>
                         <th>PF INR</th>
                         <th>TDS INR</th>
@@ -153,18 +152,6 @@ export default function EmployeeCashFlowSavedRows({
                                   })
                                 }
                                 className={`${inputClass} min-w-[6rem]`}
-                              />
-                            </td>
-                            <td>
-                              <input
-                                value={toCurrencyInput(row.monthlyPaidUsdCents)}
-                                onChange={(event) =>
-                                  updateRow(row.id, {
-                                    monthlyPaidUsdCents: fromCurrencyInput(event.target.value),
-                                  })
-                                }
-                                className={`${inputClass} min-w-[8rem]`}
-                                inputMode="decimal"
                               />
                             </td>
                             <td>

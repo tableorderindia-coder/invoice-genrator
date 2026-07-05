@@ -1,6 +1,5 @@
 type LineItemInput = {
   billingRateUsdCents: number;
-  payoutMonthlyUsdCents: number;
   hrsPerWeek: number;
   daysWorked?: number;
   daysInMonth?: number;
@@ -28,9 +27,16 @@ type RealizationInput = {
 
 type EmployeePayoutMetricsInput = {
   dollarInwardUsdCents: number;
-  employeeMonthlyUsdCents: number;
-  cashoutUsdInrRate: number;
-  paidUsdInrRate: number;
+  actualPaidInrCents: number;
+  pegUsdInrRate: number;
+  receivedUsdInrRate: number;
+};
+
+type PegRateMarginMetricsInput = {
+  dollarInwardUsdCents: number;
+  pegUsdInrRate: number;
+  receivedUsdInrRate: number;
+  actualPaidInrCents: number;
 };
 
 type EffectiveLineTotalInput = {
@@ -58,7 +64,6 @@ const WEEKS_PER_YEAR = 52;
 
 export function calculateLineItemTotals({
   billingRateUsdCents,
-  payoutMonthlyUsdCents,
   hrsPerWeek,
   daysWorked,
   daysInMonth,
@@ -78,12 +83,11 @@ export function calculateLineItemTotals({
   const billedTotalUsdCents = roundToWholeDollarCents(
     (monthlyBilledUsdCents * normalizedDaysWorked) / normalizedDaysInMonth,
   );
-  const payoutTotalUsdCents = roundToWholeDollarCents(payoutMonthlyUsdCents);
 
   return {
     billedTotalUsdCents,
-    payoutTotalUsdCents,
-    profitTotalUsdCents: billedTotalUsdCents - payoutTotalUsdCents,
+    payoutTotalUsdCents: 0,
+    profitTotalUsdCents: billedTotalUsdCents,
   };
 }
 
@@ -141,26 +145,45 @@ export function createRealizationRecord({
 
 export function calculateEmployeePayoutMetrics({
   dollarInwardUsdCents,
-  employeeMonthlyUsdCents,
-  cashoutUsdInrRate,
-  paidUsdInrRate,
+  actualPaidInrCents,
+  pegUsdInrRate,
+  receivedUsdInrRate,
 }: EmployeePayoutMetricsInput) {
-  const totalCommissionUsdCents = dollarInwardUsdCents - employeeMonthlyUsdCents;
+  const marginMetrics = calculatePegRateMarginMetrics({
+    dollarInwardUsdCents,
+    actualPaidInrCents,
+    pegUsdInrRate,
+    receivedUsdInrRate,
+  });
 
-  const fxCommissionInrCents = roundCurrency(
-    (cashoutUsdInrRate - paidUsdInrRate) * employeeMonthlyUsdCents,
+  return {
+    totalCommissionUsdCents: dollarInwardUsdCents,
+    fxCommissionInrCents: marginMetrics.forexGainInrCents,
+    commissionEarnedInrCents: marginMetrics.operatingMarginInrCents,
+  };
+}
+
+export function calculatePegRateMarginMetrics({
+  dollarInwardUsdCents,
+  pegUsdInrRate,
+  receivedUsdInrRate,
+  actualPaidInrCents,
+}: PegRateMarginMetricsInput) {
+  const totalInwardInrCents = roundCurrency(
+    dollarInwardUsdCents * receivedUsdInrRate,
   );
-
-  const commissionEarnedInrCents = roundCurrency(
-    dollarInwardUsdCents * cashoutUsdInrRate -
-      employeeMonthlyUsdCents * paidUsdInrRate -
-      fxCommissionInrCents,
+  const operatingMarginInrCents =
+    roundCurrency(dollarInwardUsdCents * pegUsdInrRate) -
+    actualPaidInrCents;
+  const forexGainInrCents = roundCurrency(
+    dollarInwardUsdCents * (receivedUsdInrRate - pegUsdInrRate),
   );
 
   return {
-    totalCommissionUsdCents,
-    fxCommissionInrCents,
-    commissionEarnedInrCents,
+    totalInwardInrCents,
+    operatingMarginInrCents,
+    forexGainInrCents,
+    totalEarningInrCents: operatingMarginInrCents + forexGainInrCents,
   };
 }
 

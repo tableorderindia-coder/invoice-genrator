@@ -57,7 +57,6 @@ describe("employee cash flow page state", () => {
         employee: {
           id: "emp_1",
           fullName: "Asha",
-          payoutMonthlyUsdCents: 2_000_00,
         },
         paymentMonth: "2026-05",
         invoiceId: "inv_1",
@@ -74,7 +73,6 @@ describe("employee cash flow page state", () => {
       employeeNameSnapshot: "Asha",
       daysWorked: 0,
       daysInMonth: 31,
-      monthlyPaidUsdCents: 2_000_00,
       baseDollarInwardUsdCents: 0,
       cashoutUsdInrRate: 84.25,
       paidAt: "2026-05-25",
@@ -88,7 +86,6 @@ describe("employee cash flow page state", () => {
         {
           daysWorked: 10,
           daysInMonth: 30,
-          monthlyPaidUsdCents: 3_000_00,
           paidUsdInrRate: 80,
           actualPaidInrCents: 8_000_000,
         },
@@ -108,7 +105,6 @@ describe("employee cash flow page state", () => {
         {
           daysWorked: 10,
           daysInMonth: 30,
-          monthlyPaidUsdCents: 3_000_00,
           paidUsdInrRate: 80,
           actualPaidInrCents: 950_000,
         },
@@ -128,16 +124,13 @@ describe("employee cash flow page state", () => {
         {
           daysWorked: 10,
           daysInMonth: 30,
-          monthlyPaidUsdCents: 3_000_00,
           paidUsdInrRate: 80,
           actualPaidInrCents: 0,
         },
         {
-          monthlyPaidUsdCents: 4_000_00,
         },
       ),
     ).toMatchObject({
-      monthlyPaidUsdCents: 4_000_00,
       actualPaidInrCents: 0,
     });
   });
@@ -148,7 +141,6 @@ describe("employee cash flow page state", () => {
         employee: {
           id: "emp_1",
           fullName: "Asha",
-          payoutMonthlyUsdCents: 2_000_00,
           onboardingAdvanceUsdCents: 900_00,
           reimbursementUsdCents: 300_00,
           reimbursementLabelsText: "Laptop",

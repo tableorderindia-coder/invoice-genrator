@@ -126,10 +126,6 @@ function netProfitColor(cents: number) {
   return "var(--text-primary)";
 }
 
-function calculateMonthlyPaidInrCents(monthlyUsdCents: number, paidUsdInrRate: number) {
-  return Math.round(monthlyUsdCents * paidUsdInrRate);
-}
-
 function getSalaryPaidInrCents(row: PnEmployeeEditableRow) {
   return row.actualPaidInrCents - row.pfInrCents - row.tdsInrCents;
 }
@@ -332,7 +328,7 @@ function EmployeeTables({
   const employeeSuffixColumns: Column<PnEmployeeEditableRow>[] = [
     {
       key: "cashoutRate",
-      label: "Cashout rate",
+      label: "Received / exchanged rate",
       render: (row) => (
         <input
           form={`dashboard-payout-${row.payoutId}`}
@@ -357,29 +353,8 @@ function EmployeeTables({
       render: (row) => formatInr(row.cashInInrCents),
     },
     {
-      key: "monthlyUsd",
-      label: "Monthly $",
-      render: (row) => (
-        <input
-          form={`dashboard-payout-${row.payoutId}`}
-          type="number"
-          name="employeeMonthlyUsd"
-          min="0.01"
-          step="0.01"
-          defaultValue={(row.employeeMonthlyUsdCents / 100).toFixed(2)}
-          className={inputClass}
-          style={{
-            minWidth: "8rem",
-            border: "1px solid var(--glass-border)",
-            background: "rgba(255,255,255,0.04)",
-            color: "var(--text-primary)",
-          }}
-        />
-      ),
-    },
-    {
       key: "paidRate",
-      label: "Paid rate",
+      label: "Peg rate",
       render: (row) =>
         row.isSecurityDepositMonth ? (
           <>
@@ -407,14 +382,6 @@ function EmployeeTables({
               color: "var(--text-primary)",
             }}
           />
-        ),
-    },
-    {
-      key: "monthlyPaidInr",
-      label: "Monthly paid INR",
-      render: (row) =>
-        formatInr(
-          calculateMonthlyPaidInrCents(row.employeeMonthlyUsdCents, row.paidUsdInrRate),
         ),
     },
     {
@@ -487,22 +454,17 @@ function EmployeeTables({
     },
     {
       key: "fxCommission",
-      label: "FX commission (INR)",
+      label: "Forex gain (INR)",
       render: (row) => formatInr(row.fxCommissionInrCents),
     },
     {
-      key: "totalCommission",
-      label: "Total commission (USD)",
-      render: (row) => formatUsd(row.totalCommissionUsdCents),
-    },
-    {
       key: "commissionEarned",
-      label: "Commission earned (INR)",
+      label: "Operating margin (INR)",
       render: (row) => formatInr(row.commissionEarnedInrCents),
     },
     {
       key: "grossEarnings",
-      label: "Gross earnings (INR)",
+      label: "Total earning (INR)",
       render: (row) => formatInr(row.grossEarningsInrCents),
     },
     {
@@ -574,12 +536,8 @@ function EmployeeTables({
         return formatRate(totals.cashoutUsdInrRate);
       case "cashIn":
         return formatInr(totals.cashInInrCents);
-      case "monthlyUsd":
-        return formatUsd(totals.employeeMonthlyUsdCents);
       case "paidRate":
         return formatRate(totals.paidUsdInrRate);
-      case "monthlyPaidInr":
-        return formatInr(totals.monthlyPaidInrCents);
       case "actualPaid":
         return formatInr(totals.actualPaidInrCents);
       case "pf":
@@ -592,8 +550,6 @@ function EmployeeTables({
         );
       case "fxCommission":
         return formatInr(totals.fxCommissionInrCents);
-      case "totalCommission":
-        return formatUsd(totals.totalCommissionUsdCents);
       case "commissionEarned":
         return formatInr(totals.commissionEarnedInrCents);
       case "grossEarnings":
@@ -785,7 +741,7 @@ function PeriodTables({
   const periodSuffixColumns: Column<PnPeriodRow>[] = [
     {
       key: "cashoutRate",
-      label: "Cashout rate",
+      label: "Received / exchanged rate",
       render: (row) => formatRate(row.cashoutUsdInrRate),
     },
     {
@@ -794,19 +750,9 @@ function PeriodTables({
       render: (row) => formatInr(row.cashInInrCents),
     },
     {
-      key: "monthlyUsd",
-      label: "Monthly $",
-      render: (row) => formatUsd(row.employeeMonthlyUsdCents),
-    },
-    {
       key: "paidRate",
-      label: "Paid rate",
+      label: "Peg rate",
       render: (row) => formatRate(row.paidUsdInrRate),
-    },
-    {
-      key: "monthlyPaidInr",
-      label: "Monthly paid INR",
-      render: (row) => formatInr(row.monthlyPaidInrCents),
     },
     {
       key: "actualPaid",
@@ -830,22 +776,17 @@ function PeriodTables({
     },
     {
       key: "fxCommission",
-      label: "FX commission (INR)",
+      label: "Forex gain (INR)",
       render: (row) => formatInr(row.fxCommissionInrCents),
     },
     {
-      key: "totalCommission",
-      label: "Total commission (USD)",
-      render: (row) => formatUsd(row.totalCommissionUsdCents),
-    },
-    {
       key: "commissionEarned",
-      label: "Commission earned (INR)",
+      label: "Operating margin (INR)",
       render: (row) => formatInr(row.commissionEarnedInrCents),
     },
     {
       key: "grossEarnings",
-      label: "Gross earnings (INR)",
+      label: "Total earning (INR)",
       render: (row) => formatInr(row.grossEarningsInrCents),
     },
   ];
@@ -939,12 +880,8 @@ function PeriodTables({
         return formatRate(totals.cashoutUsdInrRate);
       case "cashIn":
         return formatInr(totals.cashInInrCents);
-      case "monthlyUsd":
-        return formatUsd(totals.employeeMonthlyUsdCents);
       case "paidRate":
         return formatRate(totals.paidUsdInrRate);
-      case "monthlyPaidInr":
-        return formatInr(totals.monthlyPaidInrCents);
       case "pf":
         return formatInr(totals.pfInrCents);
       case "tds":
@@ -955,8 +892,6 @@ function PeriodTables({
         return formatInr(totals.salaryPaidInrCents);
       case "fxCommission":
         return formatInr(totals.fxCommissionInrCents);
-      case "totalCommission":
-        return formatUsd(totals.totalCommissionUsdCents);
       case "commissionEarned":
         return formatInr(totals.commissionEarnedInrCents);
       case "grossEarnings":

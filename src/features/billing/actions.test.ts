@@ -189,7 +189,6 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
       reimbursementLabelsText: "Laptop",
       appraisalAdvanceUsdCents: 7500,
       offboardingDeductionUsdCents: 2500,
-      employeeMonthlyUsdCents: 90000,
       cashoutUsdInrRate: 83.45,
       paidUsdInrRate: 82.75,
       pfInrCents: 10000,
@@ -219,7 +218,6 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
           employeeNameSnapshot: "Asha",
           daysWorked: 10,
           daysInMonth: 30,
-          monthlyPaidUsdCents: 300000,
           baseDollarInwardUsdCents: 0,
           onboardingAdvanceUsdCents: 0,
           reimbursementUsdCents: 0,
@@ -308,7 +306,6 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
             monthKey: "2026-04",
             monthLabel: "April 2026",
             effectiveDollarInwardUsdCents: 134000,
-            monthlyDollarPaidUsdCents: 250000,
           },
         ],
       }),
@@ -330,7 +327,6 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
       monthSummaries: [
         expect.objectContaining({
           monthKey: "2026-04",
-          monthlyDollarPaidUsdCents: 250000,
         }),
       ],
     });

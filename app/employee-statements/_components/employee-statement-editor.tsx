@@ -214,7 +214,7 @@ export default function EmployeeStatementEditor(props: {
               <th className="px-4 py-3 text-right font-medium">Appraisal advance</th>
               <th className="px-4 py-3 text-right font-medium">Offboarding deduction</th>
               <th className="px-4 py-3 text-right font-medium">Effective dollar inward</th>
-              <th className="px-4 py-3 text-right font-medium">Monthly $ paid</th>
+              <th className="px-4 py-3 text-right font-medium">Employee $ paid</th>
               <th className="px-4 py-3 text-right font-medium">Total balance</th>
             </tr>
           </thead>

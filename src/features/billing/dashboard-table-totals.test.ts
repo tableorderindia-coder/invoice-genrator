@@ -26,7 +26,6 @@ const employeeRows: PnEmployeeEditableRow[] = [
     offboardingDeductionUsdCents: 0,
     effectiveDollarInwardUsdCents: 98_00,
     cashInInrCents: 8_000_00,
-    employeeMonthlyUsdCents: 20_000,
     cashoutUsdInrRate: 80,
     paidUsdInrRate: 75,
     salaryPaidInrCents: 14_500_00,
@@ -59,7 +58,6 @@ const employeeRows: PnEmployeeEditableRow[] = [
     offboardingDeductionUsdCents: 1_00,
     effectiveDollarInwardUsdCents: 199_00,
     cashInInrCents: 16_000_00,
-    employeeMonthlyUsdCents: 10_000,
     cashoutUsdInrRate: 82,
     paidUsdInrRate: 78,
     salaryPaidInrCents: 7_500_00,
@@ -90,9 +88,7 @@ const periodRows: PnPeriodRow[] = [
     effectiveDollarInwardUsdCents: 99_00,
     cashoutUsdInrRate: 80,
     cashInInrCents: 8_000_00,
-    employeeMonthlyUsdCents: 20_000,
     paidUsdInrRate: 75,
-    monthlyPaidInrCents: 15_000_00,
     pfInrCents: 500_00,
     tdsInrCents: 200_00,
     actualPaidInrCents: 15_200_00,
@@ -120,9 +116,7 @@ const periodRows: PnPeriodRow[] = [
     effectiveDollarInwardUsdCents: 199_00,
     cashoutUsdInrRate: 82,
     cashInInrCents: 16_000_00,
-    employeeMonthlyUsdCents: 10_000,
     paidUsdInrRate: 78,
-    monthlyPaidInrCents: 7_800_00,
     pfInrCents: 300_00,
     tdsInrCents: 100_00,
     actualPaidInrCents: 7_900_00,
@@ -145,8 +139,8 @@ describe("dashboard table totals", () => {
     expect(totals.daysWorked).toBe(30);
     expect(totals.actualPaidInrCents).toBe(23_100_00);
     expect(totals.netProfitInrCents).toBe(21_000_00);
-    expect(totals.cashoutUsdInrRate).toBeCloseTo(80.6667, 3);
-    expect(totals.paidUsdInrRate).toBeCloseTo(76, 3);
+    expect(totals.cashoutUsdInrRate).toBeCloseTo(81.3401, 3);
+    expect(totals.paidUsdInrRate).toBeCloseTo(77.0101, 3);
   });
 
   it("computes period totals and respects P/L toggles", () => {

@@ -10,7 +10,6 @@ import {
   calculateCashInInrCents,
   calculateEffectiveDollarInwardUsdCents,
   calculateEmployeeMonthNetInrCents,
-  calculateMonthlyPaidInrCents,
   resolveEmployeeCashFlowStatus,
 } from "@/src/features/billing/employee-cash-flow";
 import {
@@ -30,7 +29,6 @@ type AvailableEmployee = {
   id: string;
   fullName: string;
   companyId: string;
-  payoutMonthlyUsdCents: number;
   defaultPaidUsdInrRate?: number;
   defaultActualPaidInrCents?: number;
   defaultPfInrCents?: number;
@@ -72,15 +70,11 @@ function deriveCardMetrics(entry: EmployeeCashFlowEditableEntry) {
   });
   const payoutMetrics = calculateEmployeePayoutMetrics({
     dollarInwardUsdCents: effectiveDollarInwardUsdCents,
-    employeeMonthlyUsdCents: entry.monthlyPaidUsdCents,
-    cashoutUsdInrRate: entry.cashoutUsdInrRate,
-    paidUsdInrRate: entry.paidUsdInrRate,
+    actualPaidInrCents: entry.actualPaidInrCents,
+    receivedUsdInrRate: entry.cashoutUsdInrRate,
+    pegUsdInrRate: entry.paidUsdInrRate,
   });
   const actualPaidInrCents = entry.actualPaidInrCents;
-  const monthlyPaidInrCents = calculateMonthlyPaidInrCents({
-    monthlyPaidUsdCents: entry.monthlyPaidUsdCents,
-    paidUsdInrRate: entry.paidUsdInrRate,
-  });
   const netInrCents = calculateEmployeeMonthNetInrCents({
     cashInInrCents,
     salaryPaidInrCents: actualPaidInrCents,
@@ -89,7 +83,6 @@ function deriveCardMetrics(entry: EmployeeCashFlowEditableEntry) {
   return {
     effectiveDollarInwardUsdCents,
     cashInInrCents,
-    monthlyPaidInrCents,
     salaryPaidInrCents: actualPaidInrCents,
     fxCommissionInrCents: payoutMetrics.fxCommissionInrCents,
     totalCommissionUsdCents: payoutMetrics.totalCommissionUsdCents,
@@ -497,22 +490,6 @@ export default function EmployeeCashFlowEntryForm({
 
                 <label className="block">
                   <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
-                    Monthly Paid $
-                  </span>
-                  <input
-                    value={toCurrencyInput(entry.monthlyPaidUsdCents)}
-                    onChange={(event) =>
-                      updateEntry(entry.id, {
-                        monthlyPaidUsdCents: fromCurrencyInput(event.target.value),
-                      })
-                    }
-                    className={cardInputClass()}
-                    inputMode="decimal"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
                     Dollar inward
                   </span>
                   <input
@@ -609,7 +586,7 @@ export default function EmployeeCashFlowEntryForm({
 
                 <label className="block">
                   <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
-                    Cashout USD/INR
+                    Received / exchanged rate
                   </span>
                   <input
                     value={toEditableRate(entry.cashoutUsdInrRate)}
@@ -625,7 +602,7 @@ export default function EmployeeCashFlowEntryForm({
 
                 <label className="block">
                   <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
-                    Paid rate
+                    Peg rate
                   </span>
                   <input
                     value={toEditableRate(entry.paidUsdInrRate)}
@@ -635,17 +612,6 @@ export default function EmployeeCashFlowEntryForm({
                       })
                     }
                     className={cardInputClass()}
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
-                    Monthly paid INR
-                  </span>
-                  <input
-                    value={toCurrencyInput(metrics.monthlyPaidInrCents)}
-                    className={cardInputClass()}
-                    readOnly
                   />
                 </label>
 
@@ -697,7 +663,7 @@ export default function EmployeeCashFlowEntryForm({
 
                 <label className="block">
                   <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
-                    FX commission (INR)
+                    Forex gain (INR)
                   </span>
                   <input
                     value={toCurrencyInput(metrics.fxCommissionInrCents)}
@@ -708,7 +674,7 @@ export default function EmployeeCashFlowEntryForm({
 
                 <label className="block">
                   <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
-                    Total commission (USD)
+                    Dollar inward (USD)
                   </span>
                   <input
                     value={toCurrencyInput(metrics.totalCommissionUsdCents)}
@@ -719,7 +685,7 @@ export default function EmployeeCashFlowEntryForm({
 
                 <label className="block">
                   <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
-                    Commission earned (INR)
+                    Operating margin (INR)
                   </span>
                   <input
                     value={toCurrencyInput(metrics.commissionEarnedInrCents)}
@@ -730,7 +696,7 @@ export default function EmployeeCashFlowEntryForm({
 
                 <label className="block">
                   <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
-                    Gross earnings (INR)
+                    Total earning (INR)
                   </span>
                   <input
                     value={toCurrencyInput(metrics.grossEarningsInrCents)}

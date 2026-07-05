@@ -97,7 +97,6 @@ type DbEmployee = {
   designation: string;
   default_team: string;
   billing_rate_usd_cents: number;
-  payout_monthly_usd_cents: number;
   default_paid_usd_inr_rate?: number | null;
   default_actual_paid_inr_cents?: number | null;
   default_pf_inr_cents?: number | null;
@@ -132,7 +131,7 @@ type DbInvoiceLineItem = {
   designation_snapshot: string;
   team_name_snapshot: string;
   billing_rate_usd_cents: number;
-  payout_monthly_usd_cents_snapshot: number;
+  payout_monthly_usd_cents_snapshot?: number | null;
   hrs_per_week: number;
   days_worked: number | null;
   billed_total_usd_cents: number;
@@ -196,7 +195,6 @@ type DbDashboardCashFlowEntry = {
   payment_month: string;
   employee_name_snapshot: string;
   company_id: string;
-  monthly_paid_usd_cents: number;
   base_dollar_inward_usd_cents: number;
   onboarding_advance_usd_cents: number;
   reimbursement_usd_cents: number;
@@ -420,7 +418,6 @@ function mapEmployee(row: DbEmployee): Employee {
     designation: row.designation,
     defaultTeam: row.default_team,
     billingRateUsdCents: row.billing_rate_usd_cents,
-    payoutMonthlyUsdCents: row.payout_monthly_usd_cents,
     defaultPaidUsdInrRate: Number(row.default_paid_usd_inr_rate ?? 0),
     defaultActualPaidInrCents: Number(row.default_actual_paid_inr_cents ?? 0),
     defaultPfInrCents: Number(row.default_pf_inr_cents ?? 0),
@@ -484,7 +481,7 @@ function mapInvoiceLineItem(row: DbInvoiceLineItem): InvoiceLineItem {
     designationSnapshot: row.designation_snapshot,
     teamNameSnapshot: row.team_name_snapshot,
     billingRateUsdCents: row.billing_rate_usd_cents,
-    payoutMonthlyUsdCentsSnapshot: row.payout_monthly_usd_cents_snapshot,
+    payoutMonthlyUsdCentsSnapshot: row.payout_monthly_usd_cents_snapshot ?? 0,
     hrsPerWeek: Number(row.hrs_per_week),
     daysWorked: Number(row.days_worked ?? 0),
     billedTotalUsdCents: row.billed_total_usd_cents,
@@ -578,7 +575,6 @@ function normalizeLineItemDaysWorked(
 
   const fullMonthBilledTotalUsdCents = calculateLineItemTotals({
     billingRateUsdCents: lineItem.billingRateUsdCents,
-    payoutMonthlyUsdCents: lineItem.payoutMonthlyUsdCentsSnapshot,
     hrsPerWeek: lineItem.hrsPerWeek,
     daysWorked: daysInMonth,
     daysInMonth,
@@ -943,7 +939,6 @@ export async function createEmployee(input: {
   designation: string;
   defaultTeam: string;
   billingRateUsdCents: number;
-  payoutMonthlyUsdCents: number;
   defaultPaidUsdInrRate?: number;
   defaultActualPaidInrCents?: number;
   defaultPfInrCents?: number;
@@ -973,7 +968,6 @@ export async function createEmployee(input: {
     designation: input.designation,
     default_team: input.defaultTeam,
     billing_rate_usd_cents: input.billingRateUsdCents,
-    payout_monthly_usd_cents: input.payoutMonthlyUsdCents,
     default_paid_usd_inr_rate: input.defaultPaidUsdInrRate ?? 0,
     default_actual_paid_inr_cents: input.defaultActualPaidInrCents ?? 0,
     default_pf_inr_cents: input.defaultPfInrCents ?? 0,
@@ -1108,7 +1102,6 @@ export async function createInvoiceDraft(input: {
           hrsPerWeek: lineItem.hrsPerWeek,
           daysWorked: lineItem.daysWorked,
           billingRateUsdCents: lineItem.billingRateUsdCents,
-          payoutMonthlyUsdCents: lineItem.payoutMonthlyUsdCentsSnapshot,
           recomputeInvoice: false,
         });
       }
@@ -1331,7 +1324,6 @@ export async function addInvoiceTeam(
         employeeId: employee.id,
         hrsPerWeek: employee.hrsPerWeek,
         billingRateUsdCents: employee.billingRateUsdCents,
-        payoutMonthlyUsdCents: employee.payoutMonthlyUsdCents,
         recomputeInvoice: false,
       });
     }
@@ -1368,7 +1360,6 @@ export async function addInvoiceLineItem(input: {
   hrsPerWeek: number;
   daysWorked?: number;
   billingRateUsdCents?: number;
-  payoutMonthlyUsdCents?: number;
   recomputeInvoice?: boolean;
 }) {
   const supabase = await getSupabaseOrThrow();
@@ -1408,8 +1399,6 @@ export async function addInvoiceLineItem(input: {
   const team = mapInvoiceTeam(teamRow as DbInvoiceTeam);
   const billingRateUsdCents =
     input.billingRateUsdCents ?? employee.billingRateUsdCents;
-  const payoutMonthlyUsdCents =
-    input.payoutMonthlyUsdCents ?? employee.payoutMonthlyUsdCents;
   const daysInMonth = getDaysInMonth(
     Number(invoiceRow.month),
     Number(invoiceRow.year),
@@ -1420,7 +1409,6 @@ export async function addInvoiceLineItem(input: {
       : Math.max(1, Math.round(input.daysWorked));
   const calculated = calculateLineItemTotals({
     billingRateUsdCents,
-    payoutMonthlyUsdCents,
     hrsPerWeek: input.hrsPerWeek,
     daysWorked: normalizedDaysWorked,
     daysInMonth,
@@ -1434,7 +1422,6 @@ export async function addInvoiceLineItem(input: {
     designation_snapshot: employee.designation,
     team_name_snapshot: team.teamName,
     billing_rate_usd_cents: billingRateUsdCents,
-    payout_monthly_usd_cents_snapshot: payoutMonthlyUsdCents,
     hrs_per_week: input.hrsPerWeek,
     days_worked: normalizedDaysWorked,
     billed_total_usd_cents: calculated.billedTotalUsdCents,
@@ -1506,7 +1493,6 @@ export async function updateInvoiceLineItem(input: {
   );
   const calculated = calculateLineItemTotals({
     billingRateUsdCents: input.billingRateUsdCents,
-    payoutMonthlyUsdCents: existingLineItem.payoutMonthlyUsdCentsSnapshot,
     hrsPerWeek: input.hrsPerWeek,
     daysWorked: normalizedDaysWorked,
     daysInMonth,
@@ -1627,7 +1613,6 @@ export async function assignEmployeeToInvoiceTeam(input: {
       employeeId: employee.id,
       hrsPerWeek: employee.hrsPerWeek,
       billingRateUsdCents: employee.billingRateUsdCents,
-      payoutMonthlyUsdCents: employee.payoutMonthlyUsdCents,
       recomputeInvoice: false,
     });
   }
@@ -1932,7 +1917,6 @@ export async function updateEmployee(input: {
   designation: string;
   defaultTeam: string;
   billingRateUsdCents: number;
-  payoutMonthlyUsdCents: number;
   defaultPaidUsdInrRate?: number;
   defaultActualPaidInrCents?: number;
   defaultPfInrCents?: number;
@@ -1950,7 +1934,6 @@ export async function updateEmployee(input: {
     designation: input.designation,
     default_team: input.defaultTeam,
     billing_rate_usd_cents: input.billingRateUsdCents,
-    payout_monthly_usd_cents: input.payoutMonthlyUsdCents,
     default_paid_usd_inr_rate: input.defaultPaidUsdInrRate ?? 0,
     default_actual_paid_inr_cents: input.defaultActualPaidInrCents ?? 0,
     default_pf_inr_cents: input.defaultPfInrCents ?? 0,
@@ -2285,7 +2268,7 @@ export async function getPnDashboardData(input: {
   let cashFlowQuery = supabase
     .from("invoice_payment_employee_entries")
     .select(
-      "id, employee_id, payment_month, employee_name_snapshot, company_id, monthly_paid_usd_cents, base_dollar_inward_usd_cents, onboarding_advance_usd_cents, reimbursement_usd_cents, reimbursement_labels_text, appraisal_advance_usd_cents, offboarding_deduction_usd_cents, effective_dollar_inward_usd_cents, cashout_usd_inr_rate, paid_usd_inr_rate, cash_in_inr_cents, pf_inr_cents, tds_inr_cents, actual_paid_inr_cents, fx_commission_inr_cents, total_commission_usd_cents, commission_earned_inr_cents, gross_earnings_inr_cents, days_worked, days_in_month, invoice_id",
+      "id, employee_id, payment_month, employee_name_snapshot, company_id, base_dollar_inward_usd_cents, onboarding_advance_usd_cents, reimbursement_usd_cents, reimbursement_labels_text, appraisal_advance_usd_cents, offboarding_deduction_usd_cents, effective_dollar_inward_usd_cents, cashout_usd_inr_rate, paid_usd_inr_rate, cash_in_inr_cents, pf_inr_cents, tds_inr_cents, actual_paid_inr_cents, fx_commission_inr_cents, total_commission_usd_cents, commission_earned_inr_cents, gross_earnings_inr_cents, days_worked, days_in_month, invoice_id",
     )
     .eq("company_id", input.companyId);
 
@@ -2401,7 +2384,6 @@ export async function getPnDashboardData(input: {
         appraisalAdvanceUsdCents: row.appraisal_advance_usd_cents,
         offboardingDeductionUsdCents: Math.abs(row.offboarding_deduction_usd_cents),
         effectiveDollarInwardUsdCents,
-        employeeMonthlyUsdCents: row.monthly_paid_usd_cents,
         cashoutUsdInrRate: row.cashout_usd_inr_rate,
         paidUsdInrRate: row.paid_usd_inr_rate,
         pfInrCents: row.pf_inr_cents,
@@ -2471,7 +2453,6 @@ export async function getPnDashboardData(input: {
         offboardingDeductionUsdCents: Math.abs(row.offboarding_deduction_usd_cents),
         effectiveDollarInwardUsdCents,
         cashInInrCents,
-        employeeMonthlyUsdCents: row.monthly_paid_usd_cents,
         cashoutUsdInrRate: row.cashout_usd_inr_rate,
         paidUsdInrRate: row.paid_usd_inr_rate,
         salaryPaidInrCents,

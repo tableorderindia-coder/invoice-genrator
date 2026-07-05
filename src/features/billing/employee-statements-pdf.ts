@@ -277,7 +277,7 @@ export async function buildEmployeeStatementPdf(input: EmployeeStatementPdfInput
       "Appraisal",
       "Offboarding",
       "Effective dollar inward",
-      "Monthly $ paid",
+      "Employee $ paid",
       "Total balance",
     ];
 
@@ -397,7 +397,7 @@ export async function buildEmployeeStatementPdf(input: EmployeeStatementPdfInput
     ["Appraisal advance", model.totals.appraisalAdvance],
     ["Offboarding deduction", model.totals.offboardingDeduction],
     ["Effective dollar inward", model.totals.effectiveDollarInward],
-    ["Monthly $ paid", model.totals.monthlyDollarPaid],
+    ["Employee $ paid", model.totals.monthlyDollarPaid],
     ["Total balance", model.totals.totalBalance],
   ].forEach(([label, value]) => {
     doc

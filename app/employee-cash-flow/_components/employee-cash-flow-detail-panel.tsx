@@ -82,22 +82,18 @@ export default function EmployeeCashFlowDetailPanel({
 
       <div className="rounded-2xl p-4" style={{ border: "1px solid var(--glass-border)" }}>
         <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-          Monthly paid $
-        </p>
-        <p className="mt-1">{formatUsd(row.monthlyPaidUsdCents)}</p>
-        <p className="mt-3 text-sm" style={{ color: "var(--text-secondary)" }}>
-          Cashout USD/INR
+          Received / exchanged rate
         </p>
         <p className="mt-1">{row.cashoutUsdInrRate.toFixed(4)}</p>
         <p className="mt-3 text-sm" style={{ color: "var(--text-secondary)" }}>
-          Paid USD/INR
+          Peg rate
         </p>
         <p className="mt-1">{row.paidUsdInrRate.toFixed(4)}</p>
         <p className="mt-3 text-sm" style={{ color: "var(--text-secondary)" }}>
           Salary snapshot
         </p>
         <p className="mt-1">
-          {salaryPayment ? formatUsd(salaryPayment.salaryUsdCents) : "Not saved yet"}
+          {salaryPayment ? formatInr(salaryPayment.salaryPaidInrCents) : "Not saved yet"}
         </p>
       </div>
     </div>
