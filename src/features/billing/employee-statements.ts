@@ -144,6 +144,20 @@ export function calculateStatementEffectiveDollarInwardUsdCents(input: {
   );
 }
 
+export function calculateEmployeeStatementDefaultPaidUsdCents(input: {
+  dollarInwardUsdCents: number;
+  reimbursementUsdCents: number;
+  appraisalAdvanceUsdCents: number;
+  offboardingDeductionUsdCents: number;
+}) {
+  return (
+    input.dollarInwardUsdCents +
+    input.reimbursementUsdCents +
+    input.appraisalAdvanceUsdCents -
+    input.offboardingDeductionUsdCents
+  );
+}
+
 export function calculateEmployeeStatementTotalBalanceUsdCents(input: {
   effectiveDollarInwardUsdCents: number;
   monthlyDollarPaidUsdCents: number;
@@ -173,13 +187,24 @@ export function buildEmployeeStatementSection(input: {
           }),
         0,
       );
+      const monthlyDollarPaidUsdCents = group.rows.reduce(
+        (sum, row) =>
+          sum +
+          calculateEmployeeStatementDefaultPaidUsdCents({
+            dollarInwardUsdCents: row.dollarInwardUsdCents,
+            reimbursementUsdCents: row.reimbursementUsdCents,
+            appraisalAdvanceUsdCents: row.appraisalAdvanceUsdCents,
+            offboardingDeductionUsdCents: row.offboardingDeductionUsdCents,
+          }),
+        0,
+      );
 
       return {
         monthKey: group.monthKey,
         monthLabel: group.rows[0]?.monthLabel ?? group.monthKey,
         rows: group.rows,
         effectiveDollarInwardUsdCents,
-        monthlyDollarPaidUsdCents: effectiveDollarInwardUsdCents,
+        monthlyDollarPaidUsdCents,
       };
     }),
   };
@@ -272,6 +297,17 @@ export function applySavedEmployeeStatementOverrides(
           }),
         0,
       );
+      const calculatedMonthlyDollarPaidUsdCents = overriddenRows.reduce(
+        (sum, row) =>
+          sum +
+          calculateEmployeeStatementDefaultPaidUsdCents({
+            dollarInwardUsdCents: row.dollarInwardUsdCents,
+            reimbursementUsdCents: row.reimbursementUsdCents,
+            appraisalAdvanceUsdCents: row.appraisalAdvanceUsdCents,
+            offboardingDeductionUsdCents: row.offboardingDeductionUsdCents,
+          }),
+        0,
+      );
 
       return {
         ...month,
@@ -281,7 +317,7 @@ export function applySavedEmployeeStatementOverrides(
           calculatedEffectiveDollarInwardUsdCents,
         monthlyDollarPaidUsdCents:
           savedMonthSummary?.monthlyDollarPaidUsdCents ??
-          calculatedEffectiveDollarInwardUsdCents,
+          calculatedMonthlyDollarPaidUsdCents,
       };
     }),
   };

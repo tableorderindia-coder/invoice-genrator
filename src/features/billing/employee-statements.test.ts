@@ -49,7 +49,7 @@ describe("employee statements helpers", () => {
     expect(toEmployeeStatementMonthKey({ year: 2026, month: 4 })).toBe("2026-04");
   });
 
-  it("builds month summary defaults from employee payout monthly amount and invoice rows", () => {
+  it("builds month summary defaults from invoice rows while excluding onboarding deposits from employee paid", () => {
     const section = buildEmployeeStatementSection({
       employee: {
         id: "emp_1",
@@ -88,6 +88,7 @@ describe("employee statements helpers", () => {
     });
 
     expect(section.months[0]?.effectiveDollarInwardUsdCents).toBe(169000);
+    expect(section.months[0]?.monthlyDollarPaidUsdCents).toBe(149000);
   });
 
   it("serializes invoice-row edits and month-summary edits separately", () => {
@@ -235,6 +236,7 @@ describe("employee statements helpers", () => {
 
     expect(overridden.months[0]?.rows[0]?.appraisalAdvanceUsdCents).toBe(7000);
     expect(overridden.months[0]?.effectiveDollarInwardUsdCents).toBe(112000);
+    expect(overridden.months[0]?.monthlyDollarPaidUsdCents).toBe(107000);
   });
 
   it("still respects newer saved appraisal edits after appraisal support shipped", () => {
@@ -351,7 +353,7 @@ describe("employee statements helpers", () => {
       monthLabel: "January 2026",
       invoiceNumber: "2026/001",
       effectiveDollarInwardUsdCents: 169000,
-      totalBalanceUsdCents: 0,
+      totalBalanceUsdCents: 20000,
     });
     expect(rows[1]).toMatchObject({
       kind: "invoice",
@@ -363,7 +365,7 @@ describe("employee statements helpers", () => {
       kind: "invoice",
       monthLabel: "February 2026",
       effectiveDollarInwardUsdCents: 71000,
-      totalBalanceUsdCents: 0,
+      totalBalanceUsdCents: 10000,
     });
   });
 
