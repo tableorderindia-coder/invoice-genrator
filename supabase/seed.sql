@@ -136,11 +136,8 @@ insert into invoice_line_items (
   designation_snapshot,
   team_name_snapshot,
   billing_rate_usd_cents,
-  payout_monthly_usd_cents_snapshot,
   hrs_per_week,
-  billed_total_usd_cents,
-  payout_total_usd_cents,
-  profit_total_usd_cents
+  billed_total_usd_cents
 )
 values
   (
@@ -151,10 +148,7 @@ values
     'Senior Data Engineer',
     'Data Engineering',
     5500,
-    0,
     40.00,
-    953333,
-    0,
     953333
   ),
   (
@@ -165,10 +159,7 @@ values
     'Data Engineer',
     'Data Engineering',
     4800,
-    0,
     32.00,
-    665600,
-    0,
     665600
   ),
   (
@@ -179,10 +170,7 @@ values
     'Finance Analyst',
     'Finance',
     4200,
-    0,
     30.00,
-    546000,
-    0,
     546000
   ),
   (
@@ -193,10 +181,7 @@ values
     'Senior Data Engineer',
     'Data Engineering',
     5500,
-    0,
     40.00,
-    953333,
-    0,
     953333
   ),
   (
@@ -207,10 +192,7 @@ values
     'Data Engineer',
     'Data Engineering',
     4800,
-    0,
     35.00,
-    728000,
-    0,
     728000
   ),
   (
@@ -221,10 +203,7 @@ values
     'Finance Analyst',
     'Finance',
     4200,
-    0,
     33.00,
-    600600,
-    0,
     600600
   )
 on conflict (id) do nothing;
@@ -282,9 +261,6 @@ insert into invoice_realizations (
   realized_at,
   dollar_inbound_usd_cents,
   usd_inr_rate,
-  realized_revenue_usd_cents,
-  realized_payout_usd_cents,
-  realized_profit_usd_cents,
   notes,
   created_at
 )
@@ -294,9 +270,6 @@ values (
   '2026-05-31',
   2177933,
   86.00,
-  2177933,
-  0,
-  2177933,
   null,
   '2026-05-31T16:00:00.000Z'
 )

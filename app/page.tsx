@@ -5,16 +5,37 @@ import { MetricCard } from "./_components/metric-card";
 import { GlassPanel } from "./_components/glass-panel";
 import { StaggerGrid } from "./_components/stagger-grid";
 import { requirePageAccess } from "@/lib/auth/server";
-import { getDashboardMetrics, listCompanies, listInvoices } from "@/src/features/billing/store";
-import { formatMonthYear, formatUsd } from "@/src/features/billing/utils";
+import { getCompanyPnSummaries, listCompanies, listInvoices } from "@/src/features/billing/store";
+import { formatMonthYear, formatSignedInr, formatUsd } from "@/src/features/billing/utils";
+import type { InvoiceStatus } from "@/src/features/billing/types";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   await requirePageAccess("overview");
-  const companies = await listCompanies();
-  const invoices = (await listInvoices()).slice(0, 3);
-  const metrics = await getDashboardMetrics();
+  const [companies, allInvoices, companyPnSummaries] = await Promise.all([
+    listCompanies(),
+    listInvoices(),
+    getCompanyPnSummaries(),
+  ]);
+  const invoices = allInvoices.slice(0, 3);
+  const invoiceStatusCounts: Record<InvoiceStatus, number> = {
+    draft: 0,
+    generated: 0,
+    sent: 0,
+    received: 0,
+    cashed_out: 0,
+  };
+  for (const invoice of allInvoices) {
+    invoiceStatusCounts[invoice.status] += 1;
+  }
+  const pendingCashOutCount = allInvoices.filter(
+    (invoice) => invoice.status === "sent",
+  ).length;
+  const totalNetPlInrCents = companyPnSummaries.reduce(
+    (sum, company) => sum + company.netPlInrCents,
+    0,
+  );
 
   return (
     <Shell title="Billing cockpit for staffing ops" eyebrow="EassyOnboard">
@@ -24,13 +45,13 @@ export default async function HomePage() {
           <MetricCard label="Companies" value={String(companies.length)} helper="Active billing relationships" />
         </div>
         <div className="stagger-item">
-          <MetricCard label="Ready for cashout" value={String(metrics.pendingCashOutCount)} helper="Sent, waiting for FX" />
+          <MetricCard label="Ready for cashout" value={String(pendingCashOutCount)} helper="Sent, waiting for FX" />
         </div>
         <div className="stagger-item">
-          <MetricCard label="Realized profit" value={formatUsd(metrics.realizedProfitUsdCents)} helper="USD only in phase 1" />
+          <MetricCard label="Net P/L (INR)" value={formatSignedInr(totalNetPlInrCents)} helper="Peg-rate dashboard total" />
         </div>
         <div className="stagger-item">
-          <MetricCard label="Cashed out" value={String(metrics.invoiceStatusCounts.cashed_out)} helper="Safe to count in P&L" />
+          <MetricCard label="Cashed out" value={String(invoiceStatusCounts.cashed_out)} helper="Safe to count in P&L" />
         </div>
       </StaggerGrid>
 
@@ -47,7 +68,7 @@ export default async function HomePage() {
               </h2>
             </div>
             <Link
-              href="/invoices/new"
+              href="/invoices/create"
               className="gradient-btn"
             >
               + New invoice
@@ -120,7 +141,7 @@ export default async function HomePage() {
             {invoices.map((invoice) => (
               <Link
                 key={invoice.id}
-                href={`/invoices/${invoice.id}`}
+                href={`/invoices/drafts/${invoice.id}`}
                 className="glass-card block px-4 py-4 cursor-pointer"
               >
                 <div className="flex items-center justify-between gap-3">

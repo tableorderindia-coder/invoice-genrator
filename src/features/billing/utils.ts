@@ -34,16 +34,6 @@ export function formatSignedInr(cents: number) {
   return formatInr(0);
 }
 
-export function formatSignedUsd(cents: number) {
-  if (cents > 0) {
-    return `+ ${formatUsd(cents)}`;
-  }
-  if (cents < 0) {
-    return `- ${formatUsd(Math.abs(cents))}`;
-  }
-  return formatUsd(0);
-}
-
 export function formatRate(value: number | null | undefined) {
   if (value === null || value === undefined || !Number.isFinite(value)) {
     return "-";

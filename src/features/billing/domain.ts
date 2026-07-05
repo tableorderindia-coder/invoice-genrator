@@ -7,8 +7,6 @@ type LineItemInput = {
 
 type CalculatedLineItem = {
   billedTotalUsdCents: number;
-  payoutTotalUsdCents: number;
-  profitTotalUsdCents: number;
 };
 
 type InvoiceTotalsInput = {
@@ -19,7 +17,6 @@ type InvoiceTotalsInput = {
 type RealizationInput = {
   invoiceId: string;
   alreadyRealized: boolean;
-  lineItems: CalculatedLineItem[];
   realizedAt: string;
   dollarInboundUsdCents: number;
   usdInrRate: number;
@@ -86,8 +83,6 @@ export function calculateLineItemTotals({
 
   return {
     billedTotalUsdCents,
-    payoutTotalUsdCents: 0,
-    profitTotalUsdCents: billedTotalUsdCents,
   };
 }
 
@@ -99,10 +94,6 @@ export function calculateInvoiceTotals({
     (sum, lineItem) => sum + lineItem.billedTotalUsdCents,
     0,
   );
-  const payoutTotalUsdCents = lineItems.reduce(
-    (sum, lineItem) => sum + lineItem.payoutTotalUsdCents,
-    0,
-  );
   const adjustmentsUsdCents = adjustments.reduce((sum, amount) => sum + amount, 0);
   const grandTotalUsdCents = subtotalUsdCents + adjustmentsUsdCents;
 
@@ -110,15 +101,12 @@ export function calculateInvoiceTotals({
     subtotalUsdCents,
     adjustmentsUsdCents,
     grandTotalUsdCents,
-    payoutTotalUsdCents,
-    profitTotalUsdCents: grandTotalUsdCents - payoutTotalUsdCents,
   };
 }
 
 export function createRealizationRecord({
   invoiceId,
   alreadyRealized,
-  lineItems,
   realizedAt,
   dollarInboundUsdCents,
   usdInrRate,
@@ -127,19 +115,11 @@ export function createRealizationRecord({
     throw new Error("Invoice has already been cashed out");
   }
 
-  const realizedPayoutUsdCents = lineItems.reduce(
-    (sum, lineItem) => sum + lineItem.payoutTotalUsdCents,
-    0,
-  );
-
   return {
     invoiceId,
     realizedAt,
     dollarInboundUsdCents,
     usdInrRate,
-    realizedRevenueUsdCents: dollarInboundUsdCents,
-    realizedPayoutUsdCents,
-    realizedProfitUsdCents: dollarInboundUsdCents - realizedPayoutUsdCents,
   };
 }
 

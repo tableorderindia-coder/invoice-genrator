@@ -152,7 +152,7 @@ export default async function InvoicesPage({
                       >
                         Open PDF
                       </a>
-                      <Link href={`/invoices/${invoice.id}`} className="btn-outline">
+                      <Link href={`/invoices/drafts/${invoice.id}`} className="btn-outline">
                         Open editor
                       </Link>
                       <form action={deleteInvoiceAction}>

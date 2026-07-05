@@ -20,7 +20,6 @@ import {
   deleteInvoiceAdjustment,
   deleteInvoiceLineItem,
   deleteInvoiceTeam,
-  listInvoicesForCompany,
   updateInvoiceLineItem,
   updateInvoiceLineItemTotal,
   updateInvoiceTeamTotal,
@@ -46,7 +45,6 @@ import {
   upsertEmployeeSalaryPayment,
   upsertInvoicePayment,
 } from "./employee-cash-flow-store";
-import { syncInvoiceToEorPortal } from "./eor-sync";
 import type { InvoiceStatus } from "./types";
 import { centsFromUsd } from "./utils";
 import { parseFounderWithdrawalRows } from "./founders-balance";
@@ -238,53 +236,6 @@ export async function updateEmployeeAction(formData: FormData) {
   revalidatePath("/employees");
   revalidatePath("/invoices");
   redirect("/employees");
-}
-
-export async function syncCompanyToEorPortalAction(formData: FormData) {
-  await requirePageEditAccess("invoices");
-  const companyId = getString(formData, "companyId");
-  const returnTo = getString(formData, "returnTo") || "/invoices";
-  let redirectTo = returnTo;
-
-  try {
-    if (!companyId) {
-      throw new Error("Company is required.");
-    }
-
-    const invoices = (await listInvoicesForCompany(companyId)).filter((invoice) => invoice.status !== "draft");
-    if (invoices.length === 0) {
-      revalidatePath("/companies");
-      redirectTo = buildFlashRedirect(returnTo, "success", "No generated invoices found to sync for this company.");
-    } else {
-      let created = 0;
-      let updated = 0;
-      let unmappedCompanies = 0;
-      let unmappedEmployees = 0;
-
-      for (const invoice of invoices) {
-        const result = await syncInvoiceToEorPortal(invoice.id);
-        created += result.created;
-        updated += result.updated;
-        unmappedCompanies += result.unmappedCompanies.length;
-        unmappedEmployees += result.unmappedEmployees.length;
-      }
-
-      revalidatePath("/invoices");
-      revalidatePath("/companies");
-      redirectTo = buildFlashRedirect(
-        returnTo,
-        unmappedCompanies || unmappedEmployees ? "error" : "success",
-        `Company synced to EOR Portal. ${invoices.length} invoices checked, ${created} created, ${updated} updated${
-          unmappedCompanies || unmappedEmployees
-            ? `, mapping needed for ${unmappedCompanies} company and ${unmappedEmployees} employee records`
-            : ""
-        }.`,
-      );
-    }
-  } catch (error) {
-    redirectTo = buildFlashRedirect(returnTo, "error", getErrorMessage(error, "Company EOR sync failed."));
-  }
-  redirect(redirectTo);
 }
 
 export async function createInvoiceDraftAction(formData: FormData) {
@@ -779,9 +730,6 @@ export async function updateInvoiceStatusAction(formData: FormData) {
   try {
     const status = getString(formData, "status") as InvoiceStatus;
     await updateInvoiceStatus(invoiceId, status);
-    if (status === "received") {
-      await syncInvoiceToEorPortal(invoiceId);
-    }
 
     revalidatePath(`/invoices/${invoiceId}`);
     revalidatePath(`/invoices/drafts/${invoiceId}`);

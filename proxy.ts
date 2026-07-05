@@ -3,7 +3,6 @@ import type { NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
 const PUBLIC_PATHS = ["/login", "/auth/callback", "/reset-password"];
-const PUBLIC_API_PATHS = ["/api/integrations/eor-portal/invoice-status"];
 const PASSWORD_RESET_ALLOWED_PATHS = ["/reset-password", "/logout"];
 
 function getSupabaseServerCredentials(env: Record<string, string | undefined>) {
@@ -53,20 +52,13 @@ function isPublicPath(pathname: string) {
   );
 }
 
-function isPublicApiPath(pathname: string) {
-  return PUBLIC_API_PATHS.some(
-    (path) => pathname === path || pathname.startsWith(`${path}/`),
-  );
-}
-
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon.ico") ||
     pathname.startsWith("/public") ||
-    isPublicApiPath(pathname) ||
     /\.[a-zA-Z0-9]+$/.test(pathname)
   ) {
     return NextResponse.next();

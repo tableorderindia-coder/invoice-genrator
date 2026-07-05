@@ -12,8 +12,6 @@ const updateCompanyMock = vi.fn();
 const createEmployeeMock = vi.fn();
 const updateEmployeeMock = vi.fn();
 const upsertFounderWithdrawalsMock = vi.fn();
-const listInvoicesForCompanyMock = vi.fn();
-const syncInvoiceToEorPortalMock = vi.fn();
 
 vi.mock("next/cache", () => ({
   revalidatePath: revalidatePathMock,
@@ -41,7 +39,6 @@ vi.mock("./store", () => ({
   deleteInvoiceAdjustment: vi.fn(),
   deleteInvoiceLineItem: vi.fn(),
   deleteInvoiceTeam: vi.fn(),
-  listInvoicesForCompany: listInvoicesForCompanyMock,
   updateInvoiceLineItem: vi.fn(),
   updateInvoiceLineItemTotal: vi.fn(),
   updateInvoiceTeamTotal: vi.fn(),
@@ -55,10 +52,6 @@ vi.mock("./store", () => ({
   upsertDashboardExpense: vi.fn(),
   upsertEmployeeStatementSection: upsertEmployeeStatementSectionMock,
   upsertFounderWithdrawals: upsertFounderWithdrawalsMock,
-}));
-
-vi.mock("./eor-sync", () => ({
-  syncInvoiceToEorPortal: syncInvoiceToEorPortalMock,
 }));
 
 vi.mock("./employee-cash-flow-store", () => ({
@@ -89,10 +82,6 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
     updateEmployeeMock.mockResolvedValue(undefined);
     upsertFounderWithdrawalsMock.mockReset();
     upsertFounderWithdrawalsMock.mockResolvedValue(undefined);
-    listInvoicesForCompanyMock.mockReset();
-    listInvoicesForCompanyMock.mockResolvedValue([]);
-    syncInvoiceToEorPortalMock.mockReset();
-    syncInvoiceToEorPortalMock.mockResolvedValue({ created: 0, updated: 0, skipped: 0, unmappedCompanies: [], unmappedEmployees: [], errors: [] });
   });
 
   it("passes employee cash-flow defaults through employee creation", async () => {
@@ -103,7 +92,6 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
     formData.set("designation", "Engineer");
     formData.set("defaultTeam", "Data");
     formData.set("billingRateUsd", "25");
-    formData.set("payoutMonthlyUsd", "3000");
     formData.set("hrsPerWeek", "40");
     formData.set("activeFrom", "2026-04-01");
     formData.set("defaultPaidUsdInrRate", "82.75");
@@ -134,7 +122,6 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
     formData.set("designation", "Engineer");
     formData.set("defaultTeam", "Data");
     formData.set("billingRateUsd", "25");
-    formData.set("payoutMonthlyUsd", "3000");
     formData.set("hrsPerWeek", "40");
     formData.set("activeFrom", "2026-04-01");
     formData.set("isActive", "true");
@@ -350,46 +337,6 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
       billingAddress: "123 Market Street",
       defaultNote: "Net 15",
     });
-    expect(revalidatePathMock).toHaveBeenCalledWith("/companies");
-  });
-
-  it("returns a friendly company sync message when there are no generated invoices", async () => {
-    const { syncCompanyToEorPortalAction } = await import("./actions");
-    const formData = new FormData();
-    formData.set("companyId", "comp_1");
-    formData.set("returnTo", "/companies");
-    listInvoicesForCompanyMock.mockResolvedValue([{ id: "draft_1", status: "draft" }]);
-
-    await expect(syncCompanyToEorPortalAction(formData)).rejects.toThrow(
-      "REDIRECT:/companies?flashStatus=success&flashMessage=No%20generated%20invoices%20found%20to%20sync%20for%20this%20company.",
-    );
-
-    expect(syncInvoiceToEorPortalMock).not.toHaveBeenCalled();
-    expect(revalidatePathMock).toHaveBeenCalledWith("/companies");
-  });
-
-  it("syncs all non-draft company invoices and revalidates company and invoice pages", async () => {
-    const { syncCompanyToEorPortalAction } = await import("./actions");
-    const formData = new FormData();
-    formData.set("companyId", "comp_1");
-    formData.set("returnTo", "/companies");
-    listInvoicesForCompanyMock.mockResolvedValue([
-      { id: "draft_1", status: "draft" },
-      { id: "invoice_1", status: "generated" },
-      { id: "invoice_2", status: "received" },
-    ]);
-    syncInvoiceToEorPortalMock
-      .mockResolvedValueOnce({ created: 2, updated: 1, skipped: 0, unmappedCompanies: [], unmappedEmployees: [], errors: [] })
-      .mockResolvedValueOnce({ created: 0, updated: 3, skipped: 0, unmappedCompanies: [], unmappedEmployees: [], errors: [] });
-
-    await expect(syncCompanyToEorPortalAction(formData)).rejects.toThrow(
-      "REDIRECT:/companies?flashStatus=success&flashMessage=Company%20synced%20to%20EOR%20Portal.%202%20invoices%20checked%2C%202%20created%2C%204%20updated.",
-    );
-
-    expect(syncInvoiceToEorPortalMock).toHaveBeenCalledTimes(2);
-    expect(syncInvoiceToEorPortalMock).toHaveBeenNthCalledWith(1, "invoice_1");
-    expect(syncInvoiceToEorPortalMock).toHaveBeenNthCalledWith(2, "invoice_2");
-    expect(revalidatePathMock).toHaveBeenCalledWith("/invoices");
     expect(revalidatePathMock).toHaveBeenCalledWith("/companies");
   });
 

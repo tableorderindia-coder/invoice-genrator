@@ -17,7 +17,7 @@ describe("stage one cleanup", () => {
     const dashboard = readProjectFile("app/dashboard/page.tsx");
 
     expect(actions).not.toMatch(
-      /syncInvoiceToEorPortalAction|addInvoiceLineItemAction|saveDashboardExpenseAction|saveInvoicePaymentAction|saveEmployeeSalaryPaymentAction/,
+      /addInvoiceLineItemAction|saveDashboardExpenseAction|saveInvoicePaymentAction|saveEmployeeSalaryPaymentAction/,
     );
     expect(cashFlowStore).not.toContain("getEmployeeCashFlowDashboardData");
     expect(store).not.toMatch(
