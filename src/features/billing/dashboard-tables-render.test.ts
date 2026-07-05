@@ -253,6 +253,34 @@ describe("dashboard tables rendering", () => {
     ]);
   });
 
+  it("renders received and peg rates with at most two decimal places", () => {
+    render(
+      createElement(DashboardTables, {
+        view: "period",
+        periodType: "monthly",
+        data: {
+          ...baseData,
+          periodRows: [
+            {
+              ...periodRows[0],
+              cashoutUsdInrRate: 87.87,
+              paidUsdInrRate: 85.6667,
+            },
+          ],
+        },
+        returnTo: "/dashboard",
+        employeeColumnKeys: allEmployeeColumnKeys,
+        periodColumnKeys: allPeriodColumnKeys,
+        updateDashboardEmployeeCashFlowEntryAction: vi.fn(async () => {}),
+      }),
+    );
+
+    expect(screen.getAllByText("87.87").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("85.67").length).toBeGreaterThan(0);
+    expect(screen.queryByText("87.8700")).toBeNull();
+    expect(screen.queryByText("85.6667")).toBeNull();
+  });
+
   it("renders only selected employee columns plus fixed columns", () => {
     render(
       createElement(DashboardTables, {

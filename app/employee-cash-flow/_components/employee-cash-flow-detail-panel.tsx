@@ -1,4 +1,4 @@
-import { formatInr, formatUsd } from "@/src/features/billing/utils";
+import { formatInr, formatRate, formatUsd } from "@/src/features/billing/utils";
 import type {
   EmployeeCashFlowMonthRow,
   EmployeeCashFlowSalaryPaymentRow,
@@ -84,11 +84,11 @@ export default function EmployeeCashFlowDetailPanel({
         <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
           Received / exchanged rate
         </p>
-        <p className="mt-1">{row.cashoutUsdInrRate.toFixed(4)}</p>
+        <p className="mt-1">{formatRate(row.cashoutUsdInrRate)}</p>
         <p className="mt-3 text-sm" style={{ color: "var(--text-secondary)" }}>
           Peg rate
         </p>
-        <p className="mt-1">{row.paidUsdInrRate.toFixed(4)}</p>
+        <p className="mt-1">{formatRate(row.paidUsdInrRate)}</p>
         <p className="mt-3 text-sm" style={{ color: "var(--text-secondary)" }}>
           Salary snapshot
         </p>

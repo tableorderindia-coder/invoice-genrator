@@ -18,8 +18,11 @@ import type {
 import {
   formatInr,
   formatMonthYear,
+  formatRate,
+  formatRateInput,
   formatSignedInr,
   formatUsd,
+  formatWholeRateInput,
 } from "../../src/features/billing/utils";
 import { getVisibleToggleColumns } from "../../src/features/billing/dashboard-column-visibility";
 
@@ -128,14 +131,6 @@ function netProfitColor(cents: number) {
 
 function getSalaryPaidInrCents(row: PnEmployeeEditableRow) {
   return row.actualPaidInrCents - row.pfInrCents - row.tdsInrCents;
-}
-
-function formatRate(rate: number | null) {
-  if (rate === null) {
-    return "-";
-  }
-
-  return rate.toFixed(4);
 }
 
 type EmployeeTablesProps = {
@@ -335,8 +330,8 @@ function EmployeeTables({
           type="number"
           name="cashoutUsdInrRate"
           min="0"
-          step="0.0001"
-          defaultValue={row.cashoutUsdInrRate.toFixed(4)}
+          step="0.01"
+          defaultValue={formatRateInput(row.cashoutUsdInrRate)}
           className={inputClass}
           style={{
             minWidth: "7rem",
@@ -372,8 +367,8 @@ function EmployeeTables({
             type="number"
             name="paidUsdInrRate"
             min="0"
-            step="0.0001"
-            defaultValue={row.paidUsdInrRate.toFixed(4)}
+            step="1"
+            defaultValue={formatWholeRateInput(row.paidUsdInrRate)}
             className={inputClass}
             style={{
               minWidth: "7rem",

@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { formatInr, formatUsd } from "@/src/features/billing/utils";
+import { formatInr, formatRate, formatUsd } from "@/src/features/billing/utils";
 import type { EmployeeCashFlowMonthRow } from "@/src/features/billing/employee-cash-flow-types";
 
 export default function EmployeeCashFlowSummaryTable({
@@ -61,8 +61,8 @@ export default function EmployeeCashFlowSummaryTable({
               <td>{formatUsd(row.onboardingAdvanceUsdCents)}</td>
               <td>{formatUsd(row.offboardingDeductionUsdCents)}</td>
               <td>{formatUsd(row.effectiveDollarInwardUsdCents)}</td>
-              <td>{row.cashoutUsdInrRate.toFixed(4)}</td>
-              <td>{row.paidUsdInrRate.toFixed(4)}</td>
+              <td>{formatRate(row.cashoutUsdInrRate)}</td>
+              <td>{formatRate(row.paidUsdInrRate)}</td>
               <td>{formatInr(row.cashInInrCents)}</td>
               <td>{formatInr(row.salaryPaidInrCents)}</td>
               <td>{formatInr(row.pendingAmountInrCents)}</td>
