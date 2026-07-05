@@ -113,4 +113,49 @@ describe("employee cash flow saved rows rendering", () => {
       screen.getByDisplayValue("Prefilled note text should remain fully visible").className,
     ).toContain("min-w-[16rem]");
   });
+
+  it("renders saved-row rate inputs without unnecessary trailing decimals", () => {
+    render(
+      createElement(EmployeeCashFlowSavedRows, {
+        returnTo: "/employee-cash-flow?companyId=comp_1",
+        initialRows: [
+          {
+            id: "row_1",
+            employeeId: "emp_1",
+            companyId: "comp_1",
+            paymentMonth: "2026-04",
+            employeeNameSnapshot: "Asha",
+            invoiceId: "inv_1",
+            invoiceNumber: "2026/004",
+            clientBatchId: "batch_1",
+            daysWorked: 10,
+            daysInMonth: 30,
+            baseDollarInwardUsdCents: 0,
+            onboardingAdvanceUsdCents: 0,
+            reimbursementUsdCents: 0,
+            reimbursementLabelsText: "",
+            appraisalAdvanceUsdCents: 0,
+            offboardingDeductionUsdCents: 0,
+            cashoutUsdInrRate: 87.87,
+            paidUsdInrRate: 86,
+            actualPaidInrCents: 9_999,
+            pfInrCents: 0,
+            tdsInrCents: 0,
+            fxCommissionInrCents: 0,
+            totalCommissionUsdCents: 0,
+            commissionEarnedInrCents: 0,
+            grossEarningsInrCents: 0,
+            isNonInvoiceEmployee: true,
+            isPaid: false,
+            notes: "",
+          },
+        ],
+      }),
+    );
+
+    expect(screen.getByDisplayValue("87.87")).not.toBeNull();
+    expect(screen.getByDisplayValue("86")).not.toBeNull();
+    expect(screen.queryByDisplayValue("87.8700")).toBeNull();
+    expect(screen.queryByDisplayValue("86.0000")).toBeNull();
+  });
 });

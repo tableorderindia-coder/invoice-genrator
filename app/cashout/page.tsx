@@ -154,10 +154,10 @@ export default async function CashoutPage({
                         <input
                           type="number"
                           name="usdInrRate"
-                          aria-label="USD/INR rate"
-                          placeholder="USD/INR rate"
-                          min="0.0001"
-                          step="0.0001"
+                          aria-label="Received / exchanged rate"
+                          placeholder="Received / exchanged rate"
+                          min="0.01"
+                          step="0.01"
                           className="min-w-32"
                           style={{
                             height: "44px",

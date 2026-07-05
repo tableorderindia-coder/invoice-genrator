@@ -13,7 +13,11 @@ import {
   buildSavedEmployeeCashFlowEntryJson,
   formatSavedPaymentMonth,
 } from "../../../src/features/billing/employee-cash-flow-saved-rows-helpers";
-import { formatUsd } from "../../../src/features/billing/utils";
+import {
+  formatRateInput,
+  formatUsd,
+  formatWholeRateInput,
+} from "../../../src/features/billing/utils";
 
 function toCurrencyInput(value: number) {
   const formatted = (value / 100).toFixed(2);
@@ -24,11 +28,6 @@ function fromCurrencyInput(value: string) {
   const parsed = Number.parseFloat(value || "0");
   if (!Number.isFinite(parsed)) return 0;
   return Math.round(parsed * 100);
-}
-
-function toEditableRate(value: number) {
-  const formatted = value.toFixed(4);
-  return formatted.replace(/\.?0+$/, "");
 }
 
 export default function EmployeeCashFlowSavedRows({
@@ -240,7 +239,9 @@ export default function EmployeeCashFlowSavedRows({
                             </td>
                             <td>
                               <input
-                                value={toEditableRate(row.cashoutUsdInrRate)}
+                                type="number"
+                                step="0.01"
+                                value={formatRateInput(row.cashoutUsdInrRate)}
                                 onChange={(event) =>
                                   updateRow(row.id, {
                                     cashoutUsdInrRate:
@@ -253,7 +254,9 @@ export default function EmployeeCashFlowSavedRows({
                             </td>
                             <td>
                               <input
-                                value={toEditableRate(row.paidUsdInrRate)}
+                                type="number"
+                                step="1"
+                                value={formatWholeRateInput(row.paidUsdInrRate)}
                                 onChange={(event) =>
                                   updateRow(row.id, {
                                     paidUsdInrRate:

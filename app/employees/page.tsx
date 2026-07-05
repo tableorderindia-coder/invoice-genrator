@@ -10,7 +10,13 @@ import { createEmployeeAction, updateEmployeeAction } from "@/src/features/billi
 import { listCompanies, listEmployees, getDashboardMetrics } from "@/src/features/billing/store";
 import { buildWhatsAppHref } from "@/src/features/billing/employee-contact";
 import { resolveSelectedCompanyId } from "@/src/features/billing/filter-selection";
-import { formatUsd, formatSignedUsd, formatInr } from "@/src/features/billing/utils";
+import {
+  formatInr,
+  formatRate,
+  formatSignedUsd,
+  formatUsd,
+  formatWholeRateInput,
+} from "@/src/features/billing/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -116,7 +122,7 @@ export default async function EmployeesPage({
                   <input name="billingRateUsd" type="number" min="0" step="0.01" required className={inputClass} placeholder="0.00" />
                 </Field>
                 <Field label="Peg rate">
-                  <input name="defaultPaidUsdInrRate" type="number" min="0" step="0.0001" className={inputClass} placeholder="0" defaultValue="0" />
+                  <input name="defaultPaidUsdInrRate" type="number" min="0" step="1" className={inputClass} placeholder="0" defaultValue="0" />
                 </Field>
                 <Field label="Actual paid (INR)">
                   <input name="defaultActualPaidInr" type="number" min="0" step="0.01" className={inputClass} placeholder="0.00" defaultValue="0" />
@@ -200,7 +206,7 @@ export default async function EmployeesPage({
                     <input name="billingRateUsd" type="number" min="0" step="0.01" required className={inputClass} defaultValue={selectedEmployee ? (selectedEmployee.billingRateUsdCents / 100).toFixed(2) : ""} />
                   </Field>
                   <Field label="Peg rate">
-                    <input name="defaultPaidUsdInrRate" type="number" min="0" step="0.0001" className={inputClass} defaultValue={selectedEmployee?.defaultPaidUsdInrRate ?? 0} />
+                    <input name="defaultPaidUsdInrRate" type="number" min="0" step="1" className={inputClass} defaultValue={formatWholeRateInput(selectedEmployee?.defaultPaidUsdInrRate)} />
                   </Field>
                   <Field label="Actual paid (INR)">
                     <input name="defaultActualPaidInr" type="number" min="0" step="0.01" className={inputClass} defaultValue={selectedEmployee ? (selectedEmployee.defaultActualPaidInrCents / 100).toFixed(2) : "0"} />
@@ -270,7 +276,7 @@ export default async function EmployeesPage({
                       <span className="text-xs ml-1 font-sans" style={{ color: "var(--text-muted)" }}>billed</span>
                     </p>
                     <p style={{ color: "var(--text-accent)" }}>
-                      {employee.defaultPaidUsdInrRate.toFixed(4).replace(/\.?0+$/, "") || "0"}
+                      {formatRate(employee.defaultPaidUsdInrRate)}
                       <span className="text-xs ml-1 font-sans" style={{ color: "var(--text-muted)" }}>peg rate</span>
                     </p>
                     <p className="mt-1 font-semibold" style={{ color: profitColor }}>

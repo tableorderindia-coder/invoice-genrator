@@ -44,6 +44,33 @@ export function formatSignedUsd(cents: number) {
   return formatUsd(0);
 }
 
+export function formatRate(value: number | null | undefined) {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return "-";
+  }
+
+  return new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+export function formatRateInput(value: number | null | undefined) {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return "";
+  }
+
+  return formatRate(value);
+}
+
+export function formatWholeRateInput(value: number | null | undefined) {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return "";
+  }
+
+  return String(Math.round(value));
+}
+
 export function formatMonthYear(month: number, year: number) {
   return new Intl.DateTimeFormat("en-US", {
     month: "long",

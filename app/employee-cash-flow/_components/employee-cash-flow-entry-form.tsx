@@ -23,7 +23,12 @@ import {
   removeEntryFromSelections,
   resolveEmployeeToAddSelection,
 } from "@/src/features/billing/employee-cash-flow-page-state";
-import { formatInr, formatUsd } from "@/src/features/billing/utils";
+import {
+  formatInr,
+  formatRateInput,
+  formatUsd,
+  formatWholeRateInput,
+} from "@/src/features/billing/utils";
 
 type AvailableEmployee = {
   id: string;
@@ -49,11 +54,6 @@ function fromCurrencyInput(value: string) {
   const parsed = Number.parseFloat(value || "0");
   if (!Number.isFinite(parsed)) return 0;
   return Math.round(parsed * 100);
-}
-
-function toEditableRate(value: number) {
-  const formatted = value.toFixed(4);
-  return formatted.replace(/\.?0+$/, "");
 }
 
 function deriveCardMetrics(entry: EmployeeCashFlowEditableEntry) {
@@ -589,7 +589,9 @@ export default function EmployeeCashFlowEntryForm({
                     Received / exchanged rate
                   </span>
                   <input
-                    value={toEditableRate(entry.cashoutUsdInrRate)}
+                    type="number"
+                    step="0.01"
+                    value={formatRateInput(entry.cashoutUsdInrRate)}
                     onChange={(event) =>
                       updateEntry(entry.id, {
                         cashoutUsdInrRate: Number.parseFloat(event.target.value || "0") || 0,
@@ -605,7 +607,9 @@ export default function EmployeeCashFlowEntryForm({
                     Peg rate
                   </span>
                   <input
-                    value={toEditableRate(entry.paidUsdInrRate)}
+                    type="number"
+                    step="1"
+                    value={formatWholeRateInput(entry.paidUsdInrRate)}
                     onChange={(event) =>
                       updateEntry(entry.id, {
                         paidUsdInrRate: Number.parseFloat(event.target.value || "0") || 0,
