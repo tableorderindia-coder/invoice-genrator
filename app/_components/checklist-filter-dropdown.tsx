@@ -4,7 +4,7 @@ import { useId, useState } from "react";
 
 import { normalizeMultiSelectValue } from "../../src/features/billing/filter-selection";
 
-export type ChecklistFilterOption = {
+type ChecklistFilterOption = {
   value: string;
   label: string;
 };

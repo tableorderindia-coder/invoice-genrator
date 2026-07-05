@@ -6,15 +6,13 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   canAccessPage,
   canEditPage,
-  getDefaultRedirectPath,
   normalizePermissionPage,
-  shouldForcePasswordReset,
   type AppPage,
   type AppPermission,
   type AppRole,
 } from "./authorization";
 
-export type AuthProfile = {
+type AuthProfile = {
   id: string;
   email: string;
   role: AppRole;
@@ -103,7 +101,7 @@ export const getAuthContext = cache(async (): Promise<AuthContext | null> => {
   };
 });
 
-export async function requireAuthContext() {
+async function requireAuthContext() {
   const context = await getAuthContext();
 
   if (!context) {
@@ -112,7 +110,6 @@ export async function requireAuthContext() {
 
   return context;
 }
-
 export async function requirePageAccess(page: AppPage) {
   const context = await requireAuthContext();
 
@@ -167,18 +164,3 @@ export async function requireAdminAccess() {
   return context;
 }
 
-export async function getPostAuthRedirectPath() {
-  const context = await requireAuthContext();
-  return getDefaultRedirectPath({
-    role: context.profile.role,
-    permissions: context.permissions,
-    mustChangePassword: context.profile.mustChangePassword,
-  });
-}
-
-export function shouldRedirectToPasswordReset(input: {
-  mustChangePassword: boolean;
-  pathname: string;
-}) {
-  return shouldForcePasswordReset(input);
-}

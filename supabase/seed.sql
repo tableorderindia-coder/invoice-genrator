@@ -151,11 +151,11 @@ values
     'Senior Data Engineer',
     'Data Engineering',
     5500,
-    520000,
+    0,
     40.00,
     953333,
-    520000,
-    433333
+    0,
+    953333
   ),
   (
     'line_mar_priya',
@@ -165,11 +165,11 @@ values
     'Data Engineer',
     'Data Engineering',
     4800,
-    410000,
+    0,
     32.00,
     665600,
-    410000,
-    255600
+    0,
+    665600
   ),
   (
     'line_mar_miguel',
@@ -179,11 +179,11 @@ values
     'Finance Analyst',
     'Finance',
     4200,
-    315000,
+    0,
     30.00,
     546000,
-    315000,
-    231000
+    0,
+    546000
   ),
   (
     'line_apr_ada',
@@ -193,11 +193,11 @@ values
     'Senior Data Engineer',
     'Data Engineering',
     5500,
-    520000,
+    0,
     40.00,
     953333,
-    520000,
-    433333
+    0,
+    953333
   ),
   (
     'line_apr_priya',
@@ -207,11 +207,11 @@ values
     'Data Engineer',
     'Data Engineering',
     4800,
-    410000,
+    0,
     35.00,
     728000,
-    410000,
-    318000
+    0,
+    728000
   ),
   (
     'line_apr_miguel',
@@ -221,11 +221,11 @@ values
     'Finance Analyst',
     'Finance',
     4200,
-    315000,
+    0,
     33.00,
     600600,
-    315000,
-    285600
+    0,
+    600600
   )
 on conflict (id) do nothing;
 
@@ -280,6 +280,8 @@ insert into invoice_realizations (
   id,
   invoice_id,
   realized_at,
+  dollar_inbound_usd_cents,
+  usd_inr_rate,
   realized_revenue_usd_cents,
   realized_payout_usd_cents,
   realized_profit_usd_cents,
@@ -291,8 +293,10 @@ values (
   'invoice_mar_2026',
   '2026-05-31',
   2177933,
-  1245000,
-  932933,
+  86.00,
+  2177933,
+  0,
+  2177933,
   null,
   '2026-05-31T16:00:00.000Z'
 )

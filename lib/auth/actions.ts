@@ -1,6 +1,5 @@
 "use server";
 
-import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -9,13 +8,10 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 import {
   APP_PAGES,
-  getDefaultRedirectPath,
-  normalizePermissionPage,
-  type AppPermission,
   type AppPage,
   type AppRole,
 } from "./authorization";
-import { requireAdminAccess, requireAuthContext } from "./server";
+import { requireAdminAccess } from "./server";
 
 function getString(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
@@ -46,21 +42,6 @@ function getSelectedPermissions(formData: FormData) {
   return [...permissions.values()].filter(
     (permission) => permission.canView || permission.canEdit,
   );
-}
-
-async function getRequestOrigin() {
-  const headerList = await headers();
-  const forwardedHost = headerList.get("x-forwarded-host");
-  const host = forwardedHost ?? headerList.get("host");
-  const protocol =
-    headerList.get("x-forwarded-proto") ??
-    (process.env.NODE_ENV === "development" ? "http" : "https");
-
-  if (!host) {
-    return null;
-  }
-
-  return `${protocol}://${host}`;
 }
 
 async function syncPermissions(input: {
@@ -118,141 +99,6 @@ function formatActionError(error: unknown, fallbackMessage: string) {
 
 function isRedirectControlFlow(error: unknown) {
   return error instanceof Error && error.message.startsWith("REDIRECT:");
-}
-
-export async function loginAction(formData: FormData) {
-  const supabase = await createSupabaseServerClient();
-
-  if (!supabase) {
-    redirect("/login?error=Supabase+is+not+configured");
-  }
-
-  const email = getString(formData, "email");
-  const password = getString(formData, "password");
-  const next = getString(formData, "next");
-
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
-
-  if (error || !data.user) {
-    redirect("/login?error=Invalid+email+or+password");
-  }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, must_change_password")
-    .eq("id", data.user.id)
-    .single();
-
-  const { data: permissionRows } = await supabase
-    .from("permissions")
-    .select("page, can_view, can_edit")
-    .eq("user_id", data.user.id);
-
-  const permissions: AppPermission[] =
-    permissionRows
-      ?.map((row) => {
-        const page = normalizePermissionPage(row.page);
-        if (!page) {
-          return null;
-        }
-
-        return {
-          page,
-          canView: row.can_view,
-          canEdit: row.can_edit,
-        } satisfies AppPermission;
-      })
-      .filter((permission): permission is AppPermission => permission !== null) ?? [];
-
-  const destination =
-    next ||
-    getDefaultRedirectPath({
-      role: profile?.role ?? "user",
-      permissions,
-      mustChangePassword: profile?.must_change_password ?? false,
-    });
-
-  redirect(destination);
-}
-
-export async function resetPasswordAction(formData: FormData) {
-  const context = await requireAuthContext();
-  const supabase = context.supabase;
-
-  const password = getString(formData, "password");
-  const confirmPassword = getString(formData, "confirmPassword");
-
-  if (password.length < 12) {
-    redirect("/reset-password?error=Password+must+be+at+least+12+characters");
-  }
-
-  if (password !== confirmPassword) {
-    redirect("/reset-password?error=Passwords+do+not+match");
-  }
-
-  const { error: updateUserError } = await supabase.auth.updateUser({ password });
-  if (updateUserError) {
-    redirect(
-      `/reset-password?error=${encodeURIComponent(updateUserError.message)}`,
-    );
-  }
-
-  const { error: profileError } = await supabase
-    .from("profiles")
-    .update({
-      must_change_password: false,
-    })
-    .eq("id", context.userId);
-
-  if (profileError) {
-    redirect(`/reset-password?error=${encodeURIComponent(profileError.message)}`);
-  }
-
-  redirect(
-    getDefaultRedirectPath({
-      role: context.profile.role,
-      permissions: context.permissions,
-      mustChangePassword: false,
-    }),
-  );
-}
-
-export async function forgotPasswordAction(formData: FormData) {
-  const supabase = await createSupabaseServerClient();
-
-  if (!supabase) {
-    redirect("/login?error=Supabase+is+not+configured");
-  }
-
-  const email = getString(formData, "email").toLowerCase();
-  if (!email) {
-    redirect("/login?error=Email+is+required");
-  }
-
-  const origin =
-    process.env.NEXT_PUBLIC_SITE_URL?.trim() || (await getRequestOrigin());
-
-  if (!origin) {
-    redirect("/login?error=Unable+to+build+password+reset+link");
-  }
-
-  const recoveryPath = "/reset-password?recovery=1";
-  const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent(recoveryPath)}`;
-
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo,
-  });
-
-  if (error) {
-    redirect(`/login?error=${encodeURIComponent(error.message)}`);
-  }
-
-  redirect(
-    "/login?success=If+that+email+exists,+a+password+reset+link+has+been+sent",
-  );
 }
 
 export async function createManagedUserAction(formData: FormData) {

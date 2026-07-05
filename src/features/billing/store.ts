@@ -880,7 +880,7 @@ export async function listEmployees(companyId?: string) {
   return (data ?? []).map((row) => mapEmployee(row as DbEmployee));
 }
 
-export async function listTeams(companyId?: string) {
+async function listTeams(companyId?: string) {
   const supabase = await getSupabaseOrThrow();
   let query = supabase.from("teams").select("*").order("name");
   if (companyId) {
@@ -2480,7 +2480,7 @@ function isMissingFounderWithdrawalsTableError(error: unknown) {
   );
 }
 
-export async function listFounderWithdrawals(companyId: string | null) {
+async function listFounderWithdrawals(companyId: string | null) {
   const supabase = await getSupabaseOrThrow();
   let query = supabase.from("founder_withdrawals").select("*");
   query = companyId ? query.eq("company_id", companyId) : query.is("company_id", null);

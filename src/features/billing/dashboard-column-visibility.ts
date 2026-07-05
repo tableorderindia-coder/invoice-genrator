@@ -1,4 +1,4 @@
-export type ToggleColumnKey =
+type ToggleColumnKey =
   | "dollarInward"
   | "onboardingAdvance"
   | "reimbursements"
@@ -9,7 +9,7 @@ export type ToggleColumnKey =
   | "offboardingDeduction"
   | "effectiveDollarInward";
 
-export type ToggleColumn = {
+type ToggleColumn = {
   key: ToggleColumnKey;
   label: string;
 };

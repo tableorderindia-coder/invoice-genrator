@@ -254,21 +254,6 @@ export type PnDashboardData = {
   periodRows: PnPeriodRow[];
 };
 
-export type FounderBalanceFounderKey =
-  | "nirbhay_kumar_giri"
-  | "pawan_kumar_beesetti"
-  | "vishal_savaliya";
-
-export type FounderWithdrawalRecord = {
-  companyId: string | null;
-  year: number;
-  month: number;
-  founderKey: FounderBalanceFounderKey;
-  founderNameSnapshot: string;
-  withdrawalInrCents: number;
-  updatedAt: string;
-};
-
 export type CompanyExpense = {
   id: string;
   companyId: string;
@@ -304,7 +289,7 @@ export type EmployeeStatementMonthSummary = {
   monthlyDollarPaidUsdCents: number;
 };
 
-export type EmployeeStatementMonthSection = {
+type EmployeeStatementMonthSection = {
   monthKey: string;
   monthLabel: string;
   rows: EmployeeStatementInvoiceRow[];
