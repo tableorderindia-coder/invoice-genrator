@@ -23,6 +23,7 @@ describe("stage one cleanup", () => {
     expect(store).not.toMatch(
       /findLatestInvoiceForCompany|export async function addInvoiceLineItem|export async function upsertDashboardExpense/,
     );
+    expect(store).toContain("async function addInvoiceLineItem");
     expect(dashboard).toContain(
       "Total earning (INR) = Operating margin (INR) + Forex gain (INR).",
     );
