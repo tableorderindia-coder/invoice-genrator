@@ -14,7 +14,6 @@ import type {
   EmployeeCashFlowInvoiceOption,
   EmployeeCashFlowMonthRow,
   EmployeeCashFlowSavedEntry,
-  EmployeeCashFlowSalaryPaymentRow,
 } from "./employee-cash-flow-types";
 
 type CashFlowPaymentEntryInput = {
@@ -142,19 +141,6 @@ type DbCashFlowEntry = {
   invoice_id: string;
 };
 
-type DbSalaryPayment = {
-  id: string;
-  employee_id: string;
-  company_id: string;
-  month: string;
-  salary_usd_cents: number;
-  paid_usd_inr_rate: number;
-  salary_paid_inr_cents: number;
-  paid_status: boolean;
-  paid_date: string | null;
-  notes: string | null;
-};
-
 type AdjustmentAwareEmployee = {
   id: string;
   fullName: string;
@@ -190,10 +176,6 @@ export const nextCashFlowId = (prefix: string) =>
   `${prefix}_${nowIso().replace(/[-:.TZ]/g, "").slice(0, 14)}_${Math.random()
     .toString(36)
     .slice(2, 8)}`;
-
-function toMonthKey(year: number, month: number) {
-  return `${year}-${String(month).padStart(2, "0")}`;
-}
 
 function normalizeInvoiceNumber(invoiceNumber: string, invoiceNumbers: Set<string>) {
   if (invoiceNumber) {
@@ -961,137 +943,6 @@ export async function getInvoicePaymentPrefillData(input: {
     },
     entries,
     availableEmployees,
-  };
-}
-
-export async function getEmployeeCashFlowDashboardData(input: {
-  companyId: string;
-  month?: string;
-  employeeIds?: string[];
-}) {
-  const supabase = await getSupabaseOrThrow();
-
-  let entryQuery = supabase
-    .from("invoice_payment_employee_entries")
-    .select(
-      "id, employee_id, payment_month, employee_name_snapshot, company_id, base_dollar_inward_usd_cents, onboarding_advance_usd_cents, reimbursement_usd_cents, reimbursement_labels_text, appraisal_advance_usd_cents, offboarding_deduction_usd_cents, effective_dollar_inward_usd_cents, cashout_usd_inr_rate, paid_usd_inr_rate, cash_in_inr_cents, actual_paid_inr_cents, days_worked, days_in_month, invoice_id",
-    )
-    .eq("company_id", input.companyId);
-
-  let salaryQuery = supabase
-    .from("employee_salary_payments")
-    .select(
-      "id, employee_id, company_id, month, salary_usd_cents, paid_usd_inr_rate, salary_paid_inr_cents, paid_status, paid_date, notes",
-    )
-    .eq("company_id", input.companyId);
-
-  let payoutQuery = supabase
-    .from("employee_payouts")
-    .select("employee_id, invoice_id, actual_paid_inr_cents")
-    .eq("company_id", input.companyId);
-
-  if (input.month) {
-    entryQuery = entryQuery.eq("payment_month", input.month);
-    salaryQuery = salaryQuery.eq("month", input.month);
-  }
-
-  if (input.employeeIds && input.employeeIds.length > 0) {
-    entryQuery = entryQuery.in("employee_id", input.employeeIds);
-    salaryQuery = salaryQuery.in("employee_id", input.employeeIds);
-    payoutQuery = payoutQuery.in("employee_id", input.employeeIds);
-  }
-
-  const [entryResult, salaryResult, payoutResult, invoiceResult] = await Promise.all([
-    entryQuery,
-    salaryQuery,
-    payoutQuery,
-    supabase.from("invoices").select("id, invoice_number, month, year"),
-  ]);
-
-  if (entryResult.error) throw entryResult.error;
-  if (salaryResult.error) throw salaryResult.error;
-  if (payoutResult.error) throw payoutResult.error;
-  if (invoiceResult.error) throw invoiceResult.error;
-
-  const invoiceMap = new Map<string, DbInvoiceOption>(
-    ((invoiceResult.data ?? []) as DbInvoiceOption[]).map((row) => [row.id, row]),
-  );
-
-  const paymentEntries = ((entryResult.data ?? []) as DbCashFlowEntry[]).map((row) => ({
-    employeeId: row.employee_id,
-    paymentMonth: row.payment_month,
-    invoicePaymentId: row.id,
-    cashInInrCents: calculateCashInInrCents({
-      effectiveDollarInwardUsdCents: calculateEffectiveDollarInwardUsdCents({
-        baseDollarInwardUsdCents: row.base_dollar_inward_usd_cents,
-        onboardingAdvanceUsdCents: row.onboarding_advance_usd_cents,
-        reimbursementUsdCents: row.reimbursement_usd_cents,
-        appraisalAdvanceUsdCents: row.appraisal_advance_usd_cents,
-        offboardingDeductionUsdCents: row.offboarding_deduction_usd_cents,
-      }),
-      cashoutUsdInrRate: row.cashout_usd_inr_rate,
-    }),
-    effectiveDollarInwardUsdCents: calculateEffectiveDollarInwardUsdCents({
-      baseDollarInwardUsdCents: row.base_dollar_inward_usd_cents,
-      onboardingAdvanceUsdCents: row.onboarding_advance_usd_cents,
-      reimbursementUsdCents: row.reimbursement_usd_cents,
-      appraisalAdvanceUsdCents: row.appraisal_advance_usd_cents,
-      offboardingDeductionUsdCents: row.offboarding_deduction_usd_cents,
-    }),
-    onboardingAdvanceUsdCents: row.onboarding_advance_usd_cents,
-    reimbursementUsdCents: row.reimbursement_usd_cents,
-    reimbursementLabelsText: row.reimbursement_labels_text ?? "",
-    appraisalAdvanceUsdCents: row.appraisal_advance_usd_cents,
-    offboardingDeductionUsdCents: Math.abs(row.offboarding_deduction_usd_cents),
-    actualPaidInrCents: row.actual_paid_inr_cents,
-    daysWorked: row.days_worked,
-    daysInMonth: row.days_in_month,
-    cashoutUsdInrRate: row.cashout_usd_inr_rate,
-    paidUsdInrRate: row.paid_usd_inr_rate,
-    employeeName: row.employee_name_snapshot,
-    companyId: row.company_id,
-    invoiceNumber: invoiceMap.get(row.invoice_id)?.invoice_number ?? "",
-  }));
-
-  const salaryPayments = ((salaryResult.data ?? []) as DbSalaryPayment[]).map((row) => ({
-    id: row.id,
-    employeeId: row.employee_id,
-    companyId: row.company_id,
-    month: row.month,
-    salaryUsdCents: row.salary_usd_cents,
-    paidUsdInrRate: row.paid_usd_inr_rate,
-    salaryPaidInrCents: row.salary_paid_inr_cents,
-    paidStatus: row.paid_status,
-    paidDate: row.paid_date ?? undefined,
-    notes: row.notes ?? undefined,
-  }));
-
-  const accrualByEmployeeMonth = ((payoutResult.data ?? []) as Array<{
-    employee_id: string;
-    invoice_id: string;
-    actual_paid_inr_cents: number | null;
-  }>).map((row) => {
-    const invoice = invoiceMap.get(row.invoice_id);
-    return {
-      employeeId: row.employee_id,
-      month: invoice ? toMonthKey(invoice.year, invoice.month) : input.month ?? "",
-      accrualInrCents: row.actual_paid_inr_cents ?? 0,
-    };
-  });
-
-  const rows = buildEmployeeCashFlowMonthRows({
-    paymentEntries,
-    salaryPayments: salaryPayments.map((row) => ({
-      employeeId: row.employeeId,
-      month: row.month,
-      salaryPaidInrCents: row.salaryPaidInrCents,
-    })),
-    accrualByEmployeeMonth,
-  });
-
-  return {
-    rows,
-    salaryPayments: salaryPayments as EmployeeCashFlowSalaryPaymentRow[],
   };
 }
 

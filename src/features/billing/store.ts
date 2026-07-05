@@ -8,7 +8,6 @@ import {
 } from "./domain";
 import {
   assertNoCaseInsensitiveDuplicate,
-  assertNoDuplicateEmployeeInTeam,
 } from "./duplicate-guards";
 import {
   buildAvailableTeamNames,
@@ -491,39 +490,6 @@ function mapInvoiceLineItem(row: DbInvoiceLineItem): InvoiceLineItem {
   };
 }
 
-async function insertInvoiceLineItemWithSchemaFallback(
-  payload: Record<string, unknown>,
-) {
-  const supabase = await getSupabaseOrThrow();
-  const insertPayload = { ...payload };
-  let attemptsRemaining = 3;
-
-  while (attemptsRemaining > 0) {
-    attemptsRemaining -= 1;
-
-    const { data, error } = await supabase
-      .from("invoice_line_items")
-      .insert(insertPayload)
-      .select()
-      .single();
-
-    if (!error) {
-      return data as DbInvoiceLineItem;
-    }
-
-    const missingColumn = getMissingSchemaColumn(error, "invoice_line_items");
-    if (!missingColumn || !(missingColumn in insertPayload)) {
-      throw error;
-    }
-
-    delete insertPayload[missingColumn];
-  }
-
-  throw new Error(
-    "Unable to insert invoice line item because schema fallback attempts were exhausted.",
-  );
-}
-
 async function updateInvoiceLineItemWithSchemaFallback(
   lineItemId: string,
   payload: Record<string, unknown>,
@@ -1000,19 +966,6 @@ export async function listInvoices() {
     .sort(sortInvoicesDesc);
 }
 
-export async function findLatestInvoiceForCompany(companyId: string) {
-  const supabase = await getSupabaseOrThrow();
-  const { data, error } = await supabase
-    .from("invoices")
-    .select("*")
-    .eq("company_id", companyId)
-    .order("year", { ascending: false })
-    .order("month", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (error) throw error;
-  return data ? mapInvoice(data as DbInvoice) : undefined;
-}
 export async function listInvoicesForCompany(companyId: string) {
   const supabase = await getSupabaseOrThrow();
   const { data, error } = await supabase
@@ -1351,97 +1304,6 @@ export async function deleteInvoiceTeam(invoiceId: string, invoiceTeamId: string
     clearTeamManualTotals: true,
     clearGrandManualTotal: true,
   });
-}
-
-export async function addInvoiceLineItem(input: {
-  invoiceId: string;
-  invoiceTeamId: string;
-  employeeId: string;
-  hrsPerWeek: number;
-  daysWorked?: number;
-  billingRateUsdCents?: number;
-  recomputeInvoice?: boolean;
-}) {
-  const supabase = await getSupabaseOrThrow();
-  const [
-    { data: employeeRow, error: employeeError },
-    { data: teamRow, error: teamError },
-    { data: invoiceRow, error: invoiceError },
-  ] = await Promise.all([
-    supabase.from("employees").select("*").eq("id", input.employeeId).single(),
-    supabase
-      .from("invoice_teams")
-      .select("*")
-      .eq("id", input.invoiceTeamId)
-      .single(),
-    supabase
-      .from("invoices")
-      .select("month, year")
-      .eq("id", input.invoiceId)
-      .single(),
-  ]);
-  if (employeeError) throw employeeError;
-  if (teamError) throw teamError;
-  if (invoiceError) throw invoiceError;
-
-  const { data: existingLineRows, error: existingLineError } = await supabase
-    .from("invoice_line_items")
-    .select("employee_id")
-    .eq("invoice_team_id", input.invoiceTeamId);
-  if (existingLineError) throw existingLineError;
-
-  assertNoDuplicateEmployeeInTeam({
-    existingEmployeeIds: (existingLineRows ?? []).map((row) => String(row.employee_id)),
-    employeeId: input.employeeId,
-  });
-
-  const employee = mapEmployee(employeeRow as DbEmployee);
-  const team = mapInvoiceTeam(teamRow as DbInvoiceTeam);
-  const billingRateUsdCents =
-    input.billingRateUsdCents ?? employee.billingRateUsdCents;
-  const daysInMonth = getDaysInMonth(
-    Number(invoiceRow.month),
-    Number(invoiceRow.year),
-  );
-  const normalizedDaysWorked =
-    input.daysWorked === undefined
-      ? daysInMonth
-      : Math.max(1, Math.round(input.daysWorked));
-  const calculated = calculateLineItemTotals({
-    billingRateUsdCents,
-    hrsPerWeek: input.hrsPerWeek,
-    daysWorked: normalizedDaysWorked,
-    daysInMonth,
-  });
-
-  const payload = {
-    id: nextId("line"),
-    invoice_team_id: team.id,
-    employee_id: employee.id,
-    employee_name_snapshot: employee.fullName,
-    designation_snapshot: employee.designation,
-    team_name_snapshot: team.teamName,
-    billing_rate_usd_cents: billingRateUsdCents,
-    hrs_per_week: input.hrsPerWeek,
-    days_worked: normalizedDaysWorked,
-    billed_total_usd_cents: calculated.billedTotalUsdCents,
-    payout_total_usd_cents: calculated.payoutTotalUsdCents,
-    profit_total_usd_cents: calculated.profitTotalUsdCents,
-  };
-
-  const data = await insertInvoiceLineItemWithSchemaFallback(payload);
-
-  if (input.recomputeInvoice !== false) {
-    await recomputeSupabaseInvoice(input.invoiceId, {
-      clearTeamManualTotals: true,
-      clearGrandManualTotal: true,
-    });
-  }
-  return normalizeLineItemDaysWorked(
-    mapInvoiceLineItem(data as DbInvoiceLineItem),
-    Number(invoiceRow.month),
-    Number(invoiceRow.year),
-  );
 }
 
 export async function deleteInvoiceLineItem(invoiceId: string, lineItemId: string) {
@@ -2204,58 +2066,6 @@ export async function listEmployeeStatementMonthSummaries(input: {
   return ((data ?? []) as DbEmployeeStatementMonthSummary[]).map((row) =>
     mapEmployeeStatementMonthSummary(row),
   );
-}
-
-export async function upsertDashboardExpense(input: {
-  companyId: string;
-  periodType: PnPeriodType;
-  year: number;
-  month?: number;
-  amountInrCents: number;
-}) {
-  const supabase = await getSupabaseOrThrow();
-  if (input.periodType === "monthly" && !input.month) {
-    throw new Error("Month is required for monthly expenses.");
-  }
-  if (input.periodType === "yearly" && input.month) {
-    throw new Error("Month is not allowed for yearly expenses.");
-  }
-
-  const monthValue = input.periodType === "monthly" ? input.month ?? null : null;
-
-  const { data: existingRow, error: existingError } = await supabase
-    .from("dashboard_expenses")
-    .select("id")
-    .eq("company_id", input.companyId)
-    .eq("period_type", input.periodType)
-    .eq("year", input.year)
-    .is("month", monthValue)
-    .maybeSingle();
-  if (existingError) throw existingError;
-
-  if (existingRow?.id) {
-    const { error } = await supabase
-      .from("dashboard_expenses")
-      .update({
-        amount_inr_cents: input.amountInrCents,
-        updated_at: nowIso(),
-      })
-      .eq("id", String(existingRow.id));
-    if (error) throw error;
-    return;
-  }
-
-  const { error } = await supabase.from("dashboard_expenses").insert({
-    id: nextId("dashboard_expense"),
-    company_id: input.companyId,
-    period_type: input.periodType,
-    year: input.year,
-    month: monthValue,
-    amount_inr_cents: input.amountInrCents,
-    created_at: nowIso(),
-    updated_at: nowIso(),
-  });
-  if (error) throw error;
 }
 
 export async function getPnDashboardData(input: {

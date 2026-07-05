@@ -169,7 +169,6 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
     formData.set("reimbursementLabelsText", "Laptop");
     formData.set("appraisalAdvanceUsd", "75");
     formData.set("offboardingDeductionUsd", "25");
-    formData.set("employeeMonthlyUsd", "900");
     formData.set("cashoutUsdInrRate", "83.45");
     formData.set("paidUsdInrRate", "82.75");
     formData.set("pfInr", "100");
