@@ -9,7 +9,6 @@ import { parseInvoiceHeaderFormInput } from "./invoice-editor";
 import { defaultEmployeeCashFlowPaidDate } from "./employee-cash-flow-page-state";
 import {
   addInvoiceAdjustment,
-  addInvoiceLineItem,
   assignEmployeeToInvoiceTeam,
   addInvoiceTeam,
   cashOutInvoice,
@@ -33,7 +32,6 @@ import {
   updateCompany,
   updateEmployee,
   upsertEmployeeStatementSection,
-  upsertDashboardExpense,
   upsertCompanyExpense,
   deleteCompanyExpense,
   upsertFounderWithdrawals,
@@ -242,28 +240,6 @@ export async function updateEmployeeAction(formData: FormData) {
   redirect("/employees");
 }
 
-export async function syncInvoiceToEorPortalAction(formData: FormData) {
-  await requirePageEditAccess("invoices");
-  const invoiceId = getString(formData, "invoiceId");
-  const returnTo = getString(formData, "returnTo") || "/invoices";
-  let redirectTo = returnTo;
-
-  try {
-    const result = await syncInvoiceToEorPortal(invoiceId);
-    revalidatePath("/invoices");
-    redirectTo = buildFlashRedirect(
-      returnTo,
-      result.unmappedCompanies.length || result.unmappedEmployees.length ? "error" : "success",
-      result.unmappedCompanies.length || result.unmappedEmployees.length
-        ? `Synced, but mapping is needed in EOR Portal (${result.unmappedCompanies.length} company, ${result.unmappedEmployees.length} employee).`
-        : `Synced to EOR Portal. Created ${result.created}, updated ${result.updated}.`,
-    );
-  } catch (error) {
-    redirectTo = buildFlashRedirect(returnTo, "error", getErrorMessage(error, "EOR sync failed."));
-  }
-  redirect(redirectTo);
-}
-
 export async function syncCompanyToEorPortalAction(formData: FormData) {
   await requirePageEditAccess("invoices");
   const companyId = getString(formData, "companyId");
@@ -386,29 +362,6 @@ export async function addInvoiceTeamAction(formData: FormData) {
   }
 
   redirect(buildFlashRedirect(returnTo, "success", "Team added to invoice."));
-}
-
-export async function addInvoiceLineItemAction(formData: FormData) {
-  await requirePageEditAccess('invoices');
-  const invoiceId = getString(formData, "invoiceId");
-  const invoiceTeamId = getString(formData, "invoiceTeamId");
-  if (!invoiceTeamId) {
-    throw new Error("Select a team before adding a candidate.");
-  }
-
-  await addInvoiceLineItem({
-    invoiceId,
-    invoiceTeamId,
-    employeeId: getString(formData, "employeeId"),
-    hrsPerWeek: Number.parseFloat(getString(formData, "hrsPerWeek")),
-    billingRateUsdCents: getString(formData, "billingRateUsd")
-      ? centsFromUsd(getString(formData, "billingRateUsd"))
-      : undefined,
-  });
-
-  revalidatePath(`/invoices/${invoiceId}`);
-  revalidatePath(`/invoices/drafts/${invoiceId}`);
-  revalidatePath("/dashboard");
 }
 
 export async function assignInvoiceMemberAction(formData: FormData) {
@@ -1012,58 +965,6 @@ export async function updateDashboardEmployeeCashFlowEntryAction(formData: FormD
   redirect(buildFlashRedirect(returnTo, "success", "Dashboard cash flow row updated."));
 }
 
-export async function saveDashboardExpenseAction(formData: FormData) {
-  await requirePageEditAccess('dashboard');
-  const returnTo = getString(formData, "returnTo") || "/dashboard";
-
-  try {
-    const companyId = getString(formData, "companyId");
-    if (!companyId) {
-      throw new Error("Select a company first.");
-    }
-    const periodType = getString(formData, "periodType") as "monthly" | "yearly";
-    if (periodType !== "monthly" && periodType !== "yearly") {
-      throw new Error("Invalid period type.");
-    }
-
-    const year = Number.parseInt(getString(formData, "year"), 10);
-    if (!Number.isFinite(year) || year <= 0) {
-      throw new Error("Invalid year.");
-    }
-
-    const monthRaw = getString(formData, "month");
-    const month = monthRaw ? Number.parseInt(monthRaw, 10) : undefined;
-    if (periodType === "monthly" && (!month || month < 1 || month > 12)) {
-      throw new Error("Invalid month for monthly expense.");
-    }
-
-    const amountInrCents = centsFromUsd(getString(formData, "amountInr"));
-    if (amountInrCents < 0) {
-      throw new Error("Expenses cannot be negative.");
-    }
-
-    await upsertDashboardExpense({
-      companyId,
-      periodType,
-      year,
-      month,
-      amountInrCents,
-    });
-
-    revalidatePath("/dashboard");
-  } catch (error) {
-    redirect(
-      buildFlashRedirect(
-        returnTo,
-        "error",
-        getErrorMessage(error, "Unable to save expense."),
-      ),
-    );
-  }
-
-  redirect(buildFlashRedirect(returnTo, "success", "Expense saved."));
-}
-
 export async function saveCompanyExpenseAction(formData: FormData) {
   await requirePageEditAccess('expenses');
   const returnTo = getString(formData, "returnTo") || "/expenses";
@@ -1175,65 +1076,6 @@ export async function deleteCompanyExpenseAction(formData: FormData) {
   redirect(buildFlashRedirect(returnTo, "success", "Expense deleted."));
 }
 
-export async function saveInvoicePaymentAction(formData: FormData) {
-  await requirePageEditAccess('employee-cash-flow');
-  const returnTo = getString(formData, "returnTo") || "/employee-cash-flow";
-
-  try {
-    const invoiceId = getString(formData, "invoiceId");
-    if (!invoiceId) {
-      throw new Error("Select an invoice first.");
-    }
-
-    const companyId = getString(formData, "companyId");
-    if (!companyId) {
-      throw new Error("Select a company first.");
-    }
-
-    const paymentMonth = getString(formData, "paymentMonth");
-    if (!/^\d{4}-\d{2}$/.test(paymentMonth)) {
-      throw new Error("Select a valid payment month.");
-    }
-
-    const paymentDate = getString(formData, "paymentDate");
-    if (!paymentDate) {
-      throw new Error("Select a payment date.");
-    }
-
-    const usdInrRate = getNonNegativeNumberOrThrow(
-      getString(formData, "usdInrRate"),
-      "USD/INR rate",
-    );
-
-    const invoicePaymentId = await upsertInvoicePayment({
-      invoicePaymentId: getString(formData, "invoicePaymentId") || undefined,
-      invoiceId,
-      companyId,
-      paymentDate,
-      paymentMonth,
-      usdInrRate,
-      notes: getString(formData, "notes") || undefined,
-    });
-
-    revalidatePath("/employee-cash-flow");
-    redirect(
-      buildFlashRedirect(
-        `${returnTo}${returnTo.includes("?") ? "&" : "?"}invoicePaymentId=${encodeURIComponent(invoicePaymentId)}`,
-        "success",
-        "Invoice payment saved.",
-      ),
-    );
-  } catch (error) {
-    redirect(
-      buildFlashRedirect(
-        returnTo,
-        "error",
-        getErrorMessage(error, "Unable to save invoice payment."),
-      ),
-    );
-  }
-}
-
 export async function saveInvoicePaymentEmployeeEntriesAction(formData: FormData) {
   await requirePageEditAccess('employee-cash-flow');
   const returnTo = getString(formData, "returnTo") || "/employee-cash-flow";
@@ -1315,61 +1157,6 @@ export async function saveInvoicePaymentEmployeeEntriesAction(formData: FormData
   }
 
   redirect(buildFlashRedirect(returnTo, "success", "Employee cash flow rows saved."));
-}
-
-export async function saveEmployeeSalaryPaymentAction(formData: FormData) {
-  await requirePageEditAccess('employee-cash-flow');
-  const returnTo = getString(formData, "returnTo") || "/employee-cash-flow";
-
-  try {
-    const employeeId = getString(formData, "employeeId");
-    if (!employeeId) {
-      throw new Error("Employee is required.");
-    }
-
-    const companyId = getString(formData, "companyId");
-    if (!companyId) {
-      throw new Error("Company is required.");
-    }
-
-    const month = getString(formData, "month");
-    if (!/^\d{4}-\d{2}$/.test(month)) {
-      throw new Error("Month is invalid.");
-    }
-
-    const salaryUsdCents = centsFromUsd(getString(formData, "salaryUsd"));
-    if (salaryUsdCents < 0) {
-      throw new Error("Salary USD cannot be negative.");
-    }
-
-    const paidUsdInrRate = getNonNegativeNumberOrThrow(
-      getString(formData, "paidUsdInrRate"),
-      "Paid USD/INR rate",
-    );
-
-    await upsertEmployeeSalaryPayment({
-      employeeId,
-      companyId,
-      month,
-      salaryUsdCents,
-      paidUsdInrRate,
-      paidStatus: getString(formData, "paidStatus") === "true",
-      paidDate: getString(formData, "paidDate") || undefined,
-      notes: getString(formData, "notes") || undefined,
-    });
-
-    revalidatePath("/employee-cash-flow");
-  } catch (error) {
-    redirect(
-      buildFlashRedirect(
-        returnTo,
-        "error",
-        getErrorMessage(error, "Unable to save salary payment."),
-      ),
-    );
-  }
-
-  redirect(buildFlashRedirect(returnTo, "success", "Salary payment saved."));
 }
 
 export async function updateSavedEmployeeCashFlowEntryAction(formData: FormData) {

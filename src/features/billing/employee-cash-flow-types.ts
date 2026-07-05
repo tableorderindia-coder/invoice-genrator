@@ -29,19 +29,6 @@ export type EmployeeCashFlowMonthRow = {
   status: EmployeeCashFlowStatus;
 };
 
-export type EmployeeCashFlowSalaryPaymentRow = {
-  id: string;
-  employeeId: string;
-  companyId: string;
-  month: string;
-  salaryUsdCents: number;
-  paidUsdInrRate: number;
-  salaryPaidInrCents: number;
-  paidStatus: boolean;
-  paidDate?: string;
-  notes?: string;
-};
-
 export type EmployeeCashFlowInvoiceOption = {
   id: string;
   invoiceNumber: string;

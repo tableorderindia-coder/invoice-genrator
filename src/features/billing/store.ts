@@ -1000,19 +1000,6 @@ export async function listInvoices() {
     .sort(sortInvoicesDesc);
 }
 
-export async function findLatestInvoiceForCompany(companyId: string) {
-  const supabase = await getSupabaseOrThrow();
-  const { data, error } = await supabase
-    .from("invoices")
-    .select("*")
-    .eq("company_id", companyId)
-    .order("year", { ascending: false })
-    .order("month", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (error) throw error;
-  return data ? mapInvoice(data as DbInvoice) : undefined;
-}
 export async function listInvoicesForCompany(companyId: string) {
   const supabase = await getSupabaseOrThrow();
   const { data, error } = await supabase
@@ -1353,7 +1340,7 @@ export async function deleteInvoiceTeam(invoiceId: string, invoiceTeamId: string
   });
 }
 
-export async function addInvoiceLineItem(input: {
+async function addInvoiceLineItem(input: {
   invoiceId: string;
   invoiceTeamId: string;
   employeeId: string;
@@ -2204,58 +2191,6 @@ export async function listEmployeeStatementMonthSummaries(input: {
   return ((data ?? []) as DbEmployeeStatementMonthSummary[]).map((row) =>
     mapEmployeeStatementMonthSummary(row),
   );
-}
-
-export async function upsertDashboardExpense(input: {
-  companyId: string;
-  periodType: PnPeriodType;
-  year: number;
-  month?: number;
-  amountInrCents: number;
-}) {
-  const supabase = await getSupabaseOrThrow();
-  if (input.periodType === "monthly" && !input.month) {
-    throw new Error("Month is required for monthly expenses.");
-  }
-  if (input.periodType === "yearly" && input.month) {
-    throw new Error("Month is not allowed for yearly expenses.");
-  }
-
-  const monthValue = input.periodType === "monthly" ? input.month ?? null : null;
-
-  const { data: existingRow, error: existingError } = await supabase
-    .from("dashboard_expenses")
-    .select("id")
-    .eq("company_id", input.companyId)
-    .eq("period_type", input.periodType)
-    .eq("year", input.year)
-    .is("month", monthValue)
-    .maybeSingle();
-  if (existingError) throw existingError;
-
-  if (existingRow?.id) {
-    const { error } = await supabase
-      .from("dashboard_expenses")
-      .update({
-        amount_inr_cents: input.amountInrCents,
-        updated_at: nowIso(),
-      })
-      .eq("id", String(existingRow.id));
-    if (error) throw error;
-    return;
-  }
-
-  const { error } = await supabase.from("dashboard_expenses").insert({
-    id: nextId("dashboard_expense"),
-    company_id: input.companyId,
-    period_type: input.periodType,
-    year: input.year,
-    month: monthValue,
-    amount_inr_cents: input.amountInrCents,
-    created_at: nowIso(),
-    updated_at: nowIso(),
-  });
-  if (error) throw error;
 }
 
 export async function getPnDashboardData(input: {

@@ -448,7 +448,7 @@ export default async function DashboardPage({
       )}
       <GlassPanel>
         <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-          Gross Earnings (INR) = Commission Earned (INR) + FX Commission (INR). Net P/L in
+          Total earning (INR) = Operating margin (INR) + Forex gain (INR). Net P/L in
           Monthly / Yearly view includes Employee Cash Flow net profit, and optionally
           company-level reimbursements and expenses (use headers toggles to include/exclude them).
         </p>
