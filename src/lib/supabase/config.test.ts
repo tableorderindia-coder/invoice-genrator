@@ -4,7 +4,7 @@ import {
   getSupabaseBrowserCredentials,
   getSupabaseMode,
   getSupabaseServerCredentials,
-} from "./config";
+} from "@/lib/supabase/config";
 
 describe("supabase config", () => {
   it("uses publishable key when present", () => {

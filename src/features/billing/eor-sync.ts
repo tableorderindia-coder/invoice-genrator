@@ -29,7 +29,7 @@ async function selectRequired<T>(query: PromiseLike<{ data: T | null; error: unk
   return data;
 }
 
-export async function buildEorFinanceSyncPayload(invoiceId: string) {
+async function buildEorFinanceSyncPayload(invoiceId: string) {
   const supabase = await getSupabaseOrThrow();
   const invoice = await selectRequired<any>(
     supabase.from("invoices").select("*").eq("id", invoiceId).single(),

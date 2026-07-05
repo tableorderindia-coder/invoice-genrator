@@ -92,7 +92,7 @@ export function toEmployeeStatementMonthKey(input: { year: number; month: number
   return `${input.year}-${String(input.month).padStart(2, "0")}`;
 }
 
-export function compareEmployeeStatementMonthKeys(left: string, right: string) {
+function compareEmployeeStatementMonthKeys(left: string, right: string) {
   return left.localeCompare(right);
 }
 
@@ -144,7 +144,7 @@ export function calculateStatementEffectiveDollarInwardUsdCents(input: {
   );
 }
 
-export function calculateEmployeeStatementDefaultPaidUsdCents(input: {
+function calculateEmployeeStatementDefaultPaidUsdCents(input: {
   dollarInwardUsdCents: number;
   reimbursementUsdCents: number;
   appraisalAdvanceUsdCents: number;
@@ -158,7 +158,7 @@ export function calculateEmployeeStatementDefaultPaidUsdCents(input: {
   );
 }
 
-export function calculateEmployeeStatementTotalBalanceUsdCents(input: {
+function calculateEmployeeStatementTotalBalanceUsdCents(input: {
   effectiveDollarInwardUsdCents: number;
   monthlyDollarPaidUsdCents: number;
 }) {

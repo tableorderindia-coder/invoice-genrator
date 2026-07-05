@@ -13,10 +13,10 @@ export const FOUNDER_BALANCE_FOUNDERS = [
   },
 ] as const;
 
-export type FounderBalanceFounder = (typeof FOUNDER_BALANCE_FOUNDERS)[number];
-export type FounderBalanceFounderKey = FounderBalanceFounder["key"];
+type FounderBalanceFounder = (typeof FOUNDER_BALANCE_FOUNDERS)[number];
+type FounderBalanceFounderKey = FounderBalanceFounder["key"];
 
-export type FounderWithdrawalMap = Record<FounderBalanceFounderKey, number>;
+type FounderWithdrawalMap = Record<FounderBalanceFounderKey, number>;
 
 export type FounderBalanceSourceRow = {
   companyId: string;
@@ -34,7 +34,7 @@ export type FounderWithdrawal = {
   updatedAt: string;
 };
 
-export type FounderBalanceRow = {
+type FounderBalanceRow = {
   key: string;
   year: number;
   month: number;
@@ -82,7 +82,7 @@ const parseMonthKey = (value: string) => {
   return { year, month };
 };
 
-export function inrCentsFromFormValue(value: FormDataEntryValue | null) {
+function inrCentsFromFormValue(value: FormDataEntryValue | null) {
   const raw = String(value ?? "").trim();
   if (!raw) return 0;
   const amount = Number.parseFloat(raw);

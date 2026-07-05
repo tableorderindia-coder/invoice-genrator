@@ -172,7 +172,7 @@ async function getSupabaseOrThrow() {
 }
 
 const nowIso = () => new Date().toISOString();
-export const nextCashFlowId = (prefix: string) =>
+const nextCashFlowId = (prefix: string) =>
   `${prefix}_${nowIso().replace(/[-:.TZ]/g, "").slice(0, 14)}_${Math.random()
     .toString(36)
     .slice(2, 8)}`;
