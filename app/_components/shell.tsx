@@ -1,282 +1,258 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { type ReactNode, useTransition, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import {
+  BarChart3,
+  Building2,
+  CircleDollarSign,
+  FilePlus2,
+  FileText,
+  Gauge,
+  Landmark,
+  LogOut,
+  ReceiptText,
+  ScrollText,
+  Shield,
+  Sparkles,
+  TrendingUp,
+  Users,
+  WalletCards,
+} from "lucide-react";
+import {
+  type ComponentType,
+  type MouseEvent,
+  type ReactNode,
+  useState,
+  useTransition,
+} from "react";
 
-const links = [
-  {
-    href: "/",
-    label: "Overview",
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="3" width="7" height="9" rx="1" />
-        <rect x="14" y="3" width="7" height="5" rx="1" />
-        <rect x="14" y="12" width="7" height="9" rx="1" />
-        <rect x="3" y="16" width="7" height="5" rx="1" />
-      </svg>
-    ),
-  },
-  {
-    href: "/companies",
-    label: "Companies",
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="2" y="7" width="20" height="14" rx="2" />
-        <path d="M16 7V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v3" />
-      </svg>
-    ),
-  },
-  {
-    href: "/employees",
-    label: "Employees",
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-        <circle cx="9" cy="7" r="4" />
-        <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-      </svg>
-    ),
-  },
-  {
-    href: "/invoices/create",
-    label: "Create Invoice",
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <line x1="12" y1="5" x2="12" y2="19" />
-        <line x1="5" y1="12" x2="19" y2="12" />
-      </svg>
-    ),
-  },
-  {
-    href: "/invoices",
-    label: "Invoices",
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-        <polyline points="14 2 14 8 20 8" />
-        <line x1="16" y1="13" x2="8" y2="13" />
-        <line x1="16" y1="17" x2="8" y2="17" />
-      </svg>
-    ),
-  },
-  {
-    href: "/cashout",
-    label: "Cashout",
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-        <polyline points="7 10 12 15 17 10" />
-        <line x1="12" y1="15" x2="12" y2="3" />
-      </svg>
-    ),
-  },
-  {
-    href: "/employee-cash-flow",
-    label: "Employee Cash Flow",
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M3 17h4l3-8 4 10 3-6h4" />
-        <path d="M3 7h18" />
-      </svg>
-    ),
-  },
-  {
-    href: "/employee-statements",
-    label: "Employee Statements",
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M8 6h13" />
-        <path d="M8 12h13" />
-        <path d="M8 18h13" />
-        <path d="M3 6h.01" />
-        <path d="M3 12h.01" />
-        <path d="M3 18h.01" />
-      </svg>
-    ),
-  },
-  {
-    href: "/expenses",
-    label: "Expenses",
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M2 17l4-4 4 4 4-8 4 4 4-6" />
-        <rect x="2" y="3" width="20" height="18" rx="2" />
-      </svg>
-    ),
-  },
-  {
-    href: "/dashboard",
-    label: "Dashboard",
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <line x1="18" y1="20" x2="18" y2="10" />
-        <line x1="12" y1="20" x2="12" y2="4" />
-        <line x1="6" y1="20" x2="6" y2="14" />
-      </svg>
-    ),
-  },
-  {
-    href: "/founders-balance",
-    label: "Founder’s Balance",
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 3l8 4-8 4-8-4 8-4z" />
-        <path d="M4 11l8 4 8-4" />
-        <path d="M4 15l8 4 8-4" />
-      </svg>
-    ),
-  },
-  {
-    href: "/admin/users",
-    label: "Admin",
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 2l3 4 5 1-3 4 .5 5L12 14l-5.5 2 .5-5-3-4 5-1 3-4z" />
-      </svg>
-    ),
-  },
+type CompanyOption = {
+  id: string;
+  name: string;
+};
+
+type ShellLink = {
+  href: string;
+  label: string;
+  Icon: ComponentType<{ className?: string; strokeWidth?: number }>;
+};
+
+const links: ShellLink[] = [
+  { href: "/", label: "Overview", Icon: Gauge },
+  { href: "/companies", label: "Companies", Icon: Building2 },
+  { href: "/employees", label: "Employees", Icon: Users },
+  { href: "/salary", label: "Salary", Icon: WalletCards },
+  { href: "/invoices/create", label: "Create Invoice", Icon: FilePlus2 },
+  { href: "/invoices", label: "Invoices", Icon: FileText },
+  { href: "/cashout", label: "Cashout", Icon: CircleDollarSign },
+  { href: "/employee-cash-flow", label: "Employee Cash Flow", Icon: TrendingUp },
+  { href: "/employee-statements", label: "Employee Statements", Icon: ScrollText },
+  { href: "/expenses", label: "Expenses", Icon: ReceiptText },
+  { href: "/dashboard", label: "Dashboard", Icon: BarChart3 },
+  { href: "/founders-balance", label: "Founders Balance", Icon: Landmark },
+  { href: "/admin/users", label: "Admin", Icon: Shield },
 ];
+
+function isLinkActive(pathname: string, href: string) {
+  if (href === "/") {
+    return pathname === "/";
+  }
+  if (href === "/invoices") {
+    return pathname === "/invoices" || pathname.startsWith("/invoices/drafts");
+  }
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 export function Shell({
   title,
   eyebrow,
   children,
+  companyOptions = [],
+  activeCompanyId,
+  companySelectorLabel = "Active company",
 }: {
   title: string;
   eyebrow?: string;
   children: ReactNode;
+  companyOptions?: CompanyOption[];
+  activeCompanyId?: string;
+  companySelectorLabel?: string;
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [pendingHref, setPendingHref] = useState<string | null>(null);
 
-  const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
-    if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey || e.button !== 0) return;
-    
-    if (pathname === href) return;
-    
-    e.preventDefault();
+  const navigateTo = (href: string) => {
     setPendingHref(href);
     startTransition(() => {
       router.push(href);
     });
   };
 
-  const navLinkStyle = (isActive: boolean) => ({
-    color: isActive ? "var(--accent-1)" : "var(--text-secondary)",
-    background: isActive ? "rgba(99, 102, 241, 0.1)" : "transparent",
-    borderBottom: isActive
-      ? "2px solid var(--accent-1)"
-      : "2px solid transparent",
-  });
+  const handleNavClick = (event: MouseEvent<HTMLAnchorElement>, href: string) => {
+    if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || event.button !== 0) {
+      return;
+    }
+
+    if (pathname === href) {
+      return;
+    }
+
+    event.preventDefault();
+    navigateTo(href);
+  };
+
+  const handleCompanyChange = (companyId: string) => {
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.set("companyId", companyId);
+    navigateTo(`${pathname}?${nextParams.toString()}`);
+  };
+
+  const renderCompanySelector = () =>
+    companyOptions.length > 0 ? (
+      <label className="flex flex-col gap-2 text-xs font-medium" style={{ color: "var(--text-muted)" }}>
+        {companySelectorLabel}
+        <select
+          className="h-10 rounded-xl px-3 text-sm"
+          value={activeCompanyId ?? companyOptions[0]?.id ?? ""}
+          onChange={(event) => handleCompanyChange(event.currentTarget.value)}
+        >
+          {companyOptions.map((company) => (
+            <option key={company.id} value={company.id}>
+              {company.name}
+            </option>
+          ))}
+        </select>
+      </label>
+    ) : null;
 
   return (
     <div className="min-h-screen" style={{ color: "var(--text-primary)" }}>
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-6 sm:px-6 lg:px-10">
-        {/* Floating glassmorphic navigation */}
-        <header className="glass-nav sticky top-4 z-50 px-5 py-3">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            {/* Logo + title */}
-            <div className="flex items-center gap-4">
-              {/* Logo mark */}
-              <div
-                className="flex h-9 w-9 items-center justify-center rounded-xl"
-                style={{ background: "var(--accent-gradient)" }}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-                </svg>
+      <div className="mx-auto flex w-full max-w-[1600px] gap-6 px-4 py-4 sm:px-6 lg:px-8">
+        <aside className="glass-nav sticky top-4 hidden h-[calc(100vh-2rem)] w-72 shrink-0 flex-col gap-5 p-4 lg:flex">
+          <div className="flex items-center gap-3 px-2">
+            <div
+              className="flex h-10 w-10 items-center justify-center rounded-xl"
+              style={{ background: "var(--accent-gradient)" }}
+            >
+              <Sparkles className="h-5 w-5 text-white" strokeWidth={2.4} />
+            </div>
+            <div>
+              <p className="text-sm font-bold gradient-text tracking-wide">EassyOnboard</p>
+              <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                Billing Console
+              </p>
+            </div>
+          </div>
+
+          {renderCompanySelector()}
+
+          <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto pr-1 text-sm">
+            {links.map((link) => {
+              const active = isLinkActive(pathname, link.href);
+              const isNavigatingToThis = isPending && pendingHref === link.href;
+              const Icon = link.Icon;
+
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={(event) => handleNavClick(event, link.href)}
+                  className="flex h-10 items-center gap-3 rounded-xl px-3 font-medium transition-all"
+                  style={{
+                    color: active ? "var(--accent-1)" : "var(--text-secondary)",
+                    background: active ? "rgba(99, 102, 241, 0.12)" : "transparent",
+                  }}
+                >
+                  <Icon className="h-4 w-4 shrink-0" strokeWidth={2.2} />
+                  <span className="min-w-0 flex-1 truncate">{link.label}</span>
+                  {isNavigatingToThis ? (
+                    <span className="h-2 w-2 rounded-full" style={{ background: "var(--accent-1)" }} />
+                  ) : null}
+                </Link>
+              );
+            })}
+          </nav>
+
+          <a
+            href="/logout"
+            className="flex h-10 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-all"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            <LogOut className="h-4 w-4" strokeWidth={2.2} />
+            <span>Sign out</span>
+          </a>
+        </aside>
+
+        <main className="min-w-0 flex-1">
+          <header className="glass-nav sticky top-3 z-40 mb-6 flex flex-col gap-4 px-4 py-3 lg:hidden">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div
+                  className="flex h-9 w-9 items-center justify-center rounded-xl"
+                  style={{ background: "var(--accent-gradient)" }}
+                >
+                  <Sparkles className="h-5 w-5 text-white" strokeWidth={2.4} />
+                </div>
+                <div>
+                  <p className="text-sm font-bold gradient-text tracking-wide">EassyOnboard</p>
+                  <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                    Billing Console
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-bold gradient-text tracking-wide">
-                  EassyOnboard
-                </p>
-                <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                  Billing Console
-                </p>
-              </div>
+              <a href="/logout" aria-label="Sign out" style={{ color: "var(--text-secondary)" }}>
+                <LogOut className="h-5 w-5" strokeWidth={2.2} />
+              </a>
             </div>
 
-            {/* Navigation pills */}
-            <div className="flex flex-col gap-3 lg:items-end">
-            <nav className="flex flex-wrap gap-1.5 text-sm">
+            {renderCompanySelector()}
+
+            <nav className="flex gap-2 overflow-x-auto pb-1 text-sm">
               {links.map((link) => {
-                const isActive =
-                  link.href === "/"
-                    ? pathname === "/"
-                    : pathname.startsWith(link.href);
-                const isNavigatingToThis = isPending && pendingHref === link.href;
+                const active = isLinkActive(pathname, link.href);
+                const Icon = link.Icon;
 
                 return (
                   <Link
                     key={link.href}
                     href={link.href}
-                    onClick={(e) => handleNavClick(e, link.href)}
-                    className="flex items-center justify-center gap-2 rounded-xl px-3.5 py-2 font-medium transition-all relative overflow-hidden"
-                    style={navLinkStyle(isActive)}
+                    onClick={(event) => handleNavClick(event, link.href)}
+                    className="flex h-10 shrink-0 items-center gap-2 rounded-xl px-3 font-medium transition-all"
+                    style={{
+                      color: active ? "var(--accent-1)" : "var(--text-secondary)",
+                      background: active ? "rgba(99, 102, 241, 0.12)" : "transparent",
+                    }}
                   >
-                    <div className={`transition-opacity ${isNavigatingToThis ? 'opacity-0 scale-95' : 'opacity-100 scale-100'} flex items-center gap-2`}>
-                      {link.icon}
-                      <span className="hidden sm:inline">{link.label}</span>
-                    </div>
-                    {isNavigatingToThis && (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <svg className="animate-spin h-5 w-5" style={{ color: "var(--accent-1)" }} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                      </div>
-                    )}
+                    <Icon className="h-4 w-4" strokeWidth={2.2} />
+                    <span>{link.label}</span>
                   </Link>
                 );
               })}
-
-              <a
-                href="/logout"
-                className="flex items-center justify-center gap-2 rounded-xl px-3.5 py-2 font-medium transition-all relative overflow-hidden"
-                style={navLinkStyle(false)}
-              >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                  <polyline points="16 17 21 12 16 7" />
-                  <line x1="21" y1="12" x2="9" y2="12" />
-                </svg>
-                <span className="hidden sm:inline">Sign out</span>
-              </a>
             </nav>
+          </header>
+
+          <div className="flex flex-col gap-6 pb-10">
+            <div className="px-1">
+              {eyebrow ? (
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] gradient-text">
+                  {eyebrow}
+                </p>
+              ) : null}
+              <h1
+                className="mt-2 text-3xl font-semibold tracking-tight lg:text-4xl"
+                style={{ color: "var(--text-primary)" }}
+              >
+                {title}
+              </h1>
             </div>
+
+            <div className="flex flex-col gap-6">{children}</div>
           </div>
-        </header>
-
-        {/* Page header */}
-        <div className="px-1">
-          {eyebrow && (
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] gradient-text">
-              {eyebrow}
-            </p>
-          )}
-          <h1
-            className="mt-2 text-3xl font-semibold tracking-tight lg:text-4xl"
-            style={{ color: "var(--text-primary)" }}
-          >
-            {title}
-          </h1>
-        </div>
-
-        {/* Page content */}
-        <div className="flex flex-col gap-6">{children}</div>
+        </main>
       </div>
     </div>
   );
