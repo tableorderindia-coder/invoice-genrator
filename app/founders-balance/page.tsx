@@ -3,6 +3,10 @@ import { Shell } from "../_components/shell";
 import { inputClass } from "../_components/field";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
 import { requirePageAccess } from "@/lib/auth/server";
+import {
+  filterCompaniesForAuthContext,
+  resolveAccessibleCompanyId,
+} from "@/src/features/billing/company-access";
 import { saveFounderWithdrawalsAction } from "../../src/features/billing/actions";
 import { getFounderBalanceData, listCompanies } from "../../src/features/billing/store";
 import { FoundersBalanceTable } from "./founders-balance-table";
@@ -18,14 +22,20 @@ export default async function FoundersBalancePage({
     flashMessage?: string | string[];
   }>;
 }) {
-  await requirePageAccess("dashboard");
+  const context = await requirePageAccess("dashboard");
   const resolved = await searchParams;
-  const companies = await listCompanies();
+  const companies = filterCompaniesForAuthContext(await listCompanies(), context);
   const selectedCompanyIdRaw = Array.isArray(resolved.companyId)
     ? resolved.companyId[0]
     : resolved.companyId;
+  const canUseAllCompanies = context.profile.role === "admin";
   const selectedCompanyId =
-    !selectedCompanyIdRaw || selectedCompanyIdRaw === "all" ? "all" : selectedCompanyIdRaw;
+    canUseAllCompanies && (!selectedCompanyIdRaw || selectedCompanyIdRaw === "all")
+      ? "all"
+      : resolveAccessibleCompanyId({
+          requestedCompanyId: selectedCompanyIdRaw,
+          companies,
+        });
   const modelCompanyId = selectedCompanyId === "all" ? null : selectedCompanyId;
   const data = await getFounderBalanceData({ companyId: modelCompanyId });
 
@@ -38,7 +48,12 @@ export default async function FoundersBalancePage({
   const returnTo = `/founders-balance?companyId=${encodeURIComponent(selectedCompanyId)}`;
 
   return (
-    <Shell title="Founder’s Balance" eyebrow="Founder withdrawals">
+    <Shell
+      title="Founders Balance"
+      eyebrow="Founder withdrawals"
+      companyOptions={companies.map((company) => ({ id: company.id, name: company.name }))}
+      activeCompanyId={selectedCompanyId === "all" ? companies[0]?.id : selectedCompanyId}
+    >
       <GlassPanel gradient className="overflow-visible">
         <form
           action="/founders-balance"
@@ -61,7 +76,7 @@ export default async function FoundersBalancePage({
                 color: "var(--text-primary)",
               }}
             >
-              <option value="all">All companies</option>
+              {canUseAllCompanies ? <option value="all">All companies</option> : null}
               {companies.map((company) => (
                 <option key={company.id} value={company.id}>
                   {company.name}
@@ -95,7 +110,7 @@ export default async function FoundersBalancePage({
         ) : null}
       </GlassPanel>
 
-      <GlassPanel title="Founder’s Balance" gradient className="overflow-visible">
+      <GlassPanel title="Founders Balance" gradient className="overflow-visible">
         <FoundersBalanceTable
           companyId={selectedCompanyId}
           data={data}

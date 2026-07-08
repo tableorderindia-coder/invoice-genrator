@@ -3,8 +3,11 @@ import { GlassPanel } from "../_components/glass-panel";
 import { inputClass } from "../_components/field";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
 import { Shell } from "../_components/shell";
-import { canAccessCompany } from "@/lib/auth/authorization";
 import { requirePageAccess } from "@/lib/auth/server";
+import {
+  filterCompaniesForAuthContext,
+  resolveAccessibleCompanyId,
+} from "@/src/features/billing/company-access";
 import {
   getInvoicePaymentPrefillData,
   listSavedEmployeeCashFlowEntries,
@@ -50,21 +53,15 @@ export default async function EmployeeCashFlowPage({
 }) {
   const context = await requirePageAccess("employee-cash-flow");
   const resolved = await searchParams;
-  const allCompanies = await listCompanies();
-  const companies = allCompanies.filter((company) =>
-    canAccessCompany({
-      role: context.profile.role,
-      companyId: company.id,
-      companyAccess: context.companyAccess,
-    }),
-  );
+  const companies = filterCompaniesForAuthContext(await listCompanies(), context);
 
   const selectedCompanyIdRaw = Array.isArray(resolved.companyId)
     ? resolved.companyId[0]
     : resolved.companyId;
-  const selectedCompanyId = companies.some((company) => company.id === selectedCompanyIdRaw)
-    ? selectedCompanyIdRaw ?? ""
-    : companies[0]?.id || "";
+  const selectedCompanyId = resolveAccessibleCompanyId({
+    requestedCompanyId: selectedCompanyIdRaw,
+    companies,
+  });
 
   const monthKey = resolveEmployeeCashFlowMonthKey(resolved.month, resolved.year);
   const selectedTabRaw = Array.isArray(resolved.tab) ? resolved.tab[0] : resolved.tab;

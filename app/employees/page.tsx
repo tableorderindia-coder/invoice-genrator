@@ -6,6 +6,10 @@ import { Field, inputClass } from "../_components/field";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
 import { StaggerGrid } from "../_components/stagger-grid";
 import { requirePageAccess } from "@/lib/auth/server";
+import {
+  filterCompaniesForAuthContext,
+  resolveAccessibleCompanyId,
+} from "@/src/features/billing/company-access";
 import { createEmployeeAction, updateEmployeeAction } from "@/src/features/billing/actions";
 import { getPnDashboardData, listCompanies, listEmployees } from "@/src/features/billing/store";
 import { buildWhatsAppHref } from "@/src/features/billing/employee-contact";
@@ -29,11 +33,14 @@ export default async function EmployeesPage({
     employeeId?: string | string[];
   }>;
 }) {
-  await requirePageAccess("employees");
+  const context = await requirePageAccess("employees");
   const resolvedSearchParams = await searchParams;
-  const companies = await listCompanies();
-  const selectedCompanyId = resolveSelectedCompanyId({
-    companyId: resolvedSearchParams.companyId,
+  const companies = filterCompaniesForAuthContext(await listCompanies(), context);
+  const selectedCompanyId = resolveAccessibleCompanyId({
+    requestedCompanyId: resolveSelectedCompanyId({
+      companyId: resolvedSearchParams.companyId,
+      companies,
+    }),
     companies,
   });
   const [employees, pnDashboardData] = selectedCompanyId
@@ -66,7 +73,12 @@ export default async function EmployeesPage({
   const editHref = companyQuery ? `/employees?tab=edit&${companyQuery}` : "/employees?tab=edit";
 
   return (
-    <Shell title="Employees" eyebrow="Defaults for billing">
+    <Shell
+      title="Employees"
+      eyebrow="Defaults for billing"
+      companyOptions={companies.map((company) => ({ id: company.id, name: company.name }))}
+      activeCompanyId={selectedCompanyId}
+    >
       <section className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
         <GlassPanel gradient>
           <div className="flex items-center gap-2">

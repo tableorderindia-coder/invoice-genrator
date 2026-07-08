@@ -1,6 +1,7 @@
 import { Shell } from "../../_components/shell";
 import { GlassPanel } from "../../_components/glass-panel";
 import { requirePageAccess } from "@/lib/auth/server";
+import { filterCompaniesForAuthContext } from "@/src/features/billing/company-access";
 import { createInvoiceDraftAction } from "@/src/features/billing/actions";
 import { CreateInvoiceForm } from "./create-invoice-form";
 import { CreateInvoiceSubmitButton } from "./submit-button";
@@ -20,8 +21,8 @@ export default async function CreateInvoicePage({
     flashMessage?: string | string[];
   }>;
 }) {
-  await requirePageAccess("invoices");
-  const companies = await listCompanies();
+  const context = await requirePageAccess("invoices");
+  const companies = filterCompaniesForAuthContext(await listCompanies(), context);
   const resolvedSearchParams = await searchParams;
   const flashStatus = Array.isArray(resolvedSearchParams.flashStatus)
     ? resolvedSearchParams.flashStatus[0]
@@ -46,7 +47,12 @@ export default async function CreateInvoicePage({
   );
 
   return (
-    <Shell title="Create invoice" eyebrow="Billing workflow">
+    <Shell
+      title="Create invoice"
+      eyebrow="Billing workflow"
+      companyOptions={companies.map((company) => ({ id: company.id, name: company.name }))}
+      activeCompanyId={companies[0]?.id}
+    >
       <GlassPanel gradient>
         {flashMessage ? (
           <div

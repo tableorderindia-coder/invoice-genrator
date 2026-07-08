@@ -3,6 +3,10 @@ import { Shell } from "../_components/shell";
 import { inputClass } from "../_components/field";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
 import { ChecklistFilterDropdown } from "../_components/checklist-filter-dropdown";
+import {
+  filterCompaniesForAuthContext,
+  resolveAccessibleCompanyId,
+} from "@/src/features/billing/company-access";
 import { requirePageAccess } from "@/lib/auth/server";
 import {
   updateDashboardEmployeeCashFlowEntryAction,
@@ -45,13 +49,16 @@ export default async function DashboardPage({
     periodColumns?: string | string[];
   }>;
 }) {
-  await requirePageAccess("dashboard");
+  const context = await requirePageAccess("dashboard");
   const resolved = await searchParams;
-  const companies = await listCompanies();
+  const companies = filterCompaniesForAuthContext(await listCompanies(), context);
   const selectedCompanyIdRaw = Array.isArray(resolved.companyId)
     ? resolved.companyId[0]
     : resolved.companyId;
-  const selectedCompanyId = selectedCompanyIdRaw || companies[0]?.id || "";
+  const selectedCompanyId = resolveAccessibleCompanyId({
+    requestedCompanyId: selectedCompanyIdRaw,
+    companies,
+  });
   const selectedPeriodTypeRaw = Array.isArray(resolved.periodType)
     ? resolved.periodType[0]
     : resolved.periodType;
@@ -210,7 +217,12 @@ export default async function DashboardPage({
   const returnTo = `/dashboard?${filterParams.toString()}`;
 
   return (
-    <Shell title="P/L Dashboard" eyebrow="Company profitability">
+    <Shell
+      title="P/L Dashboard"
+      eyebrow="Company profitability"
+      companyOptions={companies.map((company) => ({ id: company.id, name: company.name }))}
+      activeCompanyId={selectedCompanyId}
+    >
       <GlassPanel gradient className="overflow-visible">
         <form
           action="/dashboard"

@@ -2,8 +2,11 @@ import { GlassPanel } from "@/app/_components/glass-panel";
 import { Field, inputClass } from "@/app/_components/field";
 import { PendingSubmitButton } from "@/app/_components/pending-submit-button";
 import { Shell } from "@/app/_components/shell";
-import { canAccessCompany } from "@/lib/auth/authorization";
 import { requirePageAccess } from "@/lib/auth/server";
+import {
+  filterCompaniesForAuthContext,
+  resolveAccessibleCompanyId,
+} from "@/src/features/billing/company-access";
 import { listMonthlyPayrollRows } from "@/src/features/billing/payroll-store";
 import { listCompanies } from "@/src/features/billing/store";
 import { formatMonthYear } from "@/src/features/billing/utils";
@@ -44,19 +47,14 @@ export default async function SalaryPage({
 }) {
   const context = await requirePageAccess("salary");
   const resolved = await searchParams;
-  const allCompanies = await listCompanies();
-  const companies = allCompanies.filter((company) =>
-    canAccessCompany({
-      role: context.profile.role,
-      companyId: company.id,
-      companyAccess: context.companyAccess,
-    }),
-  );
+  const companies = filterCompaniesForAuthContext(await listCompanies(), context);
 
   const selectedCompanyIdRaw = firstSearchValue(resolved.companyId);
-  const selectedCompany =
-    companies.find((company) => company.id === selectedCompanyIdRaw) ?? companies[0];
-  const selectedCompanyId = selectedCompany?.id ?? "";
+  const selectedCompanyId = resolveAccessibleCompanyId({
+    requestedCompanyId: selectedCompanyIdRaw,
+    companies,
+  });
+  const selectedCompany = companies.find((company) => company.id === selectedCompanyId);
   const selectedMonth = firstSearchValue(resolved.month) || currentMonthKey();
   const flashStatus = firstSearchValue(resolved.flashStatus);
   const flashMessage = firstSearchValue(resolved.flashMessage);
