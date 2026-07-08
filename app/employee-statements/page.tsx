@@ -5,7 +5,6 @@ import { PendingSubmitButton } from "../_components/pending-submit-button";
 import { Shell } from "../_components/shell";
 import {
   filterCompaniesForAuthContext,
-  resolveAccessibleCompanyId,
 } from "@/src/features/billing/company-access";
 import { requirePageAccess } from "@/lib/auth/server";
 import EmployeeStatementEditor from "./_components/employee-statement-editor";
@@ -14,6 +13,7 @@ import {
 } from "@/src/features/billing/employee-statements";
 import { listEmployeeStatementSections } from "@/src/features/billing/employee-statements-load";
 import { listCompanies, listEmployees, listInvoicesForCompany } from "@/src/features/billing/store";
+import { resolveSelectedCompanyIds } from "@/src/features/billing/filter-selection";
 import { formatDate } from "@/src/features/billing/utils";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +27,7 @@ export default async function EmployeeStatementsPage({
 }: {
   searchParams: Promise<{
     companyId?: string | string[];
+    companyIds?: string | string[];
     employeeIds?: string | string[];
     startMonth?: string | string[];
     endMonth?: string | string[];
@@ -38,12 +39,17 @@ export default async function EmployeeStatementsPage({
   const resolved = await searchParams;
   const filters = parseEmployeeStatementFilters(resolved);
   const companies = filterCompaniesForAuthContext(await listCompanies(), context);
-  const selectedCompanyId = resolveAccessibleCompanyId({
-    requestedCompanyId: filters.companyId,
+  const selectedCompanyIds = resolveSelectedCompanyIds({
+    companyIds: resolved.companyIds,
+    companyId: filters.companyId,
     companies,
   });
-  const employees = selectedCompanyId ? await listEmployees(selectedCompanyId) : [];
-  const invoices = selectedCompanyId ? await listInvoicesForCompany(selectedCompanyId) : [];
+  const [employeeBuckets, invoiceBuckets] = await Promise.all([
+    Promise.all(selectedCompanyIds.map((companyId) => listEmployees(companyId))),
+    Promise.all(selectedCompanyIds.map((companyId) => listInvoicesForCompany(companyId))),
+  ]);
+  const employees = employeeBuckets.flat();
+  const invoices = invoiceBuckets.flat();
   const availableMonths = getUniqueInvoiceMonths(
     invoices.map((invoice) => `${invoice.year}-${String(invoice.month).padStart(2, "0")}`),
   );
@@ -57,13 +63,25 @@ export default async function EmployeeStatementsPage({
   const selectedEmployeeIds =
     filters.employeeIds.length > 0 ? filters.employeeIds : employees.map((employee) => employee.id);
   const sections =
-    selectedCompanyId && startMonth && endMonth
-      ? await listEmployeeStatementSections({
-          companyId: selectedCompanyId,
-          employeeIds: filters.employeeIds.length > 0 ? filters.employeeIds : undefined,
-          startMonth,
-          endMonth,
-        })
+    startMonth && endMonth
+      ? (
+          await Promise.all(
+            selectedCompanyIds.map(async (companyId) => ({
+              companyId,
+              sections: await listEmployeeStatementSections({
+                companyId,
+                employeeIds: filters.employeeIds.length > 0 ? filters.employeeIds : undefined,
+                startMonth,
+                endMonth,
+              }),
+            })),
+          )
+        ).flatMap((bucket) =>
+          bucket.sections.map((section) => ({
+            companyId: bucket.companyId,
+            section,
+          })),
+        )
       : [];
   const flashStatus = Array.isArray(resolved.flashStatus)
     ? resolved.flashStatus[0]
@@ -71,12 +89,11 @@ export default async function EmployeeStatementsPage({
   const flashMessage = Array.isArray(resolved.flashMessage)
     ? resolved.flashMessage[0]
     : resolved.flashMessage;
-  const companyName =
-    companies.find((company) => company.id === selectedCompanyId)?.name || "Unknown company";
+  const companyNameMap = new Map(companies.map((company) => [company.id, company.name]));
   const generatedDate = formatDate(new Date());
-  const returnTo = `/employee-statements?companyId=${encodeURIComponent(
-    selectedCompanyId,
-  )}&startMonth=${encodeURIComponent(startMonth)}&endMonth=${encodeURIComponent(
+  const returnTo = `/employee-statements?${selectedCompanyIds
+    .map((companyId) => `companyIds=${encodeURIComponent(companyId)}`)
+    .join("&")}&startMonth=${encodeURIComponent(startMonth)}&endMonth=${encodeURIComponent(
     endMonth,
   )}${selectedEmployeeIds.map((employeeId) => `&employeeIds=${encodeURIComponent(employeeId)}`).join("")}`;
 
@@ -85,14 +102,16 @@ export default async function EmployeeStatementsPage({
       title="Employee Statements"
       eyebrow="Editable employee statement ledger"
       companyOptions={companies.map((company) => ({ id: company.id, name: company.name }))}
-      activeCompanyId={selectedCompanyId}
+      activeCompanyIds={selectedCompanyIds}
     >
       <GlassPanel gradient className="overflow-visible">
         <form
           action="/employee-statements"
           className="grid gap-3 md:grid-cols-[1.4fr_180px_180px_auto] md:items-end"
         >
-          <input type="hidden" name="companyId" value={selectedCompanyId} />
+          {selectedCompanyIds.map((companyId) => (
+            <input key={companyId} type="hidden" name="companyIds" value={companyId} />
+          ))}
 
           <ChecklistFilterDropdown
             name="employeeIds"
@@ -149,11 +168,11 @@ export default async function EmployeeStatementsPage({
       <GlassPanel title="Statement Sections" gradient>
         {sections.length > 0 ? (
           <div className="space-y-8">
-            {sections.map((section) => (
+            {sections.map(({ companyId, section }) => (
               <EmployeeStatementEditor
-                key={section.employeeId}
-                companyId={selectedCompanyId}
-                companyName={companyName}
+                key={`${companyId}:${section.employeeId}`}
+                companyId={companyId}
+                companyName={companyNameMap.get(companyId) || "Unknown company"}
                 section={section}
                 startMonth={startMonth}
                 endMonth={endMonth}

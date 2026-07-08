@@ -6,21 +6,35 @@ import { GlassPanel } from "./_components/glass-panel";
 import { StaggerGrid } from "./_components/stagger-grid";
 import { requirePageAccess } from "@/lib/auth/server";
 import { filterCompaniesForAuthContext } from "@/src/features/billing/company-access";
+import { resolveSelectedCompanyIds } from "@/src/features/billing/filter-selection";
 import { getCompanyPnSummaries, listCompanies, listInvoices } from "@/src/features/billing/store";
 import { formatMonthYear, formatSignedInr, formatUsd } from "@/src/features/billing/utils";
 import type { InvoiceStatus } from "@/src/features/billing/types";
 
 export const dynamic = "force-dynamic";
 
-export default async function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    companyId?: string | string[];
+    companyIds?: string | string[];
+  }>;
+}) {
   const context = await requirePageAccess("overview");
+  const resolved = await searchParams;
   const [allCompanies, allInvoicesRaw, companyPnSummariesRaw] = await Promise.all([
     listCompanies(),
     listInvoices(),
     getCompanyPnSummaries(),
   ]);
   const companies = filterCompaniesForAuthContext(allCompanies, context);
-  const accessibleCompanyIds = new Set(companies.map((company) => company.id));
+  const selectedCompanyIds = resolveSelectedCompanyIds({
+    companyIds: resolved.companyIds,
+    companyId: resolved.companyId,
+    companies,
+  });
+  const accessibleCompanyIds = new Set(selectedCompanyIds);
   const allInvoices = allInvoicesRaw.filter((invoice) =>
     accessibleCompanyIds.has(invoice.companyId),
   );
@@ -51,7 +65,7 @@ export default async function HomePage() {
       title="Billing cockpit for staffing ops"
       eyebrow="EassyOnboard"
       companyOptions={companies.map((company) => ({ id: company.id, name: company.name }))}
-      activeCompanyId={companies[0]?.id}
+      activeCompanyIds={selectedCompanyIds}
     >
       {/* Metric cards with 3D tilt */}
       <StaggerGrid className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

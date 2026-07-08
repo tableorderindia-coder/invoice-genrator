@@ -5,15 +5,12 @@ import { Shell } from "../_components/shell";
 import { GlassPanel } from "../_components/glass-panel";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
 import { requirePageAccess } from "@/lib/auth/server";
-import {
-  filterCompaniesForAuthContext,
-  resolveAccessibleCompanyId,
-} from "@/src/features/billing/company-access";
+import { filterCompaniesForAuthContext } from "@/src/features/billing/company-access";
 import {
   deleteInvoiceAction,
   updateInvoiceStatusAction,
 } from "@/src/features/billing/actions";
-import { resolveSelectedCompanyId } from "@/src/features/billing/filter-selection";
+import { resolveSelectedCompanyIds } from "@/src/features/billing/filter-selection";
 import { listCompanies, listInvoicesForCompany } from "@/src/features/billing/store";
 import { formatDate, formatMonthYear, formatUsd } from "@/src/features/billing/utils";
 
@@ -35,6 +32,7 @@ export default async function InvoicesPage({
 }: {
   searchParams: Promise<{
     companyId?: string | string[];
+    companyIds?: string | string[];
     flashStatus?: string | string[];
     flashMessage?: string | string[];
   }>;
@@ -42,18 +40,21 @@ export default async function InvoicesPage({
   const context = await requirePageAccess("invoices");
   const resolvedSearchParams = await searchParams;
   const companies = filterCompaniesForAuthContext(await listCompanies(), context);
-  const selectedCompanyId = resolveSelectedCompanyId({
+  const selectedCompanyIds = resolveSelectedCompanyIds({
+    companyIds: resolvedSearchParams.companyIds,
     companyId: resolvedSearchParams.companyId,
     companies,
   });
-  const accessibleCompanyId = resolveAccessibleCompanyId({
-    requestedCompanyId: selectedCompanyId,
-    companies,
-  });
-  const invoices = accessibleCompanyId ? await listInvoicesForCompany(accessibleCompanyId) : [];
+  const invoices = (
+    await Promise.all(selectedCompanyIds.map((companyId) => listInvoicesForCompany(companyId)))
+  ).flat();
   const companyMap = new Map(companies.map((company) => [company.id, company.name]));
-  const filteredInvoicesPath = accessibleCompanyId
-    ? `/invoices?companyId=${encodeURIComponent(accessibleCompanyId)}`
+  const filteredInvoicesParams = new URLSearchParams();
+  for (const companyId of selectedCompanyIds) {
+    filteredInvoicesParams.append("companyIds", companyId);
+  }
+  const filteredInvoicesPath = filteredInvoicesParams.toString()
+    ? `/invoices?${filteredInvoicesParams.toString()}`
     : "/invoices";
   const flashStatus = Array.isArray(resolvedSearchParams.flashStatus)
     ? resolvedSearchParams.flashStatus[0]
@@ -67,7 +68,7 @@ export default async function InvoicesPage({
       title="Invoices"
       eyebrow="Issued invoices"
       companyOptions={companies.map((company) => ({ id: company.id, name: company.name }))}
-      activeCompanyId={accessibleCompanyId}
+      activeCompanyIds={selectedCompanyIds}
     >
       <GlassPanel gradient>
         <div className="flex items-center justify-between gap-4">
@@ -215,7 +216,7 @@ export default async function InvoicesPage({
               {invoices.length === 0 && (
                 <tr>
                   <td colSpan={7} className="text-center py-8" style={{ color: "var(--text-muted)" }}>
-                    No invoices for this company yet.
+                    No invoices for the selected companies yet.
                   </td>
                 </tr>
               )}

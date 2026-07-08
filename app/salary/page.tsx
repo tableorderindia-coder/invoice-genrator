@@ -3,10 +3,8 @@ import { Field, inputClass } from "@/app/_components/field";
 import { PendingSubmitButton } from "@/app/_components/pending-submit-button";
 import { Shell } from "@/app/_components/shell";
 import { requirePageAccess } from "@/lib/auth/server";
-import {
-  filterCompaniesForAuthContext,
-  resolveAccessibleCompanyId,
-} from "@/src/features/billing/company-access";
+import { filterCompaniesForAuthContext } from "@/src/features/billing/company-access";
+import { resolveSelectedCompanyIds } from "@/src/features/billing/filter-selection";
 import { listMonthlyPayrollRows } from "@/src/features/billing/payroll-store";
 import { listCompanies } from "@/src/features/billing/store";
 import { formatMonthYear } from "@/src/features/billing/utils";
@@ -40,6 +38,7 @@ export default async function SalaryPage({
 }: {
   searchParams: Promise<{
     companyId?: SearchValue;
+    companyIds?: SearchValue;
     month?: SearchValue;
     flashStatus?: SearchValue;
     flashMessage?: SearchValue;
@@ -49,17 +48,22 @@ export default async function SalaryPage({
   const resolved = await searchParams;
   const companies = filterCompaniesForAuthContext(await listCompanies(), context);
 
-  const selectedCompanyIdRaw = firstSearchValue(resolved.companyId);
-  const selectedCompanyId = resolveAccessibleCompanyId({
-    requestedCompanyId: selectedCompanyIdRaw,
+  const selectedCompanyIds = resolveSelectedCompanyIds({
+    companyIds: resolved.companyIds,
+    companyId: resolved.companyId,
     companies,
   });
+  const selectedCompanyId = selectedCompanyIds[0] ?? "";
+  const singleCompanySelected = selectedCompanyIds.length === 1;
   const selectedCompany = companies.find((company) => company.id === selectedCompanyId);
   const selectedMonth = firstSearchValue(resolved.month) || currentMonthKey();
   const flashStatus = firstSearchValue(resolved.flashStatus);
   const flashMessage = firstSearchValue(resolved.flashMessage);
-  const returnTo = `/salary?companyId=${encodeURIComponent(selectedCompanyId)}&month=${encodeURIComponent(selectedMonth)}`;
-  const payrollRows = selectedCompanyId
+  const companyScopeParams = selectedCompanyIds
+    .map((companyId) => `companyIds=${encodeURIComponent(companyId)}`)
+    .join("&");
+  const returnTo = `/salary?${companyScopeParams}&month=${encodeURIComponent(selectedMonth)}`;
+  const payrollRows = singleCompanySelected
     ? await listMonthlyPayrollRows({ companyId: selectedCompanyId, month: selectedMonth })
     : [];
 
@@ -68,7 +72,7 @@ export default async function SalaryPage({
       title="Salary"
       eyebrow="Monthly payroll review"
       companyOptions={companies.map((company) => ({ id: company.id, name: company.name }))}
-      activeCompanyId={selectedCompanyId}
+      activeCompanyIds={selectedCompanyIds}
     >
       {flashMessage ? (
         <div
@@ -83,16 +87,10 @@ export default async function SalaryPage({
       ) : null}
 
       <GlassPanel>
-        <form action="/salary" className="grid gap-4 p-5 md:grid-cols-[1fr_1fr_auto] md:items-end">
-          <Field label="Company">
-            <select name="companyId" className={inputClass} defaultValue={selectedCompanyId}>
-              {companies.map((company) => (
-                <option key={company.id} value={company.id}>
-                  {company.name}
-                </option>
-              ))}
-            </select>
-          </Field>
+        <form action="/salary" className="grid gap-4 p-5 md:grid-cols-[1fr_auto] md:items-end">
+          {selectedCompanyIds.map((companyId) => (
+            <input key={companyId} type="hidden" name="companyIds" value={companyId} />
+          ))}
           <Field label="Salary month">
             <input name="month" type="month" className={inputClass} defaultValue={selectedMonth} />
           </Field>
@@ -104,7 +102,7 @@ export default async function SalaryPage({
         </form>
       </GlassPanel>
 
-      {selectedCompany ? (
+      {singleCompanySelected && selectedCompany ? (
         <div className="space-y-4">
           <div className="flex flex-col gap-1 px-1">
             <h2 className="text-xl font-semibold">
@@ -124,7 +122,9 @@ export default async function SalaryPage({
       ) : (
         <GlassPanel>
           <div className="p-6 text-sm" style={{ color: "var(--text-muted)" }}>
-            No companies are assigned to this user.
+            {companies.length === 0
+              ? "No companies are assigned to this user."
+              : "Select one company in the global company scope to review salary for a month."}
           </div>
         </GlassPanel>
       )}

@@ -52,6 +52,7 @@ export default async function CreateInvoicePage({
       eyebrow="Billing workflow"
       companyOptions={companies.map((company) => ({ id: company.id, name: company.name }))}
       activeCompanyId={companies[0]?.id}
+      showCompanySelector={false}
     >
       <GlassPanel gradient>
         {flashMessage ? (

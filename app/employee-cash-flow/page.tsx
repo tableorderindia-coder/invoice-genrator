@@ -6,7 +6,6 @@ import { Shell } from "../_components/shell";
 import { requirePageAccess } from "@/lib/auth/server";
 import {
   filterCompaniesForAuthContext,
-  resolveAccessibleCompanyId,
 } from "@/src/features/billing/company-access";
 import {
   getInvoicePaymentPrefillData,
@@ -23,6 +22,7 @@ import {
   buildEmployeeCashFlowFilterFieldEntries,
   filterSavedCashFlowRows,
   formatPaymentMonthLabel,
+  resolveSelectedCompanyIds,
   resolveSavedCashFlowFilters,
 } from "@/src/features/billing/filter-selection";
 import { listCompanies } from "@/src/features/billing/store";
@@ -41,6 +41,7 @@ export default async function EmployeeCashFlowPage({
 }: {
   searchParams: Promise<{
     companyId?: string | string[];
+    companyIds?: string | string[];
     month?: string | string[];
     year?: string | string[];
     invoiceId?: string | string[];
@@ -55,19 +56,21 @@ export default async function EmployeeCashFlowPage({
   const resolved = await searchParams;
   const companies = filterCompaniesForAuthContext(await listCompanies(), context);
 
-  const selectedCompanyIdRaw = Array.isArray(resolved.companyId)
-    ? resolved.companyId[0]
-    : resolved.companyId;
-  const selectedCompanyId = resolveAccessibleCompanyId({
-    requestedCompanyId: selectedCompanyIdRaw,
+  const selectedCompanyIds = resolveSelectedCompanyIds({
+    companyIds: resolved.companyIds,
+    companyId: resolved.companyId,
     companies,
   });
+  const selectedCompanyId = selectedCompanyIds[0] ?? "";
+  const singleCompanySelected = selectedCompanyIds.length === 1;
 
   const monthKey = resolveEmployeeCashFlowMonthKey(resolved.month, resolved.year);
   const selectedTabRaw = Array.isArray(resolved.tab) ? resolved.tab[0] : resolved.tab;
   const selectedTab = selectedTabRaw === "saved" ? "saved" : "compose";
 
-  const invoiceOptionsInput = buildEmployeeCashFlowInvoiceOptionsInput(selectedCompanyId);
+  const invoiceOptionsInput = singleCompanySelected
+    ? buildEmployeeCashFlowInvoiceOptionsInput(selectedCompanyId)
+    : null;
   const invoiceOptions = invoiceOptionsInput
     ? await listCashFlowInvoiceOptions(invoiceOptionsInput)
     : [];
@@ -84,7 +87,7 @@ export default async function EmployeeCashFlowPage({
     paymentMonths: resolved.paymentMonths,
   });
 
-  const prefillDataList = selectedInvoiceIds.length
+  const prefillDataList = singleCompanySelected && selectedInvoiceIds.length
     ? await Promise.all(
         selectedInvoiceIds.map((invoiceId) =>
           getInvoicePaymentPrefillData({
@@ -127,11 +130,15 @@ export default async function EmployeeCashFlowPage({
         }
       : undefined;
 
-  const savedRows = selectedCompanyId
-    ? await listSavedEmployeeCashFlowEntries({
-        companyId: selectedCompanyId,
-      })
-    : [];
+  const savedRows = (
+    await Promise.all(
+      selectedCompanyIds.map((companyId) =>
+        listSavedEmployeeCashFlowEntries({
+          companyId,
+        }),
+      ),
+    )
+  ).flat();
   const filteredSavedRows = filterSavedCashFlowRows(savedRows, savedFilters);
   const savedEmployeeOptions = [...new Map(savedRows.map((row) => [row.employeeId, row.employeeNameSnapshot] as const)).entries()]
     .map(([value, label]) => ({ value, label }))
@@ -158,7 +165,10 @@ export default async function EmployeeCashFlowPage({
           ),
         ]
       : selectedInvoiceIds.map((invoiceId) => `invoiceId=${encodeURIComponent(invoiceId)}`);
-  const returnTo = `/employee-cash-flow?companyId=${encodeURIComponent(selectedCompanyId)}&month=${monthKey}&tab=${selectedTab}${filterParams.length ? `&${filterParams.join("&")}` : ""}`;
+  const companyScopeParams = selectedCompanyIds
+    .map((companyId) => `companyIds=${encodeURIComponent(companyId)}`)
+    .join("&");
+  const returnTo = `/employee-cash-flow?${companyScopeParams}&month=${monthKey}&tab=${selectedTab}${filterParams.length ? `&${filterParams.join("&")}` : ""}`;
   const initialEntries: EmployeeCashFlowEditableEntry[] = prefillData
     ? aggregateEmployeeCashFlowEditableEntries(
         prefillData.entries.map((entry) => ({
@@ -174,7 +184,7 @@ export default async function EmployeeCashFlowPage({
     invoiceIds: selectedInvoiceIds,
     employeeIds: savedFilters.employeeIds,
     paymentMonths: savedFilters.paymentMonths,
-    includeCompanyId: true,
+    includeCompanyId: false,
     includeMonth: true,
     includeTab: false,
   });
@@ -184,7 +194,7 @@ export default async function EmployeeCashFlowPage({
       title="Employee Cash Flow"
       eyebrow="Cash reality dashboard"
       companyOptions={companies.map((company) => ({ id: company.id, name: company.name }))}
-      activeCompanyId={selectedCompanyId}
+      activeCompanyIds={selectedCompanyIds}
     >
       <GlassPanel gradient className="overflow-visible">
         <form
@@ -195,7 +205,9 @@ export default async function EmployeeCashFlowPage({
               : "grid gap-3 md:grid-cols-[180px_1.2fr_auto] md:items-end"
           }
         >
-          <input type="hidden" name="companyId" value={selectedCompanyId} />
+          {selectedCompanyIds.map((companyId) => (
+            <input key={companyId} type="hidden" name="companyIds" value={companyId} />
+          ))}
           <input type="hidden" name="tab" value={selectedTab} />
           {selectedTab === "saved" ? <input type="hidden" name="month" value={monthKey} /> : null}
           {selectedTab === "compose" ? (
@@ -268,6 +280,9 @@ export default async function EmployeeCashFlowPage({
 
       <GlassPanel gradient className="overflow-visible">
         <form action="/employee-cash-flow" className="mb-2 flex flex-wrap items-center gap-2">
+          {selectedCompanyIds.map((companyId) => (
+            <input key={companyId} type="hidden" name="companyIds" value={companyId} />
+          ))}
           {tabSwitchHiddenFields.map((field) => (
             <input key={`${field.name}:${field.value}`} type="hidden" name={field.name} value={field.value} />
           ))}
@@ -304,7 +319,9 @@ export default async function EmployeeCashFlowPage({
           />
         ) : (
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-            Select a company, month, and one or more cashed-out invoices to load invoice-level employee cash flow cards.
+            {singleCompanySelected
+              ? "Select a month and one or more cashed-out invoices to load invoice-level employee cash flow cards."
+              : "Select one company in the global company scope to compose employee cash flow rows."}
           </p>
         )}
       </GlassPanel>

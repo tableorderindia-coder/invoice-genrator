@@ -70,14 +70,18 @@ export function Shell({
   children,
   companyOptions = [],
   activeCompanyId,
+  activeCompanyIds,
   companySelectorLabel = "Active company",
+  showCompanySelector = true,
 }: {
   title: string;
   eyebrow?: string;
   children: ReactNode;
   companyOptions?: CompanyOption[];
   activeCompanyId?: string;
+  activeCompanyIds?: string[];
   companySelectorLabel?: string;
+  showCompanySelector?: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -108,38 +112,100 @@ export function Shell({
   const persistentSearchFields = [...searchParams.entries()].filter(
     ([name]) => name !== "companyId" && name !== "companyIds",
   );
+  const selectedCompanyIds = activeCompanyIds?.length
+    ? activeCompanyIds
+    : activeCompanyId
+      ? [activeCompanyId]
+      : companyOptions.map((company) => company.id);
+  const selectedCompanyIdSet = new Set(selectedCompanyIds);
+  const allCompaniesSelected =
+    companyOptions.length > 0 &&
+    selectedCompanyIds.length >= companyOptions.length &&
+    companyOptions.every((company) => selectedCompanyIdSet.has(company.id));
+
+  const navigateWithCompanyScope = (companyIds: string[]) => {
+    const nextParams = new URLSearchParams();
+    for (const [name, value] of persistentSearchFields) {
+      nextParams.append(name, value);
+    }
+    const selectedIdSet = new Set(companyIds);
+    const nextAllSelected =
+      companyOptions.length > 0 &&
+      companyIds.length >= companyOptions.length &&
+      companyOptions.every((company) => selectedIdSet.has(company.id));
+    if (!nextAllSelected) {
+      for (const companyId of companyIds) {
+        nextParams.append("companyIds", companyId);
+      }
+    }
+    const queryString = nextParams.toString();
+    navigateTo(queryString ? `${pathname}?${queryString}` : pathname);
+  };
+
+  const handleAllCompaniesChange = () => {
+    navigateWithCompanyScope(companyOptions.map((company) => company.id));
+  };
+
+  const handleCompanyScopeChange = (companyId: string, checked: boolean) => {
+    const currentIds = allCompaniesSelected
+      ? companyOptions.map((company) => company.id)
+      : selectedCompanyIds;
+    const nextIds = checked
+      ? [...new Set([...currentIds, companyId])]
+      : currentIds.filter((currentCompanyId) => currentCompanyId !== companyId);
+    navigateWithCompanyScope(nextIds.length > 0 ? nextIds : companyOptions.map((company) => company.id));
+  };
 
   const scopedHref = (href: string) => {
-    if (!activeCompanyId || href === "/logout") {
+    if (!showCompanySelector || href === "/logout") {
       return href;
     }
     const nextParams = new URLSearchParams();
-    nextParams.set("companyId", activeCompanyId);
+    if (!allCompaniesSelected) {
+      for (const companyId of selectedCompanyIds) {
+        nextParams.append("companyIds", companyId);
+      }
+    }
+    const queryString = nextParams.toString();
+    if (!queryString) {
+      return href;
+    }
     return `${href}?${nextParams.toString()}`;
   };
 
   const renderCompanySelector = () =>
-    companyOptions.length > 0 ? (
-      <form action={pathname} className="flex flex-col gap-2">
-        {persistentSearchFields.map(([name, value], index) => (
-          <input key={`${name}-${value}-${index}`} type="hidden" name={name} value={value} />
-        ))}
-        <label className="flex flex-col gap-2 text-xs font-medium" style={{ color: "var(--text-muted)" }}>
-          {companySelectorLabel}
-          <select
-            name="companyId"
-            className="h-10 rounded-xl px-3 text-sm"
-            defaultValue={activeCompanyId ?? companyOptions[0]?.id ?? ""}
-            onChange={(event) => event.currentTarget.form?.requestSubmit()}
-          >
+    showCompanySelector && companyOptions.length > 0 ? (
+      <div className="flex flex-col gap-2 text-xs font-medium" style={{ color: "var(--text-muted)" }}>
+        <span>{companySelectorLabel}</span>
+        <div
+          className="rounded-xl border p-2"
+          style={{
+            borderColor: "var(--glass-border)",
+            background: "rgba(255,255,255,0.03)",
+          }}
+        >
+          <label className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5">
+            <input
+              type="checkbox"
+              checked={allCompaniesSelected}
+              onChange={handleAllCompaniesChange}
+            />
+            <span>All companies</span>
+          </label>
+          <div className="mt-1 max-h-32 space-y-1 overflow-y-auto pr-1">
             {companyOptions.map((company) => (
-              <option key={company.id} value={company.id}>
-                {company.name}
-              </option>
+              <label key={company.id} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5">
+                <input
+                  type="checkbox"
+                  checked={allCompaniesSelected || selectedCompanyIdSet.has(company.id)}
+                  onChange={(event) => handleCompanyScopeChange(company.id, event.currentTarget.checked)}
+                />
+                <span className="min-w-0 truncate">{company.name}</span>
+              </label>
             ))}
-          </select>
-        </label>
-      </form>
+          </div>
+        </div>
+      </div>
     ) : null;
 
   return (

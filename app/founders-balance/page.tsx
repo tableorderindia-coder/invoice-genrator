@@ -1,7 +1,5 @@
 import { GlassPanel } from "../_components/glass-panel";
 import { Shell } from "../_components/shell";
-import { PendingSubmitButton } from "../_components/pending-submit-button";
-import { ChecklistFilterDropdown } from "../_components/checklist-filter-dropdown";
 import { requirePageAccess } from "@/lib/auth/server";
 import {
   filterCompaniesForAuthContext,
@@ -141,32 +139,12 @@ export default async function FoundersBalancePage({
       title="Founders Balance"
       eyebrow="Founder withdrawals"
       companyOptions={companies.map((company) => ({ id: company.id, name: company.name }))}
-      activeCompanyId={selectedCompanyIds[0] ?? companies[0]?.id}
+      activeCompanyIds={selectedCompanyIds}
     >
-      <GlassPanel gradient className="overflow-visible">
-        <form
-          action="/founders-balance"
-          className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end"
-        >
-          <ChecklistFilterDropdown
-            name="companyIds"
-            label="company"
-            options={companies.map((company) => ({
-              value: company.id,
-              label: company.name,
-            }))}
-            defaultSelectedValues={selectedCompanyIds}
-            includeSelectAll
-          />
-          <PendingSubmitButton
-            className="gradient-btn"
-            defaultText="Load"
-            pendingText="Loading..."
-          />
-        </form>
-        {flashMessage ? (
+      {flashMessage ? (
+        <GlassPanel gradient className="overflow-visible">
           <div
-            className="mt-4 rounded-2xl px-4 py-3 text-sm font-medium"
+            className="rounded-2xl px-4 py-3 text-sm font-medium"
             style={{
               background:
                 flashStatus === "error"
@@ -181,8 +159,8 @@ export default async function FoundersBalancePage({
           >
             {flashMessage}
           </div>
-        ) : null}
-      </GlassPanel>
+        </GlassPanel>
+      ) : null}
 
       <GlassPanel title="Founders Balance" gradient className="overflow-visible">
         <FoundersBalanceTable
