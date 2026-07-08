@@ -4,6 +4,7 @@ import { cache } from "react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 import {
+  canAccessCompany,
   canAccessPage,
   canEditPage,
   normalizePermissionPage,
@@ -25,6 +26,7 @@ export type AuthContext = {
   email: string;
   profile: AuthProfile;
   permissions: AppPermission[];
+  companyAccess: string[];
   supabase: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
 };
 
@@ -32,6 +34,10 @@ type RawPermissionRow = {
   page: string;
   can_view: boolean;
   can_edit: boolean;
+};
+
+type RawCompanyAccessRow = {
+  company_id: string;
 };
 
 export const getAuthContext = cache(async (): Promise<AuthContext | null> => {
@@ -69,6 +75,15 @@ export const getAuthContext = cache(async (): Promise<AuthContext | null> => {
     return null;
   }
 
+  const { data: companyAccessRows, error: companyAccessError } = await supabase
+    .from("user_company_access")
+    .select("company_id")
+    .eq("user_id", user.id);
+
+  if (companyAccessError) {
+    return null;
+  }
+
   const permissions = ((permissionRows ?? []) as RawPermissionRow[])
     .map((row) => {
       const page = normalizePermissionPage(row.page);
@@ -97,6 +112,9 @@ export const getAuthContext = cache(async (): Promise<AuthContext | null> => {
     email: user.email ?? profile.email,
     profile: mappedProfile,
     permissions,
+    companyAccess: ((companyAccessRows ?? []) as RawCompanyAccessRow[]).map(
+      (row) => row.company_id,
+    ),
     supabase,
   };
 });
@@ -142,6 +160,44 @@ export async function requirePageEditAccess(page: AppPage) {
       role: context.profile.role,
       page,
       permissions: context.permissions,
+    })
+  ) {
+    redirect("/unauthorized");
+  }
+
+  return context;
+}
+
+export async function requireCompanyPageAccess(
+  page: AppPage,
+  companyId: string,
+) {
+  const context = await requirePageAccess(page);
+
+  if (
+    !canAccessCompany({
+      role: context.profile.role,
+      companyId,
+      companyAccess: context.companyAccess,
+    })
+  ) {
+    redirect("/unauthorized");
+  }
+
+  return context;
+}
+
+export async function requireCompanyPageEditAccess(
+  page: AppPage,
+  companyId: string,
+) {
+  const context = await requirePageEditAccess(page);
+
+  if (
+    !canAccessCompany({
+      role: context.profile.role,
+      companyId,
+      companyAccess: context.companyAccess,
     })
   ) {
     redirect("/unauthorized");

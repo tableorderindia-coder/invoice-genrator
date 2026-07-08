@@ -10,6 +10,7 @@ import { PendingSubmitButton } from "@/app/_components/pending-submit-button";
 import { Shell } from "@/app/_components/shell";
 import PasswordInput from "@/components/PasswordInput";
 import { AccessMatrix } from "./_components/access-matrix";
+import { CompanyAccessPicker } from "./_components/company-access-picker";
 
 type ProfileRow = {
   id: string;
@@ -24,6 +25,16 @@ type PermissionRow = {
   page: string;
   can_view: boolean;
   can_edit: boolean;
+};
+
+type CompanyRow = {
+  id: string;
+  name: string;
+};
+
+type CompanyAccessRow = {
+  user_id: string;
+  company_id: string;
 };
 
 export const dynamic = "force-dynamic";
@@ -41,7 +52,12 @@ export default async function AdminUsersPage({
   const error = Array.isArray(params.error) ? params.error[0] : params.error;
   const success = Array.isArray(params.success) ? params.success[0] : params.success;
 
-  const [{ data: profiles }, { data: permissionRows }] = await Promise.all([
+  const [
+    { data: profiles },
+    { data: permissionRows },
+    { data: companies },
+    { data: companyAccessRows },
+  ] = await Promise.all([
     context.supabase
       .from("profiles")
       .select("id, email, role, must_change_password, created_at")
@@ -50,6 +66,14 @@ export default async function AdminUsersPage({
       .from("permissions")
       .select("user_id, page, can_view, can_edit")
       .order("page", { ascending: true }),
+    context.supabase
+      .from("companies")
+      .select("id, name")
+      .order("name", { ascending: true }),
+    context.supabase
+      .from("user_company_access")
+      .select("user_id, company_id")
+      .order("company_id", { ascending: true }),
   ]);
 
   const permissionsByUserId = new Map<string, PermissionRow[]>();
@@ -57,6 +81,17 @@ export default async function AdminUsersPage({
     const current = permissionsByUserId.get(permission.user_id) ?? [];
     current.push(permission);
     permissionsByUserId.set(permission.user_id, current);
+  }
+
+  const companyOptions = ((companies ?? []) as CompanyRow[]).map((company) => ({
+    id: company.id,
+    name: company.name,
+  }));
+  const companyAccessByUserId = new Map<string, string[]>();
+  for (const access of (companyAccessRows ?? []) as CompanyAccessRow[]) {
+    const current = companyAccessByUserId.get(access.user_id) ?? [];
+    current.push(access.company_id);
+    companyAccessByUserId.set(access.user_id, current);
   }
 
   const creatablePages = APP_PAGES.filter((page) => page.id !== "admin-users");
@@ -115,6 +150,13 @@ export default async function AdminUsersPage({
               <AccessMatrix pages={creatablePages} />
             </div>
 
+            <div className="space-y-3">
+              <p className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
+                Company access
+              </p>
+              <CompanyAccessPicker companies={companyOptions} />
+            </div>
+
             <PendingSubmitButton
               className="gradient-btn w-full"
               defaultText="Create user"
@@ -169,6 +211,22 @@ export default async function AdminUsersPage({
                         ]),
                       )}
                     />
+                  </div>
+
+                  <div className="space-y-3">
+                    <p className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
+                      Company access
+                    </p>
+                    {profile.role === "admin" ? (
+                      <p className="rounded-2xl border px-4 py-3 text-sm" style={{ borderColor: "var(--glass-border)", color: "var(--text-muted)" }}>
+                        Admins can access all companies.
+                      </p>
+                    ) : (
+                      <CompanyAccessPicker
+                        companies={companyOptions}
+                        defaultCompanyIds={companyAccessByUserId.get(profile.id) ?? []}
+                      />
+                    )}
                   </div>
 
                   <PendingSubmitButton
