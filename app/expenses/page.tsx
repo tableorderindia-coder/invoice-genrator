@@ -4,6 +4,10 @@ import { Field, inputClass } from "../_components/field";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
 import { requirePageAccess } from "@/lib/auth/server";
 import {
+  filterCompaniesForAuthContext,
+  resolveAccessibleCompanyId,
+} from "@/src/features/billing/company-access";
+import {
   saveCompanyExpenseAction,
   deleteCompanyExpenseAction,
 } from "@/src/features/billing/actions";
@@ -32,11 +36,14 @@ export default async function ExpensesPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requirePageAccess("expenses");
+  const context = await requirePageAccess("expenses");
   const params = await searchParams;
-  const companies = await listCompanies();
+  const companies = filterCompaniesForAuthContext(await listCompanies(), context);
 
-  const selectedCompanyId = typeof params.companyId === "string" ? params.companyId : companies[0]?.id ?? "";
+  const selectedCompanyId = resolveAccessibleCompanyId({
+    requestedCompanyId: typeof params.companyId === "string" ? params.companyId : undefined,
+    companies,
+  });
   const now = new Date();
   const selectedYear = typeof params.year === "string" ? Number.parseInt(params.year, 10) : now.getFullYear();
   const selectedMonth = typeof params.month === "string" ? Number.parseInt(params.month, 10) : (now.getMonth() + 1);
@@ -64,7 +71,12 @@ export default async function ExpensesPage({
   const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
 
   return (
-    <Shell title="Company Expenses" eyebrow="Financial management">
+    <Shell
+      title="Company Expenses"
+      eyebrow="Financial management"
+      companyOptions={companies.map((company) => ({ id: company.id, name: company.name }))}
+      activeCompanyId={selectedCompanyId}
+    >
       {/* Flash message */}
       {flashStatus && flashMessage && (
         <div

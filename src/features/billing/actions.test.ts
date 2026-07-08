@@ -12,6 +12,8 @@ const updateCompanyMock = vi.fn();
 const createEmployeeMock = vi.fn();
 const updateEmployeeMock = vi.fn();
 const upsertFounderWithdrawalsMock = vi.fn();
+const saveMonthlyPayrollRowsMock = vi.fn();
+const requireCompanyPageEditAccessMock = vi.fn();
 
 vi.mock("next/cache", () => ({
   revalidatePath: revalidatePathMock,
@@ -23,6 +25,7 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("@/lib/auth/server", () => ({
   requirePageEditAccess: vi.fn().mockResolvedValue(undefined),
+  requireCompanyPageEditAccess: requireCompanyPageEditAccessMock,
 }));
 
 vi.mock("./store", () => ({
@@ -59,8 +62,11 @@ vi.mock("./employee-cash-flow-store", () => ({
   replaceInvoicePaymentEmployeeEntries: replaceInvoicePaymentEmployeeEntriesMock,
   updateSavedEmployeeCashFlowEntry: vi.fn(),
   updateDashboardEmployeeCashFlowEntry: updateDashboardEmployeeCashFlowEntryMock,
-  upsertEmployeeSalaryPayment: vi.fn(),
   upsertInvoicePayment: upsertInvoicePaymentMock,
+}));
+
+vi.mock("./payroll-store", () => ({
+  saveMonthlyPayrollRows: saveMonthlyPayrollRowsMock,
 }));
 
 describe("updateDashboardEmployeeCashFlowEntryAction", () => {
@@ -82,6 +88,61 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
     updateEmployeeMock.mockResolvedValue(undefined);
     upsertFounderWithdrawalsMock.mockReset();
     upsertFounderWithdrawalsMock.mockResolvedValue(undefined);
+    saveMonthlyPayrollRowsMock.mockReset();
+    saveMonthlyPayrollRowsMock.mockResolvedValue(undefined);
+    requireCompanyPageEditAccessMock.mockReset();
+    requireCompanyPageEditAccessMock.mockResolvedValue({
+      profile: { id: "admin_1", role: "admin" },
+    });
+  });
+
+  it("saves monthly payroll rows through the company-scoped Salary permission gate", async () => {
+    const { saveMonthlyPayrollRowsAction } = await import("./actions");
+    const formData = new FormData();
+    formData.set("companyId", "comp_1");
+    formData.set("month", "2026-07");
+    formData.set("status", "verified");
+    formData.set("updateEmployeeMaster", "true");
+    formData.set("returnTo", "/salary?companyId=comp_1&month=2026-07");
+    formData.set(
+      "rowsJson",
+      JSON.stringify([
+        {
+          employeeId: "emp_1",
+          employeeName: "Asha",
+          paidUsdInrRate: 83,
+          salaryPaidInrCents: 20000000,
+          pfInrCents: 180000,
+          tdsInrCents: 250000,
+          paidStatus: true,
+          paidDate: "2026-07-31",
+          notes: "Verified",
+          overrideNote: "Final admin override",
+        },
+      ]),
+    );
+
+    await expect(saveMonthlyPayrollRowsAction(formData)).rejects.toThrow(
+      "REDIRECT:/salary?companyId=comp_1&month=2026-07&flashStatus=success&flashMessage=Salary%20month%20saved.",
+    );
+
+    expect(requireCompanyPageEditAccessMock).toHaveBeenCalledWith("salary", "comp_1");
+    expect(saveMonthlyPayrollRowsMock).toHaveBeenCalledWith({
+      companyId: "comp_1",
+      month: "2026-07",
+      status: "verified",
+      updateEmployeeMaster: true,
+      actorUserId: "admin_1",
+      rows: [
+        expect.objectContaining({
+          employeeId: "emp_1",
+          salaryPaidInrCents: 20000000,
+          overrideNote: "Final admin override",
+        }),
+      ],
+    });
+    expect(revalidatePathMock).toHaveBeenCalledWith("/salary");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/employee-cash-flow");
   });
 
   it("passes employee cash-flow defaults through employee creation", async () => {

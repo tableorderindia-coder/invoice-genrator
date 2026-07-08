@@ -2,6 +2,7 @@ import { Shell } from "../_components/shell";
 import { GlassPanel } from "../_components/glass-panel";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
 import { requirePageAccess } from "@/lib/auth/server";
+import { filterCompaniesForAuthContext } from "@/src/features/billing/company-access";
 import { cashOutInvoiceAction } from "@/src/features/billing/actions";
 import { filterCashoutEligibleInvoices } from "@/src/features/billing/invoice-workflow";
 import { listCompanies, listInvoices } from "@/src/features/billing/store";
@@ -21,9 +22,13 @@ export default async function CashoutPage({
     flashMessage?: string | string[];
   }>;
 }) {
-  await requirePageAccess("cashout");
-  const [allInvoices, companies] = await Promise.all([listInvoices(), listCompanies()]);
-  const invoices = filterCashoutEligibleInvoices(allInvoices);
+  const context = await requirePageAccess("cashout");
+  const [allInvoices, allCompanies] = await Promise.all([listInvoices(), listCompanies()]);
+  const companies = filterCompaniesForAuthContext(allCompanies, context);
+  const accessibleCompanyIds = new Set(companies.map((company) => company.id));
+  const invoices = filterCashoutEligibleInvoices(allInvoices).filter((invoice) =>
+    accessibleCompanyIds.has(invoice.companyId),
+  );
   const companyMap = new Map(companies.map((company) => [company.id, company.name]));
   const resolvedSearchParams = await searchParams;
   const flashStatus = Array.isArray(resolvedSearchParams.flashStatus)
@@ -34,7 +39,11 @@ export default async function CashoutPage({
     : resolvedSearchParams.flashMessage;
 
   return (
-    <Shell title="Cashout" eyebrow="Settlement queue">
+    <Shell
+      title="Cashout"
+      eyebrow="Settlement queue"
+      companyOptions={companies.map((company) => ({ id: company.id, name: company.name }))}
+    >
       <GlassPanel gradient>
         <div>
           <h2 className="text-xl font-semibold" style={{ color: "var(--text-primary)" }}>

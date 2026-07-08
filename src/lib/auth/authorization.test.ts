@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  canAccessCompany,
   canAccessPage,
   getDefaultRedirectPath,
+  normalizePermissionPage,
   shouldForcePasswordReset,
   type AppPermission,
 } from "./authorization";
@@ -95,5 +97,43 @@ describe("authorization", () => {
         mustChangePassword: false,
       }),
     ).toBe("/unauthorized");
+  });
+
+  it("registers salary as a page permission and prioritizes it after employee cash flow", () => {
+    expect(normalizePermissionPage("salary")).toBe("salary");
+
+    expect(
+      getDefaultRedirectPath({
+        role: "user",
+        permissions: [buildPermission({ page: "salary", canView: true })],
+        mustChangePassword: false,
+      }),
+    ).toBe("/salary");
+  });
+
+  it("checks company access for admins and assigned users", () => {
+    expect(
+      canAccessCompany({
+        role: "admin",
+        companyId: "company_ntt",
+        companyAccess: [],
+      }),
+    ).toBe(true);
+
+    expect(
+      canAccessCompany({
+        role: "user",
+        companyId: "company_ntt",
+        companyAccess: ["company_ntt"],
+      }),
+    ).toBe(true);
+
+    expect(
+      canAccessCompany({
+        role: "user",
+        companyId: "company_ntt",
+        companyAccess: ["company_wizard"],
+      }),
+    ).toBe(false);
   });
 });

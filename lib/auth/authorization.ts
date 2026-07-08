@@ -14,6 +14,7 @@ export const APP_PAGES = [
     label: "Employee Statements",
     path: "/employee-statements",
   },
+  { id: "salary", label: "Salary", path: "/salary" },
   { id: "expenses", label: "Expenses", path: "/expenses" },
   { id: "dashboard", label: "Dashboard", path: "/dashboard" },
   { id: "admin-users", label: "Admin Users", path: "/admin/users" },
@@ -58,6 +59,18 @@ export function canEditPage(input: {
   );
 }
 
+export function canAccessCompany(input: {
+  role: AppRole;
+  companyId: string;
+  companyAccess: string[];
+}) {
+  if (input.role === "admin") {
+    return true;
+  }
+
+  return input.companyAccess.includes(input.companyId);
+}
+
 export function shouldForcePasswordReset(input: {
   mustChangePassword: boolean;
   pathname: string;
@@ -92,6 +105,7 @@ export function getDefaultRedirectPath(input: {
     "employees",
     "cashout",
     "employee-cash-flow",
+    "salary",
     "employee-statements",
     "expenses",
     "admin-users",

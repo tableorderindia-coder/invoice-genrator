@@ -15,6 +15,7 @@ type FoundersBalanceTableProps = {
   companyId: string;
   data: FounderBalanceModel;
   returnTo: string;
+  canEdit?: boolean;
   saveFounderWithdrawalsAction: (formData: FormData) => Promise<void>;
 };
 
@@ -31,9 +32,11 @@ function formatInputAmount(cents: number) {
 function FounderWithdrawalInput({
   name,
   defaultValue,
+  disabled = false,
 }: {
   name: string;
   defaultValue: number;
+  disabled?: boolean;
 }) {
   const { pending } = useFormStatus();
   return (
@@ -43,7 +46,7 @@ function FounderWithdrawalInput({
       min="0"
       step="0.01"
       defaultValue={formatInputAmount(defaultValue)}
-      disabled={pending}
+      disabled={disabled || pending}
       className={inputClass}
       style={{
         minWidth: "8rem",
@@ -90,6 +93,7 @@ export function FoundersBalanceTable({
   companyId,
   data,
   returnTo,
+  canEdit = true,
   saveFounderWithdrawalsAction,
 }: FoundersBalanceTableProps) {
   const rowKeys = useMemo(() => data.rows.map((row) => row.key), [data.rows]);
@@ -118,12 +122,13 @@ export function FoundersBalanceTable({
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm" style={{ color: "var(--text-muted)" }}>
           Founder’s Share is split equally across Nirbhay, Pawan, and Vishal.
+          {!canEdit ? " Custom multi-company views are read-only." : ""}
         </p>
         <PendingSubmitButton
           className="gradient-btn"
           defaultText="Update selected"
           pendingText="Updating..."
-          disabled={selectedRows.size === 0 || data.rows.length === 0}
+          disabled={!canEdit || selectedRows.size === 0 || data.rows.length === 0}
         />
       </div>
       <div
@@ -176,6 +181,7 @@ export function FoundersBalanceTable({
                       <FounderWithdrawalInput
                         name={`withdrawal__${row.key}__${founder.key}`}
                         defaultValue={row.withdrawals[founder.key]}
+                        disabled={!canEdit}
                       />
                     </td>
                   ))}

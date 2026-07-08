@@ -90,4 +90,63 @@ describe("auth actions", () => {
 
     expect(revalidatePathMock).not.toHaveBeenCalled();
   });
+
+  it("syncs selected company access when updating a managed user", async () => {
+    const profileUpdateEq = vi.fn().mockResolvedValue({ error: null });
+    const permissionsDeleteEq = vi.fn().mockResolvedValue({ error: null });
+    const companyDeleteEq = vi.fn().mockResolvedValue({ error: null });
+    const companyInsert = vi.fn().mockResolvedValue({ error: null });
+
+    const fromMock = vi.fn((table: string) => {
+      if (table === "profiles") {
+        return {
+          update: () => ({
+            eq: profileUpdateEq,
+          }),
+        };
+      }
+
+      if (table === "permissions") {
+        return {
+          delete: () => ({
+            eq: permissionsDeleteEq,
+          }),
+        };
+      }
+
+      if (table === "user_company_access") {
+        return {
+          delete: () => ({
+            eq: companyDeleteEq,
+          }),
+          insert: companyInsert,
+        };
+      }
+
+      throw new Error(`Unexpected table: ${table}`);
+    });
+
+    requireAdminAccessMock.mockResolvedValue({
+      supabase: {
+        from: fromMock,
+      },
+    });
+
+    const { updateManagedUserAccessAction } = await import("@/lib/auth/actions");
+    const formData = new FormData();
+    formData.set("userId", "user_1");
+    formData.set("role", "user");
+    formData.append("companyAccess", "company_a");
+    formData.append("companyAccess", "company_b");
+
+    await expect(updateManagedUserAccessAction(formData)).rejects.toThrow(
+      "REDIRECT:/admin/users?success=Access+updated",
+    );
+
+    expect(companyInsert).toHaveBeenCalledWith([
+      { user_id: "user_1", company_id: "company_a" },
+      { user_id: "user_1", company_id: "company_b" },
+    ]);
+    expect(revalidatePathMock).toHaveBeenCalledWith("/admin/users");
+  });
 });

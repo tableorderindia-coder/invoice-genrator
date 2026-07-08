@@ -5,6 +5,7 @@ import { MetricCard } from "./_components/metric-card";
 import { GlassPanel } from "./_components/glass-panel";
 import { StaggerGrid } from "./_components/stagger-grid";
 import { requirePageAccess } from "@/lib/auth/server";
+import { filterCompaniesForAuthContext } from "@/src/features/billing/company-access";
 import { getCompanyPnSummaries, listCompanies, listInvoices } from "@/src/features/billing/store";
 import { formatMonthYear, formatSignedInr, formatUsd } from "@/src/features/billing/utils";
 import type { InvoiceStatus } from "@/src/features/billing/types";
@@ -12,12 +13,20 @@ import type { InvoiceStatus } from "@/src/features/billing/types";
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  await requirePageAccess("overview");
-  const [companies, allInvoices, companyPnSummaries] = await Promise.all([
+  const context = await requirePageAccess("overview");
+  const [allCompanies, allInvoicesRaw, companyPnSummariesRaw] = await Promise.all([
     listCompanies(),
     listInvoices(),
     getCompanyPnSummaries(),
   ]);
+  const companies = filterCompaniesForAuthContext(allCompanies, context);
+  const accessibleCompanyIds = new Set(companies.map((company) => company.id));
+  const allInvoices = allInvoicesRaw.filter((invoice) =>
+    accessibleCompanyIds.has(invoice.companyId),
+  );
+  const companyPnSummaries = companyPnSummariesRaw.filter((summary) =>
+    accessibleCompanyIds.has(summary.companyId),
+  );
   const invoices = allInvoices.slice(0, 3);
   const invoiceStatusCounts: Record<InvoiceStatus, number> = {
     draft: 0,
@@ -38,7 +47,12 @@ export default async function HomePage() {
   );
 
   return (
-    <Shell title="Billing cockpit for staffing ops" eyebrow="EassyOnboard">
+    <Shell
+      title="Billing cockpit for staffing ops"
+      eyebrow="EassyOnboard"
+      companyOptions={companies.map((company) => ({ id: company.id, name: company.name }))}
+      activeCompanyId={companies[0]?.id}
+    >
       {/* Metric cards with 3D tilt */}
       <StaggerGrid className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="stagger-item">

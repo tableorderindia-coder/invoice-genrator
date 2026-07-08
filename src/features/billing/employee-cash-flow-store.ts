@@ -141,6 +141,15 @@ type DbCashFlowEntry = {
   invoice_id: string;
 };
 
+type DbMonthlySalaryPayment = {
+  employee_id: string;
+  paid_usd_inr_rate: number | null;
+  salary_paid_inr_cents: number | null;
+  pf_inr_cents: number | null;
+  tds_inr_cents: number | null;
+  override_note: string | null;
+};
+
 type AdjustmentAwareEmployee = {
   id: string;
   fullName: string;
@@ -624,6 +633,7 @@ export async function getInvoicePaymentPrefillData(input: {
     lineItemResult,
     adjustmentResult,
     employeesResult,
+    salaryPaymentResult,
     invoicePaymentResult,
   ] =
     await Promise.all([
@@ -648,6 +658,12 @@ export async function getInvoicePaymentPrefillData(input: {
         .eq("company_id", invoice.company_id)
         .order("full_name"),
       supabase
+        .from("employee_salary_payments")
+        .select("employee_id, paid_usd_inr_rate, salary_paid_inr_cents, pf_inr_cents, tds_inr_cents, override_note")
+        .eq("company_id", invoice.company_id)
+        .eq("month", input.paymentMonth)
+        .eq("status", "verified"),
+      supabase
         .from("invoice_payments")
         .select("id, payment_date, payment_month, usd_inr_rate")
         .eq("invoice_id", input.invoiceId)
@@ -660,6 +676,7 @@ export async function getInvoicePaymentPrefillData(input: {
   if (realizationResult.error) throw realizationResult.error;
   if (adjustmentResult.error) throw adjustmentResult.error;
   if (employeesResult.error) throw employeesResult.error;
+  if (salaryPaymentResult.error) throw salaryPaymentResult.error;
   if (invoicePaymentResult.error) throw invoicePaymentResult.error;
 
   const lineItems = new Map<string, DbInvoiceLineItem>(
@@ -668,6 +685,12 @@ export async function getInvoicePaymentPrefillData(input: {
   const adjustments = (adjustmentResult.data ?? []) as DbInvoiceAdjustment[];
   const realization = (realizationResult.data ?? null) as DbInvoiceRealization | null;
   const invoicePayment = (invoicePaymentResult.data ?? null) as DbInvoicePayment | null;
+  const salaryPaymentsByEmployeeId = new Map(
+    ((salaryPaymentResult.data ?? []) as DbMonthlySalaryPayment[]).map((row) => [
+      row.employee_id,
+      row,
+    ]),
+  );
 
   let savedEntries: DbCashFlowEntry[] = [];
   if (invoicePayment?.id) {
@@ -729,39 +752,41 @@ export async function getInvoicePaymentPrefillData(input: {
     return new Date(year, month, 0).getDate();
   })();
 
-  const availableEmployees = (employeesResult.data ?? []).map((row) => ({
-    id: String(row.id),
-    fullName: String(row.full_name),
-    companyId: String(row.company_id),
-    defaultPaidUsdInrRate: Number(row.default_paid_usd_inr_rate ?? 0),
-    defaultActualPaidInrCents: Number(row.default_actual_paid_inr_cents ?? 0),
-    defaultPfInrCents: Number(row.default_pf_inr_cents ?? 0),
-    defaultTdsInrCents: Number(row.default_tds_inr_cents ?? 0),
-    onboardingAdvanceUsdCents:
-      onboardingByEmployeeName.get(
-        normalizeEmployeeNameForMatch(String(row.full_name)),
-      ) ?? 0,
-    reimbursementUsdCents:
-      reimbursementByEmployeeName.get(
-        normalizeEmployeeNameForMatch(String(row.full_name)),
-      ) ?? 0,
-    reimbursementLabelsText: [
-      ...(
-        reimbursementLabelsByEmployeeName.get(
-          normalizeEmployeeNameForMatch(String(row.full_name)),
-        ) ?? new Set<string>()
+  const availableEmployees = (employeesResult.data ?? []).map((row) => {
+    const employeeId = String(row.id);
+    const employeeName = String(row.full_name);
+    const payroll = salaryPaymentsByEmployeeId.get(employeeId);
+
+    return {
+      id: employeeId,
+      fullName: employeeName,
+      companyId: String(row.company_id),
+      defaultPaidUsdInrRate: Number(
+        payroll?.paid_usd_inr_rate ?? row.default_paid_usd_inr_rate ?? 0,
       ),
-    ].join(", "),
-    appraisalAdvanceUsdCents:
-      appraisalByEmployeeName.get(
-        normalizeEmployeeNameForMatch(String(row.full_name)),
-      ) ?? 0,
-    offboardingDeductionUsdCents: Math.abs(
-      offboardingByEmployeeName.get(
-        normalizeEmployeeNameForMatch(String(row.full_name)),
-      ) ?? 0,
-    ),
-  }));
+      defaultActualPaidInrCents: Number(
+        payroll?.salary_paid_inr_cents ?? row.default_actual_paid_inr_cents ?? 0,
+      ),
+      defaultPfInrCents: Number(payroll?.pf_inr_cents ?? row.default_pf_inr_cents ?? 0),
+      defaultTdsInrCents: Number(payroll?.tds_inr_cents ?? row.default_tds_inr_cents ?? 0),
+      onboardingAdvanceUsdCents:
+        onboardingByEmployeeName.get(normalizeEmployeeNameForMatch(employeeName)) ?? 0,
+      reimbursementUsdCents:
+        reimbursementByEmployeeName.get(normalizeEmployeeNameForMatch(employeeName)) ?? 0,
+      reimbursementLabelsText: [
+        ...(
+          reimbursementLabelsByEmployeeName.get(
+            normalizeEmployeeNameForMatch(employeeName),
+          ) ?? new Set<string>()
+        ),
+      ].join(", "),
+      appraisalAdvanceUsdCents:
+        appraisalByEmployeeName.get(normalizeEmployeeNameForMatch(employeeName)) ?? 0,
+      offboardingDeductionUsdCents: Math.abs(
+        offboardingByEmployeeName.get(normalizeEmployeeNameForMatch(employeeName)) ?? 0,
+      ),
+    };
+  });
   const employeeDefaultsById = new Map(
     availableEmployees.map((employee) => [employee.id, employee]),
   );
@@ -845,12 +870,17 @@ export async function getInvoicePaymentPrefillData(input: {
           const cashoutUsdInrRate =
             realization?.usd_inr_rate ?? row.cashout_usd_inr_rate ?? 0;
           const employeeDefaults = employeeDefaultsById.get(row.employee_id);
+          const payroll = salaryPaymentsByEmployeeId.get(row.employee_id);
           const paidUsdInrRate =
-            row.paid_usd_inr_rate && row.paid_usd_inr_rate > 0
+            payroll?.paid_usd_inr_rate && payroll.paid_usd_inr_rate > 0
+              ? payroll.paid_usd_inr_rate
+              : row.paid_usd_inr_rate && row.paid_usd_inr_rate > 0
               ? row.paid_usd_inr_rate
               : employeeDefaults?.defaultPaidUsdInrRate ?? 0;
           const actualPaidInrCents =
-            row.actual_paid_inr_cents && row.actual_paid_inr_cents > 0
+            payroll?.salary_paid_inr_cents && payroll.salary_paid_inr_cents > 0
+              ? payroll.salary_paid_inr_cents
+              : row.actual_paid_inr_cents && row.actual_paid_inr_cents > 0
               ? row.actual_paid_inr_cents
               : employeeDefaults?.defaultActualPaidInrCents ?? 0;
           const metrics = calculateEmployeePayoutMetrics({
@@ -886,11 +916,15 @@ export async function getInvoicePaymentPrefillData(input: {
               cashoutUsdInrRate,
             }),
             pfInrCents:
-              row.pf_inr_cents && row.pf_inr_cents > 0
+              payroll?.pf_inr_cents && payroll.pf_inr_cents > 0
+                ? payroll.pf_inr_cents
+                : row.pf_inr_cents && row.pf_inr_cents > 0
                 ? row.pf_inr_cents
                 : employeeDefaults?.defaultPfInrCents ?? 0,
             tdsInrCents:
-              row.tds_inr_cents && row.tds_inr_cents > 0
+              payroll?.tds_inr_cents && payroll.tds_inr_cents > 0
+                ? payroll.tds_inr_cents
+                : row.tds_inr_cents && row.tds_inr_cents > 0
                 ? row.tds_inr_cents
                 : employeeDefaults?.defaultTdsInrCents ?? 0,
             actualPaidInrCents,
@@ -902,7 +936,9 @@ export async function getInvoicePaymentPrefillData(input: {
             isNonInvoiceEmployee: row.is_non_invoice_employee ?? false,
             isPaid: row.is_paid,
             paidAt: row.paid_at ?? undefined,
-            notes: "",
+            notes: payroll?.override_note
+              ? `Salary override: ${payroll.override_note}`
+              : "",
           };
         })
         : buildInvoiceCashFlowFallbackEntries({
@@ -1281,62 +1317,5 @@ export async function updateDashboardEmployeeCashFlowEntry(input: {
     })
     .eq("id", input.entryId);
   if (error) throw error;
-}
-
-export async function upsertEmployeeSalaryPayment(input: {
-  employeeId: string;
-  companyId: string;
-  month: string;
-  salaryUsdCents: number;
-  paidUsdInrRate: number;
-  paidStatus: boolean;
-  paidDate?: string;
-  notes?: string;
-}) {
-  const supabase = await getSupabaseOrThrow();
-  const salaryPaidInrCents = calculateCashInInrCents({
-    effectiveDollarInwardUsdCents: input.salaryUsdCents,
-    cashoutUsdInrRate: input.paidUsdInrRate,
-  });
-
-  const { data: existing, error: existingError } = await supabase
-    .from("employee_salary_payments")
-    .select("id")
-    .eq("employee_id", input.employeeId)
-    .eq("company_id", input.companyId)
-    .eq("month", input.month)
-    .maybeSingle();
-  if (existingError) throw existingError;
-
-  const payload = {
-    employee_id: input.employeeId,
-    company_id: input.companyId,
-    month: input.month,
-    salary_usd_cents: input.salaryUsdCents,
-    paid_usd_inr_rate: input.paidUsdInrRate,
-    salary_paid_inr_cents: salaryPaidInrCents,
-    paid_status: input.paidStatus,
-    paid_date: input.paidDate ?? null,
-    notes: input.notes ?? null,
-    updated_at: nowIso(),
-  };
-
-  if (existing?.id) {
-    const { error } = await supabase
-      .from("employee_salary_payments")
-      .update(payload)
-      .eq("id", String(existing.id));
-    if (error) throw error;
-    return String(existing.id);
-  }
-
-  const id = nextCashFlowId("salary_payment");
-  const { error } = await supabase.from("employee_salary_payments").insert({
-    id,
-    ...payload,
-    created_at: nowIso(),
-  });
-  if (error) throw error;
-  return id;
 }
 

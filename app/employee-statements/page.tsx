@@ -3,6 +3,10 @@ import { GlassPanel } from "../_components/glass-panel";
 import { inputClass } from "../_components/field";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
 import { Shell } from "../_components/shell";
+import {
+  filterCompaniesForAuthContext,
+  resolveAccessibleCompanyId,
+} from "@/src/features/billing/company-access";
 import { requirePageAccess } from "@/lib/auth/server";
 import EmployeeStatementEditor from "./_components/employee-statement-editor";
 import {
@@ -30,11 +34,14 @@ export default async function EmployeeStatementsPage({
     flashMessage?: string | string[];
   }>;
 }) {
-  await requirePageAccess("employee-statements");
+  const context = await requirePageAccess("employee-statements");
   const resolved = await searchParams;
   const filters = parseEmployeeStatementFilters(resolved);
-  const companies = await listCompanies();
-  const selectedCompanyId = filters.companyId || companies[0]?.id || "";
+  const companies = filterCompaniesForAuthContext(await listCompanies(), context);
+  const selectedCompanyId = resolveAccessibleCompanyId({
+    requestedCompanyId: filters.companyId,
+    companies,
+  });
   const employees = selectedCompanyId ? await listEmployees(selectedCompanyId) : [];
   const invoices = selectedCompanyId ? await listInvoicesForCompany(selectedCompanyId) : [];
   const availableMonths = getUniqueInvoiceMonths(
@@ -74,24 +81,18 @@ export default async function EmployeeStatementsPage({
   )}${selectedEmployeeIds.map((employeeId) => `&employeeIds=${encodeURIComponent(employeeId)}`).join("")}`;
 
   return (
-    <Shell title="Employee Statements" eyebrow="Editable employee statement ledger">
+    <Shell
+      title="Employee Statements"
+      eyebrow="Editable employee statement ledger"
+      companyOptions={companies.map((company) => ({ id: company.id, name: company.name }))}
+      activeCompanyId={selectedCompanyId}
+    >
       <GlassPanel gradient className="overflow-visible">
         <form
           action="/employee-statements"
-          className="grid gap-3 md:grid-cols-[1.2fr_1.4fr_180px_180px_auto] md:items-end"
+          className="grid gap-3 md:grid-cols-[1.4fr_180px_180px_auto] md:items-end"
         >
-          <label className="block">
-            <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
-              Company
-            </span>
-            <select name="companyId" defaultValue={selectedCompanyId} className={inputClass}>
-              {companies.map((company) => (
-                <option key={company.id} value={company.id}>
-                  {company.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <input type="hidden" name="companyId" value={selectedCompanyId} />
 
           <ChecklistFilterDropdown
             name="employeeIds"

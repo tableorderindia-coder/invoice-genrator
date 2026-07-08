@@ -3,9 +3,12 @@ import Link from "next/link";
 import { ConfirmDeleteInvoiceButton } from "./confirm-delete-invoice-button";
 import { Shell } from "../_components/shell";
 import { GlassPanel } from "../_components/glass-panel";
-import { Field, inputClass } from "../_components/field";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
 import { requirePageAccess } from "@/lib/auth/server";
+import {
+  filterCompaniesForAuthContext,
+  resolveAccessibleCompanyId,
+} from "@/src/features/billing/company-access";
 import {
   deleteInvoiceAction,
   updateInvoiceStatusAction,
@@ -36,17 +39,21 @@ export default async function InvoicesPage({
     flashMessage?: string | string[];
   }>;
 }) {
-  await requirePageAccess("invoices");
+  const context = await requirePageAccess("invoices");
   const resolvedSearchParams = await searchParams;
-  const companies = await listCompanies();
+  const companies = filterCompaniesForAuthContext(await listCompanies(), context);
   const selectedCompanyId = resolveSelectedCompanyId({
     companyId: resolvedSearchParams.companyId,
     companies,
   });
-  const invoices = selectedCompanyId ? await listInvoicesForCompany(selectedCompanyId) : [];
+  const accessibleCompanyId = resolveAccessibleCompanyId({
+    requestedCompanyId: selectedCompanyId,
+    companies,
+  });
+  const invoices = accessibleCompanyId ? await listInvoicesForCompany(accessibleCompanyId) : [];
   const companyMap = new Map(companies.map((company) => [company.id, company.name]));
-  const filteredInvoicesPath = selectedCompanyId
-    ? `/invoices?companyId=${encodeURIComponent(selectedCompanyId)}`
+  const filteredInvoicesPath = accessibleCompanyId
+    ? `/invoices?companyId=${encodeURIComponent(accessibleCompanyId)}`
     : "/invoices";
   const flashStatus = Array.isArray(resolvedSearchParams.flashStatus)
     ? resolvedSearchParams.flashStatus[0]
@@ -56,7 +63,12 @@ export default async function InvoicesPage({
     : resolvedSearchParams.flashMessage;
 
   return (
-    <Shell title="Invoices" eyebrow="Issued invoices">
+    <Shell
+      title="Invoices"
+      eyebrow="Issued invoices"
+      companyOptions={companies.map((company) => ({ id: company.id, name: company.name }))}
+      activeCompanyId={accessibleCompanyId}
+    >
       <GlassPanel gradient>
         <div className="flex items-center justify-between gap-4">
           <div>
@@ -71,25 +83,6 @@ export default async function InvoicesPage({
             Go to create invoice
           </Link>
         </div>
-        <div className="mt-4 flex flex-wrap items-end gap-3">
-          <form action="/invoices" className="flex flex-wrap items-end gap-3">
-            <Field label="Filter company">
-              <select name="companyId" className={inputClass} defaultValue={selectedCompanyId}>
-                {companies.map((company) => (
-                  <option key={company.id} value={company.id}>
-                    {company.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <PendingSubmitButton
-              className="btn-outline"
-              defaultText="Load company"
-              pendingText="Loading..."
-            />
-          </form>
-        </div>
-
         {flashMessage ? (
           <div
             className="mt-4 rounded-2xl px-4 py-3 text-sm font-medium"

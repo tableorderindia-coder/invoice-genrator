@@ -5,6 +5,10 @@ import { PendingSubmitButton } from "../_components/pending-submit-button";
 import { Shell } from "../_components/shell";
 import { requirePageAccess } from "@/lib/auth/server";
 import {
+  filterCompaniesForAuthContext,
+  resolveAccessibleCompanyId,
+} from "@/src/features/billing/company-access";
+import {
   getInvoicePaymentPrefillData,
   listSavedEmployeeCashFlowEntries,
   listCashFlowInvoiceOptions,
@@ -47,14 +51,17 @@ export default async function EmployeeCashFlowPage({
     flashMessage?: string | string[];
   }>;
 }) {
-  await requirePageAccess("employee-cash-flow");
+  const context = await requirePageAccess("employee-cash-flow");
   const resolved = await searchParams;
-  const companies = await listCompanies();
+  const companies = filterCompaniesForAuthContext(await listCompanies(), context);
 
   const selectedCompanyIdRaw = Array.isArray(resolved.companyId)
     ? resolved.companyId[0]
     : resolved.companyId;
-  const selectedCompanyId = selectedCompanyIdRaw || companies[0]?.id || "";
+  const selectedCompanyId = resolveAccessibleCompanyId({
+    requestedCompanyId: selectedCompanyIdRaw,
+    companies,
+  });
 
   const monthKey = resolveEmployeeCashFlowMonthKey(resolved.month, resolved.year);
   const selectedTabRaw = Array.isArray(resolved.tab) ? resolved.tab[0] : resolved.tab;
@@ -173,28 +180,22 @@ export default async function EmployeeCashFlowPage({
   });
 
   return (
-    <Shell title="Employee Cash Flow" eyebrow="Cash reality dashboard">
+    <Shell
+      title="Employee Cash Flow"
+      eyebrow="Cash reality dashboard"
+      companyOptions={companies.map((company) => ({ id: company.id, name: company.name }))}
+      activeCompanyId={selectedCompanyId}
+    >
       <GlassPanel gradient className="overflow-visible">
         <form
           action="/employee-cash-flow"
           className={
             selectedTab === "saved"
-              ? "grid gap-3 md:grid-cols-[1.2fr_1fr_1fr_auto] md:items-end"
-              : "grid gap-3 md:grid-cols-[1.2fr_180px_1.2fr_auto] md:items-end"
+              ? "grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end"
+              : "grid gap-3 md:grid-cols-[180px_1.2fr_auto] md:items-end"
           }
         >
-          <label className="block">
-            <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
-              Company
-            </span>
-            <select name="companyId" defaultValue={selectedCompanyId} className={inputClass}>
-              {companies.map((company) => (
-                <option key={company.id} value={company.id}>
-                  {company.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <input type="hidden" name="companyId" value={selectedCompanyId} />
           <input type="hidden" name="tab" value={selectedTab} />
           {selectedTab === "saved" ? <input type="hidden" name="month" value={monthKey} /> : null}
           {selectedTab === "compose" ? (

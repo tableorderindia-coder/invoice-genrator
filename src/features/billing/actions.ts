@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { requirePageEditAccess } from "@/lib/auth/server";
+import { requireCompanyPageEditAccess, requirePageEditAccess } from "@/lib/auth/server";
 import { buildInvoiceAdjustmentPayload } from "./adjustments";
 import { parseInvoiceHeaderFormInput } from "./invoice-editor";
 import { defaultEmployeeCashFlowPaidDate } from "./employee-cash-flow-page-state";
@@ -42,12 +42,19 @@ import {
   replaceInvoicePaymentEmployeeEntries,
   updateSavedEmployeeCashFlowEntry,
   updateDashboardEmployeeCashFlowEntry,
-  upsertEmployeeSalaryPayment,
   upsertInvoicePayment,
 } from "./employee-cash-flow-store";
 import type { InvoiceStatus } from "./types";
 import { centsFromUsd } from "./utils";
 import { parseFounderWithdrawalRows } from "./founders-balance";
+import {
+  normalizePayrollMonthKey,
+  type PayrollStatus,
+} from "./payroll";
+import {
+  saveMonthlyPayrollRows,
+  type SaveMonthlyPayrollRowInput,
+} from "./payroll-store";
 
 function getString(formData: FormData, key: string) {
   return String(formData.get(key) || "").trim();
@@ -137,6 +144,33 @@ function parseSavedEmployeeCashFlowEntryJson(rawValue: string) {
   }
 
   return parsed as EmployeeCashFlowSavedEntry;
+}
+
+function parseMonthlyPayrollRowsJson(rawValue: string) {
+  if (!rawValue) {
+    throw new Error("Salary rows payload is required.");
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(rawValue);
+  } catch {
+    throw new Error("Salary rows could not be parsed.");
+  }
+
+  if (!Array.isArray(parsed)) {
+    throw new Error("Salary rows must be an array.");
+  }
+
+  return parsed as SaveMonthlyPayrollRowInput[];
+}
+
+function parsePayrollStatus(rawValue: string): PayrollStatus {
+  if (rawValue === "draft" || rawValue === "in_review" || rawValue === "verified") {
+    return rawValue;
+  }
+
+  throw new Error("Salary month status is invalid.");
 }
 
 export async function createCompanyAction(formData: FormData) {
@@ -1080,19 +1114,6 @@ export async function saveInvoicePaymentEmployeeEntriesAction(formData: FormData
       });
     }
 
-    for (const entry of entries) {
-      await upsertEmployeeSalaryPayment({
-        employeeId: entry.employeeId,
-        companyId,
-        month: paymentMonth,
-        salaryUsdCents: 0,
-        paidUsdInrRate: entry.paidUsdInrRate,
-        paidStatus: entry.isPaid,
-        paidDate: entry.paidAt,
-        notes: entry.notes,
-      });
-    }
-
     revalidatePath("/employee-cash-flow");
   } catch (error) {
     redirect(
@@ -1105,6 +1126,42 @@ export async function saveInvoicePaymentEmployeeEntriesAction(formData: FormData
   }
 
   redirect(buildFlashRedirect(returnTo, "success", "Employee cash flow rows saved."));
+}
+
+export async function saveMonthlyPayrollRowsAction(formData: FormData) {
+  const companyId = getString(formData, "companyId");
+  const returnTo = getString(formData, "returnTo") || "/salary";
+
+  if (!companyId) {
+    redirect(buildFlashRedirect(returnTo, "error", "Company is required."));
+  }
+
+  const context = await requireCompanyPageEditAccess("salary", companyId);
+
+  try {
+    await saveMonthlyPayrollRows({
+      companyId,
+      month: normalizePayrollMonthKey(getString(formData, "month")),
+      status: parsePayrollStatus(getString(formData, "status") || "draft"),
+      rows: parseMonthlyPayrollRowsJson(getString(formData, "rowsJson")),
+      actorUserId: context.profile.id,
+      updateEmployeeMaster: getString(formData, "updateEmployeeMaster") === "true",
+    });
+
+    revalidatePath("/salary");
+    revalidatePath("/employee-cash-flow");
+    revalidatePath("/dashboard");
+  } catch (error) {
+    redirect(
+      buildFlashRedirect(
+        returnTo,
+        "error",
+        getErrorMessage(error, "Unable to save salary month."),
+      ),
+    );
+  }
+
+  redirect(buildFlashRedirect(returnTo, "success", "Salary month saved."));
 }
 
 export async function updateSavedEmployeeCashFlowEntryAction(formData: FormData) {

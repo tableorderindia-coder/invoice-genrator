@@ -44,6 +44,17 @@ function getSelectedPermissions(formData: FormData) {
   );
 }
 
+function getSelectedCompanyIds(formData: FormData) {
+  return [
+    ...new Set(
+      formData
+        .getAll("companyAccess")
+        .map((value) => String(value).trim())
+        .filter(Boolean),
+    ),
+  ];
+}
+
 async function syncPermissions(input: {
   supabase: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
   userId: string;
@@ -74,6 +85,38 @@ async function syncPermissions(input: {
       can_edit: permission.canEdit,
     })),
   );
+
+  if (insertError) {
+    throw insertError;
+  }
+}
+
+async function syncCompanyAccess(input: {
+  supabase: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
+  userId: string;
+  companyIds: string[];
+}) {
+  const { error: deleteError } = await input.supabase
+    .from("user_company_access")
+    .delete()
+    .eq("user_id", input.userId);
+
+  if (deleteError) {
+    throw deleteError;
+  }
+
+  if (input.companyIds.length === 0) {
+    return;
+  }
+
+  const { error: insertError } = await input.supabase
+    .from("user_company_access")
+    .insert(
+      input.companyIds.map((companyId) => ({
+        user_id: input.userId,
+        company_id: companyId,
+      })),
+    );
 
   if (insertError) {
     throw insertError;
@@ -114,6 +157,7 @@ export async function createManagedUserAction(formData: FormData) {
     const tempPassword = getString(formData, "tempPassword");
     const role = getRole(formData);
     const permissions = getSelectedPermissions(formData);
+    const companyIds = getSelectedCompanyIds(formData);
 
     if (!email || !tempPassword) {
       redirect("/admin/users?error=Email+and+temporary+password+are+required");
@@ -153,6 +197,11 @@ export async function createManagedUserAction(formData: FormData) {
       userId: createdUser.user.id,
       permissions,
     });
+    await syncCompanyAccess({
+      supabase: context.supabase,
+      userId: createdUser.user.id,
+      companyIds,
+    });
 
     revalidatePath("/admin/users");
     redirect("/admin/users?success=User+created");
@@ -177,6 +226,7 @@ export async function updateManagedUserAccessAction(formData: FormData) {
     const userId = getString(formData, "userId");
     const role = getRole(formData);
     const permissions = getSelectedPermissions(formData);
+    const companyIds = getSelectedCompanyIds(formData);
 
     if (!userId) {
       redirect("/admin/users?error=User+ID+is+required");
@@ -197,6 +247,11 @@ export async function updateManagedUserAccessAction(formData: FormData) {
       supabase: context.supabase,
       userId,
       permissions,
+    });
+    await syncCompanyAccess({
+      supabase: context.supabase,
+      userId,
+      companyIds,
     });
 
     revalidatePath("/admin/users");
