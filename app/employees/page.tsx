@@ -90,39 +90,13 @@ export default async function EmployeesPage({
             </Link>
           </div>
 
-          <form action="/employees" className="mt-5 flex flex-wrap items-end gap-3">
-            <input type="hidden" name="tab" value={activeTab} />
-            <Field label="Filter company">
-              <select name="companyId" className={inputClass} defaultValue={selectedCompanyId}>
-                {companies.map((company) => (
-                  <option key={company.id} value={company.id}>
-                    {company.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <PendingSubmitButton
-              className="btn-outline"
-              defaultText="Load company"
-              pendingText="Loading..."
-            />
-          </form>
-
           {activeTab === "add" ? (
             <form action={createEmployeeAction}>
               <h2 className="mt-4 text-xl font-semibold" style={{ color: "var(--text-primary)" }}>
                 Add employee
               </h2>
+              <input type="hidden" name="companyId" value={selectedCompanyId} />
               <div className="mt-5 grid gap-4 md:grid-cols-2">
-                <Field label="Company">
-                  <select name="companyId" required className={inputClass} defaultValue={selectedCompanyId}>
-                    {companies.map((company) => (
-                      <option key={company.id} value={company.id}>
-                        {company.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
                 <Field label="Name">
                   <input name="fullName" required className={inputClass} placeholder="Jane Doe" />
                 </Field>
@@ -197,16 +171,8 @@ export default async function EmployeesPage({
               </div>
               <form action={updateEmployeeAction}>
                 {selectedEmployee ? <input type="hidden" name="employeeId" value={selectedEmployee.id} /> : null}
+                {selectedEmployee ? <input type="hidden" name="companyId" value={selectedEmployee.companyId} /> : null}
                 <div className="mt-5 grid gap-4 md:grid-cols-2">
-                  <Field label="Company">
-                    <select name="companyId" required className={inputClass} defaultValue={selectedEmployee?.companyId}>
-                      {companies.map((company) => (
-                        <option key={company.id} value={company.id}>
-                          {company.name}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
                   <Field label="Name">
                     <input name="fullName" required className={inputClass} defaultValue={selectedEmployee?.fullName} />
                   </Field>

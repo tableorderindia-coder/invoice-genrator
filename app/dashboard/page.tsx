@@ -1,11 +1,9 @@
 import { GlassPanel } from "../_components/glass-panel";
 import { Shell } from "../_components/shell";
-import { inputClass } from "../_components/field";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
 import { ChecklistFilterDropdown } from "../_components/checklist-filter-dropdown";
 import {
   filterCompaniesForAuthContext,
-  resolveAccessibleCompanyId,
 } from "@/src/features/billing/company-access";
 import { requirePageAccess } from "@/lib/auth/server";
 import {
@@ -16,6 +14,7 @@ import {
   formatPaymentMonthLabel,
   normalizeMultiSelectValue,
   resolveDashboardColumnSelection,
+  resolveSelectedCompanyIds,
 } from "../../src/features/billing/filter-selection";
 import {
   EMPLOYEE_DASHBOARD_COLUMN_OPTIONS,
@@ -27,16 +26,100 @@ import {
   listEmployees,
   listAvailablePaymentMonths,
 } from "../../src/features/billing/store";
-import type { PnDashboardData } from "../../src/features/billing/types";
+import type { PnDashboardData, PnPeriodRow } from "../../src/features/billing/types";
 import { DashboardTables } from "./dashboard-tables";
 
 export const dynamic = "force-dynamic";
+
+function weightedRate(rows: PnPeriodRow[], rateKey: "cashoutUsdInrRate" | "paidUsdInrRate") {
+  const eligibleRows = rateKey === "paidUsdInrRate"
+    ? rows.filter((row) => row.paidUsdInrRate > 0)
+    : rows;
+  const totalWeight = eligibleRows.reduce(
+    (sum, row) => sum + row.effectiveDollarInwardUsdCents,
+    0,
+  );
+  if (totalWeight <= 0) return 0;
+  return (
+    eligibleRows.reduce(
+      (sum, row) => sum + row[rateKey] * row.effectiveDollarInwardUsdCents,
+      0,
+    ) / totalWeight
+  );
+}
+
+function mergePeriodRows(rows: PnPeriodRow[]): PnPeriodRow[] {
+  const grouped = new Map<string, PnPeriodRow[]>();
+  for (const row of rows) {
+    const key = row.fiscalLabel ?? `${row.year}-${String(row.month ?? 0).padStart(2, "0")}`;
+    grouped.set(key, [...(grouped.get(key) ?? []), row]);
+  }
+
+  return [...grouped.values()]
+    .map((bucket) => {
+      const first = bucket[0];
+      const sum = (pick: (row: PnPeriodRow) => number) =>
+        bucket.reduce((total, row) => total + pick(row), 0);
+      const reimbursementLabelsText = [
+        ...new Set(
+          bucket
+            .flatMap((row) => row.reimbursementLabelsText.split(","))
+            .map((label) => label.trim())
+            .filter(Boolean),
+        ),
+      ].join(", ");
+
+      return {
+        year: first.year,
+        month: first.month,
+        fiscalLabel: first.fiscalLabel,
+        dollarInwardUsdCents: sum((row) => row.dollarInwardUsdCents),
+        onboardingAdvanceUsdCents: sum((row) => row.onboardingAdvanceUsdCents),
+        reimbursementUsdCents: sum((row) => row.reimbursementUsdCents),
+        reimbursementLabelsText,
+        reimbursementInrCents: sum((row) => row.reimbursementInrCents),
+        appraisalAdvanceUsdCents: sum((row) => row.appraisalAdvanceUsdCents),
+        appraisalAdvanceInrCents: sum((row) => row.appraisalAdvanceInrCents),
+        offboardingDeductionUsdCents: sum((row) => row.offboardingDeductionUsdCents),
+        effectiveDollarInwardUsdCents: sum((row) => row.effectiveDollarInwardUsdCents),
+        cashoutUsdInrRate: weightedRate(bucket, "cashoutUsdInrRate"),
+        cashInInrCents: sum((row) => row.cashInInrCents),
+        paidUsdInrRate: weightedRate(bucket, "paidUsdInrRate"),
+        pfInrCents: sum((row) => row.pfInrCents),
+        tdsInrCents: sum((row) => row.tdsInrCents),
+        actualPaidInrCents: sum((row) => row.actualPaidInrCents),
+        salaryPaidInrCents: sum((row) => row.salaryPaidInrCents),
+        fxCommissionInrCents: sum((row) => row.fxCommissionInrCents),
+        totalCommissionUsdCents: sum((row) => row.totalCommissionUsdCents),
+        commissionEarnedInrCents: sum((row) => row.commissionEarnedInrCents),
+        grossEarningsInrCents: sum((row) => row.grossEarningsInrCents),
+        expensesInrCents: sum((row) => row.expensesInrCents),
+        companyReimbursementUsdCents: sum((row) => row.companyReimbursementUsdCents),
+        companyReimbursementInrCents: sum((row) => row.companyReimbursementInrCents),
+        netPlInrCents: sum((row) => row.netPlInrCents),
+      };
+    })
+    .sort(
+      (left, right) =>
+        left.year * 100 + (left.month ?? 0) - (right.year * 100 + (right.month ?? 0)),
+    );
+}
+
+function mergeDashboardData(companyIds: string[], data: PnDashboardData[]): PnDashboardData {
+  return {
+    companyId: companyIds.join(","),
+    employeeEditableSections: data.flatMap((item) => item.employeeEditableSections),
+    employeeSections: data.flatMap((item) => item.employeeSections),
+    periodRows: mergePeriodRows(data.flatMap((item) => item.periodRows)),
+  };
+}
 
 export default async function DashboardPage({
   searchParams,
 }: {
   searchParams: Promise<{
     companyId?: string | string[];
+    companyIds?: string | string[];
     employeeIds?: string | string[];
     allEmployees?: string | string[];
     periodType?: string | string[];
@@ -52,13 +135,12 @@ export default async function DashboardPage({
   const context = await requirePageAccess("dashboard");
   const resolved = await searchParams;
   const companies = filterCompaniesForAuthContext(await listCompanies(), context);
-  const selectedCompanyIdRaw = Array.isArray(resolved.companyId)
-    ? resolved.companyId[0]
-    : resolved.companyId;
-  const selectedCompanyId = resolveAccessibleCompanyId({
-    requestedCompanyId: selectedCompanyIdRaw,
+  const selectedCompanyIds = resolveSelectedCompanyIds({
+    companyIds: resolved.companyIds,
+    companyId: resolved.companyId,
     companies,
   });
+  const activeCompanyId = selectedCompanyIds[0] ?? companies[0]?.id ?? "";
   const selectedPeriodTypeRaw = Array.isArray(resolved.periodType)
     ? resolved.periodType[0]
     : resolved.periodType;
@@ -73,14 +155,33 @@ export default async function DashboardPage({
   const allEmployeesSelected = allEmployeesValue === "1";
   const selectedEmployeeIds = normalizeMultiSelectValue(resolved.employeeIds);
 
-  const [employees, availableMonths] = selectedCompanyId 
-    ? await Promise.all([listEmployees(selectedCompanyId), listAvailablePaymentMonths(selectedCompanyId)])
-    : [[], []];
+  const companyEmployeeEntries = await Promise.all(
+    selectedCompanyIds.map(async (companyId) => ({
+      companyId,
+      employees: await listEmployees(companyId),
+    })),
+  );
+  const employees = companyEmployeeEntries.flatMap((entry) => entry.employees);
+  const employeeCompanyMap = new Map(
+    companyEmployeeEntries.flatMap((entry) =>
+      entry.employees.map((employee) => [employee.id, entry.companyId] as const),
+    ),
+  );
+  const availableMonths = [
+    ...new Set(
+      (
+        await Promise.all(
+          selectedCompanyIds.map((companyId) => listAvailablePaymentMonths(companyId)),
+        )
+      ).flat(),
+    ),
+  ].sort((left, right) => right.localeCompare(left));
 
   const effectiveEmployeeIds =
     allEmployeesSelected || selectedEmployeeIds.length === 0
       ? employees.map((employee) => employee.id)
       : selectedEmployeeIds;
+  const employeeFilterActive = !allEmployeesSelected && selectedEmployeeIds.length > 0;
 
   const allMonthsValue = Array.isArray(resolved.allMonths)
     ? resolved.allMonths[0]
@@ -108,7 +209,7 @@ export default async function DashboardPage({
   });
 
   const dashboardFilterFields = buildDashboardFilterFieldEntries({
-    companyId: selectedCompanyId,
+    companyIds: selectedCompanyIds,
     periodType,
     view,
     employeeIds: effectiveEmployeeIds,
@@ -120,7 +221,7 @@ export default async function DashboardPage({
   });
 
   const dashboardSwitchFields = buildDashboardFilterFieldEntries({
-    companyId: selectedCompanyId,
+    companyIds: selectedCompanyIds,
     periodType,
     view,
     employeeIds: effectiveEmployeeIds,
@@ -133,7 +234,7 @@ export default async function DashboardPage({
   });
 
   const employeeFilterFields = buildDashboardFilterFieldEntries({
-    companyId: selectedCompanyId,
+    companyIds: selectedCompanyIds,
     periodType,
     view,
     allEmployees: allEffectiveEmployeeIdsSelected,
@@ -148,7 +249,7 @@ export default async function DashboardPage({
   });
 
   const periodFilterFields = buildDashboardFilterFieldEntries({
-    companyId: selectedCompanyId,
+    companyIds: selectedCompanyIds,
     periodType,
     view,
     allEmployees: allEffectiveEmployeeIdsSelected,
@@ -163,7 +264,7 @@ export default async function DashboardPage({
   });
 
   const periodTypeSwitchFields = buildDashboardFilterFieldEntries({
-    companyId: selectedCompanyId,
+    companyIds: selectedCompanyIds,
     periodType,
     view,
     employeeIds: effectiveEmployeeIds,
@@ -176,7 +277,7 @@ export default async function DashboardPage({
   });
 
   const companyLoadFields = buildDashboardFilterFieldEntries({
-    companyId: selectedCompanyId,
+    companyIds: selectedCompanyIds,
     periodType,
     view,
     employeeColumns: employeeColumnKeys,
@@ -195,13 +296,27 @@ export default async function DashboardPage({
     periodRows: [],
   };
 
-  const data = selectedCompanyId
-    ? await getPnDashboardData({
-        companyId: selectedCompanyId,
-        periodType,
-        employeeIds: effectiveEmployeeIds,
-        paymentMonths: effectivePaymentMonths,
-      })
+  const data = selectedCompanyIds.length > 0
+    ? mergeDashboardData(
+        selectedCompanyIds,
+        await Promise.all(
+          selectedCompanyIds.map((companyId) => {
+            const companyEmployeeIds = effectiveEmployeeIds.filter(
+              (employeeId) => employeeCompanyMap.get(employeeId) === companyId,
+            );
+            return getPnDashboardData({
+              companyId,
+              periodType,
+              employeeIds: employeeFilterActive
+                ? companyEmployeeIds.length > 0
+                  ? companyEmployeeIds
+                  : ["__none__"]
+                : undefined,
+              paymentMonths: effectivePaymentMonths,
+            });
+          }),
+        ),
+      )
     : emptyDashboardData;
 
   const flashStatus = Array.isArray(resolved.flashStatus)
@@ -221,37 +336,23 @@ export default async function DashboardPage({
       title="P/L Dashboard"
       eyebrow="Company profitability"
       companyOptions={companies.map((company) => ({ id: company.id, name: company.name }))}
-      activeCompanyId={selectedCompanyId}
+      activeCompanyId={activeCompanyId}
     >
       <GlassPanel gradient className="overflow-visible">
         <form
           action="/dashboard"
           className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end"
         >
-          <label className="block">
-            <span
-              className="mb-2 block text-sm font-medium"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              Select company
-            </span>
-            <select
-              name="companyId"
-              defaultValue={selectedCompanyId}
-              className={inputClass}
-              style={{
-                border: "1px solid var(--glass-border)",
-                background: "rgba(255,255,255,0.04)",
-                color: "var(--text-primary)",
-              }}
-            >
-              {companies.map((company) => (
-                <option key={company.id} value={company.id}>
-                  {company.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <ChecklistFilterDropdown
+            name="companyIds"
+            label="company"
+            options={companies.map((company) => ({
+              value: company.id,
+              label: company.name,
+            }))}
+            defaultSelectedValues={selectedCompanyIds}
+            includeSelectAll
+          />
           <div className="flex gap-2">
             {companyLoadFields.map((field, index) => (
               <input
@@ -263,7 +364,7 @@ export default async function DashboardPage({
             ))}
             <PendingSubmitButton
               className="gradient-btn"
-              defaultText="Load company"
+              defaultText="Load"
               pendingText="Loading..."
             />
           </div>

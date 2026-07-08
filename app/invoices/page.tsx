@@ -3,7 +3,6 @@ import Link from "next/link";
 import { ConfirmDeleteInvoiceButton } from "./confirm-delete-invoice-button";
 import { Shell } from "../_components/shell";
 import { GlassPanel } from "../_components/glass-panel";
-import { Field, inputClass } from "../_components/field";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
 import { requirePageAccess } from "@/lib/auth/server";
 import {
@@ -84,25 +83,6 @@ export default async function InvoicesPage({
             Go to create invoice
           </Link>
         </div>
-        <div className="mt-4 flex flex-wrap items-end gap-3">
-          <form action="/invoices" className="flex flex-wrap items-end gap-3">
-            <Field label="Filter company">
-              <select name="companyId" className={inputClass} defaultValue={accessibleCompanyId}>
-                {companies.map((company) => (
-                  <option key={company.id} value={company.id}>
-                    {company.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <PendingSubmitButton
-              className="btn-outline"
-              defaultText="Load company"
-              pendingText="Loading..."
-            />
-          </form>
-        </div>
-
         {flashMessage ? (
           <div
             className="mt-4 rounded-2xl px-4 py-3 text-sm font-medium"

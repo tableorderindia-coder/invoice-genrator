@@ -32,6 +32,23 @@ export function resolveSelectedCompanyId(input: {
   return input.companies[0]?.id ?? "";
 }
 
+export function resolveSelectedCompanyIds(input: {
+  companyIds?: MultiSelectInput;
+  companyId?: MultiSelectInput;
+  companies: CompanySelectionOption[];
+}) {
+  const companyIdSet = new Set(input.companies.map((company) => company.id));
+  const requestedCompanyIds = [
+    ...normalizeMultiSelectValue(input.companyIds),
+    ...normalizeMultiSelectValue(input.companyId),
+  ].filter((companyId) => companyIdSet.has(companyId));
+  const selectedCompanyIds = [...new Set(requestedCompanyIds)];
+
+  return selectedCompanyIds.length > 0
+    ? selectedCompanyIds
+    : input.companies.map((company) => company.id);
+}
+
 export function formatPaymentMonthLabel(paymentMonth: string) {
   const match = /^(\d{4})-(\d{2})$/.exec(paymentMonth);
   if (!match) {
@@ -138,7 +155,8 @@ export function buildEmployeeCashFlowFilterFieldEntries(input: {
 }
 
 export function buildDashboardFilterFieldEntries(input: {
-  companyId: string;
+  companyId?: string;
+  companyIds?: MultiSelectInput;
   periodType: "monthly" | "yearly";
   view: "employee" | "period";
   employeeIds?: MultiSelectInput;
@@ -159,8 +177,18 @@ export function buildDashboardFilterFieldEntries(input: {
 }) {
   const fields: Array<{ name: string; value: string }> = [];
 
-  if (input.includeCompanyId !== false && input.companyId) {
-    fields.push({ name: "companyId", value: input.companyId });
+  if (input.includeCompanyId !== false) {
+    const companyIds = normalizeMultiSelectValue(input.companyIds);
+    if (companyIds.length > 0) {
+      fields.push(
+        ...companyIds.map((value) => ({
+          name: "companyIds",
+          value,
+        })),
+      );
+    } else if (input.companyId) {
+      fields.push({ name: "companyId", value: input.companyId });
+    }
   }
 
   if (input.includePeriodType !== false && input.periodType) {

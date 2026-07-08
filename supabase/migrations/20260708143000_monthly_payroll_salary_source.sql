@@ -45,16 +45,16 @@ create policy "employee_salary_payments_all"
 on public.employee_salary_payments
 for all
 to authenticated
-using ((select private.has_any_page_permission(array['salary', 'employee-cash-flow', 'dashboard'], 'view')))
-with check ((select private.has_any_page_permission(array['salary', 'employee-cash-flow'], 'edit')));
+using ((select public.has_any_page_permission(array['salary', 'employee-cash-flow', 'dashboard'], 'view')))
+with check ((select public.has_any_page_permission(array['salary', 'employee-cash-flow'], 'edit')));
 
 drop policy if exists "employee_salary_payment_audit_all" on public.employee_salary_payment_audit;
 create policy "employee_salary_payment_audit_all"
 on public.employee_salary_payment_audit
 for all
 to authenticated
-using ((select private.has_any_page_permission(array['salary', 'employee-cash-flow', 'dashboard'], 'view')))
-with check ((select private.has_any_page_permission(array['salary', 'employee-cash-flow'], 'edit')));
+using ((select public.has_any_page_permission(array['salary', 'employee-cash-flow', 'dashboard'], 'view')))
+with check ((select public.has_any_page_permission(array['salary', 'employee-cash-flow'], 'edit')));
 
 drop policy if exists "companies_select" on public.companies;
 create policy "companies_select"
@@ -62,7 +62,7 @@ on public.companies
 for select
 to authenticated
 using ((
-  select private.has_any_page_permission(
+  select public.has_any_page_permission(
     array[
       'overview',
       'companies',
@@ -84,7 +84,7 @@ on public.employees
 for select
 to authenticated
 using ((
-  select private.has_any_page_permission(
+  select public.has_any_page_permission(
     array['employees', 'invoices', 'employee-cash-flow', 'employee-statements', 'salary', 'dashboard'],
     'view'
   )

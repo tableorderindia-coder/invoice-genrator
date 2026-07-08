@@ -34,12 +34,12 @@ create policy "user_company_access_select"
 on public.user_company_access
 for select
 to authenticated
-using ((select private.is_admin()) or user_id = (select auth.uid()));
+using ((select public.is_admin()) or user_id = (select auth.uid()));
 
 drop policy if exists "user_company_access_modify" on public.user_company_access;
 create policy "user_company_access_modify"
 on public.user_company_access
 for all
 to authenticated
-using ((select private.is_admin()))
-with check ((select private.is_admin()));
+using ((select public.is_admin()))
+with check ((select public.is_admin()));

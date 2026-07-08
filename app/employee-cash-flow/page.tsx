@@ -191,22 +191,11 @@ export default async function EmployeeCashFlowPage({
           action="/employee-cash-flow"
           className={
             selectedTab === "saved"
-              ? "grid gap-3 md:grid-cols-[1.2fr_1fr_1fr_auto] md:items-end"
-              : "grid gap-3 md:grid-cols-[1.2fr_180px_1.2fr_auto] md:items-end"
+              ? "grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end"
+              : "grid gap-3 md:grid-cols-[180px_1.2fr_auto] md:items-end"
           }
         >
-          <label className="block">
-            <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
-              Company
-            </span>
-            <select name="companyId" defaultValue={selectedCompanyId} className={inputClass}>
-              {companies.map((company) => (
-                <option key={company.id} value={company.id}>
-                  {company.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <input type="hidden" name="companyId" value={selectedCompanyId} />
           <input type="hidden" name="tab" value={selectedTab} />
           {selectedTab === "saved" ? <input type="hidden" name="month" value={monthKey} /> : null}
           {selectedTab === "compose" ? (

@@ -90,20 +90,9 @@ export default async function EmployeeStatementsPage({
       <GlassPanel gradient className="overflow-visible">
         <form
           action="/employee-statements"
-          className="grid gap-3 md:grid-cols-[1.2fr_1.4fr_180px_180px_auto] md:items-end"
+          className="grid gap-3 md:grid-cols-[1.4fr_180px_180px_auto] md:items-end"
         >
-          <label className="block">
-            <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
-              Company
-            </span>
-            <select name="companyId" defaultValue={selectedCompanyId} className={inputClass}>
-              {companies.map((company) => (
-                <option key={company.id} value={company.id}>
-                  {company.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <input type="hidden" name="companyId" value={selectedCompanyId} />
 
           <ChecklistFilterDropdown
             name="employeeIds"

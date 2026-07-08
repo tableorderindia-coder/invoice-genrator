@@ -105,28 +105,41 @@ export function Shell({
     navigateTo(href);
   };
 
-  const handleCompanyChange = (companyId: string) => {
-    const nextParams = new URLSearchParams(searchParams.toString());
-    nextParams.set("companyId", companyId);
-    navigateTo(`${pathname}?${nextParams.toString()}`);
+  const persistentSearchFields = [...searchParams.entries()].filter(
+    ([name]) => name !== "companyId" && name !== "companyIds",
+  );
+
+  const scopedHref = (href: string) => {
+    if (!activeCompanyId || href === "/logout") {
+      return href;
+    }
+    const nextParams = new URLSearchParams();
+    nextParams.set("companyId", activeCompanyId);
+    return `${href}?${nextParams.toString()}`;
   };
 
   const renderCompanySelector = () =>
     companyOptions.length > 0 ? (
-      <label className="flex flex-col gap-2 text-xs font-medium" style={{ color: "var(--text-muted)" }}>
-        {companySelectorLabel}
-        <select
-          className="h-10 rounded-xl px-3 text-sm"
-          value={activeCompanyId ?? companyOptions[0]?.id ?? ""}
-          onChange={(event) => handleCompanyChange(event.currentTarget.value)}
-        >
-          {companyOptions.map((company) => (
-            <option key={company.id} value={company.id}>
-              {company.name}
-            </option>
-          ))}
-        </select>
-      </label>
+      <form action={pathname} className="flex flex-col gap-2">
+        {persistentSearchFields.map(([name, value], index) => (
+          <input key={`${name}-${value}-${index}`} type="hidden" name={name} value={value} />
+        ))}
+        <label className="flex flex-col gap-2 text-xs font-medium" style={{ color: "var(--text-muted)" }}>
+          {companySelectorLabel}
+          <select
+            name="companyId"
+            className="h-10 rounded-xl px-3 text-sm"
+            defaultValue={activeCompanyId ?? companyOptions[0]?.id ?? ""}
+            onChange={(event) => event.currentTarget.form?.requestSubmit()}
+          >
+            {companyOptions.map((company) => (
+              <option key={company.id} value={company.id}>
+                {company.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </form>
     ) : null;
 
   return (
@@ -153,14 +166,15 @@ export function Shell({
           <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto pr-1 text-sm">
             {links.map((link) => {
               const active = isLinkActive(pathname, link.href);
-              const isNavigatingToThis = isPending && pendingHref === link.href;
+              const href = scopedHref(link.href);
+              const isNavigatingToThis = isPending && pendingHref === href;
               const Icon = link.Icon;
 
               return (
                 <Link
                   key={link.href}
-                  href={link.href}
-                  onClick={(event) => handleNavClick(event, link.href)}
+                  href={href}
+                  onClick={(event) => handleNavClick(event, href)}
                   className="flex h-10 items-center gap-3 rounded-xl px-3 font-medium transition-all"
                   style={{
                     color: active ? "var(--accent-1)" : "var(--text-secondary)",
@@ -214,13 +228,14 @@ export function Shell({
             <nav className="flex gap-2 overflow-x-auto pb-1 text-sm">
               {links.map((link) => {
                 const active = isLinkActive(pathname, link.href);
+                const href = scopedHref(link.href);
                 const Icon = link.Icon;
 
                 return (
                   <Link
                     key={link.href}
-                    href={link.href}
-                    onClick={(event) => handleNavClick(event, link.href)}
+                    href={href}
+                    onClick={(event) => handleNavClick(event, href)}
                     className="flex h-10 shrink-0 items-center gap-2 rounded-xl px-3 font-medium transition-all"
                     style={{
                       color: active ? "var(--accent-1)" : "var(--text-secondary)",
