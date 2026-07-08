@@ -26,6 +26,7 @@ create table if not exists public.permissions (
       'cashout',
       'employee-cash-flow',
       'employee-statements',
+      'salary',
       'expenses',
       'dashboard',
       'admin-users'
@@ -35,6 +36,13 @@ create table if not exists public.permissions (
   can_edit boolean not null default false,
   created_at timestamptz not null default timezone('utc', now()),
   unique (user_id, page)
+);
+
+create table if not exists public.user_company_access (
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  company_id text not null references public.companies (id) on delete cascade,
+  created_at timestamptz not null default timezone('utc', now()),
+  primary key (user_id, company_id)
 );
 
 create table if not exists employees (
@@ -367,6 +375,7 @@ grant select, insert, update, delete on all tables in schema public to authentic
 grant usage, select on all sequences in schema public to authenticated;
 revoke all on public.profiles from anon;
 revoke all on public.permissions from anon;
+revoke all on public.user_company_access from anon;
 
 -- Move RBAC helper logic out of the exposed public API schema.
 create schema if not exists private;
@@ -475,6 +484,7 @@ grant execute on function private.current_app_role() to authenticated;
 grant execute on function private.is_admin() to authenticated;
 grant execute on function private.has_page_permission(text, text) to authenticated;
 grant execute on function private.has_any_page_permission(text[], text) to authenticated;
+grant select, insert, update, delete on public.user_company_access to authenticated;
 grant execute on function private.guard_profile_self_update() to authenticated;
 
 drop trigger if exists profiles_guard_profile_self_update on public.profiles;
@@ -540,6 +550,21 @@ on public.permissions
 for delete
 to authenticated
 using ((select private.is_admin()));
+
+alter table public.user_company_access enable row level security;
+drop policy if exists "user_company_access_select" on public.user_company_access;
+create policy "user_company_access_select"
+on public.user_company_access
+for select
+to authenticated
+using ((select private.is_admin()) or user_id = (select auth.uid()));
+drop policy if exists "user_company_access_modify" on public.user_company_access;
+create policy "user_company_access_modify"
+on public.user_company_access
+for all
+to authenticated
+using ((select private.is_admin()))
+with check ((select private.is_admin()));
 
 drop policy if exists "companies_select" on public.companies;
 create policy "companies_select"
