@@ -234,10 +234,19 @@ create table if not exists employee_salary_payments (
   employee_id text not null references employees (id) on delete cascade,
   company_id text not null references companies (id) on delete cascade,
   month text not null check (month ~ '^\d{4}-\d{2}$'),
+  employee_name_snapshot text not null default '',
   paid_usd_inr_rate numeric(12,4) not null default 0 check (paid_usd_inr_rate >= 0),
   salary_paid_inr_cents bigint not null default 0 check (salary_paid_inr_cents >= 0),
+  pf_inr_cents bigint not null default 0 check (pf_inr_cents >= 0),
+  tds_inr_cents bigint not null default 0 check (tds_inr_cents >= 0),
   paid_status boolean not null default false,
   paid_date date,
+  status text not null default 'draft' check (status in ('draft', 'in_review', 'verified')),
+  verified_at timestamptz,
+  verified_by uuid references profiles (id) on delete set null,
+  override_note text,
+  override_at timestamptz,
+  override_by uuid references profiles (id) on delete set null,
   notes text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -251,6 +260,25 @@ create index if not exists employee_salary_payments_company_month_idx
 
 create index if not exists employee_salary_payments_employee_month_idx
   on employee_salary_payments (employee_id, month);
+
+create table if not exists employee_salary_payment_audit (
+  id text primary key,
+  employee_id text not null references employees (id) on delete cascade,
+  company_id text not null references companies (id) on delete cascade,
+  month text not null check (month ~ '^\d{4}-\d{2}$'),
+  actor_user_id uuid references profiles (id) on delete set null,
+  salary_paid_inr_cents bigint not null default 0 check (salary_paid_inr_cents >= 0),
+  pf_inr_cents bigint not null default 0 check (pf_inr_cents >= 0),
+  tds_inr_cents bigint not null default 0 check (tds_inr_cents >= 0),
+  override_note text not null default '',
+  created_at timestamptz not null default now()
+);
+
+create index if not exists employee_salary_payment_audit_company_month_idx
+  on employee_salary_payment_audit (company_id, month);
+
+create index if not exists employee_salary_payment_audit_employee_month_idx
+  on employee_salary_payment_audit (employee_id, month);
 
 create table if not exists company_expenses (
   id text primary key,
@@ -580,6 +608,7 @@ using ((
       'cashout',
       'employee-cash-flow',
       'employee-statements',
+      'salary',
       'expenses',
       'dashboard'
     ],
@@ -615,7 +644,7 @@ for select
 to authenticated
 using ((
   select private.has_any_page_permission(
-    array['employees', 'invoices', 'employee-cash-flow', 'employee-statements', 'dashboard'],
+    array['employees', 'invoices', 'employee-cash-flow', 'employee-statements', 'salary', 'dashboard'],
     'view'
   )
 ));
@@ -768,8 +797,17 @@ create policy "employee_salary_payments_all"
 on public.employee_salary_payments
 for all
 to authenticated
-using ((select private.has_any_page_permission(array['employee-cash-flow', 'dashboard'], 'view')))
-with check ((select private.has_page_permission('employee-cash-flow', 'edit')));
+using ((select private.has_any_page_permission(array['salary', 'employee-cash-flow', 'dashboard'], 'view')))
+with check ((select private.has_any_page_permission(array['salary', 'employee-cash-flow'], 'edit')));
+
+alter table public.employee_salary_payment_audit enable row level security;
+drop policy if exists "employee_salary_payment_audit_all" on public.employee_salary_payment_audit;
+create policy "employee_salary_payment_audit_all"
+on public.employee_salary_payment_audit
+for all
+to authenticated
+using ((select private.has_any_page_permission(array['salary', 'employee-cash-flow', 'dashboard'], 'view')))
+with check ((select private.has_any_page_permission(array['salary', 'employee-cash-flow'], 'edit')));
 
 drop policy if exists "employee_payouts_all" on public.employee_payouts;
 create policy "employee_payouts_all"

@@ -1312,7 +1312,6 @@ export async function upsertEmployeeSalaryPayment(input: {
     employee_id: input.employeeId,
     company_id: input.companyId,
     month: input.month,
-    salary_usd_cents: input.salaryUsdCents,
     paid_usd_inr_rate: input.paidUsdInrRate,
     salary_paid_inr_cents: salaryPaidInrCents,
     paid_status: input.paidStatus,
