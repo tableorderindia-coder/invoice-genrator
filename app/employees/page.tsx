@@ -8,12 +8,11 @@ import { StaggerGrid } from "../_components/stagger-grid";
 import { requirePageAccess } from "@/lib/auth/server";
 import {
   filterCompaniesForAuthContext,
-  resolveAccessibleCompanyId,
 } from "@/src/features/billing/company-access";
 import { createEmployeeAction, updateEmployeeAction } from "@/src/features/billing/actions";
 import { getPnDashboardData, listCompanies, listEmployees } from "@/src/features/billing/store";
 import { buildWhatsAppHref } from "@/src/features/billing/employee-contact";
-import { resolveSelectedCompanyId } from "@/src/features/billing/filter-selection";
+import { resolveSelectedCompanyIds } from "@/src/features/billing/filter-selection";
 import {
   formatInr,
   formatRate,
@@ -30,32 +29,38 @@ export default async function EmployeesPage({
   searchParams: Promise<{
     tab?: string | string[];
     companyId?: string | string[];
+    companyIds?: string | string[];
     employeeId?: string | string[];
   }>;
 }) {
   const context = await requirePageAccess("employees");
   const resolvedSearchParams = await searchParams;
   const companies = filterCompaniesForAuthContext(await listCompanies(), context);
-  const selectedCompanyId = resolveAccessibleCompanyId({
-    requestedCompanyId: resolveSelectedCompanyId({
-      companyId: resolvedSearchParams.companyId,
-      companies,
-    }),
+  const selectedCompanyIds = resolveSelectedCompanyIds({
+    companyIds: resolvedSearchParams.companyIds,
+    companyId: resolvedSearchParams.companyId,
     companies,
   });
-  const [employees, pnDashboardData] = selectedCompanyId
-    ? await Promise.all([
-        listEmployees(selectedCompanyId),
-        getPnDashboardData({ companyId: selectedCompanyId, periodType: "monthly" }),
-      ])
-    : [[], null];
-  const selectedCompany = companies.find((company) => company.id === selectedCompanyId);
+  const [employeeBuckets, pnDashboardDataBuckets] = await Promise.all([
+    Promise.all(selectedCompanyIds.map((companyId) => listEmployees(companyId))),
+    Promise.all(
+      selectedCompanyIds.map((companyId) =>
+        getPnDashboardData({ companyId, periodType: "monthly" }),
+      ),
+    ),
+  ]);
+  const employees = employeeBuckets.flat();
+  const selectedCompany = selectedCompanyIds.length === 1
+    ? companies.find((company) => company.id === selectedCompanyIds[0])
+    : undefined;
 
   const employeeProfitMap = new Map(
-    (pnDashboardData?.employeeEditableSections ?? []).map((section) => [
-      section.employeeId,
-      section.totalNetProfitInrCents,
-    ]),
+    pnDashboardDataBuckets.flatMap((data) =>
+      data.employeeEditableSections.map((section) => [
+        section.employeeId,
+        section.totalNetProfitInrCents,
+      ] as const),
+    ),
   );
   const tab = Array.isArray(resolvedSearchParams.tab)
     ? resolvedSearchParams.tab[0]
@@ -66,18 +71,19 @@ export default async function EmployeesPage({
     : resolvedSearchParams.employeeId;
   const selectedEmployee =
     employees.find((employee) => employee.id === selectedEmployeeIdRaw) ?? employees[0];
-  const companyQuery = selectedCompanyId
-    ? `companyId=${encodeURIComponent(selectedCompanyId)}`
-    : "";
+  const companyQuery = selectedCompanyIds
+    .map((companyId) => `companyIds=${encodeURIComponent(companyId)}`)
+    .join("&");
   const addHref = companyQuery ? `/employees?tab=add&${companyQuery}` : "/employees?tab=add";
   const editHref = companyQuery ? `/employees?tab=edit&${companyQuery}` : "/employees?tab=edit";
+  const canCreateEmployee = selectedCompanyIds.length === 1;
 
   return (
     <Shell
       title="Employees"
       eyebrow="Defaults for billing"
       companyOptions={companies.map((company) => ({ id: company.id, name: company.name }))}
-      activeCompanyId={selectedCompanyId}
+      activeCompanyIds={selectedCompanyIds}
     >
       <section className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
         <GlassPanel gradient>
@@ -95,7 +101,13 @@ export default async function EmployeesPage({
               <h2 className="mt-4 text-xl font-semibold" style={{ color: "var(--text-primary)" }}>
                 Add employee
               </h2>
-              <input type="hidden" name="companyId" value={selectedCompanyId} />
+              {canCreateEmployee ? (
+                <input type="hidden" name="companyId" value={selectedCompanyIds[0]} />
+              ) : (
+                <p className="mt-3 text-sm" style={{ color: "var(--text-muted)" }}>
+                  Select one company in the global company scope to add an employee.
+                </p>
+              )}
               <div className="mt-5 grid gap-4 md:grid-cols-2">
                 <Field label="Name">
                   <input name="fullName" required className={inputClass} placeholder="Jane Doe" />
@@ -138,6 +150,7 @@ export default async function EmployeesPage({
                 className="gradient-btn mt-5"
                 defaultText="Save employee"
                 pendingText="Saving..."
+                disabled={!canCreateEmployee}
               />
             </form>
           ) : (
@@ -148,7 +161,9 @@ export default async function EmployeesPage({
               <div className="mt-4">
                 <form action="/employees" className="flex items-end gap-2">
                   <input type="hidden" name="tab" value="edit" />
-                  <input type="hidden" name="companyId" value={selectedCompanyId} />
+                  {selectedCompanyIds.map((companyId) => (
+                    <input key={companyId} type="hidden" name="companyIds" value={companyId} />
+                  ))}
                   <Field label="Select employee">
                     <select
                       name="employeeId"
@@ -232,7 +247,7 @@ export default async function EmployeesPage({
             Employee defaults
           </h2>
           <p className="mt-1 text-sm" style={{ color: "var(--text-secondary)" }}>
-            {selectedCompany ? selectedCompany.name : "No company selected"}
+            {selectedCompany ? selectedCompany.name : "Selected companies"}
           </p>
           <StaggerGrid className="mt-5 space-y-4">
             {employees.map((employee) => {

@@ -3,15 +3,13 @@ import { GlassPanel } from "../_components/glass-panel";
 import { Field, inputClass } from "../_components/field";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
 import { requirePageAccess } from "@/lib/auth/server";
-import {
-  filterCompaniesForAuthContext,
-  resolveAccessibleCompanyId,
-} from "@/src/features/billing/company-access";
+import { filterCompaniesForAuthContext } from "@/src/features/billing/company-access";
 import {
   saveCompanyExpenseAction,
   deleteCompanyExpenseAction,
 } from "@/src/features/billing/actions";
 import { listCompanies, listCompanyExpenses } from "@/src/features/billing/store";
+import { resolveSelectedCompanyIds } from "@/src/features/billing/filter-selection";
 import { formatInr, formatMonthYear } from "@/src/features/billing/utils";
 
 export const dynamic = "force-dynamic";
@@ -40,10 +38,13 @@ export default async function ExpensesPage({
   const params = await searchParams;
   const companies = filterCompaniesForAuthContext(await listCompanies(), context);
 
-  const selectedCompanyId = resolveAccessibleCompanyId({
-    requestedCompanyId: typeof params.companyId === "string" ? params.companyId : undefined,
+  const selectedCompanyIds = resolveSelectedCompanyIds({
+    companyIds: params.companyIds,
+    companyId: params.companyId,
     companies,
   });
+  const selectedCompanyId = selectedCompanyIds[0] ?? "";
+  const singleCompanySelected = selectedCompanyIds.length === 1;
   const now = new Date();
   const selectedYear = typeof params.year === "string" ? Number.parseInt(params.year, 10) : now.getFullYear();
   const selectedMonth = typeof params.month === "string" ? Number.parseInt(params.month, 10) : (now.getMonth() + 1);
@@ -51,20 +52,30 @@ export default async function ExpensesPage({
   const flashStatus = typeof params.flashStatus === "string" ? params.flashStatus : undefined;
   const flashMessage = typeof params.flashMessage === "string" ? params.flashMessage : undefined;
 
-  const selectedCompany = companies.find((c) => c.id === selectedCompanyId);
+  const selectedCompany = singleCompanySelected
+    ? companies.find((c) => c.id === selectedCompanyId)
+    : undefined;
+  const companyNameMap = new Map(companies.map((company) => [company.id, company.name]));
 
-  const expenses = selectedCompanyId
-    ? await listCompanyExpenses({
-        companyId: selectedCompanyId,
-        year: selectedYear,
-        month: selectedMonth,
-      })
-    : [];
+  const expenses = (
+    await Promise.all(
+      selectedCompanyIds.map((companyId) =>
+        listCompanyExpenses({
+          companyId,
+          year: selectedYear,
+          month: selectedMonth,
+        }),
+      ),
+    )
+  ).flat();
 
   const totalInrCents = expenses.reduce((sum, e) => sum + e.amountInrCents, 0);
 
   // Build return URL with current filters
-  const returnUrl = `/expenses?companyId=${encodeURIComponent(selectedCompanyId)}&year=${selectedYear}&month=${selectedMonth}`;
+  const companyScopeParams = selectedCompanyIds
+    .map((companyId) => `companyIds=${encodeURIComponent(companyId)}`)
+    .join("&");
+  const returnUrl = `/expenses?${companyScopeParams}&year=${selectedYear}&month=${selectedMonth}`;
 
   // Years dropdown range
   const currentYear = now.getFullYear();
@@ -75,7 +86,7 @@ export default async function ExpensesPage({
       title="Company Expenses"
       eyebrow="Financial management"
       companyOptions={companies.map((company) => ({ id: company.id, name: company.name }))}
-      activeCompanyId={selectedCompanyId}
+      activeCompanyIds={selectedCompanyIds}
     >
       {/* Flash message */}
       {flashStatus && flashMessage && (
@@ -99,18 +110,9 @@ export default async function ExpensesPage({
               Select Period
             </h2>
             <form className="mt-4 flex flex-wrap gap-3 items-end">
-              <Field label="Company">
-                <select
-                  name="companyId"
-                  defaultValue={selectedCompanyId}
-                  className={inputClass}
-                  style={{ minWidth: 160 }}
-                >
-                  {companies.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-              </Field>
+              {selectedCompanyIds.map((companyId) => (
+                <input key={companyId} type="hidden" name="companyIds" value={companyId} />
+              ))}
               <Field label="Month">
                 <select name="month" defaultValue={selectedMonth} className={inputClass}>
                   {MONTHS.map((m) => (
@@ -143,6 +145,7 @@ export default async function ExpensesPage({
             <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
               {selectedCompany?.name ?? "—"} · {formatMonthYear(selectedMonth, selectedYear)}
             </p>
+            {singleCompanySelected ? (
             <form action={saveCompanyExpenseAction} className="mt-4 space-y-4">
               <input type="hidden" name="companyId" value={selectedCompanyId} />
               <input type="hidden" name="year" value={selectedYear} />
@@ -174,6 +177,11 @@ export default async function ExpensesPage({
                 pendingText="Saving..."
               />
             </form>
+            ) : (
+              <p className="mt-4 text-sm" style={{ color: "var(--text-muted)" }}>
+                Select one company in the global company scope to add an expense.
+              </p>
+            )}
           </GlassPanel>
         </div>
 
@@ -185,7 +193,7 @@ export default async function ExpensesPage({
                 Expenses for {formatMonthYear(selectedMonth, selectedYear)}
               </h2>
               <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-                {selectedCompany?.name ?? "—"}
+                {selectedCompany?.name ?? "Selected companies"}
               </p>
             </div>
             <div className="text-right">
@@ -215,14 +223,14 @@ export default async function ExpensesPage({
                     {expense.label || "(No label)"}
                   </p>
                   <p className="text-sm mt-0.5" style={{ color: "var(--text-secondary)" }}>
-                    {formatInr(expense.amountInrCents)}
+                    {companyNameMap.get(expense.companyId)} · {formatInr(expense.amountInrCents)}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   {/* Edit form — inline amount update */}
                   <form action={saveCompanyExpenseAction} className="flex items-center gap-2">
                     <input type="hidden" name="expenseId" value={expense.id} />
-                    <input type="hidden" name="companyId" value={selectedCompanyId} />
+                    <input type="hidden" name="companyId" value={expense.companyId} />
                     <input type="hidden" name="year" value={selectedYear} />
                     <input type="hidden" name="month" value={selectedMonth} />
                     <input type="hidden" name="label" value={expense.label} />

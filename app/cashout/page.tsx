@@ -3,6 +3,7 @@ import { GlassPanel } from "../_components/glass-panel";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
 import { requirePageAccess } from "@/lib/auth/server";
 import { filterCompaniesForAuthContext } from "@/src/features/billing/company-access";
+import { resolveSelectedCompanyIds } from "@/src/features/billing/filter-selection";
 import { cashOutInvoiceAction } from "@/src/features/billing/actions";
 import { filterCashoutEligibleInvoices } from "@/src/features/billing/invoice-workflow";
 import { listCompanies, listInvoices } from "@/src/features/billing/store";
@@ -18,31 +19,46 @@ export default async function CashoutPage({
   searchParams,
 }: {
   searchParams: Promise<{
+    companyId?: string | string[];
+    companyIds?: string | string[];
     flashStatus?: string | string[];
     flashMessage?: string | string[];
   }>;
 }) {
   const context = await requirePageAccess("cashout");
+  const resolvedSearchParams = await searchParams;
   const [allInvoices, allCompanies] = await Promise.all([listInvoices(), listCompanies()]);
   const companies = filterCompaniesForAuthContext(allCompanies, context);
-  const accessibleCompanyIds = new Set(companies.map((company) => company.id));
+  const selectedCompanyIds = resolveSelectedCompanyIds({
+    companyIds: resolvedSearchParams.companyIds,
+    companyId: resolvedSearchParams.companyId,
+    companies,
+  });
+  const accessibleCompanyIds = new Set(selectedCompanyIds);
   const invoices = filterCashoutEligibleInvoices(allInvoices).filter((invoice) =>
     accessibleCompanyIds.has(invoice.companyId),
   );
   const companyMap = new Map(companies.map((company) => [company.id, company.name]));
-  const resolvedSearchParams = await searchParams;
   const flashStatus = Array.isArray(resolvedSearchParams.flashStatus)
     ? resolvedSearchParams.flashStatus[0]
     : resolvedSearchParams.flashStatus;
   const flashMessage = Array.isArray(resolvedSearchParams.flashMessage)
     ? resolvedSearchParams.flashMessage[0]
     : resolvedSearchParams.flashMessage;
+  const returnToParams = new URLSearchParams();
+  for (const companyId of selectedCompanyIds) {
+    returnToParams.append("companyIds", companyId);
+  }
+  const returnTo = returnToParams.toString()
+    ? `/cashout?${returnToParams.toString()}`
+    : "/cashout";
 
   return (
     <Shell
       title="Cashout"
       eyebrow="Settlement queue"
       companyOptions={companies.map((company) => ({ id: company.id, name: company.name }))}
+      activeCompanyIds={selectedCompanyIds}
     >
       <GlassPanel gradient>
         <div>
@@ -126,7 +142,7 @@ export default async function CashoutPage({
                         className="grid gap-2 md:grid-cols-4 md:items-center"
                       >
                         <input type="hidden" name="invoiceId" value={invoice.id} />
-                        <input type="hidden" name="returnTo" value="/cashout" />
+                        <input type="hidden" name="returnTo" value={returnTo} />
                         <input
                           type="date"
                           name="realizedAt"

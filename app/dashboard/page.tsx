@@ -140,7 +140,6 @@ export default async function DashboardPage({
     companyId: resolved.companyId,
     companies,
   });
-  const activeCompanyId = selectedCompanyIds[0] ?? companies[0]?.id ?? "";
   const selectedPeriodTypeRaw = Array.isArray(resolved.periodType)
     ? resolved.periodType[0]
     : resolved.periodType;
@@ -276,19 +275,6 @@ export default async function DashboardPage({
     includePeriodType: false,
   });
 
-  const companyLoadFields = buildDashboardFilterFieldEntries({
-    companyIds: selectedCompanyIds,
-    periodType,
-    view,
-    employeeColumns: employeeColumnKeys,
-    periodColumns: periodColumnKeys,
-    includeCompanyId: false,
-    includeEmployeeIds: false,
-    includePaymentMonths: false,
-    includeAllEmployees: false,
-    includeAllMonths: false,
-  });
-
   const emptyDashboardData: PnDashboardData = {
     companyId: "",
     employeeEditableSections: [],
@@ -336,42 +322,12 @@ export default async function DashboardPage({
       title="P/L Dashboard"
       eyebrow="Company profitability"
       companyOptions={companies.map((company) => ({ id: company.id, name: company.name }))}
-      activeCompanyId={activeCompanyId}
+      activeCompanyIds={selectedCompanyIds}
     >
-      <GlassPanel gradient className="overflow-visible">
-        <form
-          action="/dashboard"
-          className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end"
-        >
-          <ChecklistFilterDropdown
-            name="companyIds"
-            label="company"
-            options={companies.map((company) => ({
-              value: company.id,
-              label: company.name,
-            }))}
-            defaultSelectedValues={selectedCompanyIds}
-            includeSelectAll
-          />
-          <div className="flex gap-2">
-            {companyLoadFields.map((field, index) => (
-              <input
-                key={`${field.name}-${field.value}-${index}`}
-                type="hidden"
-                name={field.name}
-                value={field.value}
-              />
-            ))}
-            <PendingSubmitButton
-              className="gradient-btn"
-              defaultText="Load"
-              pendingText="Loading..."
-            />
-          </div>
-        </form>
-        {flashMessage ? (
+      {flashMessage ? (
+        <GlassPanel gradient className="overflow-visible">
           <div
-            className="mt-4 rounded-2xl px-4 py-3 text-sm font-medium"
+            className="rounded-2xl px-4 py-3 text-sm font-medium"
             style={{
               background:
                 flashStatus === "error"
@@ -386,8 +342,8 @@ export default async function DashboardPage({
           >
             {flashMessage}
           </div>
-        ) : null}
-      </GlassPanel>
+        </GlassPanel>
+      ) : null}
 
       <GlassPanel gradient className="overflow-visible">
         <form action="/dashboard" className="mb-2 flex flex-wrap items-center gap-2">
