@@ -142,18 +142,15 @@ export function Shell({
     navigateTo(queryString ? `${pathname}?${queryString}` : pathname);
   };
 
-  const handleAllCompaniesChange = () => {
-    navigateWithCompanyScope(companyOptions.map((company) => company.id));
-  };
+  const selectedCompanyScopeValue = allCompaniesSelected ? "__all__" : selectedCompanyIds[0] ?? "__all__";
 
-  const handleCompanyScopeChange = (companyId: string, checked: boolean) => {
-    const currentIds = allCompaniesSelected
-      ? companyOptions.map((company) => company.id)
-      : selectedCompanyIds;
-    const nextIds = checked
-      ? [...new Set([...currentIds, companyId])]
-      : currentIds.filter((currentCompanyId) => currentCompanyId !== companyId);
-    navigateWithCompanyScope(nextIds.length > 0 ? nextIds : companyOptions.map((company) => company.id));
+  const handleCompanyScopeSelect = (companyId: string) => {
+    if (companyId === "__all__") {
+      navigateWithCompanyScope(companyOptions.map((company) => company.id));
+      return;
+    }
+
+    navigateWithCompanyScope([companyId]);
   };
 
   const scopedHref = (href: string) => {
@@ -175,37 +172,26 @@ export function Shell({
 
   const renderCompanySelector = () =>
     showCompanySelector && companyOptions.length > 0 ? (
-      <div className="flex flex-col gap-2 text-xs font-medium" style={{ color: "var(--text-muted)" }}>
-        <span>{companySelectorLabel}</span>
-        <div
-          className="rounded-xl border p-2"
+      <label className="flex flex-col gap-2 text-xs font-medium" style={{ color: "var(--text-muted)" }}>
+        {companySelectorLabel}
+        <select
+          value={selectedCompanyScopeValue}
+          onChange={(event) => handleCompanyScopeSelect(event.currentTarget.value)}
+          className="h-10 w-full rounded-xl border px-3 text-sm font-medium outline-none transition"
           style={{
             borderColor: "var(--glass-border)",
             background: "rgba(255,255,255,0.03)",
+            color: "var(--text-primary)",
           }}
         >
-          <label className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5">
-            <input
-              type="checkbox"
-              checked={allCompaniesSelected}
-              onChange={handleAllCompaniesChange}
-            />
-            <span>All companies</span>
-          </label>
-          <div className="mt-1 max-h-32 space-y-1 overflow-y-auto pr-1">
-            {companyOptions.map((company) => (
-              <label key={company.id} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5">
-                <input
-                  type="checkbox"
-                  checked={allCompaniesSelected || selectedCompanyIdSet.has(company.id)}
-                  onChange={(event) => handleCompanyScopeChange(company.id, event.currentTarget.checked)}
-                />
-                <span className="min-w-0 truncate">{company.name}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-      </div>
+          <option value="__all__">All companies</option>
+          {companyOptions.map((company) => (
+            <option key={company.id} value={company.id}>
+              {company.name}
+            </option>
+          ))}
+        </select>
+      </label>
     ) : null;
 
   return (
