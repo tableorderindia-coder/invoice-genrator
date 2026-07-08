@@ -3,6 +3,7 @@ import { GlassPanel } from "../_components/glass-panel";
 import { inputClass } from "../_components/field";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
 import { Shell } from "../_components/shell";
+import { canAccessCompany } from "@/lib/auth/authorization";
 import { requirePageAccess } from "@/lib/auth/server";
 import {
   getInvoicePaymentPrefillData,
@@ -47,14 +48,23 @@ export default async function EmployeeCashFlowPage({
     flashMessage?: string | string[];
   }>;
 }) {
-  await requirePageAccess("employee-cash-flow");
+  const context = await requirePageAccess("employee-cash-flow");
   const resolved = await searchParams;
-  const companies = await listCompanies();
+  const allCompanies = await listCompanies();
+  const companies = allCompanies.filter((company) =>
+    canAccessCompany({
+      role: context.profile.role,
+      companyId: company.id,
+      companyAccess: context.companyAccess,
+    }),
+  );
 
   const selectedCompanyIdRaw = Array.isArray(resolved.companyId)
     ? resolved.companyId[0]
     : resolved.companyId;
-  const selectedCompanyId = selectedCompanyIdRaw || companies[0]?.id || "";
+  const selectedCompanyId = companies.some((company) => company.id === selectedCompanyIdRaw)
+    ? selectedCompanyIdRaw ?? ""
+    : companies[0]?.id || "";
 
   const monthKey = resolveEmployeeCashFlowMonthKey(resolved.month, resolved.year);
   const selectedTabRaw = Array.isArray(resolved.tab) ? resolved.tab[0] : resolved.tab;
@@ -173,7 +183,12 @@ export default async function EmployeeCashFlowPage({
   });
 
   return (
-    <Shell title="Employee Cash Flow" eyebrow="Cash reality dashboard">
+    <Shell
+      title="Employee Cash Flow"
+      eyebrow="Cash reality dashboard"
+      companyOptions={companies.map((company) => ({ id: company.id, name: company.name }))}
+      activeCompanyId={selectedCompanyId}
+    >
       <GlassPanel gradient className="overflow-visible">
         <form
           action="/employee-cash-flow"

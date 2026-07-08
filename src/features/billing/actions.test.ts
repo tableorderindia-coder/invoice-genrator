@@ -62,7 +62,6 @@ vi.mock("./employee-cash-flow-store", () => ({
   replaceInvoicePaymentEmployeeEntries: replaceInvoicePaymentEmployeeEntriesMock,
   updateSavedEmployeeCashFlowEntry: vi.fn(),
   updateDashboardEmployeeCashFlowEntry: updateDashboardEmployeeCashFlowEntryMock,
-  upsertEmployeeSalaryPayment: vi.fn(),
   upsertInvoicePayment: upsertInvoicePaymentMock,
 }));
 

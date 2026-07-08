@@ -42,7 +42,6 @@ import {
   replaceInvoicePaymentEmployeeEntries,
   updateSavedEmployeeCashFlowEntry,
   updateDashboardEmployeeCashFlowEntry,
-  upsertEmployeeSalaryPayment,
   upsertInvoicePayment,
 } from "./employee-cash-flow-store";
 import type { InvoiceStatus } from "./types";
@@ -1112,19 +1111,6 @@ export async function saveInvoicePaymentEmployeeEntriesAction(formData: FormData
           ...entry,
           invoicePaymentId,
         })),
-      });
-    }
-
-    for (const entry of entries) {
-      await upsertEmployeeSalaryPayment({
-        employeeId: entry.employeeId,
-        companyId,
-        month: paymentMonth,
-        salaryUsdCents: 0,
-        paidUsdInrRate: entry.paidUsdInrRate,
-        paidStatus: entry.isPaid,
-        paidDate: entry.paidAt,
-        notes: entry.notes,
       });
     }
 
