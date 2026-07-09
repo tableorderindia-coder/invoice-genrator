@@ -419,6 +419,9 @@ create unique index if not exists companies_name_unique_ci
 create unique index if not exists employees_company_full_name_unique_ci
   on employees (company_id, lower(btrim(full_name)));
 
+create index if not exists employees_company_full_name_idx
+  on employees (company_id, full_name);
+
 create unique index if not exists invoices_invoice_number_unique_ci
   on invoices (lower(btrim(invoice_number)));
 

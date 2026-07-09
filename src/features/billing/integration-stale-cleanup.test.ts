@@ -71,8 +71,8 @@ describe("external integration and stale profit cleanup", () => {
 
     expect(overview).toContain("Net P/L (INR)");
     expect(overview).not.toMatch(/Realized profit|USD only in phase 1|getDashboardMetrics/);
-    expect(employees).toContain("Net P/L (INR)");
     expect(employees).not.toMatch(/realizedProfit|formatSignedUsd|getDashboardMetrics/);
+    expect(employees).not.toContain("getPnDashboardData");
     expect(store).not.toContain("getDashboardMetrics");
     expect(types).not.toContain("DashboardMetrics");
   });

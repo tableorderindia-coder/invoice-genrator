@@ -869,6 +869,22 @@ export async function listEmployees(companyId?: string) {
   return (data ?? []).map((row) => mapEmployee(row as DbEmployee));
 }
 
+export async function listEmployeesForCompanies(companyIds: string[]) {
+  const uniqueCompanyIds = [...new Set(companyIds.filter(Boolean))];
+  if (uniqueCompanyIds.length === 0) {
+    return [];
+  }
+
+  const supabase = await getSupabaseOrThrow();
+  const { data, error } = await supabase
+    .from("employees")
+    .select("*")
+    .in("company_id", uniqueCompanyIds)
+    .order("full_name");
+  if (error) throw error;
+  return (data ?? []).map((row) => mapEmployee(row as DbEmployee));
+}
+
 async function listTeams(companyId?: string) {
   const supabase = await getSupabaseOrThrow();
   let query = supabase.from("teams").select("*").order("name");
