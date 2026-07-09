@@ -13,6 +13,8 @@ const createEmployeeMock = vi.fn();
 const updateEmployeeMock = vi.fn();
 const upsertFounderWithdrawalsMock = vi.fn();
 const saveMonthlyPayrollRowsMock = vi.fn();
+const prepareAndSavePayslipsMock = vi.fn();
+const savePayslipRecordMock = vi.fn();
 const requireCompanyPageEditAccessMock = vi.fn();
 
 vi.mock("next/cache", () => ({
@@ -69,6 +71,11 @@ vi.mock("./payroll-store", () => ({
   saveMonthlyPayrollRows: saveMonthlyPayrollRowsMock,
 }));
 
+vi.mock("./payslip-store", () => ({
+  prepareAndSavePayslips: prepareAndSavePayslipsMock,
+  savePayslipRecord: savePayslipRecordMock,
+}));
+
 describe("updateDashboardEmployeeCashFlowEntryAction", () => {
   beforeEach(() => {
     revalidatePathMock.mockReset();
@@ -90,6 +97,10 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
     upsertFounderWithdrawalsMock.mockResolvedValue(undefined);
     saveMonthlyPayrollRowsMock.mockReset();
     saveMonthlyPayrollRowsMock.mockResolvedValue(undefined);
+    prepareAndSavePayslipsMock.mockReset();
+    prepareAndSavePayslipsMock.mockResolvedValue([]);
+    savePayslipRecordMock.mockReset();
+    savePayslipRecordMock.mockResolvedValue(undefined);
     requireCompanyPageEditAccessMock.mockReset();
     requireCompanyPageEditAccessMock.mockResolvedValue({
       profile: { id: "admin_1", role: "admin" },
@@ -143,6 +154,67 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
     });
     expect(revalidatePathMock).toHaveBeenCalledWith("/salary");
     expect(revalidatePathMock).toHaveBeenCalledWith("/employee-cash-flow");
+  });
+
+  it("prepares payslips through the company-scoped Salary permission gate", async () => {
+    const { preparePayslipsAction } = await import("./actions");
+    const formData = new FormData();
+    formData.set("companyId", "comp_1");
+    formData.set("month", "2026-07");
+    formData.set("returnTo", "/salary?companyIds=comp_1&month=2026-07&tab=payslips");
+
+    await expect(preparePayslipsAction(formData)).rejects.toThrow(
+      "REDIRECT:/salary?companyIds=comp_1&month=2026-07&tab=payslips&flashStatus=success&flashMessage=Payslips%20prepared.",
+    );
+
+    expect(requireCompanyPageEditAccessMock).toHaveBeenCalledWith("salary", "comp_1");
+    expect(prepareAndSavePayslipsMock).toHaveBeenCalledWith({
+      companyId: "comp_1",
+      month: "2026-07",
+      resetEmployeeIds: undefined,
+    });
+    expect(revalidatePathMock).toHaveBeenCalledWith("/salary");
+  });
+
+  it("saves edited payslip rows through the company-scoped Salary permission gate", async () => {
+    const { savePayslipAction } = await import("./actions");
+    const formData = new FormData();
+    formData.set("companyId", "comp_1");
+    formData.set("returnTo", "/salary?companyIds=comp_1&month=2026-07&tab=payslips");
+    formData.set(
+      "payslipJson",
+      JSON.stringify({
+        id: "payslip_1",
+        companyId: "comp_1",
+        employeeId: "emp_1",
+        employeeName: "Asha",
+        month: "2026-07",
+        panNumber: "ABCDE1234F",
+        pfUan: "",
+        joiningDate: "2026-04-01",
+        designation: "Engineer",
+        effectiveWorkDays: 31,
+        earnings: [{ label: "BASIC", amountInrCents: 100_00, sortOrder: 1 }],
+        deductions: [],
+        tdsEarnings: [],
+        tdsIncomeTaxDeductions: [],
+        taxPaidMonths: [],
+      }),
+    );
+
+    await expect(savePayslipAction(formData)).rejects.toThrow(
+      "REDIRECT:/salary?companyIds=comp_1&month=2026-07&tab=payslips&flashStatus=success&flashMessage=Payslip%20saved.",
+    );
+
+    expect(requireCompanyPageEditAccessMock).toHaveBeenCalledWith("salary", "comp_1");
+    expect(savePayslipRecordMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: "payslip_1",
+        companyId: "comp_1",
+        employeeId: "emp_1",
+      }),
+    );
+    expect(revalidatePathMock).toHaveBeenCalledWith("/salary");
   });
 
   it("passes employee cash-flow defaults through employee creation", async () => {

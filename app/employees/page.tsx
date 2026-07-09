@@ -115,6 +115,12 @@ export default async function EmployeesPage({
                 <Field label="Phone number">
                   <input name="phoneNumber" type="tel" className={inputClass} placeholder="+91 98765 43210" />
                 </Field>
+                <Field label="PAN number">
+                  <input name="panNumber" className={inputClass} placeholder="ABCDE1234F" />
+                </Field>
+                <Field label="PF UAN">
+                  <input name="pfUan" className={inputClass} placeholder="100200300400" />
+                </Field>
                 <Field label="Designation">
                   <input name="designation" required className={inputClass} placeholder="Senior Engineer" />
                 </Field>
@@ -193,6 +199,12 @@ export default async function EmployeesPage({
                   </Field>
                   <Field label="Phone number">
                     <input name="phoneNumber" type="tel" className={inputClass} defaultValue={selectedEmployee?.phoneNumber ?? ""} />
+                  </Field>
+                  <Field label="PAN number">
+                    <input name="panNumber" className={inputClass} defaultValue={selectedEmployee?.panNumber ?? ""} />
+                  </Field>
+                  <Field label="PF UAN">
+                    <input name="pfUan" className={inputClass} defaultValue={selectedEmployee?.pfUan ?? ""} />
                   </Field>
                   <Field label="Designation">
                     <input name="designation" required className={inputClass} defaultValue={selectedEmployee?.designation} />

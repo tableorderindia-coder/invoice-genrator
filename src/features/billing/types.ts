@@ -19,6 +19,8 @@ export type Employee = {
   id: string;
   companyId: string;
   fullName: string;
+  panNumber?: string;
+  pfUan?: string;
   phoneNumber?: string;
   designation: string;
   defaultTeam: string;

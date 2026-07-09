@@ -92,6 +92,8 @@ type DbEmployee = {
   id: string;
   company_id: string;
   full_name: string;
+  pan_number?: string | null;
+  pf_uan?: string | null;
   phone_number?: string | null;
   designation: string;
   default_team: string;
@@ -407,6 +409,8 @@ function mapEmployee(row: DbEmployee): Employee {
     id: row.id,
     companyId: row.company_id,
     fullName: row.full_name,
+    panNumber: row.pan_number ?? undefined,
+    pfUan: row.pf_uan ?? undefined,
     phoneNumber: row.phone_number ?? undefined,
     designation: row.designation,
     defaultTeam: row.default_team,
@@ -920,6 +924,8 @@ export async function createTeam(input: {
 export async function createEmployee(input: {
   companyId: string;
   fullName: string;
+  panNumber?: string;
+  pfUan?: string;
   phoneNumber?: string;
   designation: string;
   defaultTeam: string;
@@ -949,6 +955,8 @@ export async function createEmployee(input: {
     id: nextId("employee"),
     company_id: input.companyId,
     full_name: input.fullName,
+    pan_number: input.panNumber || null,
+    pf_uan: input.pfUan || null,
     phone_number: input.phoneNumber || null,
     designation: input.designation,
     default_team: input.defaultTeam,
@@ -1869,6 +1877,8 @@ export async function updateEmployee(input: {
   employeeId: string;
   companyId: string;
   fullName: string;
+  panNumber?: string;
+  pfUan?: string;
   phoneNumber?: string;
   designation: string;
   defaultTeam: string;
@@ -1886,6 +1896,8 @@ export async function updateEmployee(input: {
   const payload = {
     company_id: input.companyId,
     full_name: input.fullName,
+    pan_number: input.panNumber || null,
+    pf_uan: input.pfUan || null,
     phone_number: input.phoneNumber || null,
     designation: input.designation,
     default_team: input.defaultTeam,
