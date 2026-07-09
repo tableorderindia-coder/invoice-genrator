@@ -49,6 +49,8 @@ create table if not exists employees (
   id text primary key,
   company_id text not null references companies (id) on delete cascade,
   full_name text not null,
+  pan_number text,
+  pf_uan text,
   phone_number text,
   designation text not null,
   default_team text not null,
@@ -279,6 +281,48 @@ create index if not exists employee_salary_payment_audit_company_month_idx
 
 create index if not exists employee_salary_payment_audit_employee_month_idx
   on employee_salary_payment_audit (employee_id, month);
+
+create table if not exists employee_payslip_templates (
+  id text primary key,
+  employee_id text not null references employees (id) on delete cascade,
+  company_id text not null references companies (id) on delete cascade,
+  earnings jsonb not null default '[]'::jsonb,
+  deductions jsonb not null default '[]'::jsonb,
+  tds_income_tax_deductions jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (company_id, employee_id)
+);
+
+create table if not exists employee_payslips (
+  id text primary key,
+  employee_id text not null references employees (id) on delete cascade,
+  company_id text not null references companies (id) on delete cascade,
+  month text not null check (month ~ '^\d{4}-\d{2}$'),
+  employee_name_snapshot text not null,
+  pan_number text,
+  pf_uan text,
+  joining_date date not null,
+  designation_snapshot text not null,
+  effective_work_days integer not null default 0 check (effective_work_days >= 0),
+  earnings jsonb not null default '[]'::jsonb,
+  deductions jsonb not null default '[]'::jsonb,
+  tds_earnings jsonb not null default '[]'::jsonb,
+  tds_income_tax_deductions jsonb not null default '[]'::jsonb,
+  tax_paid_months jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (company_id, employee_id, month)
+);
+
+create index if not exists employee_payslip_templates_company_employee_idx
+  on employee_payslip_templates (company_id, employee_id);
+
+create index if not exists employee_payslips_company_month_idx
+  on employee_payslips (company_id, month);
+
+create index if not exists employee_payslips_employee_month_idx
+  on employee_payslips (employee_id, month);
 
 create table if not exists company_expenses (
   id text primary key,
@@ -808,6 +852,24 @@ for all
 to authenticated
 using ((select private.has_any_page_permission(array['salary', 'employee-cash-flow', 'dashboard'], 'view')))
 with check ((select private.has_any_page_permission(array['salary', 'employee-cash-flow'], 'edit')));
+
+alter table public.employee_payslip_templates enable row level security;
+drop policy if exists "employee_payslip_templates_all" on public.employee_payslip_templates;
+create policy "employee_payslip_templates_all"
+on public.employee_payslip_templates
+for all
+to authenticated
+using ((select private.has_page_permission('salary', 'view')))
+with check ((select private.has_page_permission('salary', 'edit')));
+
+alter table public.employee_payslips enable row level security;
+drop policy if exists "employee_payslips_all" on public.employee_payslips;
+create policy "employee_payslips_all"
+on public.employee_payslips
+for all
+to authenticated
+using ((select private.has_page_permission('salary', 'view')))
+with check ((select private.has_page_permission('salary', 'edit')));
 
 drop policy if exists "employee_payouts_all" on public.employee_payouts;
 create policy "employee_payouts_all"

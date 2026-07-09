@@ -55,6 +55,7 @@ import {
   saveMonthlyPayrollRows,
   type SaveMonthlyPayrollRowInput,
 } from "./payroll-store";
+import { prepareAndSavePayslips, savePayslipRecord } from "./payslip-store";
 
 function getString(formData: FormData, key: string) {
   return String(formData.get(key) || "").trim();
@@ -205,6 +206,8 @@ export async function createEmployeeAction(formData: FormData) {
   await createEmployee({
     companyId: getString(formData, "companyId"),
     fullName: getString(formData, "fullName"),
+    panNumber: getString(formData, "panNumber") || undefined,
+    pfUan: getString(formData, "pfUan") || undefined,
     phoneNumber: getString(formData, "phoneNumber") || undefined,
     designation: getString(formData, "designation"),
     defaultTeam: getString(formData, "defaultTeam"),
@@ -241,6 +244,8 @@ export async function updateEmployeeAction(formData: FormData) {
     employeeId: getString(formData, "employeeId"),
     companyId: getString(formData, "companyId"),
     fullName: getString(formData, "fullName"),
+    panNumber: getString(formData, "panNumber") || undefined,
+    pfUan: getString(formData, "pfUan") || undefined,
     phoneNumber: getString(formData, "phoneNumber") || undefined,
     designation: getString(formData, "designation"),
     defaultTeam: getString(formData, "defaultTeam"),
@@ -1162,6 +1167,71 @@ export async function saveMonthlyPayrollRowsAction(formData: FormData) {
   }
 
   redirect(buildFlashRedirect(returnTo, "success", "Salary month saved."));
+}
+
+export async function preparePayslipsAction(formData: FormData) {
+  const companyId = getString(formData, "companyId");
+  const returnTo = getString(formData, "returnTo") || "/salary?tab=payslips";
+  if (!companyId) {
+    redirect(buildFlashRedirect(returnTo, "error", "Company is required."));
+  }
+
+  await requireCompanyPageEditAccess("salary", companyId);
+
+  try {
+    const resetEmployeeId = getString(formData, "resetEmployeeId");
+    await prepareAndSavePayslips({
+      companyId,
+      month: normalizePayrollMonthKey(getString(formData, "month")),
+      resetEmployeeIds: resetEmployeeId ? new Set([resetEmployeeId]) : undefined,
+    });
+
+    revalidatePath("/salary");
+  } catch (error) {
+    redirect(
+      buildFlashRedirect(
+        returnTo,
+        "error",
+        getErrorMessage(error, "Unable to prepare payslips."),
+      ),
+    );
+  }
+
+  redirect(buildFlashRedirect(returnTo, "success", "Payslips prepared."));
+}
+
+export async function savePayslipAction(formData: FormData) {
+  const companyId = getString(formData, "companyId");
+  const returnTo = getString(formData, "returnTo") || "/salary?tab=payslips";
+  if (!companyId) {
+    redirect(buildFlashRedirect(returnTo, "error", "Company is required."));
+  }
+
+  await requireCompanyPageEditAccess("salary", companyId);
+
+  try {
+    const payslipJson = getString(formData, "payslipJson");
+    if (!payslipJson) {
+      throw new Error("Payslip payload is required.");
+    }
+    const payslip = JSON.parse(payslipJson) as Parameters<typeof savePayslipRecord>[0];
+    if (payslip.companyId !== companyId) {
+      throw new Error("Payslip company does not match the selected company.");
+    }
+
+    await savePayslipRecord(payslip);
+    revalidatePath("/salary");
+  } catch (error) {
+    redirect(
+      buildFlashRedirect(
+        returnTo,
+        "error",
+        getErrorMessage(error, "Unable to save payslip."),
+      ),
+    );
+  }
+
+  redirect(buildFlashRedirect(returnTo, "success", "Payslip saved."));
 }
 
 export async function updateSavedEmployeeCashFlowEntryAction(formData: FormData) {
