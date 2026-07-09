@@ -10,13 +10,12 @@ import {
   filterCompaniesForAuthContext,
 } from "@/src/features/billing/company-access";
 import { createEmployeeAction, updateEmployeeAction } from "@/src/features/billing/actions";
-import { getPnDashboardData, listCompanies, listEmployees } from "@/src/features/billing/store";
+import { listCompanies, listEmployeesForCompanies } from "@/src/features/billing/store";
 import { buildWhatsAppHref } from "@/src/features/billing/employee-contact";
 import { resolveSelectedCompanyIds } from "@/src/features/billing/filter-selection";
 import {
   formatInr,
   formatRate,
-  formatSignedInr,
   formatUsd,
   formatWholeRateInput,
 } from "@/src/features/billing/utils";
@@ -41,27 +40,10 @@ export default async function EmployeesPage({
     companyId: resolvedSearchParams.companyId,
     companies,
   });
-  const [employeeBuckets, pnDashboardDataBuckets] = await Promise.all([
-    Promise.all(selectedCompanyIds.map((companyId) => listEmployees(companyId))),
-    Promise.all(
-      selectedCompanyIds.map((companyId) =>
-        getPnDashboardData({ companyId, periodType: "monthly" }),
-      ),
-    ),
-  ]);
-  const employees = employeeBuckets.flat();
+  const employees = await listEmployeesForCompanies(selectedCompanyIds);
   const selectedCompany = selectedCompanyIds.length === 1
     ? companies.find((company) => company.id === selectedCompanyIds[0])
     : undefined;
-
-  const employeeProfitMap = new Map(
-    pnDashboardDataBuckets.flatMap((data) =>
-      data.employeeEditableSections.map((section) => [
-        section.employeeId,
-        section.totalNetProfitInrCents,
-      ] as const),
-    ),
-  );
   const tab = Array.isArray(resolvedSearchParams.tab)
     ? resolvedSearchParams.tab[0]
     : resolvedSearchParams.tab;
@@ -263,8 +245,6 @@ export default async function EmployeesPage({
           </p>
           <StaggerGrid className="mt-5 space-y-4">
             {employees.map((employee) => {
-              const profit = employeeProfitMap.get(employee.id) ?? 0;
-              const profitColor = profit === 0 ? "var(--text-primary)" : (profit > 0 ? "#6ee7b7" : "#fca5a5");
               const whatsappHref = buildWhatsAppHref(employee.phoneNumber);
               return (
               <div
@@ -288,10 +268,6 @@ export default async function EmployeesPage({
                     <p style={{ color: "var(--text-accent)" }}>
                       {formatRate(employee.defaultPaidUsdInrRate)}
                       <span className="text-xs ml-1 font-sans" style={{ color: "var(--text-muted)" }}>peg rate</span>
-                    </p>
-                    <p className="mt-1 font-semibold" style={{ color: profitColor }}>
-                      {formatSignedInr(profit)}
-                      <span className="text-[10px] ml-1 uppercase tracking-wider font-sans" style={{ color: "var(--text-muted)", opacity: 0.8 }}>Net P/L (INR)</span>
                     </p>
                   </div>
                 </div>

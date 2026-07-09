@@ -64,6 +64,40 @@ function isLinkActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+export function buildCompanyScopeHref({
+  pathname,
+  persistentSearchFields,
+  companyOptions,
+  companyIds,
+}: {
+  pathname: string;
+  persistentSearchFields: Array<[string, string]>;
+  companyOptions: CompanyOption[];
+  companyIds: string[];
+}) {
+  const nextParams = new URLSearchParams();
+  for (const [name, value] of persistentSearchFields) {
+    if (name !== "companyId" && name !== "companyIds") {
+      nextParams.append(name, value);
+    }
+  }
+
+  const selectedIdSet = new Set(companyIds);
+  const nextAllSelected =
+    companyOptions.length > 0 &&
+    companyIds.length >= companyOptions.length &&
+    companyOptions.every((company) => selectedIdSet.has(company.id));
+
+  if (!nextAllSelected) {
+    for (const companyId of companyIds) {
+      nextParams.append("companyIds", companyId);
+    }
+  }
+
+  const queryString = nextParams.toString();
+  return queryString ? `${pathname}?${queryString}` : pathname;
+}
+
 export function Shell({
   title,
   eyebrow,
@@ -124,22 +158,14 @@ export function Shell({
     companyOptions.every((company) => selectedCompanyIdSet.has(company.id));
 
   const navigateWithCompanyScope = (companyIds: string[]) => {
-    const nextParams = new URLSearchParams();
-    for (const [name, value] of persistentSearchFields) {
-      nextParams.append(name, value);
-    }
-    const selectedIdSet = new Set(companyIds);
-    const nextAllSelected =
-      companyOptions.length > 0 &&
-      companyIds.length >= companyOptions.length &&
-      companyOptions.every((company) => selectedIdSet.has(company.id));
-    if (!nextAllSelected) {
-      for (const companyId of companyIds) {
-        nextParams.append("companyIds", companyId);
-      }
-    }
-    const queryString = nextParams.toString();
-    navigateTo(queryString ? `${pathname}?${queryString}` : pathname);
+    const href = buildCompanyScopeHref({
+      pathname,
+      persistentSearchFields,
+      companyOptions,
+      companyIds,
+    });
+    setPendingHref(href);
+    window.location.assign(href);
   };
 
   const selectedCompanyScopeValue = allCompaniesSelected ? "__all__" : selectedCompanyIds[0] ?? "__all__";
