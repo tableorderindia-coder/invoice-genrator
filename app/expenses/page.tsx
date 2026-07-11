@@ -8,7 +8,7 @@ import {
   saveCompanyExpenseAction,
   deleteCompanyExpenseAction,
 } from "@/src/features/billing/actions";
-import { listCompanies, listCompanyExpenses } from "@/src/features/billing/store";
+import { listCompanies, listCompanyExpensesForCompanies } from "@/src/features/billing/store";
 import { resolveSelectedCompanyIds } from "@/src/features/billing/filter-selection";
 import { formatInr, formatMonthYear } from "@/src/features/billing/utils";
 
@@ -57,17 +57,11 @@ export default async function ExpensesPage({
     : undefined;
   const companyNameMap = new Map(companies.map((company) => [company.id, company.name]));
 
-  const expenses = (
-    await Promise.all(
-      selectedCompanyIds.map((companyId) =>
-        listCompanyExpenses({
-          companyId,
-          year: selectedYear,
-          month: selectedMonth,
-        }),
-      ),
-    )
-  ).flat();
+  const expenses = await listCompanyExpensesForCompanies({
+    companyIds: selectedCompanyIds,
+    year: selectedYear,
+    month: selectedMonth,
+  });
 
   const totalInrCents = expenses.reduce((sum, e) => sum + e.amountInrCents, 0);
 
