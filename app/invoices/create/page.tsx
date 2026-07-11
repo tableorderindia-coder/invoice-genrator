@@ -6,9 +6,9 @@ import { createInvoiceDraftAction } from "@/src/features/billing/actions";
 import { CreateInvoiceForm } from "./create-invoice-form";
 import { CreateInvoiceSubmitButton } from "./submit-button";
 import {
-  listAvailableTeamNames,
+  listAvailableTeamNamesForCompanies,
   listCompanies,
-  listInvoicesForCompany,
+  listInvoicesForCompanies,
 } from "@/src/features/billing/store";
 
 export const dynamic = "force-dynamic";
@@ -30,21 +30,11 @@ export default async function CreateInvoicePage({
   const flashMessage = Array.isArray(resolvedSearchParams.flashMessage)
     ? resolvedSearchParams.flashMessage[0]
     : resolvedSearchParams.flashMessage;
-  const previousInvoices = await Promise.all(
-    companies.map(async (company) => ({
-      company,
-      invoices: await listInvoicesForCompany(company.id),
-    })),
-  );
-  const teamCatalog = await Promise.all(
-    companies.map(async (company) => ({
-      companyId: company.id,
-      teamNames: await listAvailableTeamNames(company.id),
-    })),
-  );
-  const availableTeamNamesByCompany = Object.fromEntries(
-    teamCatalog.map((item) => [item.companyId, item.teamNames]),
-  );
+  const companyIds = companies.map((company) => company.id);
+  const [invoices, availableTeamNamesByCompany] = await Promise.all([
+    listInvoicesForCompanies(companyIds),
+    listAvailableTeamNamesForCompanies(companyIds),
+  ]);
 
   return (
     <Shell
@@ -79,14 +69,12 @@ export default async function CreateInvoicePage({
               id: company.id,
               name: company.name,
             }))}
-            previousInvoices={previousInvoices.flatMap(({ company, invoices }) =>
-              invoices.map((invoice) => ({
-                companyId: company.id,
+            previousInvoices={invoices.map((invoice) => ({
+                companyId: invoice.companyId,
                 invoiceId: invoice.id,
                 invoiceNumber: invoice.invoiceNumber,
                 status: invoice.status,
-              })),
-            )}
+              }))}
             availableTeamNamesByCompany={availableTeamNamesByCompany}
           />
           <CreateInvoiceSubmitButton />

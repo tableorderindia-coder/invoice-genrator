@@ -23,8 +23,8 @@ import {
 import {
   getPnDashboardData,
   listCompanies,
-  listEmployees,
-  listAvailablePaymentMonths,
+  listEmployeesForCompanies,
+  listAvailablePaymentMonthsForCompanies,
 } from "../../src/features/billing/store";
 import type { PnDashboardData, PnPeriodRow } from "../../src/features/billing/types";
 import { DashboardTables } from "./dashboard-tables";
@@ -154,27 +154,11 @@ export default async function DashboardPage({
   const allEmployeesSelected = allEmployeesValue === "1";
   const selectedEmployeeIds = normalizeMultiSelectValue(resolved.employeeIds);
 
-  const companyEmployeeEntries = await Promise.all(
-    selectedCompanyIds.map(async (companyId) => ({
-      companyId,
-      employees: await listEmployees(companyId),
-    })),
-  );
-  const employees = companyEmployeeEntries.flatMap((entry) => entry.employees);
+  const employees = await listEmployeesForCompanies(selectedCompanyIds);
   const employeeCompanyMap = new Map(
-    companyEmployeeEntries.flatMap((entry) =>
-      entry.employees.map((employee) => [employee.id, entry.companyId] as const),
-    ),
+    employees.map((employee) => [employee.id, employee.companyId] as const),
   );
-  const availableMonths = [
-    ...new Set(
-      (
-        await Promise.all(
-          selectedCompanyIds.map((companyId) => listAvailablePaymentMonths(companyId)),
-        )
-      ).flat(),
-    ),
-  ].sort((left, right) => right.localeCompare(left));
+  const availableMonths = await listAvailablePaymentMonthsForCompanies(selectedCompanyIds);
 
   const effectiveEmployeeIds =
     allEmployeesSelected || selectedEmployeeIds.length === 0

@@ -11,7 +11,7 @@ import {
   updateInvoiceStatusAction,
 } from "@/src/features/billing/actions";
 import { resolveSelectedCompanyIds } from "@/src/features/billing/filter-selection";
-import { listCompanies, listInvoicesForCompany } from "@/src/features/billing/store";
+import { listCompanies, listInvoicesForCompanies } from "@/src/features/billing/store";
 import { formatDate, formatMonthYear, formatUsd } from "@/src/features/billing/utils";
 
 export const dynamic = "force-dynamic";
@@ -45,9 +45,7 @@ export default async function InvoicesPage({
     companyId: resolvedSearchParams.companyId,
     companies,
   });
-  const invoices = (
-    await Promise.all(selectedCompanyIds.map((companyId) => listInvoicesForCompany(companyId)))
-  ).flat();
+  const invoices = await listInvoicesForCompanies(selectedCompanyIds);
   const companyMap = new Map(companies.map((company) => [company.id, company.name]));
   const filteredInvoicesParams = new URLSearchParams();
   for (const companyId of selectedCompanyIds) {

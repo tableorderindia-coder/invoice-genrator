@@ -12,7 +12,11 @@ import {
   parseEmployeeStatementFilters,
 } from "@/src/features/billing/employee-statements";
 import { listEmployeeStatementSections } from "@/src/features/billing/employee-statements-load";
-import { listCompanies, listEmployees, listInvoicesForCompany } from "@/src/features/billing/store";
+import {
+  listCompanies,
+  listEmployeesForCompanies,
+  listInvoicesForCompanies,
+} from "@/src/features/billing/store";
 import { resolveSelectedCompanyIds } from "@/src/features/billing/filter-selection";
 import { formatDate } from "@/src/features/billing/utils";
 
@@ -44,12 +48,10 @@ export default async function EmployeeStatementsPage({
     companyId: filters.companyId,
     companies,
   });
-  const [employeeBuckets, invoiceBuckets] = await Promise.all([
-    Promise.all(selectedCompanyIds.map((companyId) => listEmployees(companyId))),
-    Promise.all(selectedCompanyIds.map((companyId) => listInvoicesForCompany(companyId))),
+  const [employees, invoices] = await Promise.all([
+    listEmployeesForCompanies(selectedCompanyIds),
+    listInvoicesForCompanies(selectedCompanyIds),
   ]);
-  const employees = employeeBuckets.flat();
-  const invoices = invoiceBuckets.flat();
   const availableMonths = getUniqueInvoiceMonths(
     invoices.map((invoice) => `${invoice.year}-${String(invoice.month).padStart(2, "0")}`),
   );

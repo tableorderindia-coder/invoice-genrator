@@ -254,6 +254,8 @@ type DbEmployeeStatementMonthSummary = {
 const sortInvoicesDesc = (left: Invoice, right: Invoice) =>
   right.year * 100 + right.month - (left.year * 100 + left.month);
 
+const uniqueNonEmptyValues = (values: string[]) => [...new Set(values.filter(Boolean))];
+
 const nowIso = () => new Date().toISOString();
 const nextId = (prefix: string) =>
   `${prefix}_${nowIso().replace(/[-:.TZ]/g, "").slice(0, 14)}_${Math.random()
@@ -281,6 +283,26 @@ export async function listAvailablePaymentMonths(companyId: string): Promise<str
   if (error) throw error;
   const months = [...new Set((data ?? []).map((row) => row.payment_month))].filter(Boolean) as string[];
   months.sort((a, b) => b.localeCompare(a)); // Descending order
+  return months;
+}
+
+export async function listAvailablePaymentMonthsForCompanies(
+  companyIds: string[],
+): Promise<string[]> {
+  const uniqueCompanyIds = uniqueNonEmptyValues(companyIds);
+  if (uniqueCompanyIds.length === 0) {
+    return [];
+  }
+
+  const supabase = await getSupabaseOrThrow();
+  const { data, error } = await supabase
+    .from("invoice_payment_employee_entries")
+    .select("payment_month")
+    .in("company_id", uniqueCompanyIds);
+
+  if (error) throw error;
+  const months = [...new Set((data ?? []).map((row) => row.payment_month))].filter(Boolean) as string[];
+  months.sort((a, b) => b.localeCompare(a));
   return months;
 }
 
@@ -870,7 +892,7 @@ export async function listEmployees(companyId?: string) {
 }
 
 export async function listEmployeesForCompanies(companyIds: string[]) {
-  const uniqueCompanyIds = [...new Set(companyIds.filter(Boolean))];
+  const uniqueCompanyIds = uniqueNonEmptyValues(companyIds);
   if (uniqueCompanyIds.length === 0) {
     return [];
   }
@@ -906,6 +928,51 @@ export async function listAvailableTeamNames(companyId: string) {
     masterTeamNames: teams.map((team) => team.name),
     employeeDefaultTeams: employees.map((employee) => employee.defaultTeam),
   });
+}
+
+export async function listAvailableTeamNamesForCompanies(companyIds: string[]) {
+  const uniqueCompanyIds = uniqueNonEmptyValues(companyIds);
+  if (uniqueCompanyIds.length === 0) {
+    return {};
+  }
+
+  const supabase = await getSupabaseOrThrow();
+  const [teamsResult, employees] = await Promise.all([
+    supabase
+      .from("teams")
+      .select("*")
+      .in("company_id", uniqueCompanyIds)
+      .order("name"),
+    listEmployeesForCompanies(uniqueCompanyIds),
+  ]);
+  if (teamsResult.error) throw teamsResult.error;
+
+  const teamNamesByCompany = new Map<string, string[]>();
+  for (const row of (teamsResult.data ?? []) as DbTeam[]) {
+    const companyId = String(row.company_id);
+    teamNamesByCompany.set(companyId, [
+      ...(teamNamesByCompany.get(companyId) ?? []),
+      String(row.name ?? ""),
+    ]);
+  }
+
+  const employeeTeamsByCompany = new Map<string, string[]>();
+  for (const employee of employees) {
+    employeeTeamsByCompany.set(employee.companyId, [
+      ...(employeeTeamsByCompany.get(employee.companyId) ?? []),
+      employee.defaultTeam,
+    ]);
+  }
+
+  return Object.fromEntries(
+    uniqueCompanyIds.map((companyId) => [
+      companyId,
+      buildAvailableTeamNames({
+        masterTeamNames: teamNamesByCompany.get(companyId) ?? [],
+        employeeDefaultTeams: employeeTeamsByCompany.get(companyId) ?? [],
+      }),
+    ]),
+  );
 }
 
 export async function createTeam(input: {
@@ -1015,6 +1082,26 @@ export async function listInvoicesForCompany(companyId: string) {
     .from("invoices")
     .select("*")
     .eq("company_id", companyId)
+    .order("year", { ascending: false })
+    .order("month", { ascending: false })
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? [])
+    .map((row) => mapInvoice(row as DbInvoice))
+    .sort(sortInvoicesDesc);
+}
+
+export async function listInvoicesForCompanies(companyIds: string[]) {
+  const uniqueCompanyIds = uniqueNonEmptyValues(companyIds);
+  if (uniqueCompanyIds.length === 0) {
+    return [];
+  }
+
+  const supabase = await getSupabaseOrThrow();
+  const { data, error } = await supabase
+    .from("invoices")
+    .select("*")
+    .in("company_id", uniqueCompanyIds)
     .order("year", { ascending: false })
     .order("month", { ascending: false })
     .order("created_at", { ascending: false });
@@ -2633,6 +2720,19 @@ export async function getInvoiceDetail(
 
 // ───────────── Company Expenses CRUD ─────────────
 
+function mapCompanyExpense(row: DbCompanyExpense): CompanyExpense {
+  return {
+    id: String(row.id),
+    companyId: String(row.company_id),
+    year: Number(row.year),
+    month: Number(row.month),
+    label: String(row.label ?? ""),
+    amountInrCents: Number(row.amount_inr_cents),
+    createdAt: String(row.created_at),
+    updatedAt: String(row.updated_at),
+  };
+}
+
 export async function listCompanyExpenses(input: {
   companyId: string;
   year?: number;
@@ -2657,16 +2757,39 @@ export async function listCompanyExpenses(input: {
   const { data, error } = await query;
   if (error) throw error;
 
-  return ((data ?? []) as DbCompanyExpense[]).map((row) => ({
-    id: String(row.id),
-    companyId: String(row.company_id),
-    year: Number(row.year),
-    month: Number(row.month),
-    label: String(row.label ?? ""),
-    amountInrCents: Number(row.amount_inr_cents),
-    createdAt: String(row.created_at),
-    updatedAt: String(row.updated_at),
-  }));
+  return ((data ?? []) as DbCompanyExpense[]).map(mapCompanyExpense);
+}
+
+export async function listCompanyExpensesForCompanies(input: {
+  companyIds: string[];
+  year?: number;
+  month?: number;
+}): Promise<CompanyExpense[]> {
+  const uniqueCompanyIds = uniqueNonEmptyValues(input.companyIds);
+  if (uniqueCompanyIds.length === 0) {
+    return [];
+  }
+
+  const supabase = await getSupabaseOrThrow();
+  let query = supabase
+    .from("company_expenses")
+    .select("*")
+    .in("company_id", uniqueCompanyIds)
+    .order("year", { ascending: false })
+    .order("month", { ascending: false })
+    .order("created_at", { ascending: true });
+
+  if (input.year !== undefined) {
+    query = query.eq("year", input.year);
+  }
+  if (input.month !== undefined) {
+    query = query.eq("month", input.month);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  return ((data ?? []) as DbCompanyExpense[]).map(mapCompanyExpense);
 }
 
 export async function upsertCompanyExpense(input: {
