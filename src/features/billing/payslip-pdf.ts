@@ -1,6 +1,3 @@
-import { existsSync } from "node:fs";
-import path from "node:path";
-
 import PDFDocument from "pdfkit";
 
 import {
@@ -13,16 +10,20 @@ import {
 import type { SavedPayslip } from "./payslip-store";
 
 const PAGE = {
-  marginX: 28,
-  marginTop: 32,
   width: 595.28,
+  marginX: 19,
 };
 
 const COLORS = {
-  ink: "#111111",
-  line: "#606060",
+  ink: "#000000",
+  line: "#555555",
   grey: "#c9c9c9",
-  muted: "#777777",
+  muted: "#666666",
+};
+
+const FONT = {
+  regular: "Times-Roman",
+  bold: "Times-Bold",
 };
 
 export async function buildPayslipPdf(input: {
@@ -30,27 +31,15 @@ export async function buildPayslipPdf(input: {
   companyName: string;
   companyAddress: string;
 }) {
-  const bundledFontPath = path.join(process.cwd(), "assets", "fonts", "Inter-Variable.ttf");
-  const windowsFallbackFontPath = "C:\\Windows\\Fonts\\arial.ttf";
   const doc = new PDFDocument({
     margin: PAGE.marginX,
     size: "A4",
-    font: existsSync(bundledFontPath)
-      ? bundledFontPath
-      : existsSync(windowsFallbackFontPath)
-        ? windowsFallbackFontPath
-        : undefined,
+    font: FONT.regular,
   });
   const chunks: Buffer[] = [];
-  const fontName = "payslip-regular";
 
   doc.on("data", (chunk) => chunks.push(chunk));
-  if (existsSync(bundledFontPath)) {
-    doc.registerFont(fontName, bundledFontPath);
-  } else if (existsSync(windowsFallbackFontPath)) {
-    doc.registerFont(fontName, windowsFallbackFontPath);
-  }
-  doc.font(fontName);
+  doc.font(FONT.regular);
 
   drawHeader(doc, input);
   drawEmployeeIdentity(doc, input.payslip);
@@ -68,133 +57,214 @@ function drawHeader(
   doc: PDFKit.PDFDocument,
   input: { payslip: SavedPayslip; companyName: string; companyAddress: string },
 ) {
-  doc.fontSize(15).fillColor(COLORS.ink).text(input.companyName, PAGE.marginX, 32, {
-    width: PAGE.width - PAGE.marginX * 2,
+  const width = contentWidth();
+  drawText(doc, input.companyName, PAGE.marginX, 27, width, {
     align: "center",
+    bold: true,
+    size: 12.8,
   });
-  doc.fontSize(8.5).text(input.companyAddress, PAGE.marginX, 53, {
-    width: PAGE.width - PAGE.marginX * 2,
+  drawText(doc, input.companyAddress, PAGE.marginX, 40, width, {
     align: "center",
+    size: 7.8,
   });
-  doc.fontSize(13).text(`Payslip for the month of ${formatPayslipMonth(input.payslip.month)}`, PAGE.marginX, 78, {
-    width: PAGE.width - PAGE.marginX * 2,
+  drawText(doc, `Payslip for the month of ${formatPayslipMonth(input.payslip.month)}`, PAGE.marginX, 58, width, {
     align: "center",
+    bold: true,
+    size: 12.2,
   });
 }
 
 function drawEmployeeIdentity(doc: PDFKit.PDFDocument, payslip: SavedPayslip) {
-  const y = 112;
-  const height = 50;
-  const leftX = PAGE.marginX;
-  const midX = PAGE.width / 2;
-  const width = PAGE.width - PAGE.marginX * 2;
+  const x = PAGE.marginX;
+  const y = 79;
+  const width = contentWidth();
+  const height = 49;
+  const midX = x + width / 2;
 
-  drawRect(doc, leftX, y, width, height);
+  drawRect(doc, x, y, width, height);
   verticalLine(doc, midX, y, height);
-  doc.fontSize(9.5).fillColor(COLORS.ink);
-  labelValue(doc, "Name:", payslip.employeeName, leftX + 4, y + 6, 140, 235);
-  labelValue(doc, "Joining Date:", formatDateSlash(payslip.joiningDate), leftX + 4, y + 18, 140, 235);
-  labelValue(doc, "Designation:", payslip.designation, leftX + 4, y + 30, 140, 235);
-  labelValue(doc, "Effective Work Days:", String(payslip.effectiveWorkDays), leftX + 4, y + 42, 140, 235);
-  labelValue(doc, "PAN Number:", payslip.panNumber, midX + 4, y + 6, 130, 205);
-  labelValue(doc, "PF UAN:", payslip.pfUan, midX + 4, y + 18, 130, 205);
-  doc.y = y + height + 18;
+
+  labelValue(doc, "Name:", payslip.employeeName, x + 3, y + 5, 140, 135);
+  labelValue(doc, "Joining Date:", formatDateSlash(payslip.joiningDate), x + 3, y + 17, 140, 135);
+  labelValue(doc, "Designation:", payslip.designation, x + 3, y + 29, 140, 135);
+  labelValue(doc, "Effective Work Days:", String(payslip.effectiveWorkDays), x + 3, y + 41, 140, 135);
+  labelValue(doc, "PAN Number:", payslip.panNumber, midX + 3, y + 5, 140, 135);
+  labelValue(doc, "PF UAN:", payslip.pfUan, midX + 3, y + 17, 140, 135);
+
+  doc.y = y + height + 12;
 }
 
 function drawEarningsAndDeductions(doc: PDFKit.PDFDocument, payslip: SavedPayslip) {
-  const startY = doc.y;
-  const leftX = PAGE.marginX;
-  const width = PAGE.width - PAGE.marginX * 2;
-  const midX = PAGE.width / 2;
-  const rowHeight = 14;
-  const maxRows = Math.max(payslip.earnings.length, payslip.deductions.length, 3);
-  const bodyHeight = maxRows * rowHeight + 8;
+  const x = PAGE.marginX;
+  const y = doc.y;
+  const width = contentWidth();
+  const halfWidth = width / 2;
+  const midX = x + halfWidth;
+  const headerH = 16;
+  const rowH = 14;
+  const visibleRows = Math.max(payslip.earnings.length, payslip.deductions.length, 3);
+  const bodyH = visibleRows * rowH + 12;
+  const totalH = 18;
+  const netH = 34;
+  const topTableH = headerH + bodyH + totalH;
   const totals = calculatePayslipTotals(payslip);
 
-  drawRect(doc, leftX, startY, width, rowHeight + bodyHeight + rowHeight + 34);
-  horizontalLine(doc, leftX, startY + rowHeight, width);
-  verticalLine(doc, midX, startY, rowHeight + bodyHeight + rowHeight);
-  doc.fontSize(9.2).fillColor(COLORS.ink);
-  text(doc, "Earnings", leftX + 4, startY + 3, 190, "left", true);
-  text(doc, "Amount", midX - 72, startY + 3, 68, "right", true);
-  text(doc, "Deductions", midX + 4, startY + 3, 190, "left", true);
-  text(doc, "Amount", PAGE.width - PAGE.marginX - 72, startY + 3, 68, "right", true);
+  drawRect(doc, x, y, width, topTableH + netH);
+  verticalLine(doc, midX, y, topTableH);
+  horizontalLine(doc, x, y + headerH, width);
+  horizontalLine(doc, x, y + headerH + bodyH, width);
+  horizontalLine(doc, x, y + topTableH, width);
 
-  for (let index = 0; index < maxRows; index += 1) {
-    const y = startY + rowHeight + 6 + index * rowHeight;
+  drawText(doc, "Earnings", x + 3, y + 4, 150, { bold: true });
+  drawText(doc, "Amount", midX - 70, y + 4, 66, { align: "right", bold: true });
+  drawText(doc, "Deductions", midX + 3, y + 4, 150, { bold: true });
+  drawText(doc, "Amount", x + width - 70, y + 4, 66, { align: "right", bold: true });
+
+  for (let index = 0; index < visibleRows; index += 1) {
+    const rowY = y + headerH + 6 + index * rowH;
     const earning = payslip.earnings[index];
     const deduction = payslip.deductions[index];
     if (earning) {
-      text(doc, earning.label, leftX + 4, y, 190);
-      text(doc, formatInrPlain(earning.amountInrCents), midX - 72, y, 68, "right");
+      drawText(doc, earning.label, x + 3, rowY, 160);
+      drawText(doc, formatInrPlain(earning.amountInrCents), midX - 90, rowY, 86, { align: "right" });
     }
     if (deduction) {
-      text(doc, deduction.label, midX + 4, y, 190);
-      text(doc, formatInrPlain(deduction.amountInrCents), PAGE.width - PAGE.marginX - 72, y, 68, "right");
+      drawText(doc, deduction.label, midX + 3, rowY, 160);
+      drawText(doc, formatInrPlain(deduction.amountInrCents), x + width - 90, rowY, 86, { align: "right" });
     }
   }
 
-  const totalY = startY + rowHeight + bodyHeight;
-  horizontalLine(doc, leftX, totalY, width);
-  text(doc, "Total Earnings", leftX + 4, totalY + 4, 170, "left", true);
-  text(doc, formatInrPlain(totals.totalEarningsInrCents), midX - 72, totalY + 4, 68, "right", true);
-  text(doc, "Total Deduction", midX + 4, totalY + 4, 170, "left", true);
-  text(doc, formatInrPlain(totals.totalDeductionsInrCents), PAGE.width - PAGE.marginX - 72, totalY + 4, 68, "right", true);
-  horizontalLine(doc, leftX, totalY + rowHeight, width);
-  text(doc, "Net Pay for the month :", leftX + 4, totalY + rowHeight + 8, 96);
-  text(doc, formatInrPlain(totals.netPayInrCents), leftX + 102, totalY + rowHeight + 8, 90, "left", true);
-  text(doc, `(${formatPayslipAmountInWords(totals.netPayInrCents)})`, leftX + 4, totalY + rowHeight + 23, width - 8);
-  doc.y = totalY + rowHeight + 46;
+  const totalY = y + headerH + bodyH + 4;
+  drawText(doc, "Total Earnings", x + 3, totalY, 160, { bold: true });
+  drawText(doc, formatInrPlain(totals.totalEarningsInrCents), midX - 90, totalY, 86, {
+    align: "right",
+    bold: true,
+  });
+  drawText(doc, "Total Deduction", midX + 3, totalY, 160, { bold: true });
+  drawText(doc, formatInrPlain(totals.totalDeductionsInrCents), x + width - 90, totalY, 86, {
+    align: "right",
+    bold: true,
+  });
+
+  const netY = y + topTableH + 8;
+  drawText(doc, "Net Pay for the month :", x + 3, netY, 105);
+  drawText(doc, formatInrPlain(totals.netPayInrCents), x + 107, netY, 105, { bold: true });
+  drawText(doc, `(${formatPayslipAmountInWords(totals.netPayInrCents)})`, x + 3, netY + 16, width - 6);
+
+  doc.y = y + topTableH + netH;
 }
 
 function drawTdsSection(doc: PDFKit.PDFDocument, payslip: SavedPayslip) {
-  const startY = doc.y;
-  const leftX = PAGE.marginX;
-  const width = PAGE.width - PAGE.marginX * 2;
-  const midX = leftX + 320;
-  const headerHeight = 15;
-  const rowHeight = 14;
-  const leftRows = Math.max(payslip.tdsEarnings.length, 4);
+  const x = PAGE.marginX;
+  const y = doc.y;
+  const width = contentWidth();
+  const headerH = 15;
+  const rowH = 14;
+  const leftW = 335;
+  const rightX = x + leftW + 5;
+  const rightW = x + width - rightX;
+  const leftHeaderH = 14;
+  const leftRows = Math.max(payslip.tdsEarnings.length, 3);
+  const leftBlankH = 16;
+  const leftTableH = leftHeaderH + leftRows * rowH + leftBlankH;
   const rightRows = Math.max(payslip.tdsIncomeTaxDeductions.length, 10);
-  const bodyHeight = Math.max(leftRows * rowHeight, rightRows * rowHeight + 64);
+  const taxDeductionH = leftHeaderH + rightRows * rowH;
+  const taxPaidTitleH = 15;
+  const taxPaidGridH = rowH * 4;
+  const rightTableH = taxDeductionH + taxPaidTitleH + taxPaidGridH;
 
-  doc.rect(leftX, startY, width, headerHeight).fillAndStroke(COLORS.grey, COLORS.line);
-  doc.fillColor(COLORS.ink).fontSize(9.2).text("TDS Details", leftX, startY + 3, {
-    width,
-    align: "center",
-  });
+  doc.rect(x, y, width, headerH).fillAndStroke(COLORS.grey, COLORS.line);
+  drawText(doc, "TDS Details", x, y + 3, width, { align: "center", bold: true });
 
-  const tableY = startY + headerHeight;
-  drawRect(doc, leftX, tableY, width, bodyHeight);
-  verticalLine(doc, midX, tableY, bodyHeight);
-  horizontalLine(doc, leftX, tableY + rowHeight, width);
-  text(doc, "Description", leftX + 4, tableY + 3, 110, "left", true);
-  text(doc, "Gross", leftX + 132, tableY + 3, 54, "right", true);
-  text(doc, "Exempt", leftX + 190, tableY + 3, 54, "right", true);
-  text(doc, "Taxable", leftX + 248, tableY + 3, 54, "right", true);
-  text(doc, "Income Tax Deduction", midX + 4, tableY + 3, width - (midX - leftX) - 8, "center", true);
+  const tableY = y + headerH;
+  drawTdsEarningsGrid(doc, payslip.tdsEarnings, x, tableY, leftW, leftTableH, leftRows);
+  drawTaxDeductionGrid(doc, payslip.tdsIncomeTaxDeductions, rightX, tableY, rightW, rightRows);
+  drawTaxPaidGrid(
+    doc,
+    payslip.taxPaidMonths,
+    rightX,
+    tableY + taxDeductionH,
+    rightW,
+    taxPaidTitleH,
+    taxPaidGridH,
+  );
 
-  payslip.tdsEarnings.forEach((row, index) => drawTdsEarningRow(doc, row, leftX, tableY + rowHeight + index * rowHeight));
-  payslip.tdsIncomeTaxDeductions.forEach((row, index) => drawTaxDeductionRow(doc, row, midX, tableY + rowHeight + index * rowHeight));
-  drawTaxPaidGrid(doc, payslip.taxPaidMonths, midX, tableY + rowHeight + rightRows * rowHeight + 4, PAGE.width - PAGE.marginX - midX);
-  doc.y = tableY + bodyHeight + 8;
+  doc.y = tableY + Math.max(leftTableH, rightTableH);
 }
 
-function drawTdsEarningRow(doc: PDFKit.PDFDocument, row: PayslipTdsEarningRow, x: number, y: number) {
-  text(doc, row.label, x + 4, y + 3, 120);
-  text(doc, formatInrPlain(row.grossInrCents), x + 132, y + 3, 54, "right");
-  text(doc, formatInrPlain(row.exemptInrCents), x + 190, y + 3, 54, "right");
-  text(doc, formatInrPlain(row.taxableInrCents), x + 248, y + 3, 54, "right");
+function drawTdsEarningsGrid(
+  doc: PDFKit.PDFDocument,
+  rows: PayslipTdsEarningRow[],
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  visibleRows: number,
+) {
+  const headerH = 14;
+  const rowH = 14;
+  const descW = 119;
+  const amountW = (width - descW) / 3;
+  const grossX = x + descW;
+  const exemptX = grossX + amountW;
+  const taxableX = exemptX + amountW;
+
+  drawRect(doc, x, y, width, height);
+  verticalLine(doc, grossX, y, headerH + visibleRows * rowH);
+  verticalLine(doc, exemptX, y, headerH + visibleRows * rowH);
+  verticalLine(doc, taxableX, y, headerH + visibleRows * rowH);
+
+  horizontalLine(doc, x, y + headerH, width);
+  for (let index = 1; index <= visibleRows; index += 1) {
+    horizontalLine(doc, x, y + headerH + index * rowH, width);
+  }
+
+  drawText(doc, "Description", x + 3, y + 3, descW - 6, { bold: true });
+  drawText(doc, "Gross", grossX + 3, y + 3, amountW - 6, { align: "right", bold: true });
+  drawText(doc, "Exempt", exemptX + 3, y + 3, amountW - 6, { align: "right", bold: true });
+  drawText(doc, "Taxable", taxableX + 3, y + 3, amountW - 6, { align: "right", bold: true });
+
+  for (let index = 0; index < visibleRows; index += 1) {
+    const row = rows[index];
+    if (!row) continue;
+    const rowY = y + headerH + 3 + index * rowH;
+    drawText(doc, row.label, x + 3, rowY, descW - 6);
+    drawText(doc, formatInrPlain(row.grossInrCents), grossX + 3, rowY, amountW - 6, { align: "right" });
+    drawText(doc, formatInrPlain(row.exemptInrCents), exemptX + 3, rowY, amountW - 6, { align: "right" });
+    drawText(doc, formatInrPlain(row.taxableInrCents), taxableX + 3, rowY, amountW - 6, { align: "right" });
+  }
 }
 
-function drawTaxDeductionRow(doc: PDFKit.PDFDocument, row: PayslipAmountRow, x: number, y: number) {
-  horizontalLine(doc, x, y, PAGE.width - PAGE.marginX - x);
-  doc.fontSize(7.4).fillColor(COLORS.ink).text(row.label, x + 4, y + 3, {
-    width: PAGE.width - PAGE.marginX - 76 - x,
-    align: "left",
-    lineBreak: false,
-  });
-  text(doc, formatInrPlain(row.amountInrCents), PAGE.width - PAGE.marginX - 68, y + 3, 64, "right");
+function drawTaxDeductionGrid(
+  doc: PDFKit.PDFDocument,
+  rows: PayslipAmountRow[],
+  x: number,
+  y: number,
+  width: number,
+  visibleRows: number,
+) {
+  const headerH = 14;
+  const rowH = 14;
+  const amountW = 72;
+  const amountX = x + width - amountW;
+  const height = headerH + visibleRows * rowH;
+
+  drawRect(doc, x, y, width, height);
+  horizontalLine(doc, x, y + headerH, width);
+  verticalLine(doc, amountX, y + headerH, visibleRows * rowH);
+  drawText(doc, "Income Tax Deduction", x, y + 3, width, { align: "center", bold: true });
+
+  for (let index = 0; index < visibleRows; index += 1) {
+    const rowY = y + headerH + index * rowH;
+    horizontalLine(doc, x, rowY, width);
+    const row = rows[index];
+    if (!row) continue;
+    drawText(doc, row.label, x + 3, rowY + 3, width - amountW - 6, { size: 8.7 });
+    drawText(doc, formatInrPlain(row.amountInrCents), amountX + 3, rowY + 3, amountW - 6, {
+      align: "right",
+      size: 8.7,
+    });
+  }
 }
 
 function drawTaxPaidGrid(
@@ -203,35 +273,45 @@ function drawTaxPaidGrid(
   x: number,
   y: number,
   width: number,
+  titleH: number,
+  gridH: number,
 ) {
+  const rowH = gridH / 4;
   const cellW = width / 6;
-  const rowH = 14;
-  horizontalLine(doc, x, y, width);
-  text(doc, "Tax Paid Details", x, y + 4, width, "center", true);
-  for (let row = 0; row < 2; row += 1) {
-    const monthY = y + 18 + row * rowH * 2;
+  drawRect(doc, x, y, width, titleH + gridH);
+  horizontalLine(doc, x, y + titleH, width);
+  drawText(doc, "Tax Paid Details", x, y + 3, width, { align: "center", bold: true });
+
+  for (let row = 0; row <= 4; row += 1) {
+    horizontalLine(doc, x, y + titleH + row * rowH, width);
+  }
+  for (let col = 1; col < 6; col += 1) {
+    verticalLine(doc, x + col * cellW, y + titleH, gridH);
+  }
+
+  for (let group = 0; group < 2; group += 1) {
+    const monthY = y + titleH + group * rowH * 2 + 3;
     const amountY = monthY + rowH;
     for (let col = 0; col < 6; col += 1) {
-      const month = months[row * 6 + col];
+      const month = months[group * 6 + col];
       const cellX = x + col * cellW;
-      drawRect(doc, cellX, monthY, cellW, rowH);
-      drawRect(doc, cellX, amountY, cellW, rowH);
-      if (month) {
-        text(doc, month.monthCode, cellX, monthY + 3, cellW, "center", true);
-        text(doc, formatInrPlain(month.amountInrCents), cellX, amountY + 3, cellW, "center");
-      }
+      if (!month) continue;
+      drawText(doc, month.monthCode, cellX, monthY, cellW, { align: "center", bold: true });
+      drawText(doc, formatInrPlain(month.amountInrCents), cellX, amountY, cellW, { align: "center", size: 8 });
     }
   }
 }
 
 function drawFooter(doc: PDFKit.PDFDocument) {
-  const y = 760;
-  horizontalLine(doc, PAGE.marginX, y, PAGE.width - PAGE.marginX * 2);
-  doc.fillColor(COLORS.muted).fontSize(8).text(
+  const y = Math.min(760, doc.y + 4);
+  horizontalLine(doc, PAGE.marginX, y, contentWidth());
+  drawText(
+    doc,
     "This is a computer generated payslip and does not require a signature",
     PAGE.marginX,
     y + 6,
-    { width: PAGE.width - PAGE.marginX * 2, align: "center" },
+    contentWidth(),
+    { align: "center", color: COLORS.muted, size: 8 },
   );
 }
 
@@ -244,36 +324,52 @@ function labelValue(
   labelWidth: number,
   valueWidth: number,
 ) {
-  text(doc, label, x, y, labelWidth);
-  text(doc, value, x + labelWidth, y, valueWidth);
+  drawText(doc, label, x, y, labelWidth);
+  drawText(doc, value, x + labelWidth, y, valueWidth);
 }
 
-function text(
+function drawText(
   doc: PDFKit.PDFDocument,
   value: string,
   x: number,
   y: number,
   width: number,
-  align: "left" | "center" | "right" = "left",
-  bold = false,
+  options: {
+    align?: "left" | "center" | "right";
+    bold?: boolean;
+    color?: string;
+    size?: number;
+  } = {},
 ) {
-  doc.fontSize(bold ? 8.9 : 8.8).fillColor(COLORS.ink).text(value, x, y, { width, align, lineBreak: false });
+  doc
+    .font(options.bold ? FONT.bold : FONT.regular)
+    .fontSize(options.size ?? 9)
+    .fillColor(options.color ?? COLORS.ink)
+    .text(value, x, y, {
+      width,
+      align: options.align ?? "left",
+      lineBreak: false,
+    });
 }
 
 function drawRect(doc: PDFKit.PDFDocument, x: number, y: number, width: number, height: number) {
-  doc.rect(x, y, width, height).lineWidth(0.5).strokeColor(COLORS.line).stroke();
+  doc.rect(x, y, width, height).lineWidth(0.65).strokeColor(COLORS.line).stroke();
 }
 
 function horizontalLine(doc: PDFKit.PDFDocument, x: number, y: number, width: number) {
-  doc.moveTo(x, y).lineTo(x + width, y).lineWidth(0.5).strokeColor(COLORS.line).stroke();
+  doc.moveTo(x, y).lineTo(x + width, y).lineWidth(0.65).strokeColor(COLORS.line).stroke();
 }
 
 function verticalLine(doc: PDFKit.PDFDocument, x: number, y: number, height: number) {
-  doc.moveTo(x, y).lineTo(x, y + height).lineWidth(0.5).strokeColor(COLORS.line).stroke();
+  doc.moveTo(x, y).lineTo(x, y + height).lineWidth(0.65).strokeColor(COLORS.line).stroke();
+}
+
+function contentWidth() {
+  return PAGE.width - PAGE.marginX * 2;
 }
 
 function formatInrPlain(cents: number) {
-  return new Intl.NumberFormat("en-IN", {
+  return new Intl.NumberFormat("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(cents / 100);
