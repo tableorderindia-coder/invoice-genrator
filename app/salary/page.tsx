@@ -6,11 +6,9 @@ import { requirePageAccess } from "@/lib/auth/server";
 import { filterCompaniesForAuthContext } from "@/src/features/billing/company-access";
 import { resolveSelectedCompanyIds } from "@/src/features/billing/filter-selection";
 import { listMonthlyPayrollRows } from "@/src/features/billing/payroll-store";
-import { listPayslipRecords } from "@/src/features/billing/payslip-store";
 import { listCompanies } from "@/src/features/billing/store";
 import { formatMonthYear } from "@/src/features/billing/utils";
 import { SalaryMonthEditor } from "./_components/salary-month-editor";
-import { PayslipEditor } from "./_components/payslip-editor";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +40,6 @@ export default async function SalaryPage({
     companyId?: SearchValue;
     companyIds?: SearchValue;
     month?: SearchValue;
-    tab?: SearchValue;
     flashStatus?: SearchValue;
     flashMessage?: SearchValue;
   }>;
@@ -60,22 +57,15 @@ export default async function SalaryPage({
   const singleCompanySelected = selectedCompanyIds.length === 1;
   const selectedCompany = companies.find((company) => company.id === selectedCompanyId);
   const selectedMonth = firstSearchValue(resolved.month) || currentMonthKey();
-  const selectedTab = firstSearchValue(resolved.tab) === "payslips" ? "payslips" : "sheet";
   const flashStatus = firstSearchValue(resolved.flashStatus);
   const flashMessage = firstSearchValue(resolved.flashMessage);
   const companyScopeParams = selectedCompanyIds
     .map((companyId) => `companyIds=${encodeURIComponent(companyId)}`)
     .join("&");
-  const baseReturnTo = `/salary?${companyScopeParams}&month=${encodeURIComponent(selectedMonth)}`;
-  const returnTo = selectedTab === "payslips" ? `${baseReturnTo}&tab=payslips` : baseReturnTo;
+  const returnTo = `/salary?${companyScopeParams}&month=${encodeURIComponent(selectedMonth)}`;
   const payrollRows = singleCompanySelected
     ? await listMonthlyPayrollRows({ companyId: selectedCompanyId, month: selectedMonth })
     : [];
-  const payslips = singleCompanySelected
-    ? await listPayslipRecords({ companyId: selectedCompanyId, month: selectedMonth })
-    : [];
-  const sheetHref = `${baseReturnTo}&tab=sheet`;
-  const payslipsHref = `${baseReturnTo}&tab=payslips`;
 
   return (
     <Shell
@@ -104,7 +94,6 @@ export default async function SalaryPage({
           <Field label="Salary month">
             <input name="month" type="month" className={inputClass} defaultValue={selectedMonth} />
           </Field>
-          <input type="hidden" name="tab" value={selectedTab} />
           <PendingSubmitButton
             className="btn-outline"
             defaultText="Load month"
@@ -115,14 +104,6 @@ export default async function SalaryPage({
 
       {singleCompanySelected && selectedCompany ? (
         <div className="space-y-4">
-          <div className="flex flex-wrap gap-2">
-            <a href={sheetHref} className={selectedTab === "sheet" ? "gradient-btn" : "btn-outline"}>
-              Salary Sheet
-            </a>
-            <a href={payslipsHref} className={selectedTab === "payslips" ? "gradient-btn" : "btn-outline"}>
-              Payslips
-            </a>
-          </div>
           <div className="flex flex-col gap-1 px-1">
             <h2 className="text-xl font-semibold">
               {selectedCompany.name} - {monthLabel(selectedMonth)}
@@ -131,21 +112,12 @@ export default async function SalaryPage({
               Review monthly salary values, then save only this month or update employee defaults for future months.
             </p>
           </div>
-          {selectedTab === "sheet" ? (
-            <SalaryMonthEditor
-              companyId={selectedCompanyId}
-              month={selectedMonth}
-              rows={payrollRows}
-              returnTo={returnTo}
-            />
-          ) : (
-            <PayslipEditor
-              companyId={selectedCompanyId}
-              month={selectedMonth}
-              payslips={payslips}
-              returnTo={returnTo}
-            />
-          )}
+          <SalaryMonthEditor
+            companyId={selectedCompanyId}
+            month={selectedMonth}
+            rows={payrollRows}
+            returnTo={returnTo}
+          />
         </div>
       ) : (
         <GlassPanel>
