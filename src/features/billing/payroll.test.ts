@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildMonthlyPayrollRows,
+  calculateActualPaidInrCents,
+  getDaysInPayrollMonth,
   normalizePayrollMonthKey,
   summarizePayrollRows,
   type MonthlyPayrollPayment,
@@ -33,6 +35,22 @@ describe("payroll helpers", () => {
     expect(() => normalizePayrollMonthKey("2026-13")).toThrow("Payroll month is invalid.");
   });
 
+  it("calculates actual paid from monthly paid and decimal days worked", () => {
+    expect(
+      calculateActualPaidInrCents({
+        monthlyPaidInrCents: 310_000,
+        daysWorked: 15.5,
+        daysInMonth: 31,
+      }),
+    ).toBe(155_000);
+  });
+
+  it("returns calendar days for a valid payroll month", () => {
+    expect(getDaysInPayrollMonth("2026-02")).toBe(28);
+    expect(getDaysInPayrollMonth("2028-02")).toBe(29);
+    expect(getDaysInPayrollMonth("2026-07")).toBe(31);
+  });
+
   it("prefills missing salary records from employee master defaults", () => {
     const rows = buildMonthlyPayrollRows({
       companyId: "company_1",
@@ -46,10 +64,12 @@ describe("payroll helpers", () => {
         employeeId: "employee_1",
         employeeName: "Jane Doe",
         source: "employee-default",
+        monthlyPaidInrCents: 250_000,
+        daysWorked: 31,
+        daysInMonth: 31,
         salaryPaidInrCents: 250_000,
         pfInrCents: 18_000,
         tdsInrCents: 12_000,
-        paidUsdInrRate: 83,
         status: "draft",
       }),
     ]);
@@ -63,7 +83,10 @@ describe("payroll helpers", () => {
       month: "2026-07",
       employeeNameSnapshot: "Jane Snapshot",
       paidUsdInrRate: 84,
-      salaryPaidInrCents: 310_000,
+      monthlyPaidInrCents: 310_000,
+      daysWorked: 15.5,
+      daysInMonth: 31,
+      salaryPaidInrCents: 155_000,
       pfInrCents: 20_000,
       tdsInrCents: 30_000,
       paidStatus: true,
@@ -85,12 +108,14 @@ describe("payroll helpers", () => {
         id: "salary_payment_1",
         employeeName: "Jane Snapshot",
         source: "monthly-payroll",
-        salaryPaidInrCents: 310_000,
+        monthlyPaidInrCents: 310_000,
+        daysWorked: 15.5,
+        daysInMonth: 31,
+        salaryPaidInrCents: 155_000,
         pfInrCents: 20_000,
         tdsInrCents: 30_000,
-        paidStatus: true,
         status: "verified",
-        overrideNote: "Admin final amount",
+        notes: "Checked by CA",
       }),
     );
   });
@@ -112,6 +137,9 @@ describe("payroll helpers", () => {
           month: "2026-07",
           employeeNameSnapshot: "Saved Inactive Snapshot",
           paidUsdInrRate: 84,
+          monthlyPaidInrCents: 310_000,
+          daysWorked: 31,
+          daysInMonth: 31,
           salaryPaidInrCents: 310_000,
           pfInrCents: 20_000,
           tdsInrCents: 30_000,
@@ -143,20 +171,21 @@ describe("payroll helpers", () => {
           month: "2026-07",
           employeeName: "Jane Doe",
           source: "employee-default",
-          paidUsdInrRate: 83,
-          salaryPaidInrCents: 100_000,
+          monthlyPaidInrCents: 100_000,
+          daysWorked: 15,
+          daysInMonth: 30,
+          salaryPaidInrCents: 50_000,
           pfInrCents: 10_000,
           tdsInrCents: 5_000,
-          paidStatus: false,
           status: "draft",
         },
       ]),
     ).toEqual({
       employeeCount: 1,
-      salaryPaidInrCents: 100_000,
+      salaryPaidInrCents: 50_000,
       pfInrCents: 10_000,
       tdsInrCents: 5_000,
-      netPaidInrCents: 85_000,
+      netPaidInrCents: 35_000,
     });
   });
 });

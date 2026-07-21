@@ -219,7 +219,7 @@ export async function createEmployeeAction(formData: FormData) {
     ),
     defaultActualPaidInrCents: getNonNegativeCentsOrThrow(
       getString(formData, "defaultActualPaidInr"),
-      "Actual paid",
+      "Monthly paid",
     ),
     defaultPfInrCents: getNonNegativeCentsOrThrow(
       getString(formData, "defaultPfInr"),
@@ -257,7 +257,7 @@ export async function updateEmployeeAction(formData: FormData) {
     ),
     defaultActualPaidInrCents: getNonNegativeCentsOrThrow(
       getString(formData, "defaultActualPaidInr"),
-      "Actual paid",
+      "Monthly paid",
     ),
     defaultPfInrCents: getNonNegativeCentsOrThrow(
       getString(formData, "defaultPfInr"),

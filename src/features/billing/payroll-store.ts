@@ -37,6 +37,9 @@ type DbSalaryPayment = {
   month: string;
   employee_name_snapshot?: string | null;
   paid_usd_inr_rate?: number | null;
+  monthly_paid_inr_cents?: number | null;
+  days_worked?: number | null;
+  days_in_month?: number | null;
   salary_paid_inr_cents?: number | null;
   pf_inr_cents?: number | null;
   tds_inr_cents?: number | null;
@@ -51,11 +54,14 @@ type DbSalaryPayment = {
 export type SaveMonthlyPayrollRowInput = {
   employeeId: string;
   employeeName: string;
-  paidUsdInrRate: number;
+  paidUsdInrRate?: number;
+  monthlyPaidInrCents: number;
+  daysWorked: number;
+  daysInMonth: number;
   salaryPaidInrCents: number;
   pfInrCents: number;
   tdsInrCents: number;
-  paidStatus: boolean;
+  paidStatus?: boolean;
   paidDate?: string;
   notes?: string;
   overrideNote?: string;
@@ -104,6 +110,9 @@ function mapSalaryPayment(row: DbSalaryPayment): MonthlyPayrollPayment {
     month: row.month,
     employeeNameSnapshot: row.employee_name_snapshot ?? "",
     paidUsdInrRate: Number(row.paid_usd_inr_rate ?? 0),
+    monthlyPaidInrCents: Number(row.monthly_paid_inr_cents ?? row.salary_paid_inr_cents ?? 0),
+    daysWorked: Number(row.days_worked ?? 0),
+    daysInMonth: Number(row.days_in_month ?? 0),
     salaryPaidInrCents: Number(row.salary_paid_inr_cents ?? 0),
     pfInrCents: Number(row.pf_inr_cents ?? 0),
     tdsInrCents: Number(row.tds_inr_cents ?? 0),
@@ -186,11 +195,14 @@ export async function saveMonthlyPayrollRows(input: {
     company_id: input.companyId,
     month,
     employee_name_snapshot: row.employeeName,
-    paid_usd_inr_rate: row.paidUsdInrRate,
+    paid_usd_inr_rate: row.paidUsdInrRate ?? 0,
+    monthly_paid_inr_cents: row.monthlyPaidInrCents,
+    days_worked: row.daysWorked,
+    days_in_month: row.daysInMonth,
     salary_paid_inr_cents: row.salaryPaidInrCents,
     pf_inr_cents: row.pfInrCents,
     tds_inr_cents: row.tdsInrCents,
-    paid_status: row.paidStatus,
+    paid_status: row.paidStatus ?? false,
     paid_date: row.paidDate ?? null,
     status: input.status,
     verified_at: input.status === "verified" ? timestamp : null,
@@ -214,8 +226,7 @@ export async function saveMonthlyPayrollRows(input: {
       const { error } = await supabase
         .from("employees")
         .update({
-          default_paid_usd_inr_rate: row.paidUsdInrRate,
-          default_actual_paid_inr_cents: row.salaryPaidInrCents,
+          default_actual_paid_inr_cents: row.monthlyPaidInrCents,
           default_pf_inr_cents: row.pfInrCents,
           default_tds_inr_cents: row.tdsInrCents,
         })
