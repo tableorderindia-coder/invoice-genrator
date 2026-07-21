@@ -39,6 +39,7 @@ import {
   type ParsedFounderWithdrawalRow,
 } from "./founders-balance";
 import { normalizeEmployeeNameForMatch } from "./employee-cash-flow-store";
+import { isExpenseInPeriod, type ExpensePeriodRange } from "./expense-period";
 import { getDaysInMonth } from "./utils";
 import type {
   AdjustmentType,
@@ -2749,11 +2750,36 @@ function mapCompanyExpense(row: DbCompanyExpense): CompanyExpense {
   };
 }
 
-export async function listCompanyExpenses(input: {
+type CompanyExpenseListInput = {
   companyId: string;
   year?: number;
   month?: number;
-}): Promise<CompanyExpense[]> {
+  startMonth?: string;
+  endMonth?: string;
+};
+
+function expensePeriodFromInput(input: {
+  startMonth?: string;
+  endMonth?: string;
+}): ExpensePeriodRange | undefined {
+  return input.startMonth && input.endMonth
+    ? { startMonth: input.startMonth, endMonth: input.endMonth }
+    : undefined;
+}
+
+function filterCompanyExpensesForInput(
+  expenses: CompanyExpense[],
+  input: CompanyExpenseListInput,
+) {
+  const period = expensePeriodFromInput(input);
+  if (!period) {
+    return expenses;
+  }
+
+  return expenses.filter((expense) => isExpenseInPeriod(expense, period));
+}
+
+export async function listCompanyExpenses(input: CompanyExpenseListInput): Promise<CompanyExpense[]> {
   const supabase = await getSupabaseOrThrow();
   let query = supabase
     .from("company_expenses")
@@ -2763,23 +2789,29 @@ export async function listCompanyExpenses(input: {
     .order("month", { ascending: false })
     .order("created_at", { ascending: true });
 
-  if (input.year !== undefined) {
+  const period = expensePeriodFromInput(input);
+  if (!period && input.year !== undefined) {
     query = query.eq("year", input.year);
   }
-  if (input.month !== undefined) {
+  if (!period && input.month !== undefined) {
     query = query.eq("month", input.month);
   }
 
   const { data, error } = await query;
   if (error) throw error;
 
-  return ((data ?? []) as DbCompanyExpense[]).map(mapCompanyExpense);
+  return filterCompanyExpensesForInput(
+    ((data ?? []) as DbCompanyExpense[]).map(mapCompanyExpense),
+    input,
+  );
 }
 
 export async function listCompanyExpensesForCompanies(input: {
   companyIds: string[];
   year?: number;
   month?: number;
+  startMonth?: string;
+  endMonth?: string;
 }): Promise<CompanyExpense[]> {
   const uniqueCompanyIds = uniqueNonEmptyValues(input.companyIds);
   if (uniqueCompanyIds.length === 0) {
@@ -2795,17 +2827,21 @@ export async function listCompanyExpensesForCompanies(input: {
     .order("month", { ascending: false })
     .order("created_at", { ascending: true });
 
-  if (input.year !== undefined) {
+  const period = expensePeriodFromInput(input);
+  if (!period && input.year !== undefined) {
     query = query.eq("year", input.year);
   }
-  if (input.month !== undefined) {
+  if (!period && input.month !== undefined) {
     query = query.eq("month", input.month);
   }
 
   const { data, error } = await query;
   if (error) throw error;
 
-  return ((data ?? []) as DbCompanyExpense[]).map(mapCompanyExpense);
+  return filterCompanyExpensesForInput(
+    ((data ?? []) as DbCompanyExpense[]).map(mapCompanyExpense),
+    { companyId: "", ...input },
+  );
 }
 
 export async function upsertCompanyExpense(input: {
