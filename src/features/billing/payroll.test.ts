@@ -95,6 +95,45 @@ describe("payroll helpers", () => {
     );
   });
 
+  it("keeps saved payroll rows for inactive employees without creating new inactive rows", () => {
+    const rows = buildMonthlyPayrollRows({
+      companyId: "company_1",
+      month: "2026-07",
+      employees: [
+        employee({ id: "employee_active", fullName: "Active Employee" }),
+        employee({ id: "employee_saved_inactive", fullName: "Saved Inactive", isActive: false }),
+        employee({ id: "employee_unsaved_inactive", fullName: "Unsaved Inactive", isActive: false }),
+      ],
+      payments: [
+        {
+          id: "salary_payment_inactive",
+          employeeId: "employee_saved_inactive",
+          companyId: "company_1",
+          month: "2026-07",
+          employeeNameSnapshot: "Saved Inactive Snapshot",
+          paidUsdInrRate: 84,
+          salaryPaidInrCents: 310_000,
+          pfInrCents: 20_000,
+          tdsInrCents: 30_000,
+          paidStatus: true,
+          status: "verified",
+        },
+      ],
+    });
+
+    expect(rows.map((row) => row.employeeId)).toEqual([
+      "employee_active",
+      "employee_saved_inactive",
+    ]);
+    expect(rows.find((row) => row.employeeId === "employee_saved_inactive")).toEqual(
+      expect.objectContaining({
+        source: "monthly-payroll",
+        employeeName: "Saved Inactive Snapshot",
+        employeeIsActive: false,
+      }),
+    );
+  });
+
   it("summarizes salary, PF, TDS, and net paid totals", () => {
     expect(
       summarizePayrollRows([

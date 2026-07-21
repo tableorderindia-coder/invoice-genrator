@@ -18,6 +18,18 @@ describe("member assignment", () => {
     expect(eligible.map((employee) => employee.id)).toEqual(["emp_2"]);
   });
 
+  it("excludes inactive employees from add-member options", () => {
+    const eligible = filterEligibleEmployeesForTeam({
+      employees: [
+        { id: "emp_1", fullName: "Pawan", isActive: true },
+        { id: "emp_2", fullName: "Riya", isActive: false },
+      ],
+      currentTeamMemberIds: [],
+    });
+
+    expect(eligible.map((employee) => employee.id)).toEqual(["emp_1"]);
+  });
+
   it("finds an existing invoice line item for an employee across teams", () => {
     expect(
       findExistingLineItemForEmployee({

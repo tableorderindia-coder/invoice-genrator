@@ -39,6 +39,7 @@ export type MonthlyPayrollRow = {
   notes?: string;
   overrideNote?: string;
   updatedAt?: string;
+  employeeIsActive?: boolean;
 };
 
 export type MonthlyPayrollSummary = {
@@ -77,7 +78,11 @@ export function buildMonthlyPayrollRows(input: {
   );
 
   return input.employees
-    .filter((employee) => employee.companyId === input.companyId && employee.isActive)
+    .filter(
+      (employee) =>
+        employee.companyId === input.companyId &&
+        (employee.isActive || paymentsByEmployeeId.has(employee.id)),
+    )
     .map((employee) => {
       const payment = paymentsByEmployeeId.get(employee.id);
       if (payment) {
@@ -98,6 +103,7 @@ export function buildMonthlyPayrollRows(input: {
           notes: payment.notes,
           overrideNote: payment.overrideNote,
           updatedAt: payment.updatedAt,
+          employeeIsActive: employee.isActive,
         } satisfies MonthlyPayrollRow;
       }
 
@@ -113,6 +119,7 @@ export function buildMonthlyPayrollRows(input: {
         tdsInrCents: employee.defaultTdsInrCents,
         paidStatus: false,
         status: "draft",
+        employeeIsActive: employee.isActive,
       } satisfies MonthlyPayrollRow;
     })
     .sort((left, right) => left.employeeName.localeCompare(right.employeeName));

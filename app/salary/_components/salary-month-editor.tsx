@@ -159,7 +159,21 @@ export function SalaryMonthEditor({
               {editableRows.map((row) => (
                 <tr key={row.employeeId} className="border-b" style={{ borderColor: "var(--glass-border)" }}>
                   <td className="px-4 py-3 align-top">
-                    <p className="font-medium">{row.employeeName}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-medium">{row.employeeName}</p>
+                      {row.employeeIsActive === false ? (
+                        <span
+                          className="rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                          style={{
+                            background: "rgba(248,113,113,0.12)",
+                            color: "#fca5a5",
+                            border: "1px solid rgba(248,113,113,0.25)",
+                          }}
+                        >
+                          Inactive
+                        </span>
+                      ) : null}
+                    </div>
                     <p className="text-xs" style={{ color: "var(--text-muted)" }}>
                       {row.source === "monthly-payroll" ? "Saved salary row" : "Employee default"}
                     </p>

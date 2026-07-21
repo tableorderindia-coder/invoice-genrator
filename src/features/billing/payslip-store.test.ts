@@ -25,6 +25,13 @@ function employee(id: string, fullName: string): Employee {
   };
 }
 
+function inactiveEmployee(id: string, fullName: string): Employee {
+  return {
+    ...employee(id, fullName),
+    isActive: false,
+  };
+}
+
 function payroll(employeeId: string, employeeName: string): MonthlyPayrollRow {
   return {
     employeeId,
@@ -148,5 +155,53 @@ describe("payslip store shaping", () => {
       panNumber: "BALA-EDITED",
       effectiveWorkDays: 10,
     });
+  });
+
+  it("does not create new payslips for inactive employees but preserves existing saved records", () => {
+    const records = preparePayslipRecords({
+      companyId: "company_1",
+      month: "2026-04",
+      employees: [employee("emp_1", "Asha"), inactiveEmployee("emp_2", "Bala")],
+      payrollRows: [payroll("emp_1", "Asha"), payroll("emp_2", "Bala")],
+      templatesByEmployeeId: new Map(),
+      existingPayslips: [
+        {
+          id: "payslip_existing_inactive",
+          companyId: "company_1",
+          employeeId: "emp_2",
+          employeeName: "Bala Existing",
+          month: "2026-04",
+          panNumber: "BALA-PAN",
+          pfUan: "",
+          joiningDate: "2026-04-01",
+          designation: "Engineer",
+          effectiveWorkDays: 30,
+          earnings: [{ label: "BASIC", amountInrCents: 80_000_00, sortOrder: 1 }],
+          deductions: [],
+          tdsEarnings: [],
+          tdsIncomeTaxDeductions: [],
+          taxPaidMonths: [],
+        },
+      ],
+      previousTaxPaidByEmployeeId: new Map(),
+    });
+
+    expect(records.map((record) => record.employeeId)).toEqual(["emp_1", "emp_2"]);
+    expect(records.find((record) => record.employeeId === "emp_2")).toMatchObject({
+      id: "payslip_existing_inactive",
+      employeeName: "Bala Existing",
+    });
+
+    const freshRecords = preparePayslipRecords({
+      companyId: "company_1",
+      month: "2026-04",
+      employees: [employee("emp_1", "Asha"), inactiveEmployee("emp_2", "Bala")],
+      payrollRows: [payroll("emp_1", "Asha"), payroll("emp_2", "Bala")],
+      templatesByEmployeeId: new Map(),
+      existingPayslips: [],
+      previousTaxPaidByEmployeeId: new Map(),
+    });
+
+    expect(freshRecords.map((record) => record.employeeId)).toEqual(["emp_1"]);
   });
 });
