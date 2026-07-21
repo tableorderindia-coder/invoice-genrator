@@ -23,6 +23,7 @@ describe("expenses period page", () => {
   it("shows row months and preserves each row month while editing", () => {
     const page = readProjectFile("app/expenses/page.tsx");
 
+    expect(page).toContain('Field label="Expense month"');
     expect(page).toContain("formatMonthYear(expense.month, expense.year)");
     expect(page).toContain('name="year" value={expense.year}');
     expect(page).toContain('name="month" value={expense.month}');
