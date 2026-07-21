@@ -11,23 +11,14 @@ import {
 import { listCompanies, listCompanyExpensesForCompanies } from "@/src/features/billing/store";
 import { resolveSelectedCompanyIds } from "@/src/features/billing/filter-selection";
 import { formatInr, formatMonthYear } from "@/src/features/billing/utils";
+import {
+  currentExpenseMonthKey,
+  formatExpensePeriodLabel,
+  normalizeExpensePeriodRange,
+  parseExpenseMonthKeyParts,
+} from "@/src/features/billing/expense-period";
 
 export const dynamic = "force-dynamic";
-
-const MONTHS = [
-  { value: 1, label: "January" },
-  { value: 2, label: "February" },
-  { value: 3, label: "March" },
-  { value: 4, label: "April" },
-  { value: 5, label: "May" },
-  { value: 6, label: "June" },
-  { value: 7, label: "July" },
-  { value: 8, label: "August" },
-  { value: 9, label: "September" },
-  { value: 10, label: "October" },
-  { value: 11, label: "November" },
-  { value: 12, label: "December" },
-];
 
 export default async function ExpensesPage({
   searchParams,
@@ -45,9 +36,16 @@ export default async function ExpensesPage({
   });
   const selectedCompanyId = selectedCompanyIds[0] ?? "";
   const singleCompanySelected = selectedCompanyIds.length === 1;
-  const now = new Date();
-  const selectedYear = typeof params.year === "string" ? Number.parseInt(params.year, 10) : now.getFullYear();
-  const selectedMonth = typeof params.month === "string" ? Number.parseInt(params.month, 10) : (now.getMonth() + 1);
+  const fallbackMonth =
+    typeof params.year === "string" && typeof params.month === "string"
+      ? `${params.year}-${params.month.padStart(2, "0")}`
+      : currentExpenseMonthKey();
+  const period = normalizeExpensePeriodRange({
+    startMonth: params.startMonth,
+    endMonth: params.endMonth,
+    fallbackMonth,
+  });
+  const addTargetMonth = parseExpenseMonthKeyParts(period.endMonth);
 
   const flashStatus = typeof params.flashStatus === "string" ? params.flashStatus : undefined;
   const flashMessage = typeof params.flashMessage === "string" ? params.flashMessage : undefined;
@@ -59,8 +57,8 @@ export default async function ExpensesPage({
 
   const expenses = await listCompanyExpensesForCompanies({
     companyIds: selectedCompanyIds,
-    year: selectedYear,
-    month: selectedMonth,
+    startMonth: period.startMonth,
+    endMonth: period.endMonth,
   });
 
   const totalInrCents = expenses.reduce((sum, e) => sum + e.amountInrCents, 0);
@@ -69,11 +67,11 @@ export default async function ExpensesPage({
   const companyScopeParams = selectedCompanyIds
     .map((companyId) => `companyIds=${encodeURIComponent(companyId)}`)
     .join("&");
-  const returnUrl = `/expenses?${companyScopeParams}&year=${selectedYear}&month=${selectedMonth}`;
-
-  // Years dropdown range
-  const currentYear = now.getFullYear();
-  const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
+  const returnUrl = `/expenses?${companyScopeParams}&startMonth=${encodeURIComponent(
+    period.startMonth,
+  )}&endMonth=${encodeURIComponent(period.endMonth)}`;
+  const periodLabel = formatExpensePeriodLabel(period.startMonth, period.endMonth);
+  const addTargetMonthLabel = formatMonthYear(addTargetMonth.month, addTargetMonth.year);
 
   return (
     <Shell
@@ -107,19 +105,23 @@ export default async function ExpensesPage({
               {selectedCompanyIds.map((companyId) => (
                 <input key={companyId} type="hidden" name="companyIds" value={companyId} />
               ))}
-              <Field label="Month">
-                <select name="month" defaultValue={selectedMonth} className={inputClass}>
-                  {MONTHS.map((m) => (
-                    <option key={m.value} value={m.value}>{m.label}</option>
-                  ))}
-                </select>
+              {flashStatus && <input type="hidden" name="flashStatus" value={flashStatus} />}
+              {flashMessage && <input type="hidden" name="flashMessage" value={flashMessage} />}
+              <Field label="Start month">
+                <input
+                  type="month"
+                  name="startMonth"
+                  defaultValue={period.startMonth}
+                  className={inputClass}
+                />
               </Field>
-              <Field label="Year">
-                <select name="year" defaultValue={selectedYear} className={inputClass}>
-                  {years.map((y) => (
-                    <option key={y} value={y}>{y}</option>
-                  ))}
-                </select>
+              <Field label="End month">
+                <input
+                  type="month"
+                  name="endMonth"
+                  defaultValue={period.endMonth}
+                  className={inputClass}
+                />
               </Field>
               <button
                 type="submit"
@@ -137,13 +139,13 @@ export default async function ExpensesPage({
               Add Expense
             </h2>
             <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-              {selectedCompany?.name ?? "—"} · {formatMonthYear(selectedMonth, selectedYear)}
+              {selectedCompany?.name ?? "-"} · saves to {addTargetMonthLabel}
             </p>
             {singleCompanySelected ? (
             <form action={saveCompanyExpenseAction} className="mt-4 space-y-4">
               <input type="hidden" name="companyId" value={selectedCompanyId} />
-              <input type="hidden" name="year" value={selectedYear} />
-              <input type="hidden" name="month" value={selectedMonth} />
+              <input type="hidden" name="year" value={addTargetMonth.year} />
+              <input type="hidden" name="month" value={addTargetMonth.month} />
               <input type="hidden" name="returnTo" value={returnUrl} />
 
               <Field label="Label">
@@ -184,7 +186,7 @@ export default async function ExpensesPage({
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xl font-semibold" style={{ color: "var(--text-primary)" }}>
-                Expenses for {formatMonthYear(selectedMonth, selectedYear)}
+                Expenses for {periodLabel}
               </h2>
               <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
                 {selectedCompany?.name ?? "Selected companies"}
@@ -217,7 +219,9 @@ export default async function ExpensesPage({
                     {expense.label || "(No label)"}
                   </p>
                   <p className="text-sm mt-0.5" style={{ color: "var(--text-secondary)" }}>
-                    {companyNameMap.get(expense.companyId)} · {formatInr(expense.amountInrCents)}
+                    {companyNameMap.get(expense.companyId)} ·{" "}
+                    {formatMonthYear(expense.month, expense.year)} ·{" "}
+                    {formatInr(expense.amountInrCents)}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -225,8 +229,8 @@ export default async function ExpensesPage({
                   <form action={saveCompanyExpenseAction} className="flex items-center gap-2">
                     <input type="hidden" name="expenseId" value={expense.id} />
                     <input type="hidden" name="companyId" value={expense.companyId} />
-                    <input type="hidden" name="year" value={selectedYear} />
-                    <input type="hidden" name="month" value={selectedMonth} />
+                    <input type="hidden" name="year" value={expense.year} />
+                    <input type="hidden" name="month" value={expense.month} />
                     <input type="hidden" name="label" value={expense.label} />
                     <input type="hidden" name="returnTo" value={returnUrl} />
                     <input

@@ -153,6 +153,82 @@ describe("batched billing store loads", () => {
     });
   });
 
+  it("filters company expenses for selected companies inside an inclusive period", async () => {
+    mocks.state.response = {
+      data: [
+        {
+          id: "expense_before",
+          company_id: "company_a",
+          year: 2025,
+          month: 11,
+          label: "Before",
+          amount_inr_cents: 10_00,
+          created_at: "2025-11-01T00:00:00.000Z",
+          updated_at: "2025-11-01T00:00:00.000Z",
+        },
+        {
+          id: "expense_dec",
+          company_id: "company_a",
+          year: 2025,
+          month: 12,
+          label: "December",
+          amount_inr_cents: 20_00,
+          created_at: "2025-12-01T00:00:00.000Z",
+          updated_at: "2025-12-01T00:00:00.000Z",
+        },
+        {
+          id: "expense_jan",
+          company_id: "company_b",
+          year: 2026,
+          month: 1,
+          label: "January",
+          amount_inr_cents: 30_00,
+          created_at: "2026-01-01T00:00:00.000Z",
+          updated_at: "2026-01-01T00:00:00.000Z",
+        },
+        {
+          id: "expense_feb",
+          company_id: "company_a",
+          year: 2026,
+          month: 2,
+          label: "February",
+          amount_inr_cents: 40_00,
+          created_at: "2026-02-01T00:00:00.000Z",
+          updated_at: "2026-02-01T00:00:00.000Z",
+        },
+        {
+          id: "expense_after",
+          company_id: "company_b",
+          year: 2026,
+          month: 3,
+          label: "After",
+          amount_inr_cents: 50_00,
+          created_at: "2026-03-01T00:00:00.000Z",
+          updated_at: "2026-03-01T00:00:00.000Z",
+        },
+      ],
+      error: null,
+    };
+
+    const expenses = await listCompanyExpensesForCompanies({
+      companyIds: ["company_a", "company_b"],
+      startMonth: "2025-12",
+      endMonth: "2026-02",
+    });
+
+    expect(mocks.state.chains[0]?.in).toHaveBeenCalledWith("company_id", [
+      "company_a",
+      "company_b",
+    ]);
+    expect(mocks.state.chains[0]?.eq).not.toHaveBeenCalledWith("year", expect.any(Number));
+    expect(mocks.state.chains[0]?.eq).not.toHaveBeenCalledWith("month", expect.any(Number));
+    expect(expenses.map((expense) => expense.id)).toEqual([
+      "expense_dec",
+      "expense_jan",
+      "expense_feb",
+    ]);
+  });
+
   it("loads available team names for selected companies with batched team and employee queries", async () => {
     mocks.state.tableResponses = {
       teams: {
