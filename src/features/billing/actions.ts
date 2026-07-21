@@ -44,6 +44,7 @@ import {
   updateDashboardEmployeeCashFlowEntry,
   upsertInvoicePayment,
 } from "./employee-cash-flow-store";
+import { parseExpenseMonthKeyParts } from "./expense-period";
 import type { InvoiceStatus } from "./types";
 import { centsFromUsd } from "./utils";
 import { parseFounderWithdrawalRows } from "./founders-balance";
@@ -965,12 +966,17 @@ export async function saveCompanyExpenseAction(formData: FormData) {
       throw new Error("Select a company first.");
     }
 
-    const year = Number.parseInt(getString(formData, "year"), 10);
+    const expenseMonth = getString(formData, "expenseMonth");
+    const parsedExpenseMonth = expenseMonth
+      ? parseExpenseMonthKeyParts(expenseMonth)
+      : undefined;
+
+    const year = parsedExpenseMonth?.year ?? Number.parseInt(getString(formData, "year"), 10);
     if (!Number.isFinite(year) || year <= 0) {
       throw new Error("Invalid year.");
     }
 
-    const month = Number.parseInt(getString(formData, "month"), 10);
+    const month = parsedExpenseMonth?.month ?? Number.parseInt(getString(formData, "month"), 10);
     if (!Number.isFinite(month) || month < 1 || month > 12) {
       throw new Error("Invalid month.");
     }

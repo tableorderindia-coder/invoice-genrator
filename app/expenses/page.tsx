@@ -71,7 +71,6 @@ export default async function ExpensesPage({
     period.startMonth,
   )}&endMonth=${encodeURIComponent(period.endMonth)}`;
   const periodLabel = formatExpensePeriodLabel(period.startMonth, period.endMonth);
-  const addTargetMonthLabel = formatMonthYear(addTargetMonth.month, addTargetMonth.year);
 
   return (
     <Shell
@@ -139,7 +138,7 @@ export default async function ExpensesPage({
               Add Expense
             </h2>
             <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-              {selectedCompany?.name ?? "-"} · saves to {addTargetMonthLabel}
+              {selectedCompany?.name ?? "-"}
             </p>
             {singleCompanySelected ? (
             <form action={saveCompanyExpenseAction} className="mt-4 space-y-4">
@@ -148,6 +147,15 @@ export default async function ExpensesPage({
               <input type="hidden" name="month" value={addTargetMonth.month} />
               <input type="hidden" name="returnTo" value={returnUrl} />
 
+              <Field label="Expense month">
+                <input
+                  name="expenseMonth"
+                  type="month"
+                  required
+                  defaultValue={period.endMonth}
+                  className={inputClass}
+                />
+              </Field>
               <Field label="Label">
                 <input
                   name="label"

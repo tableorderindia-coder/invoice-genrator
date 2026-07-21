@@ -15,6 +15,7 @@ const upsertFounderWithdrawalsMock = vi.fn();
 const saveMonthlyPayrollRowsMock = vi.fn();
 const prepareAndSavePayslipsMock = vi.fn();
 const savePayslipRecordMock = vi.fn();
+const upsertCompanyExpenseMock = vi.fn();
 const requireCompanyPageEditAccessMock = vi.fn();
 
 vi.mock("next/cache", () => ({
@@ -54,6 +55,7 @@ vi.mock("./store", () => ({
   updateInvoiceStatus: vi.fn(),
   updateCompany: updateCompanyMock,
   updateEmployee: updateEmployeeMock,
+  upsertCompanyExpense: upsertCompanyExpenseMock,
   upsertDashboardExpense: vi.fn(),
   upsertEmployeeStatementSection: upsertEmployeeStatementSectionMock,
   upsertFounderWithdrawals: upsertFounderWithdrawalsMock,
@@ -101,9 +103,36 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
     prepareAndSavePayslipsMock.mockResolvedValue([]);
     savePayslipRecordMock.mockReset();
     savePayslipRecordMock.mockResolvedValue(undefined);
+    upsertCompanyExpenseMock.mockReset();
+    upsertCompanyExpenseMock.mockResolvedValue("expense_1");
     requireCompanyPageEditAccessMock.mockReset();
     requireCompanyPageEditAccessMock.mockResolvedValue({
       profile: { id: "admin_1", role: "admin" },
+    });
+  });
+
+  it("saves a new company expense to the explicit expense month from the add form", async () => {
+    const { saveCompanyExpenseAction } = await import("./actions");
+    const formData = new FormData();
+    formData.set("companyId", "company_1");
+    formData.set("expenseMonth", "2026-05");
+    formData.set("year", "2026");
+    formData.set("month", "7");
+    formData.set("label", "Software");
+    formData.set("amountInr", "123.45");
+    formData.set("returnTo", "/expenses?companyIds=company_1&startMonth=2026-04&endMonth=2026-07");
+
+    await expect(saveCompanyExpenseAction(formData)).rejects.toThrow(
+      "REDIRECT:/expenses?companyIds=company_1&startMonth=2026-04&endMonth=2026-07&flashStatus=success&flashMessage=Expense%20saved.",
+    );
+
+    expect(upsertCompanyExpenseMock).toHaveBeenCalledWith({
+      id: undefined,
+      companyId: "company_1",
+      year: 2026,
+      month: 5,
+      label: "Software",
+      amountInrCents: 12345,
     });
   });
 
