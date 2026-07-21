@@ -9,6 +9,7 @@ import { requirePageAccess } from "@/lib/auth/server";
 import {
   updateDashboardEmployeeCashFlowEntryAction,
 } from "../../src/features/billing/actions";
+import { employeeStatusLabel } from "../../src/features/billing/employee-status";
 import {
   buildDashboardFilterFieldEntries,
   formatPaymentMonthLabel,
@@ -373,7 +374,7 @@ export default async function DashboardPage({
                 label="Employee"
                 options={employees.map((employee) => ({
                   value: employee.id,
-                  label: employee.fullName,
+                  label: employeeStatusLabel(employee),
                 }))}
                 defaultSelectedValues={effectiveEmployeeIds}
                 includeSelectAll
@@ -431,7 +432,7 @@ export default async function DashboardPage({
                 label="Employee"
                 options={employees.map((employee) => ({
                   value: employee.id,
-                  label: employee.fullName,
+                  label: employeeStatusLabel(employee),
                 }))}
                 defaultSelectedValues={effectiveEmployeeIds}
                 includeSelectAll

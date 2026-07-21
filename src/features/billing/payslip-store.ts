@@ -88,6 +88,10 @@ export function preparePayslipRecords(input: {
 
   return input.payrollRows
     .filter((row) => row.companyId === input.companyId && row.month === input.month && row.source === "monthly-payroll")
+    .filter((row) => {
+      const employee = employeesById.get(row.employeeId);
+      return employee?.isActive !== false || existingByEmployeeId.has(row.employeeId);
+    })
     .map((payrollRow) => {
       const existing = existingByEmployeeId.get(payrollRow.employeeId);
       if (existing && !resetEmployeeIds.has(payrollRow.employeeId)) {

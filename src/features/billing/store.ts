@@ -880,29 +880,42 @@ export async function updateCompany(input: {
   return mapCompany(data as DbCompany);
 }
 
-export async function listEmployees(companyId?: string) {
+type ListEmployeesOptions = {
+  activeOnly?: boolean;
+};
+
+export async function listEmployees(companyId?: string, options: ListEmployeesOptions = {}) {
   const supabase = await getSupabaseOrThrow();
-  let query = supabase.from("employees").select("*").order("full_name");
+  let query = supabase.from("employees").select("*");
   if (companyId) {
     query = query.eq("company_id", companyId);
   }
-  const { data, error } = await query;
+  if (options.activeOnly) {
+    query = query.eq("is_active", true);
+  }
+  const { data, error } = await query.order("full_name");
   if (error) throw error;
   return (data ?? []).map((row) => mapEmployee(row as DbEmployee));
 }
 
-export async function listEmployeesForCompanies(companyIds: string[]) {
+export async function listEmployeesForCompanies(
+  companyIds: string[],
+  options: ListEmployeesOptions = {},
+) {
   const uniqueCompanyIds = uniqueNonEmptyValues(companyIds);
   if (uniqueCompanyIds.length === 0) {
     return [];
   }
 
   const supabase = await getSupabaseOrThrow();
-  const { data, error } = await supabase
+  let query = supabase
     .from("employees")
     .select("*")
-    .in("company_id", uniqueCompanyIds)
-    .order("full_name");
+    .in("company_id", uniqueCompanyIds);
+  if (options.activeOnly) {
+    query = query.eq("is_active", true);
+  }
+  const { data, error } = await query.order("full_name");
   if (error) throw error;
   return (data ?? []).map((row) => mapEmployee(row as DbEmployee));
 }
@@ -921,7 +934,7 @@ async function listTeams(companyId?: string) {
 export async function listAvailableTeamNames(companyId: string) {
   const [teams, employees] = await Promise.all([
     listTeams(companyId),
-    listEmployees(companyId),
+    listEmployees(companyId, { activeOnly: true }),
   ]);
 
   return buildAvailableTeamNames({
@@ -943,7 +956,7 @@ export async function listAvailableTeamNamesForCompanies(companyIds: string[]) {
       .select("*")
       .in("company_id", uniqueCompanyIds)
       .order("name"),
-    listEmployeesForCompanies(uniqueCompanyIds),
+    listEmployeesForCompanies(uniqueCompanyIds, { activeOnly: true }),
   ]);
   if (teamsResult.error) throw teamsResult.error;
 
@@ -1394,7 +1407,7 @@ export async function addInvoiceTeam(
       .single();
     if (invoiceError) throw invoiceError;
 
-    const employees = await listEmployees(String(invoiceRow.company_id));
+    const employees = await listEmployees(String(invoiceRow.company_id), { activeOnly: true });
     const matchingEmployees = getMatchingEmployeesForTeam({
       teamName,
       employees,
@@ -1466,6 +1479,9 @@ async function addInvoiceLineItem(input: {
   if (employeeError) throw employeeError;
   if (teamError) throw teamError;
   if (invoiceError) throw invoiceError;
+  if (!(employeeRow as DbEmployee).is_active) {
+    throw new Error("Inactive employees cannot be added to new invoice work.");
+  }
 
   const { data: existingLineRows, error: existingLineError } = await supabase
     .from("invoice_line_items")

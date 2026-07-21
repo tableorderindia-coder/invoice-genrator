@@ -37,6 +37,8 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 
 import {
+  listEmployees,
+  listEmployeesForCompanies,
   listAvailablePaymentMonthsForCompanies,
   listAvailableTeamNamesForCompanies,
   listCompanyExpensesForCompanies,
@@ -223,6 +225,92 @@ describe("batched billing store loads", () => {
     expect(namesByCompany).toEqual({
       company_a: ["Analytics", "Data"],
       company_b: ["Ops"],
+    });
+  });
+
+  it("can load only active employees for one company without changing the default historical load", async () => {
+    mocks.state.response = {
+      data: [
+        {
+          id: "emp_active",
+          company_id: "company_a",
+          full_name: "Active Employee",
+          designation: "Engineer",
+          default_team: "Data",
+          billing_rate_usd_cents: 100,
+          payout_monthly_usd_cents: 1000,
+          default_paid_usd_inr_rate: 83,
+          default_actual_paid_inr_cents: 0,
+          default_pf_inr_cents: 0,
+          default_tds_inr_cents: 0,
+          hrs_per_week: 40,
+          active_from: "2026-04-01",
+          active_to: null,
+          is_active: true,
+          created_at: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+      error: null,
+    };
+
+    await listEmployees("company_a");
+    await listEmployees("company_a", { activeOnly: true });
+
+    expect(mocks.state.chains[0]?.eq).toHaveBeenCalledWith("company_id", "company_a");
+    expect(mocks.state.chains[0]?.eq).not.toHaveBeenCalledWith("is_active", true);
+    expect(mocks.state.chains[1]?.eq).toHaveBeenCalledWith("company_id", "company_a");
+    expect(mocks.state.chains[1]?.eq).toHaveBeenCalledWith("is_active", true);
+  });
+
+  it("can load only active employees for selected companies", async () => {
+    mocks.state.response = { data: [], error: null };
+
+    await listEmployeesForCompanies(["company_a", "company_b"], { activeOnly: true });
+
+    expect(mocks.supabase.from).toHaveBeenCalledWith("employees");
+    expect(mocks.state.chains[0]?.in).toHaveBeenCalledWith("company_id", [
+      "company_a",
+      "company_b",
+    ]);
+    expect(mocks.state.chains[0]?.eq).toHaveBeenCalledWith("is_active", true);
+  });
+
+  it("excludes inactive employee default teams from new invoice team catalogs", async () => {
+    mocks.state.tableResponses = {
+      teams: {
+        data: [],
+        error: null,
+      },
+      employees: {
+        data: [
+          {
+            id: "emp_active",
+            company_id: "company_a",
+            full_name: "Active Employee",
+            designation: "Engineer",
+            default_team: "Active Team",
+            billing_rate_usd_cents: 100,
+            payout_monthly_usd_cents: 1000,
+            default_paid_usd_inr_rate: 83,
+            default_actual_paid_inr_cents: 0,
+            default_pf_inr_cents: 0,
+            default_tds_inr_cents: 0,
+            hrs_per_week: 40,
+            active_from: "2026-04-01",
+            active_to: null,
+            is_active: true,
+            created_at: "2026-04-01T00:00:00.000Z",
+          },
+        ],
+        error: null,
+      },
+    };
+
+    const namesByCompany = await listAvailableTeamNamesForCompanies(["company_a"]);
+
+    expect(mocks.state.chains[1]?.eq).toHaveBeenCalledWith("is_active", true);
+    expect(namesByCompany).toEqual({
+      company_a: ["Active Team"],
     });
   });
 });

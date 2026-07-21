@@ -6,6 +6,7 @@ import { Shell } from "../_components/shell";
 import {
   filterCompaniesForAuthContext,
 } from "@/src/features/billing/company-access";
+import { employeeStatusLabel } from "@/src/features/billing/employee-status";
 import { requirePageAccess } from "@/lib/auth/server";
 import EmployeeStatementEditor from "./_components/employee-statement-editor";
 import {
@@ -120,7 +121,7 @@ export default async function EmployeeStatementsPage({
             label="employee"
             options={employees.map((employee) => ({
               value: employee.id,
-              label: employee.fullName,
+              label: employeeStatusLabel(employee),
             }))}
             defaultSelectedValues={selectedEmployeeIds}
             includeSelectAll

@@ -54,7 +54,7 @@ export default async function DraftInvoicePage({
   }
 
   const availableTeamNames = await listAvailableTeamNames(detail.company.id);
-  const employees = await listEmployees(detail.company.id);
+  const employees = await listEmployees(detail.company.id, { activeOnly: true });
   const securityDepositBalances = await getCompanySecurityDepositBalances(detail.company.id);
   const selectedTeamNames = new Set(detail.teams.map((team) => team.teamName.toLowerCase()));
   const remainingTeamNames = availableTeamNames.filter(

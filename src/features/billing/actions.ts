@@ -274,6 +274,9 @@ export async function updateEmployeeAction(formData: FormData) {
 
   revalidatePath("/employees");
   revalidatePath("/invoices");
+  revalidatePath("/salary");
+  revalidatePath("/dashboard");
+  revalidatePath("/employee-statements");
   redirect("/employees");
 }
 

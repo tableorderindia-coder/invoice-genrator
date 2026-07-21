@@ -12,6 +12,7 @@ import {
 import { createEmployeeAction, updateEmployeeAction } from "@/src/features/billing/actions";
 import { listCompanies, listEmployeesForCompanies } from "@/src/features/billing/store";
 import { buildWhatsAppHref } from "@/src/features/billing/employee-contact";
+import { employeeStatusLabel } from "@/src/features/billing/employee-status";
 import { resolveSelectedCompanyIds } from "@/src/features/billing/filter-selection";
 import {
   formatInr,
@@ -160,7 +161,7 @@ export default async function EmployeesPage({
                     >
                       {employees.map((employee) => (
                         <option key={employee.id} value={employee.id}>
-                          {employee.fullName}
+                          {employeeStatusLabel(employee)}
                         </option>
                       ))}
                     </select>
@@ -256,6 +257,16 @@ export default async function EmployeesPage({
                     <p className="font-semibold" style={{ color: "var(--text-primary)" }}>
                       {employee.fullName}
                     </p>
+                    <span
+                      className="mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold"
+                      style={{
+                        background: employee.isActive ? "rgba(16,185,129,0.12)" : "rgba(248,113,113,0.12)",
+                        color: employee.isActive ? "#86efac" : "#fca5a5",
+                        border: employee.isActive ? "1px solid rgba(16,185,129,0.25)" : "1px solid rgba(248,113,113,0.25)",
+                      }}
+                    >
+                      {employee.isActive ? "Active" : "Inactive"}
+                    </span>
                     <p className="text-sm" style={{ color: "var(--text-muted)" }}>
                       {employee.designation}
                     </p>

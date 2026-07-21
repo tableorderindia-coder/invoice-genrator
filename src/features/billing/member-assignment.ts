@@ -1,9 +1,9 @@
-export function filterEligibleEmployeesForTeam<T extends { id: string }>(input: {
+export function filterEligibleEmployeesForTeam<T extends { id: string; isActive?: boolean }>(input: {
   employees: T[];
   currentTeamMemberIds: string[];
 }) {
   const memberIds = new Set(input.currentTeamMemberIds);
-  return input.employees.filter((employee) => !memberIds.has(employee.id));
+  return input.employees.filter((employee) => employee.isActive !== false && !memberIds.has(employee.id));
 }
 
 export function findExistingLineItemForEmployee(input: {
