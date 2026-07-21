@@ -150,14 +150,13 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
         {
           employeeId: "emp_1",
           employeeName: "Asha",
-          paidUsdInrRate: 83,
-          salaryPaidInrCents: 20000000,
+          monthlyPaidInrCents: 20000000,
+          daysWorked: 15.5,
+          daysInMonth: 31,
+          salaryPaidInrCents: 10000000,
           pfInrCents: 180000,
           tdsInrCents: 250000,
-          paidStatus: true,
-          paidDate: "2026-07-31",
           notes: "Verified",
-          overrideNote: "Final admin override",
         },
       ]),
     );
@@ -176,8 +175,11 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
       rows: [
         expect.objectContaining({
           employeeId: "emp_1",
-          salaryPaidInrCents: 20000000,
-          overrideNote: "Final admin override",
+          monthlyPaidInrCents: 20000000,
+          daysWorked: 15.5,
+          daysInMonth: 31,
+          salaryPaidInrCents: 10000000,
+          notes: "Verified",
         }),
       ],
     });

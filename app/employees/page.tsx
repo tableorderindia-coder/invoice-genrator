@@ -116,7 +116,7 @@ export default async function EmployeesPage({
                 <Field label="Peg rate">
                   <input name="defaultPaidUsdInrRate" type="number" min="0" step="1" className={inputClass} placeholder="0" defaultValue="0" />
                 </Field>
-                <Field label="Actual paid (INR)">
+                <Field label="Monthly paid (INR)">
                   <input name="defaultActualPaidInr" type="number" min="0" step="0.01" className={inputClass} placeholder="0.00" defaultValue="0" />
                 </Field>
                 <Field label="PF (INR)">
@@ -201,7 +201,7 @@ export default async function EmployeesPage({
                   <Field label="Peg rate">
                     <input name="defaultPaidUsdInrRate" type="number" min="0" step="1" className={inputClass} defaultValue={formatWholeRateInput(selectedEmployee?.defaultPaidUsdInrRate)} />
                   </Field>
-                  <Field label="Actual paid (INR)">
+                  <Field label="Monthly paid (INR)">
                     <input name="defaultActualPaidInr" type="number" min="0" step="0.01" className={inputClass} defaultValue={selectedEmployee ? (selectedEmployee.defaultActualPaidInrCents / 100).toFixed(2) : "0"} />
                   </Field>
                   <Field label="PF (INR)">
@@ -335,7 +335,7 @@ export default async function EmployeesPage({
                       border: "1px solid var(--glass-border)",
                     }}
                   >
-                    Paid {formatInr(employee.defaultActualPaidInrCents)}
+                    Monthly paid {formatInr(employee.defaultActualPaidInrCents)}
                   </span>
                   <span
                     className="rounded-full px-3 py-1 text-xs font-medium"

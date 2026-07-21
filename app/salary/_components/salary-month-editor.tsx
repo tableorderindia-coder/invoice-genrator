@@ -6,13 +6,17 @@ import { BadgeCheck } from "lucide-react";
 import { Field, inputClass } from "@/app/_components/field";
 import { PendingSubmitButton } from "@/app/_components/pending-submit-button";
 import { saveMonthlyPayrollRowsAction } from "@/src/features/billing/actions";
-import { summarizePayrollRows, type MonthlyPayrollRow, type PayrollStatus } from "@/src/features/billing/payroll";
-import { formatInr, formatRate } from "@/src/features/billing/utils";
+import {
+  calculateActualPaidInrCents,
+  normalizePayrollDaysWorked,
+  summarizePayrollRows,
+  type MonthlyPayrollRow,
+  type PayrollStatus,
+} from "@/src/features/billing/payroll";
+import { formatInr } from "@/src/features/billing/utils";
 
 type EditablePayrollRow = MonthlyPayrollRow & {
-  paidDate: string;
   notes: string;
-  overrideNote: string;
 };
 
 function inrInputValue(cents: number) {
@@ -30,9 +34,7 @@ function centsFromInrInput(value: string) {
 function toEditableRow(row: MonthlyPayrollRow): EditablePayrollRow {
   return {
     ...row,
-    paidDate: row.paidDate ?? "",
     notes: row.notes ?? "",
-    overrideNote: row.overrideNote ?? "",
   };
 }
 
@@ -56,21 +58,37 @@ export function SalaryMonthEditor({
   );
   const [updateEmployeeMaster, setUpdateEmployeeMaster] = useState(false);
   const [editableRows, setEditableRows] = useState(() => rows.map(toEditableRow));
-  const summary = useMemo(() => summarizePayrollRows(editableRows), [editableRows]);
+  const summary = useMemo(
+    () =>
+      summarizePayrollRows(
+        editableRows.map((row) => ({
+          ...row,
+          salaryPaidInrCents: calculateActualPaidInrCents({
+            monthlyPaidInrCents: row.monthlyPaidInrCents,
+            daysWorked: row.daysWorked,
+            daysInMonth: row.daysInMonth,
+          }),
+        })),
+      ),
+    [editableRows],
+  );
   const rowsJson = useMemo(
     () =>
       JSON.stringify(
         editableRows.map((row) => ({
           employeeId: row.employeeId,
           employeeName: row.employeeName,
-          paidUsdInrRate: row.paidUsdInrRate,
-          salaryPaidInrCents: row.salaryPaidInrCents,
+          monthlyPaidInrCents: row.monthlyPaidInrCents,
+          daysWorked: row.daysWorked,
+          daysInMonth: row.daysInMonth,
+          salaryPaidInrCents: calculateActualPaidInrCents({
+            monthlyPaidInrCents: row.monthlyPaidInrCents,
+            daysWorked: row.daysWorked,
+            daysInMonth: row.daysInMonth,
+          }),
           pfInrCents: row.pfInrCents,
           tdsInrCents: row.tdsInrCents,
-          paidStatus: row.paidStatus,
-          paidDate: row.paidDate || undefined,
           notes: row.notes,
-          overrideNote: row.overrideNote,
         })),
       ),
     [editableRows],
@@ -116,7 +134,7 @@ export function SalaryMonthEditor({
         <input type="hidden" name="updateEmployeeMaster" value={updateEmployeeMaster ? "true" : "false"} />
 
         <div className="rounded-2xl border px-4 py-3" style={{ borderColor: "var(--glass-border)" }}>
-          <p className="text-xs" style={{ color: "var(--text-muted)" }}>Gross salary</p>
+          <p className="text-xs" style={{ color: "var(--text-muted)" }}>Actual paid</p>
           <p className="mt-1 text-lg font-semibold">{formatInr(summary.salaryPaidInrCents)}</p>
         </div>
 
@@ -141,74 +159,86 @@ export function SalaryMonthEditor({
         </div>
 
         <div className="overflow-x-auto">
-          <table className="min-w-[1180px] w-full text-left text-sm">
+          <table className="min-w-[980px] w-full text-left text-sm">
             <thead style={{ color: "var(--text-muted)" }}>
               <tr className="border-b" style={{ borderColor: "var(--glass-border)" }}>
                 <th className="px-4 py-3 font-medium">Employee</th>
-                <th className="px-4 py-3 font-medium">Peg rate</th>
+                <th className="px-4 py-3 font-medium">Days worked</th>
+                <th className="px-4 py-3 font-medium">Monthly paid INR</th>
                 <th className="px-4 py-3 font-medium">Actual paid INR</th>
                 <th className="px-4 py-3 font-medium">PF INR</th>
                 <th className="px-4 py-3 font-medium">TDS INR</th>
-                <th className="px-4 py-3 font-medium">Paid</th>
-                <th className="px-4 py-3 font-medium">Paid date</th>
                 <th className="px-4 py-3 font-medium">Notes</th>
-                <th className="px-4 py-3 font-medium">Override note</th>
               </tr>
             </thead>
             <tbody>
-              {editableRows.map((row) => (
-                <tr key={row.employeeId} className="border-b" style={{ borderColor: "var(--glass-border)" }}>
-                  <td className="px-4 py-3 align-top">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-medium">{row.employeeName}</p>
-                      {row.employeeIsActive === false ? (
-                        <span
-                          className="rounded-full px-2 py-0.5 text-[11px] font-semibold"
-                          style={{
-                            background: "rgba(248,113,113,0.12)",
-                            color: "#fca5a5",
-                            border: "1px solid rgba(248,113,113,0.25)",
-                          }}
-                        >
-                          Inactive
-                        </span>
-                      ) : null}
-                    </div>
-                    <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                      {row.source === "monthly-payroll" ? "Saved salary row" : "Employee default"}
-                    </p>
-                  </td>
-                  <td className="px-4 py-3 align-top">
-                    <input
-                      className={`${inputClass} w-28`}
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={row.paidUsdInrRate}
-                      onChange={(event) =>
-                        updateRow(row.employeeId, {
-                          paidUsdInrRate: Number.parseFloat(event.currentTarget.value || "0"),
-                        })
-                      }
-                      aria-label={`${row.employeeName} peg rate`}
-                    />
-                    <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>{formatRate(row.paidUsdInrRate)}</p>
-                  </td>
-                  <td className="px-4 py-3 align-top">
-                    <input
-                      className={`${inputClass} w-36`}
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={inrInputValue(row.salaryPaidInrCents)}
-                      onChange={(event) =>
-                        updateRow(row.employeeId, {
-                          salaryPaidInrCents: centsFromInrInput(event.currentTarget.value),
-                        })
-                      }
-                      aria-label={`${row.employeeName} actual paid INR`}
-                    />
-                  </td>
+              {editableRows.map((row) => {
+                const actualPaidInrCents = calculateActualPaidInrCents({
+                  monthlyPaidInrCents: row.monthlyPaidInrCents,
+                  daysWorked: row.daysWorked,
+                  daysInMonth: row.daysInMonth,
+                });
+
+                return (
+                  <tr key={row.employeeId} className="border-b" style={{ borderColor: "var(--glass-border)" }}>
+                    <td className="px-4 py-3 align-top">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-medium">{row.employeeName}</p>
+                        {row.employeeIsActive === false ? (
+                          <span
+                            className="rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                            style={{
+                              background: "rgba(248,113,113,0.12)",
+                              color: "#fca5a5",
+                              border: "1px solid rgba(248,113,113,0.25)",
+                            }}
+                          >
+                            Inactive
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                        {row.source === "monthly-payroll" ? "Saved salary row" : "Employee default"}
+                      </p>
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      <input
+                        className={`${inputClass} w-28`}
+                        type="number"
+                        min="0"
+                        max={row.daysInMonth}
+                        step="0.01"
+                        value={row.daysWorked}
+                        onChange={(event) => {
+                          const parsed = Number.parseFloat(event.currentTarget.value || "0");
+                          updateRow(row.employeeId, {
+                            daysWorked: normalizePayrollDaysWorked(parsed, row.daysInMonth),
+                          });
+                        }}
+                        aria-label={`${row.employeeName} days worked`}
+                      />
+                      <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
+                        of {row.daysInMonth} days
+                      </p>
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      <input
+                        className={`${inputClass} w-36`}
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={inrInputValue(row.monthlyPaidInrCents)}
+                        onChange={(event) =>
+                          updateRow(row.employeeId, {
+                            monthlyPaidInrCents: centsFromInrInput(event.currentTarget.value),
+                          })
+                        }
+                        aria-label={`${row.employeeName} monthly paid INR`}
+                      />
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      <p className="font-semibold">{formatInr(actualPaidInrCents)}</p>
+                    </td>
                   <td className="px-4 py-3 align-top">
                     <input
                       className={`${inputClass} w-28`}
@@ -240,23 +270,6 @@ export function SalaryMonthEditor({
                     />
                   </td>
                   <td className="px-4 py-3 align-top">
-                    <input
-                      type="checkbox"
-                      checked={row.paidStatus}
-                      onChange={(event) => updateRow(row.employeeId, { paidStatus: event.currentTarget.checked })}
-                      aria-label={`${row.employeeName} paid`}
-                    />
-                  </td>
-                  <td className="px-4 py-3 align-top">
-                    <input
-                      className={`${inputClass} w-36`}
-                      type="date"
-                      value={row.paidDate}
-                      onChange={(event) => updateRow(row.employeeId, { paidDate: event.currentTarget.value })}
-                      aria-label={`${row.employeeName} paid date`}
-                    />
-                  </td>
-                  <td className="px-4 py-3 align-top">
                     <textarea
                       className={`${inputClass} min-h-20 w-48`}
                       value={row.notes}
@@ -264,16 +277,9 @@ export function SalaryMonthEditor({
                       aria-label={`${row.employeeName} notes`}
                     />
                   </td>
-                  <td className="px-4 py-3 align-top">
-                    <textarea
-                      className={`${inputClass} min-h-20 w-56`}
-                      value={row.overrideNote}
-                      onChange={(event) => updateRow(row.employeeId, { overrideNote: event.currentTarget.value })}
-                      aria-label={`${row.employeeName} override note`}
-                    />
-                  </td>
-                </tr>
-              ))}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

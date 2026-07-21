@@ -11,6 +11,9 @@ export type MonthlyPayrollPayment = {
   month: string;
   employeeNameSnapshot: string;
   paidUsdInrRate: number;
+  monthlyPaidInrCents: number;
+  daysWorked: number;
+  daysInMonth: number;
   salaryPaidInrCents: number;
   pfInrCents: number;
   tdsInrCents: number;
@@ -30,6 +33,9 @@ export type MonthlyPayrollRow = {
   employeeName: string;
   source: PayrollSource;
   paidUsdInrRate: number;
+  monthlyPaidInrCents: number;
+  daysWorked: number;
+  daysInMonth: number;
   salaryPaidInrCents: number;
   pfInrCents: number;
   tdsInrCents: number;
@@ -64,6 +70,38 @@ export function normalizePayrollMonthKey(input: string) {
   return `${match[1]}-${match[2]}`;
 }
 
+export function getDaysInPayrollMonth(input: string) {
+  const monthKey = normalizePayrollMonthKey(input);
+  const [yearText, monthText] = monthKey.split("-");
+  const year = Number.parseInt(yearText ?? "", 10);
+  const month = Number.parseInt(monthText ?? "", 10);
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
+export function normalizePayrollDaysWorked(input: number, daysInMonth: number) {
+  if (!Number.isFinite(input) || input < 0) {
+    return 0;
+  }
+  const rounded = Math.round(input * 100) / 100;
+  if (!Number.isFinite(daysInMonth) || daysInMonth <= 0) {
+    return rounded;
+  }
+  return Math.min(rounded, daysInMonth);
+}
+
+export function calculateActualPaidInrCents(input: {
+  monthlyPaidInrCents: number;
+  daysWorked: number;
+  daysInMonth: number;
+}) {
+  const monthlyPaidInrCents = Math.max(0, Math.round(input.monthlyPaidInrCents));
+  if (!Number.isFinite(input.daysInMonth) || input.daysInMonth <= 0) {
+    return monthlyPaidInrCents;
+  }
+  const daysWorked = normalizePayrollDaysWorked(input.daysWorked, input.daysInMonth);
+  return Math.round((monthlyPaidInrCents * daysWorked) / input.daysInMonth);
+}
+
 export function buildMonthlyPayrollRows(input: {
   companyId: string;
   month: string;
@@ -71,6 +109,7 @@ export function buildMonthlyPayrollRows(input: {
   payments: MonthlyPayrollPayment[];
 }): MonthlyPayrollRow[] {
   const month = normalizePayrollMonthKey(input.month);
+  const defaultDaysInMonth = getDaysInPayrollMonth(month);
   const paymentsByEmployeeId = new Map(
     input.payments
       .filter((payment) => payment.companyId === input.companyId && payment.month === month)
@@ -86,6 +125,12 @@ export function buildMonthlyPayrollRows(input: {
     .map((employee) => {
       const payment = paymentsByEmployeeId.get(employee.id);
       if (payment) {
+        const daysInMonth = payment.daysInMonth > 0 ? payment.daysInMonth : defaultDaysInMonth;
+        const daysWorked = normalizePayrollDaysWorked(payment.daysWorked, daysInMonth);
+        const monthlyPaidInrCents =
+          payment.monthlyPaidInrCents > 0
+            ? payment.monthlyPaidInrCents
+            : payment.salaryPaidInrCents;
         return {
           id: payment.id,
           employeeId: employee.id,
@@ -94,7 +139,14 @@ export function buildMonthlyPayrollRows(input: {
           employeeName: payment.employeeNameSnapshot || employee.fullName,
           source: "monthly-payroll",
           paidUsdInrRate: payment.paidUsdInrRate,
-          salaryPaidInrCents: payment.salaryPaidInrCents,
+          monthlyPaidInrCents,
+          daysWorked,
+          daysInMonth,
+          salaryPaidInrCents: calculateActualPaidInrCents({
+            monthlyPaidInrCents,
+            daysWorked,
+            daysInMonth,
+          }),
           pfInrCents: payment.pfInrCents,
           tdsInrCents: payment.tdsInrCents,
           paidStatus: payment.paidStatus,
@@ -114,6 +166,9 @@ export function buildMonthlyPayrollRows(input: {
         employeeName: employee.fullName,
         source: "employee-default",
         paidUsdInrRate: employee.defaultPaidUsdInrRate,
+        monthlyPaidInrCents: employee.defaultActualPaidInrCents,
+        daysWorked: defaultDaysInMonth,
+        daysInMonth: defaultDaysInMonth,
         salaryPaidInrCents: employee.defaultActualPaidInrCents,
         pfInrCents: employee.defaultPfInrCents,
         tdsInrCents: employee.defaultTdsInrCents,
