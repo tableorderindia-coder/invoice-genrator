@@ -52,12 +52,10 @@ describe("external integration and stale profit cleanup", () => {
   });
 
   it("uses canonical invoice routes and removes redirect-only legacy routes", () => {
-    const appHome = readProjectFile("app/page.tsx");
     const invoiceList = readProjectFile("app/invoices/page.tsx");
 
-    expect(appHome).toContain('href="/invoices/create"');
-    expect(appHome).not.toContain('href="/invoices/new"');
-    expect(appHome).not.toMatch(/href=\{`\/invoices\/\$\{invoice\.id\}`/);
+    expect(invoiceList).toContain('href="/invoices/create"');
+    expect(invoiceList).not.toContain('href="/invoices/new"');
     expect(invoiceList).not.toMatch(/href=\{`\/invoices\/\$\{invoice\.id\}`/);
     expect(existsSync(resolve(projectRoot, "app/invoices/new/page.tsx"))).toBe(false);
     expect(existsSync(resolve(projectRoot, "app/invoices/[id]/page.tsx"))).toBe(false);
@@ -65,11 +63,13 @@ describe("external integration and stale profit cleanup", () => {
 
   it("retires legacy USD dashboard profit metrics from app code", () => {
     const overview = readProjectFile("app/page.tsx");
+    const overviewTable = readProjectFile("app/overview-pnl-summary-table.tsx");
     const employees = readProjectFile("app/employees/page.tsx");
     const store = readProjectFile("src/features/billing/store.ts");
     const types = readProjectFile("src/features/billing/types.ts");
 
-    expect(overview).toContain("Net P/L (INR)");
+    expect(overview).toContain("P&L Overview");
+    expect(overviewTable).toContain("Net P/L INR");
     expect(overview).not.toMatch(/Realized profit|USD only in phase 1|getDashboardMetrics/);
     expect(employees).not.toMatch(/realizedProfit|formatSignedUsd|getDashboardMetrics/);
     expect(employees).not.toContain("getPnDashboardData");

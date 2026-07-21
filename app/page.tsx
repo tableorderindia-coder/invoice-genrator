@@ -1,15 +1,23 @@
-import Link from "next/link";
-
-import { Shell } from "./_components/shell";
-import { MetricCard } from "./_components/metric-card";
 import { GlassPanel } from "./_components/glass-panel";
-import { StaggerGrid } from "./_components/stagger-grid";
+import { inputClass } from "./_components/field";
+import { PendingSubmitButton } from "./_components/pending-submit-button";
+import { Shell } from "./_components/shell";
+import { OverviewPnlSummaryTable } from "./overview-pnl-summary-table";
 import { requirePageAccess } from "@/lib/auth/server";
 import { filterCompaniesForAuthContext } from "@/src/features/billing/company-access";
 import { resolveSelectedCompanyIds } from "@/src/features/billing/filter-selection";
-import { getCompanyPnSummaries, listCompanies, listInvoices } from "@/src/features/billing/store";
-import { formatMonthYear, formatSignedInr, formatUsd } from "@/src/features/billing/utils";
-import type { InvoiceStatus } from "@/src/features/billing/types";
+import {
+  buildOverviewCompanySummaryRows,
+  buildOverviewGrandTotalRow,
+  currentMonthKey,
+  formatOverviewPeriodLabel,
+  resolveOverviewMonthRange,
+} from "@/src/features/billing/overview-pnl-summary";
+import {
+  getPnDashboardData,
+  listAvailablePaymentMonthsForCompanies,
+  listCompanies,
+} from "@/src/features/billing/store";
 
 export const dynamic = "force-dynamic";
 
@@ -19,189 +27,113 @@ export default async function HomePage({
   searchParams: Promise<{
     companyId?: string | string[];
     companyIds?: string | string[];
+    startMonth?: string | string[];
+    endMonth?: string | string[];
   }>;
 }) {
   const context = await requirePageAccess("overview");
   const resolved = await searchParams;
-  const [allCompanies, allInvoicesRaw, companyPnSummariesRaw] = await Promise.all([
-    listCompanies(),
-    listInvoices(),
-    getCompanyPnSummaries(),
-  ]);
-  const companies = filterCompaniesForAuthContext(allCompanies, context);
+  const companies = filterCompaniesForAuthContext(await listCompanies(), context);
   const selectedCompanyIds = resolveSelectedCompanyIds({
     companyIds: resolved.companyIds,
     companyId: resolved.companyId,
     companies,
   });
-  const accessibleCompanyIds = new Set(selectedCompanyIds);
-  const allInvoices = allInvoicesRaw.filter((invoice) =>
-    accessibleCompanyIds.has(invoice.companyId),
+  const selectedCompanyIdSet = new Set(selectedCompanyIds);
+  const selectedCompanies = companies.filter((company) => selectedCompanyIdSet.has(company.id));
+  const allSelected =
+    companies.length > 0 &&
+    selectedCompanyIds.length >= companies.length &&
+    companies.every((company) => selectedCompanyIdSet.has(company.id));
+  const [availableMonths, companyDashboardData] = await Promise.all([
+    listAvailablePaymentMonthsForCompanies(selectedCompanyIds),
+    Promise.all(
+      selectedCompanies.map(async (company) => ({
+        companyId: company.id,
+        data: await getPnDashboardData({
+          companyId: company.id,
+          periodType: "monthly",
+        }),
+      })),
+    ),
+  ]);
+  const startMonthParam = Array.isArray(resolved.startMonth)
+    ? resolved.startMonth[0]
+    : resolved.startMonth;
+  const endMonthParam = Array.isArray(resolved.endMonth)
+    ? resolved.endMonth[0]
+    : resolved.endMonth;
+  const range = resolveOverviewMonthRange({
+    startMonth: startMonthParam,
+    endMonth: endMonthParam,
+    availableMonths,
+    currentMonth: currentMonthKey(),
+  });
+  const periodLabel = formatOverviewPeriodLabel(range.startMonth, range.endMonth);
+  const dashboardDataByCompanyId = new Map(
+    companyDashboardData.map((item) => [item.companyId, item.data] as const),
   );
-  const companyPnSummaries = companyPnSummariesRaw.filter((summary) =>
-    accessibleCompanyIds.has(summary.companyId),
-  );
-  const invoices = allInvoices.slice(0, 3);
-  const invoiceStatusCounts: Record<InvoiceStatus, number> = {
-    draft: 0,
-    generated: 0,
-    sent: 0,
-    received: 0,
-    cashed_out: 0,
-  };
-  for (const invoice of allInvoices) {
-    invoiceStatusCounts[invoice.status] += 1;
-  }
-  const pendingCashOutCount = allInvoices.filter(
-    (invoice) => invoice.status === "sent",
-  ).length;
-  const totalNetPlInrCents = companyPnSummaries.reduce(
-    (sum, company) => sum + company.netPlInrCents,
-    0,
-  );
+  const companyRows = buildOverviewCompanySummaryRows({
+    companies: selectedCompanies,
+    dashboardDataByCompanyId,
+    monthKeys: range.monthKeys,
+    periodLabel,
+  });
+  const rows =
+    companyRows.length > 1
+      ? [...companyRows, buildOverviewGrandTotalRow(companyRows, periodLabel)]
+      : companyRows;
 
   return (
     <Shell
-      title="Billing cockpit for staffing ops"
-      eyebrow="EassyOnboard"
+      title="P&L Overview"
+      eyebrow="Company profitability summary"
       companyOptions={companies.map((company) => ({ id: company.id, name: company.name }))}
       activeCompanyIds={selectedCompanyIds}
     >
-      {/* Metric cards with 3D tilt */}
-      <StaggerGrid className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="stagger-item">
-          <MetricCard label="Companies" value={String(companies.length)} helper="Active billing relationships" />
-        </div>
-        <div className="stagger-item">
-          <MetricCard label="Ready for cashout" value={String(pendingCashOutCount)} helper="Sent, waiting for FX" />
-        </div>
-        <div className="stagger-item">
-          <MetricCard label="Net P/L (INR)" value={formatSignedInr(totalNetPlInrCents)} helper="Peg-rate dashboard total" />
-        </div>
-        <div className="stagger-item">
-          <MetricCard label="Cashed out" value={String(invoiceStatusCounts.cashed_out)} helper="Safe to count in P&L" />
-        </div>
-      </StaggerGrid>
+      <GlassPanel gradient>
+        <form action="/" className="grid gap-3 md:grid-cols-[180px_180px_auto] md:items-end">
+          {!allSelected
+            ? selectedCompanyIds.map((companyId) => (
+                <input key={companyId} type="hidden" name="companyIds" value={companyId} />
+              ))
+            : null}
 
-      {/* Main content: Workflow + Recent invoices */}
-      <section className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-        <GlassPanel gradient>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] gradient-text">
-                Monthly workflow
-              </p>
-              <h2 className="mt-1 text-2xl font-semibold" style={{ color: "var(--text-primary)" }}>
-                Raise, receive payment, then cash out
-              </h2>
-            </div>
-            <Link
-              href="/invoices/create"
-              className="gradient-btn"
-            >
-              + New invoice
-            </Link>
-          </div>
+          <label className="block">
+            <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
+              Start month
+            </span>
+            <input
+              name="startMonth"
+              type="month"
+              defaultValue={range.startMonth}
+              className={inputClass}
+            />
+          </label>
 
-          <div className="mt-5 grid gap-3 md:grid-cols-3">
-            {[
-              { num: "01", text: "Start invoice from a company or duplicate last month." },
-              { num: "02", text: "Add teams, candidates, hours, and adjustments." },
-              { num: "03", text: "Generate PDF, mark payment received when money lands, then cash out after FX settlement." },
-            ].map((step) => (
-              <div
-                key={step.num}
-                className="rounded-2xl p-4 text-sm"
-                style={{
-                  background: "rgba(255,255,255,0.03)",
-                  border: "1px solid var(--glass-border)",
-                  color: "var(--text-secondary)",
-                }}
-              >
-                <span
-                  className="inline-block rounded-lg px-2 py-0.5 text-xs font-bold mb-2"
-                  style={{ background: "var(--accent-gradient)", color: "white" }}
-                >
-                  {step.num}
-                </span>
-                <p>{step.text}</p>
-              </div>
-            ))}
-          </div>
+          <label className="block">
+            <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
+              End month
+            </span>
+            <input
+              name="endMonth"
+              type="month"
+              defaultValue={range.endMonth}
+              className={inputClass}
+            />
+          </label>
 
-          <div
-            className="mt-6 rounded-2xl p-5"
-            style={{
-              background: "rgba(99,102,241,0.05)",
-              border: "1px dashed rgba(99,102,241,0.2)",
-            }}
-          >
-            <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
-              Deployment mode
-            </p>
-            <p className="mt-2 text-sm leading-7" style={{ color: "var(--text-secondary)" }}>
-              This app now expects a real Supabase project. Set the required Vercel environment
-              variables and it will run against your production database with no mock fallback.
-            </p>
-          </div>
-        </GlassPanel>
+          <PendingSubmitButton
+            className="gradient-btn"
+            defaultText="Load"
+            pendingText="Loading..."
+          />
+        </form>
+      </GlassPanel>
 
-        <GlassPanel gradient>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] gradient-text">
-                Recent invoices
-              </p>
-              <h2 className="mt-1 text-2xl font-semibold" style={{ color: "var(--text-primary)" }}>
-                Live snapshot history
-              </h2>
-            </div>
-            <Link
-              href="/invoices"
-              className="text-sm font-semibold underline-offset-4 hover:underline"
-              style={{ color: "var(--text-accent)" }}
-            >
-              View all →
-            </Link>
-          </div>
-
-          <div className="mt-4 space-y-3">
-            {invoices.map((invoice) => (
-              <Link
-                key={invoice.id}
-                href={`/invoices/drafts/${invoice.id}`}
-                className="glass-card block px-4 py-4 cursor-pointer"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="font-semibold" style={{ color: "var(--text-primary)" }}>
-                      {invoice.invoiceNumber}
-                    </p>
-                    <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-                      {formatMonthYear(invoice.month, invoice.year)}
-                    </p>
-                  </div>
-                  <p
-                    className="text-right text-sm font-semibold"
-                    style={{
-                      fontFamily: "var(--font-jetbrains-mono), monospace",
-                      color: "var(--text-primary)",
-                    }}
-                  >
-                    {formatUsd(invoice.grandTotalUsdCents)}
-                  </p>
-                </div>
-              </Link>
-            ))}
-
-            {invoices.length === 0 && (
-              <p className="text-sm py-6 text-center" style={{ color: "var(--text-muted)" }}>
-                No invoices created yet. Start your first one!
-              </p>
-            )}
-          </div>
-        </GlassPanel>
-      </section>
+      <GlassPanel title="P&L Summary" gradient>
+        <OverviewPnlSummaryTable rows={rows} />
+      </GlassPanel>
     </Shell>
   );
 }
