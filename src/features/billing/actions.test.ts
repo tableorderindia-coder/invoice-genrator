@@ -234,6 +234,7 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
       month: "2026-07",
       status: "verified",
       updateEmployeeMaster: true,
+      updateEmployeeIdentityFromImport: false,
       actorUserId: "admin_1",
       rows: [
         expect.objectContaining({
@@ -258,6 +259,60 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
     expect(updateTagMock).toHaveBeenCalledWith("billing:overview:comp_1");
     expect(revalidatePathMock).toHaveBeenCalledWith("/salary");
     expect(revalidatePathMock).toHaveBeenCalledWith("/employee-cash-flow");
+  });
+
+  it("passes imported employee identity fields through salary saves only when enabled", async () => {
+    const { saveMonthlyPayrollRowsAction } = await import("./actions");
+    const formData = new FormData();
+    formData.set("companyId", "comp_1");
+    formData.set("month", "2026-07");
+    formData.set("status", "draft");
+    formData.set("updateEmployeeMaster", "false");
+    formData.set("updateEmployeeIdentityFromImport", "true");
+    formData.set("returnTo", "/salary?companyId=comp_1&month=2026-07");
+    formData.set(
+      "rowsJson",
+      JSON.stringify([
+        {
+          employeeId: "emp_1",
+          employeeName: "Asha",
+          basicInrCents: 12000000,
+          specialAllowanceInrCents: 4000000,
+          insuranceInrCents: 1000000,
+          bonusInrCents: 500000,
+          monthlyPaidInrCents: 18000000,
+          daysWorked: 31,
+          daysInMonth: 31,
+          actualPaidInrCents: 18000000,
+          salaryPaidInrCents: 17570000,
+          pfInrCents: 180000,
+          tdsInrCents: 250000,
+          importedPanNumber: "ABCDE1234F",
+          importedPfUan: "100200300",
+          importedDesignation: "Engineer",
+          importedActiveFrom: "2025-04-01",
+        },
+      ]),
+    );
+
+    await expect(saveMonthlyPayrollRowsAction(formData)).rejects.toThrow(
+      "REDIRECT:/salary?companyId=comp_1&month=2026-07&flashStatus=success&flashMessage=Salary%20month%20saved.",
+    );
+
+    expect(saveMonthlyPayrollRowsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        updateEmployeeMaster: false,
+        updateEmployeeIdentityFromImport: true,
+        rows: [
+          expect.objectContaining({
+            importedPanNumber: "ABCDE1234F",
+            importedPfUan: "100200300",
+            importedDesignation: "Engineer",
+            importedActiveFrom: "2025-04-01",
+          }),
+        ],
+      }),
+    );
   });
 
   it("prepares payslips through the company-scoped Salary permission gate", async () => {

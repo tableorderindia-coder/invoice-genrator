@@ -46,4 +46,15 @@ describe("salary page", () => {
     expect(editor).not.toContain("paidStatus");
     expect(editor).not.toContain("overrideNote");
   });
+
+  it("renders salary file import controls and template downloads", () => {
+    const editor = readProjectFile("app/salary/_components/salary-month-editor.tsx");
+
+    expect(editor).toContain("Add from file");
+    expect(editor).toContain("Download XLSX format");
+    expect(editor).toContain("Download CSV format");
+    expect(editor).toContain("accept=\".xlsx,.xls,.csv\"");
+    expect(editor).toContain("Update employee details from import");
+    expect(editor).toContain("Required columns");
+  });
 });

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { BadgeCheck } from "lucide-react";
+import * as XLSX from "xlsx";
 
 import { Field, inputClass } from "@/app/_components/field";
 import { PendingSubmitButton } from "@/app/_components/pending-submit-button";
@@ -15,10 +16,28 @@ import {
   type MonthlyPayrollRow,
   type PayrollStatus,
 } from "@/src/features/billing/payroll";
+import {
+  applySalaryImportToRows,
+  buildSalaryImportTemplateCsv,
+  buildSalaryImportTemplateRows,
+  matchSalaryImportRows,
+  parseSalaryImportCsv,
+  parseSalaryImportSheetRows,
+  SALARY_IMPORT_HEADERS,
+  type SalaryImportCell,
+  type SalaryImportMatchResult,
+} from "@/src/features/billing/salary-import";
 import { formatInr } from "@/src/features/billing/utils";
 
 type EditablePayrollRow = MonthlyPayrollRow & {
   notes: string;
+};
+
+type ImportSummary = SalaryImportMatchResult & {
+  fileName: string;
+  parsedRows: number;
+  skippedRows: number;
+  errors: string[];
 };
 
 function inrInputValue(cents: number) {
@@ -87,6 +106,8 @@ export function SalaryMonthEditor({
         : "draft",
   );
   const [updateEmployeeMaster, setUpdateEmployeeMaster] = useState(false);
+  const [updateEmployeeIdentityFromImport, setUpdateEmployeeIdentityFromImport] = useState(false);
+  const [importSummary, setImportSummary] = useState<ImportSummary | undefined>();
   const [editableRows, setEditableRows] = useState(() => rows.map(toEditableRow));
   const rowsWithTotals = useMemo(
     () =>
@@ -122,6 +143,10 @@ export function SalaryMonthEditor({
           pfInrCents: row.pfInrCents,
           tdsInrCents: row.tdsInrCents,
           notes: row.notes,
+          importedPanNumber: row.importedPanNumber,
+          importedPfUan: row.importedPfUan,
+          importedDesignation: row.importedDesignation,
+          importedActiveFrom: row.importedActiveFrom,
         })),
       ),
     [rowsWithTotals],
@@ -133,12 +158,120 @@ export function SalaryMonthEditor({
     );
   }
 
+  function applyParsedImport(input: {
+    fileName: string;
+    rows: ReturnType<typeof parseSalaryImportCsv>["rows"];
+    skippedRows: number;
+    errors: string[];
+  }) {
+    const matchResult =
+      input.errors.length === 0
+        ? matchSalaryImportRows({ importRows: input.rows, payrollRows: editableRows })
+        : { matches: [], unmatched: [], duplicates: [] };
+
+    setImportSummary({
+      fileName: input.fileName,
+      parsedRows: input.rows.length,
+      skippedRows: input.skippedRows,
+      errors: input.errors,
+      ...matchResult,
+    });
+
+    if (input.errors.length === 0 && matchResult.matches.length > 0) {
+      setEditableRows((current) =>
+        applySalaryImportToRows({
+          payrollRows: current,
+          matches: matchResult.matches,
+          sourceFileName: input.fileName,
+        }).map(toEditableRow),
+      );
+    }
+  }
+
+  async function importSalaryFile(file: File) {
+    try {
+      if (file.name.toLowerCase().endsWith(".csv")) {
+        const result = parseSalaryImportCsv(await file.text(), {
+          selectedMonth: month,
+          sourceFileName: file.name,
+        });
+        applyParsedImport({ fileName: file.name, ...result });
+        return;
+      }
+
+      const workbook = XLSX.read(await file.arrayBuffer(), { cellDates: false });
+      const sheetName = workbook.SheetNames[0];
+      const sheet = sheetName ? workbook.Sheets[sheetName] : undefined;
+      if (!sheet) {
+        applyParsedImport({
+          fileName: file.name,
+          rows: [],
+          skippedRows: 0,
+          errors: ["The selected workbook does not contain a readable first sheet."],
+        });
+        return;
+      }
+
+      const sheetRows = XLSX.utils.sheet_to_json<SalaryImportCell[]>(sheet, {
+        header: 1,
+        raw: false,
+        defval: "",
+      });
+      const result = parseSalaryImportSheetRows(sheetRows, {
+        selectedMonth: month,
+        sourceFileName: file.name,
+      });
+      applyParsedImport({ fileName: file.name, ...result });
+    } catch (error) {
+      applyParsedImport({
+        fileName: file.name,
+        rows: [],
+        skippedRows: 0,
+        errors: [error instanceof Error ? error.message : "Unable to read the selected salary file."],
+      });
+    }
+  }
+
+  function downloadFile(fileName: string, blob: Blob) {
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = fileName;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function downloadCsvTemplate() {
+    downloadFile(
+      "salary-import-format.csv",
+      new Blob([buildSalaryImportTemplateCsv()], { type: "text/csv;charset=utf-8" }),
+    );
+  }
+
+  function downloadXlsxTemplate() {
+    const worksheet = XLSX.utils.aoa_to_sheet(buildSalaryImportTemplateRows());
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Salary Import");
+    const buffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+    downloadFile(
+      "salary-import-format.xlsx",
+      new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      }),
+    );
+  }
+
   return (
     <form action={saveMonthlyPayrollRowsAction} className="space-y-5">
       <input type="hidden" name="companyId" value={companyId} />
       <input type="hidden" name="month" value={month} />
       <input type="hidden" name="returnTo" value={returnTo} />
       <input type="hidden" name="rowsJson" value={rowsJson} />
+      <input
+        type="hidden"
+        name="updateEmployeeIdentityFromImport"
+        value={updateEmployeeIdentityFromImport ? "true" : "false"}
+      />
 
       <div className="glass-panel grid gap-4 p-5 md:grid-cols-4">
         <Field label="Month status">
@@ -175,6 +308,120 @@ export function SalaryMonthEditor({
           <p className="text-xs" style={{ color: "var(--text-muted)" }}>Salary paid</p>
           <p className="mt-1 text-lg font-semibold">{formatInr(summary.salaryPaidInrCents)}</p>
         </div>
+      </div>
+
+      <div className="glass-panel space-y-4 p-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-semibold">Add from file</h2>
+            <p className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>
+              Import XLSX or CSV rows into this visible salary sheet. Review, then use Save salary month.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" className="btn-outline" onClick={downloadXlsxTemplate}>
+              Download XLSX format
+            </button>
+            <button type="button" className="btn-outline" onClick={downloadCsvTemplate}>
+              Download CSV format
+            </button>
+            <label className="gradient-btn inline-flex cursor-pointer items-center gap-2">
+              Add from file
+              <input
+                className="sr-only"
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                onChange={(event) => {
+                  const file = event.currentTarget.files?.[0];
+                  if (file) void importSalaryFile(file);
+                  event.currentTarget.value = "";
+                }}
+              />
+            </label>
+          </div>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+          <div
+            className="rounded-2xl border p-4"
+            style={{ borderColor: "var(--glass-border)" }}
+          >
+            <p className="text-sm font-medium">Required columns</p>
+            <p className="mt-2 text-xs leading-5" style={{ color: "var(--text-muted)" }}>
+              {SALARY_IMPORT_HEADERS.slice(0, 10).join(", ")}
+            </p>
+            <p className="mt-2 text-xs leading-5" style={{ color: "var(--text-muted)" }}>
+              Optional: {SALARY_IMPORT_HEADERS.slice(10).join(", ")}
+            </p>
+          </div>
+
+          <label className="flex items-start gap-3 rounded-2xl border p-4 text-sm" style={{ borderColor: "var(--glass-border)" }}>
+            <input
+              type="checkbox"
+              checked={updateEmployeeIdentityFromImport}
+              onChange={(event) => setUpdateEmployeeIdentityFromImport(event.currentTarget.checked)}
+            />
+            <span>
+              <span className="block font-medium">Update employee details from import</span>
+              <span className="mt-1 block text-xs" style={{ color: "var(--text-muted)" }}>
+                PAN Number, PF UAN, designation, and joining date update only after Save salary month.
+              </span>
+            </span>
+          </label>
+        </div>
+
+        {importSummary ? (
+          <div className="space-y-3 text-sm">
+            <div className="flex flex-wrap gap-2">
+              {[
+                ["File", importSummary.fileName],
+                ["Parsed", importSummary.parsedRows],
+                ["Matched", importSummary.matches.length],
+                ["Unmatched", importSummary.unmatched.length],
+                ["Duplicate", importSummary.duplicates.length],
+                ["Skipped", importSummary.skippedRows],
+                ["Errors", importSummary.errors.length],
+              ].map(([label, value]) => (
+                <span
+                  key={label}
+                  className="rounded-full border px-3 py-1 text-xs"
+                  style={{ borderColor: "var(--glass-border)", color: "var(--text-muted)" }}
+                >
+                  {label}: {value}
+                </span>
+              ))}
+            </div>
+
+            {importSummary.errors.length > 0 ? (
+              <ul className="space-y-1" style={{ color: "#fca5a5" }}>
+                {importSummary.errors.map((error) => (
+                  <li key={error}>{error}</li>
+                ))}
+              </ul>
+            ) : null}
+
+            {importSummary.unmatched.length > 0 || importSummary.duplicates.length > 0 ? (
+              <div className="grid gap-3 md:grid-cols-2">
+                {importSummary.unmatched.length > 0 ? (
+                  <div>
+                    <p className="font-medium">Unmatched rows</p>
+                    <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
+                      {importSummary.unmatched.map((row) => row.employeeName).join(", ")}
+                    </p>
+                  </div>
+                ) : null}
+                {importSummary.duplicates.length > 0 ? (
+                  <div>
+                    <p className="font-medium">Duplicate matches</p>
+                    <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
+                      {importSummary.duplicates.map((row) => row.employeeName).join(", ")}
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       <div className="glass-panel overflow-hidden">

@@ -16,6 +16,8 @@ type DbEmployee = {
   id: string;
   company_id: string;
   full_name: string;
+  pan_number?: string | null;
+  pf_uan?: string | null;
   phone_number?: string | null;
   designation: string;
   default_team: string;
@@ -80,6 +82,10 @@ export type SaveMonthlyPayrollRowInput = {
   paidDate?: string;
   notes?: string;
   overrideNote?: string;
+  importedPanNumber?: string;
+  importedPfUan?: string;
+  importedDesignation?: string;
+  importedActiveFrom?: string;
 };
 
 const nowIso = () => new Date().toISOString();
@@ -101,6 +107,8 @@ function mapEmployee(row: DbEmployee): Employee {
     id: row.id,
     companyId: row.company_id,
     fullName: row.full_name,
+    panNumber: row.pan_number ?? undefined,
+    pfUan: row.pf_uan ?? undefined,
     phoneNumber: row.phone_number ?? undefined,
     designation: row.designation,
     defaultTeam: row.default_team,
@@ -195,6 +203,7 @@ export async function saveMonthlyPayrollRows(input: {
   rows: SaveMonthlyPayrollRowInput[];
   actorUserId: string;
   updateEmployeeMaster: boolean;
+  updateEmployeeIdentityFromImport?: boolean;
 }) {
   const month = normalizePayrollMonthKey(input.month);
   const supabase = await getSupabaseOrThrow();
@@ -277,6 +286,24 @@ export async function saveMonthlyPayrollRows(input: {
           default_pf_inr_cents: row.pfInrCents,
           default_tds_inr_cents: row.tdsInrCents,
         })
+        .eq("id", row.employeeId)
+        .eq("company_id", input.companyId);
+      if (error) throw error;
+    }
+  }
+
+  if (input.updateEmployeeIdentityFromImport) {
+    for (const row of input.rows) {
+      const employeeUpdates: Record<string, string> = {};
+      if (row.importedPanNumber) employeeUpdates.pan_number = row.importedPanNumber;
+      if (row.importedPfUan) employeeUpdates.pf_uan = row.importedPfUan;
+      if (row.importedDesignation) employeeUpdates.designation = row.importedDesignation;
+      if (row.importedActiveFrom) employeeUpdates.active_from = row.importedActiveFrom;
+      if (Object.keys(employeeUpdates).length === 0) continue;
+
+      const { error } = await supabase
+        .from("employees")
+        .update(employeeUpdates)
         .eq("id", row.employeeId)
         .eq("company_id", input.companyId);
       if (error) throw error;
