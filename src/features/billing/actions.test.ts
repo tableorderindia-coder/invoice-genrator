@@ -6,6 +6,7 @@ const redirectMock = vi.fn((path: string) => {
   throw new Error(`REDIRECT:${path}`);
 });
 const updateDashboardEmployeeCashFlowEntryMock = vi.fn();
+const cashOutInvoiceMock = vi.fn();
 const replaceInvoicePaymentEmployeeEntriesMock = vi.fn();
 const upsertInvoicePaymentMock = vi.fn();
 const upsertEmployeeStatementSectionMock = vi.fn();
@@ -43,7 +44,7 @@ vi.mock("./store", () => ({
   addInvoiceLineItem: vi.fn(),
   assignEmployeeToInvoiceTeam: vi.fn(),
   addInvoiceTeam: vi.fn(),
-  cashOutInvoice: vi.fn(),
+  cashOutInvoice: cashOutInvoiceMock,
   createCompany: vi.fn(),
   createEmployee: createEmployeeMock,
   createInvoiceDraft: vi.fn(),
@@ -98,6 +99,8 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
     revalidatePathMock.mockReset();
     updateTagMock.mockReset();
     redirectMock.mockClear();
+    cashOutInvoiceMock.mockReset();
+    cashOutInvoiceMock.mockResolvedValue(undefined);
     updateDashboardEmployeeCashFlowEntryMock.mockReset();
     updateDashboardEmployeeCashFlowEntryMock.mockResolvedValue(undefined);
     replaceInvoicePaymentEmployeeEntriesMock.mockReset();
@@ -135,6 +138,28 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
     requireCompanyPageEditAccessMock.mockResolvedValue({
       profile: { id: "admin_1", role: "admin" },
     });
+  });
+
+  it("cashout action defaults the settlement date server-side", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-22T10:00:00.000Z"));
+    try {
+      const { cashOutInvoiceAction } = await import("./actions");
+      const formData = new FormData();
+      formData.set("invoiceId", "inv_1");
+      formData.set("returnTo", "/cashout?companyIds=comp_1");
+      formData.set("dollarInboundUsd", "1234.56");
+      formData.set("usdInrRate", "84.25");
+
+      await expect(cashOutInvoiceAction(formData)).rejects.toThrow(
+        "REDIRECT:/cashout?companyIds=comp_1&flashStatus=success&flashMessage=Invoice%20marked%20as%20cashed%20out.",
+      );
+
+      expect(cashOutInvoiceMock).toHaveBeenCalledWith("inv_1", "2026-07-22", 123456, 84.25);
+      expect(revalidatePathMock).toHaveBeenCalledWith("/cashout");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("saves a new company expense to the explicit expense month from the add form", async () => {
