@@ -63,6 +63,9 @@ describe("employee cash flow saved rows rendering", () => {
     expect(screen.getByRole("columnheader", { name: "Monthly paid INR" })).not.toBeNull();
     expect(screen.getByRole("columnheader", { name: "Actual paid INR" })).not.toBeNull();
     expect(screen.getByRole("columnheader", { name: "Salary paid INR" })).not.toBeNull();
+    expect(screen.queryByRole("columnheader", { name: "Paid date" })).toBeNull();
+    expect(screen.queryByRole("columnheader", { name: "Paid status" })).toBeNull();
+    expect(screen.queryByText("Mark as paid")).toBeNull();
     expect(screen.queryByRole("columnheader", { name: "Total paid INR" })).toBeNull();
 
     const bodyRow = screen.getAllByRole("row")[1];

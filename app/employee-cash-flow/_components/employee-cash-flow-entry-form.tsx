@@ -737,44 +737,6 @@ export default function EmployeeCashFlowEntryForm({
                   />
                 </label>
 
-                <label className="block">
-                  <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
-                    Paid date
-                  </span>
-                  <input
-                    type="date"
-                    value={entry.paidAt ?? ""}
-                    onChange={(event) =>
-                      updateEntry(entry.id, {
-                        paidAt: event.target.value || undefined,
-                      })
-                    }
-                    className={cardInputClass()}
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
-                    Mark as paid
-                  </span>
-                  <div
-                    className="flex min-h-[56px] items-center rounded-xl px-4"
-                    style={{ border: "1px solid var(--glass-border)", background: "rgba(255,255,255,0.04)" }}
-                  >
-                    <label className="inline-flex items-center gap-2 text-sm" style={{ color: "var(--text-secondary)" }}>
-                      <input
-                        type="checkbox"
-                        checked={entry.isPaid}
-                        onChange={(event) =>
-                          updateEntry(entry.id, {
-                            isPaid: event.target.checked,
-                          })
-                        }
-                      />
-                      Paid this month
-                    </label>
-                  </div>
-                </label>
               </div>
 
               <label className="mt-4 block">

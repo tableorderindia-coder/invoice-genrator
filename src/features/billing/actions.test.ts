@@ -526,7 +526,8 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
           commissionEarnedInrCents: 0,
           grossEarningsInrCents: 0,
           isNonInvoiceEmployee: false,
-          isPaid: false,
+          isPaid: true,
+          paidAt: "2026-04-10",
           notes: "",
         },
       ]),
@@ -542,6 +543,8 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
           expect.objectContaining({
             employeeId: "emp_1",
             actualPaidInrCents: 950000,
+            isPaid: false,
+            paidAt: undefined,
           }),
         ],
       }),

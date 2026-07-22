@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 import {
   applyEmployeeCashFlowEntryPatch,
   buildAddedEmployeeCashFlowEntry,
   buildEmployeeCashFlowInvoiceOptionsInput,
-  defaultEmployeeCashFlowPaidDate,
   getDaysInMonthFromMonthKey,
   removeEntryFromSelections,
   resolveEmployeeToAddSelection,
@@ -12,6 +13,12 @@ import {
   removeEmployeeFromSelections,
   resolveEmployeeCashFlowMonthKey,
 } from "./employee-cash-flow-page-state";
+
+const projectRoot = resolve(__dirname, "../../..");
+
+function readProjectFile(path: string) {
+  return readFileSync(resolve(projectRoot, path), "utf8");
+}
 
 describe("employee cash flow page state", () => {
   it("keeps payment month separate from invoice option filtering", () => {
@@ -43,14 +50,6 @@ describe("employee cash flow page state", () => {
     expect(getDaysInMonthFromMonthKey("2026-05")).toBe(31);
   });
 
-  it("defaults the employee cash flow paid date to the 25th of the selected month", () => {
-    expect(defaultEmployeeCashFlowPaidDate("2026-04")).toBe("2026-04-25");
-  });
-
-  it("falls back to the first of the month when the payment month key is invalid", () => {
-    expect(defaultEmployeeCashFlowPaidDate("bad-input")).toBe("bad-input-01");
-  });
-
   it("prefills added employee rows from the selected cashed-out invoice", () => {
     expect(
       buildAddedEmployeeCashFlowEntry({
@@ -75,9 +74,20 @@ describe("employee cash flow page state", () => {
       daysInMonth: 31,
       baseDollarInwardUsdCents: 0,
       cashoutUsdInrRate: 84.25,
-      paidAt: "2026-05-25",
+      paidAt: undefined,
       isNonInvoiceEmployee: true,
     });
+  });
+
+  it("does not render paid date or paid checkbox controls in compose cashflow", () => {
+    const formSource = readProjectFile(
+      "app/employee-cash-flow/_components/employee-cash-flow-entry-form.tsx",
+    );
+    const pageSource = readProjectFile("app/employee-cash-flow/page.tsx");
+
+    expect(formSource).not.toContain("Paid date");
+    expect(formSource).not.toContain("Mark as paid");
+    expect(pageSource).not.toContain("defaultEmployeeCashFlowPaidDate");
   });
 
   it("keeps employee default actual paid when formula inputs change", () => {
