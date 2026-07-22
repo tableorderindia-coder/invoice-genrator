@@ -6,8 +6,10 @@ import { filterCompaniesForAuthContext } from "@/src/features/billing/company-ac
 import { resolveSelectedCompanyIds } from "@/src/features/billing/filter-selection";
 import { cashOutInvoiceAction } from "@/src/features/billing/actions";
 import { filterCashoutEligibleInvoices } from "@/src/features/billing/invoice-workflow";
-import { listCachedCompanies } from "@/src/features/billing/cached-store";
-import { listInvoices } from "@/src/features/billing/store";
+import {
+  listCachedCompanies,
+  listCachedInvoicesForCompanies,
+} from "@/src/features/billing/cached-store";
 import { formatMonthYear, formatUsd } from "@/src/features/billing/utils";
 
 export const dynamic = "force-dynamic";
@@ -24,16 +26,14 @@ export default async function CashoutPage({
 }) {
   const context = await requirePageAccess("cashout");
   const resolvedSearchParams = await searchParams;
-  const [allInvoices, allCompanies] = await Promise.all([listInvoices(), listCachedCompanies()]);
-  const companies = filterCompaniesForAuthContext(allCompanies, context);
+  const companies = filterCompaniesForAuthContext(await listCachedCompanies(), context);
   const selectedCompanyIds = resolveSelectedCompanyIds({
     companyIds: resolvedSearchParams.companyIds,
     companyId: resolvedSearchParams.companyId,
     companies,
   });
-  const accessibleCompanyIds = new Set(selectedCompanyIds);
-  const invoices = filterCashoutEligibleInvoices(allInvoices).filter((invoice) =>
-    accessibleCompanyIds.has(invoice.companyId),
+  const invoices = filterCashoutEligibleInvoices(
+    await listCachedInvoicesForCompanies(selectedCompanyIds),
   );
   const companyMap = new Map(companies.map((company) => [company.id, company.name]));
   const flashStatus = Array.isArray(resolvedSearchParams.flashStatus)

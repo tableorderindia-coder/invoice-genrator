@@ -8,8 +8,10 @@ import {
   saveCompanyExpenseAction,
   deleteCompanyExpenseAction,
 } from "@/src/features/billing/actions";
-import { listCachedCompanies } from "@/src/features/billing/cached-store";
-import { listCompanyExpensesForCompanies } from "@/src/features/billing/store";
+import {
+  listCachedCompanies,
+  listCachedCompanyExpensesForCompanies,
+} from "@/src/features/billing/cached-store";
 import { resolveSelectedCompanyIds } from "@/src/features/billing/filter-selection";
 import { formatInr, formatMonthYear } from "@/src/features/billing/utils";
 import {
@@ -56,7 +58,7 @@ export default async function ExpensesPage({
     : undefined;
   const companyNameMap = new Map(companies.map((company) => [company.id, company.name]));
 
-  const expenses = await listCompanyExpensesForCompanies({
+  const expenses = await listCachedCompanyExpensesForCompanies({
     companyIds: selectedCompanyIds,
     startMonth: period.startMonth,
     endMonth: period.endMonth,

@@ -9,6 +9,7 @@ import {
   getBillingInvalidationTags,
   type BillingInvalidationInput,
 } from "./cache-tags";
+import { invalidatePortalSnapshotsForBilling } from "./portal-snapshot-cache";
 import { parseInvoiceHeaderFormInput } from "./invoice-editor";
 import { defaultEmployeeCashFlowPaidDate } from "./employee-cash-flow-page-state";
 import {
@@ -87,6 +88,11 @@ function invalidateBillingCache(input: BillingInvalidationInput) {
   for (const tag of getBillingInvalidationTags(input)) {
     updateTag(tag);
   }
+}
+
+async function invalidateBillingCaches(input: BillingInvalidationInput) {
+  invalidateBillingCache(input);
+  await invalidatePortalSnapshotsForBilling(input);
 }
 
 async function refreshPnSummariesForCompany(companyId: string | undefined) {
@@ -217,7 +223,7 @@ export async function createCompanyAction(formData: FormData) {
     defaultNote: getString(formData, "defaultNote"),
   });
 
-  invalidateBillingCache({ type: "company" });
+  await invalidateBillingCaches({ type: "company" });
   revalidatePath("/");
   revalidatePath("/companies");
   redirect("/companies");
@@ -233,7 +239,7 @@ export async function updateCompanyAction(formData: FormData) {
     defaultNote: getString(formData, "defaultNote"),
   });
 
-  invalidateBillingCache({ type: "company", companyId });
+  await invalidateBillingCaches({ type: "company", companyId });
   revalidatePath("/");
   revalidatePath("/companies");
   redirect("/companies");
@@ -298,7 +304,7 @@ export async function createEmployeeAction(formData: FormData) {
     activeTo: getString(formData, "activeTo") || undefined,
   });
 
-  invalidateBillingCache({ type: "employee", companyId });
+  await invalidateBillingCaches({ type: "employee", companyId });
   revalidatePath("/");
   revalidatePath("/employees");
   redirect("/employees");
@@ -365,7 +371,7 @@ export async function updateEmployeeAction(formData: FormData) {
     isActive: getString(formData, "isActive") === "true",
   });
 
-  invalidateBillingCache({ type: "employee", companyId });
+  await invalidateBillingCaches({ type: "employee", companyId });
   revalidatePath("/employees");
   revalidatePath("/invoices");
   revalidatePath("/salary");
@@ -396,7 +402,7 @@ export async function createInvoiceDraftAction(formData: FormData) {
       selectedTeamNames,
     });
 
-    invalidateBillingCache({ type: "invoice", companyId });
+    await invalidateBillingCaches({ type: "invoice", companyId });
     await refreshPnSummariesForCompany(companyId);
     revalidatePath("/");
     revalidatePath("/invoices");
@@ -1052,6 +1058,9 @@ export async function updateDashboardEmployeeCashFlowEntryAction(formData: FormD
       tdsInrCents,
       actualPaidInrCents,
     });
+    if (companyId) {
+      await invalidateBillingCaches({ type: "cashflow", companyId });
+    }
     await refreshPnSummariesForCompany(companyId);
 
     revalidatePath("/dashboard");
@@ -1115,7 +1124,7 @@ export async function saveCompanyExpenseAction(formData: FormData) {
       amountInrCents,
     });
 
-    invalidateBillingCache({ type: "expense", companyId });
+    await invalidateBillingCaches({ type: "expense", companyId });
     await refreshPnSummariesForCompany(companyId);
     revalidatePath("/expenses");
     revalidatePath("/dashboard");
@@ -1172,6 +1181,9 @@ export async function deleteCompanyExpenseAction(formData: FormData) {
 
     const companyId = await getCompanyExpenseCompanyId(expenseId);
     await deleteCompanyExpense(expenseId);
+    if (companyId) {
+      await invalidateBillingCaches({ type: "expense", companyId });
+    }
     await refreshPnSummariesForCompany(companyId);
 
     revalidatePath("/expenses");
@@ -1245,7 +1257,7 @@ export async function saveInvoicePaymentEmployeeEntriesAction(formData: FormData
       });
     }
 
-    invalidateBillingCache({ type: "cashflow", companyId, month: paymentMonth });
+    await invalidateBillingCaches({ type: "cashflow", companyId, month: paymentMonth });
     await refreshPnSummariesForCompany(companyId);
     revalidatePath("/employee-cash-flow");
   } catch (error) {
@@ -1282,7 +1294,7 @@ export async function saveMonthlyPayrollRowsAction(formData: FormData) {
       updateEmployeeMaster: getString(formData, "updateEmployeeMaster") === "true",
     });
 
-    invalidateBillingCache({ type: "salary", companyId, month });
+    await invalidateBillingCaches({ type: "salary", companyId, month });
     await refreshPnSummariesForCompany(companyId);
     revalidatePath("/salary");
     revalidatePath("/employee-cash-flow");
@@ -1373,7 +1385,7 @@ export async function updateSavedEmployeeCashFlowEntryAction(formData: FormData)
     const entry = parseSavedEmployeeCashFlowEntryJson(getString(formData, "entryJson"));
     await updateSavedEmployeeCashFlowEntry(entry);
 
-    invalidateBillingCache({
+    await invalidateBillingCaches({
       type: "cashflow",
       companyId: entry.companyId,
       month: entry.paymentMonth,
@@ -1405,6 +1417,9 @@ export async function deleteSavedEmployeeCashFlowEntryAction(formData: FormData)
 
     const companyId = await getEmployeeCashFlowEntryCompanyId(entryId);
     await deleteSavedEmployeeCashFlowEntry(entryId);
+    if (companyId) {
+      await invalidateBillingCaches({ type: "cashflow", companyId });
+    }
     await refreshPnSummariesForCompany(companyId);
     revalidatePath("/employee-cash-flow");
   } catch (error) {

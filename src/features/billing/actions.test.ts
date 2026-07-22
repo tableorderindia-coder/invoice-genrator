@@ -24,6 +24,7 @@ const rebuildPnSummariesForInvoiceMock = vi.fn();
 const getInvoiceCompanyIdMock = vi.fn();
 const getCompanyExpenseCompanyIdMock = vi.fn();
 const getEmployeeCashFlowEntryCompanyIdMock = vi.fn();
+const invalidatePortalSnapshotsForBillingMock = vi.fn();
 
 vi.mock("next/cache", () => ({
   revalidatePath: revalidatePathMock,
@@ -94,11 +95,17 @@ vi.mock("./pn-summary-store", () => ({
   getEmployeeCashFlowEntryCompanyId: getEmployeeCashFlowEntryCompanyIdMock,
 }));
 
+vi.mock("./portal-snapshot-cache", () => ({
+  invalidatePortalSnapshotsForBilling: invalidatePortalSnapshotsForBillingMock,
+}));
+
 describe("updateDashboardEmployeeCashFlowEntryAction", () => {
   beforeEach(() => {
     revalidatePathMock.mockReset();
     updateTagMock.mockReset();
     redirectMock.mockClear();
+    invalidatePortalSnapshotsForBillingMock.mockReset();
+    invalidatePortalSnapshotsForBillingMock.mockResolvedValue(undefined);
     cashOutInvoiceMock.mockReset();
     cashOutInvoiceMock.mockResolvedValue(undefined);
     updateDashboardEmployeeCashFlowEntryMock.mockReset();
