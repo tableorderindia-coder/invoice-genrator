@@ -288,4 +288,84 @@ describe("employee cash flow store shaping", () => {
       tdsInrCents: 2_750_00,
     });
   });
+
+  it("reimports saved salary details into fallback invoice cash flow entries", () => {
+    const entries = buildInvoiceCashFlowFallbackEntries({
+      invoice: {
+        id: "inv_2026_006",
+        invoice_number: "2026/006",
+        company_id: "comp_1",
+        month: 6,
+        year: 2026,
+        status: "cashed_out",
+      },
+      invoicePayment: null,
+      lineItems: [
+        {
+          id: "line_1",
+          employee_id: "emp_1",
+          employee_name_snapshot: "Asha Rao",
+          billed_total_usd_cents: 400_000,
+          manual_total_usd_cents: null,
+          days_worked: 30,
+        },
+      ],
+      availableEmployees: [
+        {
+          id: "emp_1",
+          fullName: "Asha Rao",
+          companyId: "comp_1",
+          defaultPaidUsdInrRate: 81.75,
+          defaultActualPaidInrCents: 180_000_00,
+          defaultPfInrCents: 1_250_00,
+          defaultTdsInrCents: 2_750_00,
+          onboardingAdvanceUsdCents: 0,
+          reimbursementUsdCents: 0,
+          reimbursementLabelsText: "",
+          appraisalAdvanceUsdCents: 0,
+          offboardingDeductionUsdCents: 0,
+        },
+      ],
+      salaryPaymentsByEmployeeId: new Map([
+        [
+          "emp_1",
+          {
+            employee_id: "emp_1",
+            paid_usd_inr_rate: 88,
+            monthly_paid_inr_cents: 220_000_00,
+            actual_paid_inr_cents: 110_000_00,
+            salary_paid_inr_cents: 105_500_00,
+            pf_inr_cents: 1_500_00,
+            tds_inr_cents: 3_000_00,
+            days_worked: 15,
+            days_in_month: 30,
+            override_note: "Admin requested June salary import.",
+          },
+        ],
+      ]),
+      onboardingByEmployeeName: new Map(),
+      reimbursementByEmployeeName: new Map(),
+      reimbursementLabelsByEmployeeName: new Map(),
+      appraisalByEmployeeName: new Map(),
+      offboardingByEmployeeName: new Map(),
+      realization: {
+        invoice_id: "inv_2026_006",
+        dollar_inbound_usd_cents: 0,
+        usd_inr_rate: 84,
+      },
+      daysInMonth: 30,
+    });
+
+    expect(entries[0]).toMatchObject({
+      daysWorked: 15,
+      daysInMonth: 30,
+      paidUsdInrRate: 88,
+      monthlyPaidInrCents: 220_000_00,
+      actualPaidInrCents: 110_000_00,
+      pfInrCents: 1_500_00,
+      tdsInrCents: 3_000_00,
+      salaryPaidInrCents: 105_500_00,
+      notes: "Salary override: Admin requested June salary import.",
+    });
+  });
 });

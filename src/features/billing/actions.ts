@@ -11,7 +11,6 @@ import {
 } from "./cache-tags";
 import { invalidatePortalSnapshotsForBilling } from "./portal-snapshot-cache";
 import { parseInvoiceHeaderFormInput } from "./invoice-editor";
-import { defaultEmployeeCashFlowPaidDate } from "./employee-cash-flow-page-state";
 import {
   addInvoiceAdjustment,
   assignEmployeeToInvoiceTeam,
@@ -77,6 +76,14 @@ function getString(formData: FormData, key: string) {
 
 function todayDateIso() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function defaultInvoicePaymentDate(monthKey: string) {
+  if (/^\d{4}-\d{2}$/.test(monthKey)) {
+    return `${monthKey}-25`;
+  }
+
+  return `${monthKey}-01`;
 }
 
 function buildFlashRedirect(path: string, status: "success" | "error", message: string) {
@@ -1240,7 +1247,7 @@ export async function saveInvoicePaymentEmployeeEntriesAction(formData: FormData
         (await upsertInvoicePayment({
           invoiceId,
           companyId,
-          paymentDate: defaultEmployeeCashFlowPaidDate(paymentMonth),
+          paymentDate: defaultInvoicePaymentDate(paymentMonth),
           paymentMonth,
           usdInrRate: firstEntry.cashoutUsdInrRate ?? 0,
         }));
@@ -1253,6 +1260,8 @@ export async function saveInvoicePaymentEmployeeEntriesAction(formData: FormData
         entries: invoiceEntries.map((entry) => ({
           ...entry,
           invoicePaymentId,
+          isPaid: false,
+          paidAt: undefined,
         })),
       });
     }
