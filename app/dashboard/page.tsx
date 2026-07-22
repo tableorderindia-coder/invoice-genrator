@@ -302,6 +302,21 @@ export default async function DashboardPage({
     filterParams.append(field.name, field.value);
   }
   const returnTo = `/dashboard?${filterParams.toString()}`;
+  const buildExportHref = (input: { format: "csv" | "pdf"; scope?: "table" | "company" }) => {
+    const params = new URLSearchParams();
+    for (const field of dashboardFilterFields) {
+      params.append(field.name, field.value);
+    }
+    params.set("format", input.format);
+    if (input.scope) {
+      params.set("scope", input.scope);
+    }
+    return `/api/dashboard/export?${params.toString()}`;
+  };
+  const tableCsvExportHref = buildExportHref({ format: "csv" });
+  const tablePdfExportHref = buildExportHref({ format: "pdf" });
+  const companyCsvExportHref = buildExportHref({ format: "csv", scope: "company" });
+  const companyPdfExportHref = buildExportHref({ format: "pdf", scope: "company" });
 
   return (
     <Shell
@@ -356,6 +371,20 @@ export default async function DashboardPage({
             pendingText="Loading view..."
           />
         </form>
+        <div className="flex flex-wrap items-center gap-2">
+          <a className="btn-outline" href={tableCsvExportHref}>
+            Export CSV
+          </a>
+          <a className="btn-outline" href={tablePdfExportHref}>
+            Export PDF
+          </a>
+          <a className="btn-outline" href={companyCsvExportHref}>
+            Export company CSV
+          </a>
+          <a className="btn-outline" href={companyPdfExportHref}>
+            Export company PDF
+          </a>
+        </div>
       </GlassPanel>
 
       {view === "employee" ? (
