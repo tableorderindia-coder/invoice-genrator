@@ -22,6 +22,7 @@ export type PnSourceRow = {
   effectiveDollarInwardUsdCents: number;
   cashoutUsdInrRate: number;
   paidUsdInrRate: number;
+  monthlyPaidInrCents: number;
   pfInrCents: number;
   tdsInrCents: number;
   actualPaidInrCents: number;
@@ -129,9 +130,11 @@ const toEmployeeMonthRow = (rows: PnSourceRow[]): PnEmployeeMonthRow => {
     ),
     cashoutUsdInrRate: averageRate(rows, "cashoutUsdInrRate"),
     paidUsdInrRate: averageRate(rows, "paidUsdInrRate"),
+    monthlyPaidInrCents: sumBy(rows, "monthlyPaidInrCents"),
     pfInrCents: sumBy(rows, "pfInrCents"),
     tdsInrCents: sumBy(rows, "tdsInrCents"),
     actualPaidInrCents: sumBy(rows, "actualPaidInrCents"),
+    salaryPaidInrCents: sumBy(rows, "salaryPaidInrCents"),
     fxCommissionInrCents,
     totalCommissionUsdCents: sumBy(rows, "totalCommissionUsdCents"),
     commissionEarnedInrCents,
@@ -192,6 +195,7 @@ const mergeEditableRowsByMonth = (rows: PnEditableSourceRow[]) => {
       cashInInrCents: sumEditableBy(bucket, "cashInInrCents"),
       cashoutUsdInrRate: last.cashoutUsdInrRate,
       paidUsdInrRate: last.paidUsdInrRate,
+      monthlyPaidInrCents: sumEditableBy(bucket, "monthlyPaidInrCents"),
       salaryPaidInrCents: sumEditableBy(bucket, "salaryPaidInrCents"),
       pfInrCents: sumEditableBy(bucket, "pfInrCents"),
       tdsInrCents: sumEditableBy(bucket, "tdsInrCents"),
@@ -283,6 +287,7 @@ export function buildPnEmployeeEditableSections(
       cashInInrCents: row.cashInInrCents,
       cashoutUsdInrRate: row.cashoutUsdInrRate,
       paidUsdInrRate: row.paidUsdInrRate,
+      monthlyPaidInrCents: row.monthlyPaidInrCents,
       salaryPaidInrCents: row.salaryPaidInrCents,
       pfInrCents: row.pfInrCents,
       tdsInrCents: row.tdsInrCents,
@@ -379,10 +384,7 @@ export function buildPnPeriodRows(input: {
       }
       const cashoutUsdInrRate = averageRate(bucket, "cashoutUsdInrRate");
       const paidUsdInrRate = averageRate(bucket, "paidUsdInrRate");
-      const salaryPaidInrCents =
-        sumBy(bucket, "actualPaidInrCents") -
-        sumBy(bucket, "pfInrCents") -
-        sumBy(bucket, "tdsInrCents");
+      const salaryPaidInrCents = sumBy(bucket, "salaryPaidInrCents");
 
       return {
         year: periodYear,
@@ -400,6 +402,7 @@ export function buildPnPeriodRows(input: {
         cashoutUsdInrRate,
         cashInInrCents: sumBy(bucket, "cashInInrCents"),
         paidUsdInrRate,
+        monthlyPaidInrCents: sumBy(bucket, "monthlyPaidInrCents"),
         pfInrCents: sumBy(bucket, "pfInrCents"),
         tdsInrCents: sumBy(bucket, "tdsInrCents"),
         actualPaidInrCents: sumBy(bucket, "actualPaidInrCents"),

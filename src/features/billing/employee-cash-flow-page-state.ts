@@ -2,6 +2,7 @@ type SearchValue = string | string[] | undefined;
 
 import type { EmployeeCashFlowEntryWriteInput } from "./employee-cash-flow-types";
 import { normalizeMultiSelectValue } from "./filter-selection";
+import { calculateSalaryPaidInrCents } from "./payroll";
 
 type EmployeeOption = {
   id: string;
@@ -120,6 +121,7 @@ export function buildAddedEmployeeCashFlowEntry(input: {
     id: string;
     fullName: string;
     defaultPaidUsdInrRate?: number;
+    defaultMonthlyPaidInrCents?: number;
     defaultActualPaidInrCents?: number;
     defaultPfInrCents?: number;
     defaultTdsInrCents?: number;
@@ -134,6 +136,28 @@ export function buildAddedEmployeeCashFlowEntry(input: {
   invoiceNumber: string;
   invoiceUsdInrRate: number;
 }): EmployeeCashFlowEntryWriteInput {
+  const safeSalaryPaidInrCents = (row: {
+    actualPaidInrCents: number;
+    pfInrCents: number;
+    tdsInrCents: number;
+  }) => {
+    try {
+      return calculateSalaryPaidInrCents(row);
+    } catch {
+      return 0;
+    }
+  };
+  const monthlyPaidInrCents =
+    input.employee.defaultMonthlyPaidInrCents ?? input.employee.defaultActualPaidInrCents ?? 0;
+  const actualPaidInrCents = input.employee.defaultActualPaidInrCents ?? monthlyPaidInrCents;
+  const pfInrCents = input.employee.defaultPfInrCents ?? 0;
+  const tdsInrCents = input.employee.defaultTdsInrCents ?? 0;
+  const salaryPaidInrCents = safeSalaryPaidInrCents({
+    actualPaidInrCents,
+    pfInrCents,
+    tdsInrCents,
+  });
+
   return {
     clientBatchId: nextCashFlowClientBatchId(),
     invoicePaymentId: undefined,
@@ -152,9 +176,11 @@ export function buildAddedEmployeeCashFlowEntry(input: {
     offboardingDeductionUsdCents: input.employee.offboardingDeductionUsdCents ?? 0,
     cashoutUsdInrRate: input.invoiceUsdInrRate,
     paidUsdInrRate: input.employee.defaultPaidUsdInrRate ?? 0,
-    pfInrCents: input.employee.defaultPfInrCents ?? 0,
-    tdsInrCents: input.employee.defaultTdsInrCents ?? 0,
-    actualPaidInrCents: input.employee.defaultActualPaidInrCents ?? 0,
+    monthlyPaidInrCents,
+    pfInrCents,
+    tdsInrCents,
+    actualPaidInrCents,
+    salaryPaidInrCents,
     fxCommissionInrCents: 0,
     totalCommissionUsdCents: 0,
     commissionEarnedInrCents: 0,
@@ -172,8 +198,29 @@ export function applyEmployeeCashFlowEntryPatch<
     | "daysWorked"
     | "daysInMonth"
     | "paidUsdInrRate"
+    | "monthlyPaidInrCents"
     | "actualPaidInrCents"
+    | "pfInrCents"
+    | "tdsInrCents"
+    | "salaryPaidInrCents"
   >,
 >(entry: TEntry, patch: Partial<TEntry>) {
-  return { ...entry, ...patch } as TEntry;
+  const safeSalaryPaidInrCents = (row: {
+    actualPaidInrCents: number;
+    pfInrCents: number;
+    tdsInrCents: number;
+  }) => {
+    try {
+      return calculateSalaryPaidInrCents(row);
+    } catch {
+      return 0;
+    }
+  };
+  const next = { ...entry, ...patch } as TEntry;
+  next.salaryPaidInrCents = safeSalaryPaidInrCents({
+    actualPaidInrCents: next.actualPaidInrCents,
+    pfInrCents: next.pfInrCents,
+    tdsInrCents: next.tdsInrCents,
+  });
+  return next;
 }

@@ -13,7 +13,9 @@ import {
   buildSavedEmployeeCashFlowEntryJson,
   formatSavedPaymentMonth,
 } from "../../../src/features/billing/employee-cash-flow-saved-rows-helpers";
+import { calculateSalaryPaidInrCents } from "../../../src/features/billing/payroll";
 import {
+  formatInr,
   formatRateInput,
   formatUsd,
   formatWholeRateInput,
@@ -71,7 +73,20 @@ export default function EmployeeCashFlowSavedRows({
 
   function updateRow(id: string, patch: Partial<EmployeeCashFlowSavedEntry>) {
     setRows((current) =>
-      current.map((row) => (row.id === id ? { ...row, ...patch } : row)),
+      current.map((row) => {
+        if (row.id !== id) return row;
+        const next = { ...row, ...patch };
+        try {
+          next.salaryPaidInrCents = calculateSalaryPaidInrCents({
+            actualPaidInrCents: next.actualPaidInrCents,
+            pfInrCents: next.pfInrCents,
+            tdsInrCents: next.tdsInrCents,
+          });
+        } catch {
+          next.salaryPaidInrCents = 0;
+        }
+        return next;
+      }),
     );
   }
 
@@ -106,7 +121,7 @@ export default function EmployeeCashFlowSavedRows({
                 </p>
 
                 <div className="overflow-x-auto rounded-2xl" style={{ border: "1px solid var(--glass-border)" }}>
-                  <table className="glass-table min-w-[1700px]">
+                  <table className="glass-table min-w-[1900px]">
                     <thead>
                       <tr>
                         <th>Month</th>
@@ -120,9 +135,11 @@ export default function EmployeeCashFlowSavedRows({
                         <th>Final effective inward $</th>
                         <th>Received / exchanged rate</th>
                         <th>Peg rate</th>
+                        <th>Monthly paid INR</th>
                         <th>Actual paid INR</th>
                         <th>PF INR</th>
                         <th>TDS INR</th>
+                        <th>Salary paid INR</th>
                         <th>Notes</th>
                         <th>Actions</th>
                       </tr>
@@ -269,6 +286,18 @@ export default function EmployeeCashFlowSavedRows({
                             </td>
                             <td>
                               <input
+                                value={toCurrencyInput(row.monthlyPaidInrCents)}
+                                onChange={(event) =>
+                                  updateRow(row.id, {
+                                    monthlyPaidInrCents: fromCurrencyInput(event.target.value),
+                                  })
+                                }
+                                className={`${inputClass} min-w-[8rem]`}
+                                inputMode="decimal"
+                              />
+                            </td>
+                            <td>
+                              <input
                                 value={toCurrencyInput(row.actualPaidInrCents)}
                                 onChange={(event) =>
                                   updateRow(row.id, {
@@ -303,6 +332,7 @@ export default function EmployeeCashFlowSavedRows({
                                 inputMode="decimal"
                               />
                             </td>
+                            <td className="font-semibold">{formatInr(row.salaryPaidInrCents)}</td>
                             <td>
                               <input
                                 value={row.notes ?? ""}

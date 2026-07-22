@@ -2,6 +2,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 import {
   buildMonthlyPayrollRows,
+  calculateSalaryPaidInrCents,
   normalizePayrollMonthKey,
   type MonthlyPayrollPayment,
   type MonthlyPayrollRow,
@@ -21,6 +22,10 @@ type DbEmployee = {
   billing_rate_usd_cents: number;
   default_paid_usd_inr_rate?: number | null;
   default_actual_paid_inr_cents?: number | null;
+  default_basic_inr_cents?: number | null;
+  default_special_allowance_inr_cents?: number | null;
+  default_insurance_inr_cents?: number | null;
+  default_bonus_inr_cents?: number | null;
   default_pf_inr_cents?: number | null;
   default_tds_inr_cents?: number | null;
   hrs_per_week: number;
@@ -37,9 +42,14 @@ type DbSalaryPayment = {
   month: string;
   employee_name_snapshot?: string | null;
   paid_usd_inr_rate?: number | null;
+  basic_inr_cents?: number | null;
+  special_allowance_inr_cents?: number | null;
+  insurance_inr_cents?: number | null;
+  bonus_inr_cents?: number | null;
   monthly_paid_inr_cents?: number | null;
   days_worked?: number | null;
   days_in_month?: number | null;
+  actual_paid_inr_cents?: number | null;
   salary_paid_inr_cents?: number | null;
   pf_inr_cents?: number | null;
   tds_inr_cents?: number | null;
@@ -55,9 +65,14 @@ export type SaveMonthlyPayrollRowInput = {
   employeeId: string;
   employeeName: string;
   paidUsdInrRate?: number;
+  basicInrCents: number;
+  specialAllowanceInrCents: number;
+  insuranceInrCents: number;
+  bonusInrCents: number;
   monthlyPaidInrCents: number;
   daysWorked: number;
   daysInMonth: number;
+  actualPaidInrCents: number;
   salaryPaidInrCents: number;
   pfInrCents: number;
   tdsInrCents: number;
@@ -92,6 +107,10 @@ function mapEmployee(row: DbEmployee): Employee {
     billingRateUsdCents: row.billing_rate_usd_cents,
     defaultPaidUsdInrRate: Number(row.default_paid_usd_inr_rate ?? 0),
     defaultActualPaidInrCents: Number(row.default_actual_paid_inr_cents ?? 0),
+    defaultBasicInrCents: Number(row.default_basic_inr_cents ?? 0),
+    defaultSpecialAllowanceInrCents: Number(row.default_special_allowance_inr_cents ?? 0),
+    defaultInsuranceInrCents: Number(row.default_insurance_inr_cents ?? 0),
+    defaultBonusInrCents: Number(row.default_bonus_inr_cents ?? 0),
     defaultPfInrCents: Number(row.default_pf_inr_cents ?? 0),
     defaultTdsInrCents: Number(row.default_tds_inr_cents ?? 0),
     hrsPerWeek: Number(row.hrs_per_week),
@@ -110,9 +129,14 @@ function mapSalaryPayment(row: DbSalaryPayment): MonthlyPayrollPayment {
     month: row.month,
     employeeNameSnapshot: row.employee_name_snapshot ?? "",
     paidUsdInrRate: Number(row.paid_usd_inr_rate ?? 0),
+    basicInrCents: Number(row.basic_inr_cents ?? 0),
+    specialAllowanceInrCents: Number(row.special_allowance_inr_cents ?? 0),
+    insuranceInrCents: Number(row.insurance_inr_cents ?? 0),
+    bonusInrCents: Number(row.bonus_inr_cents ?? 0),
     monthlyPaidInrCents: Number(row.monthly_paid_inr_cents ?? row.salary_paid_inr_cents ?? 0),
     daysWorked: Number(row.days_worked ?? 0),
     daysInMonth: Number(row.days_in_month ?? 0),
+    actualPaidInrCents: Number(row.actual_paid_inr_cents ?? row.salary_paid_inr_cents ?? 0),
     salaryPaidInrCents: Number(row.salary_paid_inr_cents ?? 0),
     pfInrCents: Number(row.pf_inr_cents ?? 0),
     tdsInrCents: Number(row.tds_inr_cents ?? 0),
@@ -175,6 +199,20 @@ export async function saveMonthlyPayrollRows(input: {
   const month = normalizePayrollMonthKey(input.month);
   const supabase = await getSupabaseOrThrow();
   const timestamp = nowIso();
+
+  for (const row of input.rows) {
+    const expectedSalaryPaidInrCents = calculateSalaryPaidInrCents({
+      actualPaidInrCents: row.actualPaidInrCents,
+      pfInrCents: row.pfInrCents,
+      tdsInrCents: row.tdsInrCents,
+    });
+    if (expectedSalaryPaidInrCents !== row.salaryPaidInrCents) {
+      throw new Error(
+        `Salary paid for ${row.employeeName} must equal actual paid minus PF and TDS.`,
+      );
+    }
+  }
+
   const { data: existingRows, error: existingError } = await supabase
     .from("employee_salary_payments")
     .select("id, employee_id")
@@ -196,9 +234,14 @@ export async function saveMonthlyPayrollRows(input: {
     month,
     employee_name_snapshot: row.employeeName,
     paid_usd_inr_rate: row.paidUsdInrRate ?? 0,
+    basic_inr_cents: row.basicInrCents,
+    special_allowance_inr_cents: row.specialAllowanceInrCents,
+    insurance_inr_cents: row.insuranceInrCents,
+    bonus_inr_cents: row.bonusInrCents,
     monthly_paid_inr_cents: row.monthlyPaidInrCents,
     days_worked: row.daysWorked,
     days_in_month: row.daysInMonth,
+    actual_paid_inr_cents: row.actualPaidInrCents,
     salary_paid_inr_cents: row.salaryPaidInrCents,
     pf_inr_cents: row.pfInrCents,
     tds_inr_cents: row.tdsInrCents,
@@ -227,6 +270,10 @@ export async function saveMonthlyPayrollRows(input: {
         .from("employees")
         .update({
           default_actual_paid_inr_cents: row.monthlyPaidInrCents,
+          default_basic_inr_cents: row.basicInrCents,
+          default_special_allowance_inr_cents: row.specialAllowanceInrCents,
+          default_insurance_inr_cents: row.insuranceInrCents,
+          default_bonus_inr_cents: row.bonusInrCents,
           default_pf_inr_cents: row.pfInrCents,
           default_tds_inr_cents: row.tdsInrCents,
         })

@@ -183,7 +183,7 @@ describe("dashboard tables rendering", () => {
     const table = screen.getByRole("table");
     const headers = within(table).getAllByRole("columnheader");
     const salaryPaidIndex = headers.findIndex(
-      (header) => header.textContent?.replace(/\s+/g, " ").trim() === "Salary paid",
+      (header) => header.textContent?.replace(/\s+/g, " ").trim() === "Salary paid (INR)",
     );
     const totalsRow = within(table).getByText("Totals").closest("tr");
 
@@ -191,7 +191,7 @@ describe("dashboard tables rendering", () => {
     expect(totalsRow).not.toBeNull();
     expect(
       within(totalsRow as HTMLElement).getAllByRole("cell")[salaryPaidIndex]?.textContent,
-    ).toBe("₹14,500.00");
+    ).toBe("₹15,200.00");
   });
 
   it("updates the period totals net p/l when expenses are excluded", () => {
@@ -239,6 +239,7 @@ describe("dashboard tables rendering", () => {
       "Received / exchanged rate",
       "Total Cash Inward (INR)",
       "Peg rate",
+      "Monthly paid (INR)",
       "Actual paid (INR)",
       "PF (INR)",
       "TDS (INR)",

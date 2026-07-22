@@ -7,6 +7,7 @@ import {
   resolveEmployeeCashFlowStatus,
 } from "./employee-cash-flow";
 import { calculateEmployeePayoutMetrics } from "./domain";
+import { calculateSalaryPaidInrCents } from "./payroll";
 import { hasMissingSchemaColumn } from "./schema-fallback";
 import type {
   EmployeeCashFlowEditableEntry,
@@ -28,7 +29,11 @@ type CashFlowPaymentEntryInput = {
   reimbursementLabelsText: string;
   appraisalAdvanceUsdCents: number;
   offboardingDeductionUsdCents: number;
+  monthlyPaidInrCents: number;
   actualPaidInrCents: number;
+  pfInrCents: number;
+  tdsInrCents: number;
+  salaryPaidInrCents: number;
   daysWorked: number;
   daysInMonth: number;
   cashoutUsdInrRate: number;
@@ -128,6 +133,8 @@ type DbCashFlowEntry = {
   pf_inr_cents: number;
   tds_inr_cents: number;
   actual_paid_inr_cents: number;
+  monthly_paid_inr_cents: number;
+  salary_paid_inr_cents: number;
   fx_commission_inr_cents: number;
   total_commission_usd_cents: number;
   commission_earned_inr_cents: number;
@@ -144,6 +151,8 @@ type DbCashFlowEntry = {
 type DbMonthlySalaryPayment = {
   employee_id: string;
   paid_usd_inr_rate: number | null;
+  monthly_paid_inr_cents: number | null;
+  actual_paid_inr_cents: number | null;
   salary_paid_inr_cents: number | null;
   pf_inr_cents: number | null;
   tds_inr_cents: number | null;
@@ -155,6 +164,7 @@ type AdjustmentAwareEmployee = {
   fullName: string;
   companyId: string;
   defaultPaidUsdInrRate?: number;
+  defaultMonthlyPaidInrCents?: number;
   defaultActualPaidInrCents?: number;
   defaultPfInrCents?: number;
   defaultTdsInrCents?: number;
@@ -178,6 +188,18 @@ async function getSupabaseOrThrow() {
   }
 
   return client;
+}
+
+function safeSalaryPaidInrCents(input: {
+  actualPaidInrCents: number;
+  pfInrCents: number;
+  tdsInrCents: number;
+}) {
+  try {
+    return calculateSalaryPaidInrCents(input);
+  } catch {
+    return 0;
+  }
 }
 
 const nowIso = () => new Date().toISOString();
@@ -247,9 +269,16 @@ export function appendMissingAdjustmentEntries(input: {
       offboardingDeductionUsdCents: employee.offboardingDeductionUsdCents,
       cashoutUsdInrRate: input.cashoutUsdInrRate,
       paidUsdInrRate: employee.defaultPaidUsdInrRate ?? 0,
+      monthlyPaidInrCents:
+        employee.defaultMonthlyPaidInrCents ?? employee.defaultActualPaidInrCents ?? 0,
       pfInrCents: employee.defaultPfInrCents ?? 0,
       tdsInrCents: employee.defaultTdsInrCents ?? 0,
       actualPaidInrCents: employee.defaultActualPaidInrCents ?? 0,
+      salaryPaidInrCents: safeSalaryPaidInrCents({
+        actualPaidInrCents: employee.defaultActualPaidInrCents ?? 0,
+        pfInrCents: employee.defaultPfInrCents ?? 0,
+        tdsInrCents: employee.defaultTdsInrCents ?? 0,
+      }),
       fxCommissionInrCents: 0,
       totalCommissionUsdCents: 0,
       commissionEarnedInrCents: 0,
@@ -394,7 +423,18 @@ export function buildInvoiceCashFlowFallbackEntries(input: {
       const cashoutUsdInrRate = input.realization?.usd_inr_rate ?? 0;
       const employeeDefaults = employeeDefaultsById.get(lineItem.employee_id);
       const paidUsdInrRate = employeeDefaults?.defaultPaidUsdInrRate ?? 0;
+      const monthlyPaidInrCents =
+        employeeDefaults?.defaultMonthlyPaidInrCents ??
+        employeeDefaults?.defaultActualPaidInrCents ??
+        0;
       const actualPaidInrCents = employeeDefaults?.defaultActualPaidInrCents ?? 0;
+      const pfInrCents = employeeDefaults?.defaultPfInrCents ?? 0;
+      const tdsInrCents = employeeDefaults?.defaultTdsInrCents ?? 0;
+      const salaryPaidInrCents = safeSalaryPaidInrCents({
+        actualPaidInrCents,
+        pfInrCents,
+        tdsInrCents,
+      });
       const metrics = calculateEmployeePayoutMetrics({
         dollarInwardUsdCents: effectiveDollarInwardUsdCents,
         actualPaidInrCents,
@@ -427,13 +467,15 @@ export function buildInvoiceCashFlowFallbackEntries(input: {
         effectiveDollarInwardUsdCents,
         cashoutUsdInrRate,
         paidUsdInrRate,
+        monthlyPaidInrCents,
         cashInInrCents: calculateCashInInrCents({
           effectiveDollarInwardUsdCents,
           cashoutUsdInrRate,
         }),
-        pfInrCents: employeeDefaults?.defaultPfInrCents ?? 0,
-        tdsInrCents: employeeDefaults?.defaultTdsInrCents ?? 0,
+        pfInrCents,
+        tdsInrCents,
         actualPaidInrCents,
+        salaryPaidInrCents,
         fxCommissionInrCents: metrics.fxCommissionInrCents,
         totalCommissionUsdCents: metrics.totalCommissionUsdCents,
         commissionEarnedInrCents: metrics.commissionEarnedInrCents,
@@ -452,6 +494,8 @@ export function buildEmployeeCashFlowMonthRows(input: {
   salaryPayments: Array<{
     employeeId: string;
     month: string;
+    monthlyPaidInrCents?: number;
+    actualPaidInrCents?: number;
     salaryPaidInrCents: number;
   }>;
   accrualByEmployeeMonth: CashFlowAccrualInput[];
@@ -474,7 +518,15 @@ export function buildEmployeeCashFlowMonthRows(input: {
   for (const row of input.paymentEntries) {
     const key = `${row.employeeId}:${row.paymentMonth}`;
     const savedSalaryPaidInrCents = salaryMap.get(key) ?? 0;
-    const actualPaidInrCents = row.actualPaidInrCents || savedSalaryPaidInrCents;
+    const fallbackSalaryPaidInrCents = safeSalaryPaidInrCents({
+      actualPaidInrCents: row.actualPaidInrCents ?? 0,
+      pfInrCents: row.pfInrCents ?? 0,
+      tdsInrCents: row.tdsInrCents ?? 0,
+    });
+    const salaryPaidInrCents =
+      row.salaryPaidInrCents && row.salaryPaidInrCents > 0
+        ? row.salaryPaidInrCents
+        : savedSalaryPaidInrCents || fallbackSalaryPaidInrCents;
 
     const existing = grouped.get(key);
     if (existing) {
@@ -506,7 +558,11 @@ export function buildEmployeeCashFlowMonthRows(input: {
         row.invoiceNumber,
         existing.invoiceNumbers,
       );
-      existing.salaryPaidInrCents += actualPaidInrCents;
+      existing.monthlyPaidInrCents += row.monthlyPaidInrCents ?? row.actualPaidInrCents ?? 0;
+      existing.actualPaidInrCents += row.actualPaidInrCents ?? 0;
+      existing.pfInrCents += row.pfInrCents ?? 0;
+      existing.tdsInrCents += row.tdsInrCents ?? 0;
+      existing.salaryPaidInrCents += salaryPaidInrCents;
       const accrualInrCents = accrualMap.get(key) ?? 0;
       existing.pendingAmountInrCents = accrualInrCents - existing.cashInInrCents;
       existing.netInrCents = calculateEmployeeMonthNetInrCents({
@@ -549,19 +605,23 @@ export function buildEmployeeCashFlowMonthRows(input: {
         row.appraisalAdvanceUsdCents * row.cashoutUsdInrRate,
       ),
       paidUsdInrRate: row.paidUsdInrRate,
+      monthlyPaidInrCents: row.monthlyPaidInrCents ?? row.actualPaidInrCents ?? 0,
+      actualPaidInrCents: row.actualPaidInrCents ?? 0,
+      pfInrCents: row.pfInrCents ?? 0,
+      tdsInrCents: row.tdsInrCents ?? 0,
       cashInInrCents: row.cashInInrCents,
-      salaryPaidInrCents: actualPaidInrCents,
+      salaryPaidInrCents,
       pendingAmountInrCents: accrualInrCents - row.cashInInrCents,
       netInrCents: calculateEmployeeMonthNetInrCents({
         cashInInrCents: row.cashInInrCents,
-        salaryPaidInrCents: actualPaidInrCents,
+        salaryPaidInrCents,
       }),
       status: "profit",
       invoiceNumbers,
     };
     cashFlowRow.status = resolveEmployeeCashFlowStatus({
       effectiveDollarInwardUsdCents: cashFlowRow.effectiveDollarInwardUsdCents,
-      salaryPaidInrCents: actualPaidInrCents,
+      salaryPaidInrCents,
       netInrCents: cashFlowRow.netInrCents,
     });
     grouped.set(key, cashFlowRow);
@@ -659,7 +719,7 @@ export async function getInvoicePaymentPrefillData(input: {
         .order("full_name"),
       supabase
         .from("employee_salary_payments")
-        .select("employee_id, paid_usd_inr_rate, salary_paid_inr_cents, pf_inr_cents, tds_inr_cents, override_note")
+        .select("employee_id, paid_usd_inr_rate, monthly_paid_inr_cents, actual_paid_inr_cents, salary_paid_inr_cents, pf_inr_cents, tds_inr_cents, override_note")
         .eq("company_id", invoice.company_id)
         .eq("month", input.paymentMonth)
         .eq("status", "verified"),
@@ -697,7 +757,7 @@ export async function getInvoicePaymentPrefillData(input: {
     const savedEntriesResult = await supabase
       .from("invoice_payment_employee_entries")
       .select(
-        "id, employee_id, payment_month, invoice_line_item_id, employee_name_snapshot, company_id, base_dollar_inward_usd_cents, onboarding_advance_usd_cents, reimbursement_usd_cents, reimbursement_labels_text, appraisal_advance_usd_cents, offboarding_deduction_usd_cents, effective_dollar_inward_usd_cents, cashout_usd_inr_rate, paid_usd_inr_rate, cash_in_inr_cents, pf_inr_cents, tds_inr_cents, actual_paid_inr_cents, fx_commission_inr_cents, total_commission_usd_cents, commission_earned_inr_cents, gross_earnings_inr_cents, is_non_invoice_employee, is_paid, paid_at, notes, days_worked, days_in_month, invoice_id",
+        "id, employee_id, payment_month, invoice_line_item_id, employee_name_snapshot, company_id, base_dollar_inward_usd_cents, onboarding_advance_usd_cents, reimbursement_usd_cents, reimbursement_labels_text, appraisal_advance_usd_cents, offboarding_deduction_usd_cents, effective_dollar_inward_usd_cents, cashout_usd_inr_rate, paid_usd_inr_rate, monthly_paid_inr_cents, cash_in_inr_cents, pf_inr_cents, tds_inr_cents, actual_paid_inr_cents, salary_paid_inr_cents, fx_commission_inr_cents, total_commission_usd_cents, commission_earned_inr_cents, gross_earnings_inr_cents, is_non_invoice_employee, is_paid, paid_at, notes, days_worked, days_in_month, invoice_id",
       )
       .eq("invoice_payment_id", invoicePayment.id)
       .order("employee_name_snapshot");
@@ -764,8 +824,16 @@ export async function getInvoicePaymentPrefillData(input: {
       defaultPaidUsdInrRate: Number(
         payroll?.paid_usd_inr_rate ?? row.default_paid_usd_inr_rate ?? 0,
       ),
+      defaultMonthlyPaidInrCents: Number(
+        payroll?.monthly_paid_inr_cents ??
+          row.default_actual_paid_inr_cents ??
+          0,
+      ),
       defaultActualPaidInrCents: Number(
-        payroll?.salary_paid_inr_cents ?? row.default_actual_paid_inr_cents ?? 0,
+        payroll?.actual_paid_inr_cents ??
+          payroll?.monthly_paid_inr_cents ??
+          row.default_actual_paid_inr_cents ??
+          0,
       ),
       defaultPfInrCents: Number(payroll?.pf_inr_cents ?? row.default_pf_inr_cents ?? 0),
       defaultTdsInrCents: Number(payroll?.tds_inr_cents ?? row.default_tds_inr_cents ?? 0),
@@ -820,6 +888,7 @@ export async function getInvoicePaymentPrefillData(input: {
           }),
           cashoutUsdInrRate: row.cashout_usd_inr_rate,
           paidUsdInrRate: row.paid_usd_inr_rate,
+          monthlyPaidInrCents: row.monthly_paid_inr_cents,
           cashInInrCents: calculateCashInInrCents({
             effectiveDollarInwardUsdCents: calculateEffectiveDollarInwardUsdCents({
               baseDollarInwardUsdCents: row.base_dollar_inward_usd_cents,
@@ -833,6 +902,7 @@ export async function getInvoicePaymentPrefillData(input: {
           pfInrCents: row.pf_inr_cents,
           tdsInrCents: row.tds_inr_cents,
           actualPaidInrCents: row.actual_paid_inr_cents,
+          salaryPaidInrCents: row.salary_paid_inr_cents,
           fxCommissionInrCents: row.fx_commission_inr_cents,
           totalCommissionUsdCents: row.total_commission_usd_cents,
           commissionEarnedInrCents: row.commission_earned_inr_cents,
@@ -877,9 +947,13 @@ export async function getInvoicePaymentPrefillData(input: {
               : row.paid_usd_inr_rate && row.paid_usd_inr_rate > 0
               ? row.paid_usd_inr_rate
               : employeeDefaults?.defaultPaidUsdInrRate ?? 0;
+          const monthlyPaidInrCents =
+            payroll?.monthly_paid_inr_cents && payroll.monthly_paid_inr_cents > 0
+              ? payroll.monthly_paid_inr_cents
+              : employeeDefaults?.defaultActualPaidInrCents ?? 0;
           const actualPaidInrCents =
-            payroll?.salary_paid_inr_cents && payroll.salary_paid_inr_cents > 0
-              ? payroll.salary_paid_inr_cents
+            payroll?.actual_paid_inr_cents && payroll.actual_paid_inr_cents > 0
+              ? payroll.actual_paid_inr_cents
               : row.actual_paid_inr_cents && row.actual_paid_inr_cents > 0
               ? row.actual_paid_inr_cents
               : employeeDefaults?.defaultActualPaidInrCents ?? 0;
@@ -889,6 +963,23 @@ export async function getInvoicePaymentPrefillData(input: {
             receivedUsdInrRate: cashoutUsdInrRate,
             pegUsdInrRate: paidUsdInrRate,
           });
+
+          const pfInrCents =
+            payroll?.pf_inr_cents && payroll.pf_inr_cents > 0
+              ? payroll.pf_inr_cents
+              : row.pf_inr_cents && row.pf_inr_cents > 0
+              ? row.pf_inr_cents
+              : employeeDefaults?.defaultPfInrCents ?? 0;
+          const tdsInrCents =
+            payroll?.tds_inr_cents && payroll.tds_inr_cents > 0
+              ? payroll.tds_inr_cents
+              : row.tds_inr_cents && row.tds_inr_cents > 0
+              ? row.tds_inr_cents
+              : employeeDefaults?.defaultTdsInrCents ?? 0;
+          const salaryPaidInrCents =
+            payroll?.salary_paid_inr_cents && payroll.salary_paid_inr_cents > 0
+              ? payroll.salary_paid_inr_cents
+              : safeSalaryPaidInrCents({ actualPaidInrCents, pfInrCents, tdsInrCents });
 
           return {
             id: nextCashFlowId("cash_entry"),
@@ -911,23 +1002,15 @@ export async function getInvoicePaymentPrefillData(input: {
           effectiveDollarInwardUsdCents,
             cashoutUsdInrRate,
             paidUsdInrRate,
+            monthlyPaidInrCents,
             cashInInrCents: calculateCashInInrCents({
               effectiveDollarInwardUsdCents,
               cashoutUsdInrRate,
             }),
-            pfInrCents:
-              payroll?.pf_inr_cents && payroll.pf_inr_cents > 0
-                ? payroll.pf_inr_cents
-                : row.pf_inr_cents && row.pf_inr_cents > 0
-                ? row.pf_inr_cents
-                : employeeDefaults?.defaultPfInrCents ?? 0,
-            tdsInrCents:
-              payroll?.tds_inr_cents && payroll.tds_inr_cents > 0
-                ? payroll.tds_inr_cents
-                : row.tds_inr_cents && row.tds_inr_cents > 0
-                ? row.tds_inr_cents
-                : employeeDefaults?.defaultTdsInrCents ?? 0,
+            pfInrCents,
+            tdsInrCents,
             actualPaidInrCents,
+            salaryPaidInrCents,
             fxCommissionInrCents: metrics.fxCommissionInrCents,
             totalCommissionUsdCents: metrics.totalCommissionUsdCents,
             commissionEarnedInrCents: metrics.commissionEarnedInrCents,
@@ -1079,9 +1162,11 @@ export async function replaceInvoicePaymentEmployeeEntries(input: {
         effectiveDollarInwardUsdCents,
         cashoutUsdInrRate: entry.cashoutUsdInrRate,
       }),
+      monthly_paid_inr_cents: entry.monthlyPaidInrCents,
       pf_inr_cents: entry.pfInrCents,
       tds_inr_cents: entry.tdsInrCents,
       actual_paid_inr_cents: entry.actualPaidInrCents,
+      salary_paid_inr_cents: entry.salaryPaidInrCents,
       fx_commission_inr_cents: payoutMetrics.fxCommissionInrCents,
       total_commission_usd_cents: payoutMetrics.totalCommissionUsdCents,
       commission_earned_inr_cents: payoutMetrics.commissionEarnedInrCents,
@@ -1110,7 +1195,7 @@ export async function listSavedEmployeeCashFlowEntries(input: {
   let query = supabase
     .from("invoice_payment_employee_entries")
     .select(
-      "id, invoice_payment_id, invoice_id, employee_id, company_id, payment_month, invoice_line_item_id, employee_name_snapshot, days_worked, days_in_month, base_dollar_inward_usd_cents, onboarding_advance_usd_cents, reimbursement_usd_cents, reimbursement_labels_text, appraisal_advance_usd_cents, offboarding_deduction_usd_cents, cashout_usd_inr_rate, paid_usd_inr_rate, pf_inr_cents, tds_inr_cents, actual_paid_inr_cents, fx_commission_inr_cents, total_commission_usd_cents, commission_earned_inr_cents, gross_earnings_inr_cents, is_non_invoice_employee, is_paid, paid_at, notes",
+      "id, invoice_payment_id, invoice_id, employee_id, company_id, payment_month, invoice_line_item_id, employee_name_snapshot, days_worked, days_in_month, base_dollar_inward_usd_cents, onboarding_advance_usd_cents, reimbursement_usd_cents, reimbursement_labels_text, appraisal_advance_usd_cents, offboarding_deduction_usd_cents, cashout_usd_inr_rate, paid_usd_inr_rate, monthly_paid_inr_cents, pf_inr_cents, tds_inr_cents, actual_paid_inr_cents, salary_paid_inr_cents, fx_commission_inr_cents, total_commission_usd_cents, commission_earned_inr_cents, gross_earnings_inr_cents, is_non_invoice_employee, is_paid, paid_at, notes",
     )
     .eq("company_id", input.companyId)
     .order("employee_name_snapshot");
@@ -1157,9 +1242,11 @@ export async function listSavedEmployeeCashFlowEntries(input: {
     offboardingDeductionUsdCents: Math.abs(row.offboarding_deduction_usd_cents),
     cashoutUsdInrRate: row.cashout_usd_inr_rate,
     paidUsdInrRate: row.paid_usd_inr_rate,
+    monthlyPaidInrCents: row.monthly_paid_inr_cents,
     pfInrCents: row.pf_inr_cents,
     tdsInrCents: row.tds_inr_cents,
     actualPaidInrCents: row.actual_paid_inr_cents,
+    salaryPaidInrCents: row.salary_paid_inr_cents,
     fxCommissionInrCents: row.fx_commission_inr_cents,
     totalCommissionUsdCents: row.total_commission_usd_cents,
     commissionEarnedInrCents: row.commission_earned_inr_cents,
@@ -1207,9 +1294,11 @@ export async function updateSavedEmployeeCashFlowEntry(
         effectiveDollarInwardUsdCents,
         cashoutUsdInrRate: entry.cashoutUsdInrRate,
       }),
+      monthly_paid_inr_cents: entry.monthlyPaidInrCents,
       pf_inr_cents: entry.pfInrCents,
       tds_inr_cents: entry.tdsInrCents,
       actual_paid_inr_cents: entry.actualPaidInrCents,
+      salary_paid_inr_cents: entry.salaryPaidInrCents,
       fx_commission_inr_cents: payoutMetrics.fxCommissionInrCents,
       total_commission_usd_cents: payoutMetrics.totalCommissionUsdCents,
       commission_earned_inr_cents: payoutMetrics.commissionEarnedInrCents,
@@ -1287,6 +1376,11 @@ export async function updateDashboardEmployeeCashFlowEntry(input: {
     receivedUsdInrRate: input.cashoutUsdInrRate,
     pegUsdInrRate: input.paidUsdInrRate,
   });
+  const salaryPaidInrCents = safeSalaryPaidInrCents({
+    actualPaidInrCents: input.actualPaidInrCents,
+    pfInrCents: input.pfInrCents,
+    tdsInrCents: input.tdsInrCents,
+  });
   const { error } = await supabase
     .from("invoice_payment_employee_entries")
     .update({
@@ -1304,9 +1398,11 @@ export async function updateDashboardEmployeeCashFlowEntry(input: {
         effectiveDollarInwardUsdCents,
         cashoutUsdInrRate: input.cashoutUsdInrRate,
       }),
+      monthly_paid_inr_cents: input.actualPaidInrCents,
       pf_inr_cents: input.pfInrCents,
       tds_inr_cents: input.tdsInrCents,
       actual_paid_inr_cents: input.actualPaidInrCents,
+      salary_paid_inr_cents: salaryPaidInrCents,
       fx_commission_inr_cents: payoutMetrics.fxCommissionInrCents,
       total_commission_usd_cents: payoutMetrics.totalCommissionUsdCents,
       commission_earned_inr_cents: payoutMetrics.commissionEarnedInrCents,

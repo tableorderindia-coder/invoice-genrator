@@ -10,6 +10,7 @@ const columns = [
   { key: "period", label: "Period" },
   { key: "dollarInward", label: "Total dollar inward" },
   { key: "cashIn", label: "Total cash inward INR" },
+  { key: "monthlyPaid", label: "Monthly paid INR" },
   { key: "actualPaid", label: "Actual paid INR" },
   { key: "salaryPaid", label: "Salary paid INR" },
   { key: "pf", label: "PF paid INR" },
@@ -42,6 +43,8 @@ function renderCell(row: OverviewPnlSummaryRow, key: (typeof columns)[number]["k
       return formatUsd(totals.dollarInwardUsdCents);
     case "cashIn":
       return formatInr(totals.cashInInrCents);
+    case "monthlyPaid":
+      return formatInr(totals.monthlyPaidInrCents);
     case "actualPaid":
       return formatInr(totals.actualPaidInrCents);
     case "salaryPaid":

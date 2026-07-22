@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   buildMonthlyPayrollRows,
   calculateActualPaidInrCents,
+  calculateMonthlyPaidInrCents,
+  calculateSalaryPaidInrCents,
   getDaysInPayrollMonth,
   normalizePayrollMonthKey,
   summarizePayrollRows,
@@ -19,6 +21,10 @@ const employee = (patch: Partial<Employee> = {}): Employee => ({
   billingRateUsdCents: 4000,
   defaultPaidUsdInrRate: 83,
   defaultActualPaidInrCents: 250_000,
+  defaultBasicInrCents: 200_000,
+  defaultSpecialAllowanceInrCents: 25_000,
+  defaultInsuranceInrCents: 5_000,
+  defaultBonusInrCents: 0,
   defaultPfInrCents: 18_000,
   defaultTdsInrCents: 12_000,
   hrsPerWeek: 40,
@@ -45,6 +51,42 @@ describe("payroll helpers", () => {
     ).toBe(155_000);
   });
 
+  it("calculates monthly, actual, and salary paid from component earnings and fixed deductions", () => {
+    const monthlyPaidInrCents = calculateMonthlyPaidInrCents({
+      basicInrCents: 200_000,
+      specialAllowanceInrCents: 25_000,
+      insuranceInrCents: 5_000,
+      bonusInrCents: 10_000,
+      pfInrCents: 18_000,
+      tdsInrCents: 12_000,
+    });
+    const actualPaidInrCents = calculateActualPaidInrCents({
+      monthlyPaidInrCents,
+      daysWorked: 15,
+      daysInMonth: 30,
+    });
+
+    expect(monthlyPaidInrCents).toBe(270_000);
+    expect(actualPaidInrCents).toBe(135_000);
+    expect(
+      calculateSalaryPaidInrCents({
+        actualPaidInrCents,
+        pfInrCents: 18_000,
+        tdsInrCents: 12_000,
+      }),
+    ).toBe(105_000);
+  });
+
+  it("rejects salary paid values that would become negative", () => {
+    expect(() =>
+      calculateSalaryPaidInrCents({
+        actualPaidInrCents: 10_000,
+        pfInrCents: 18_000,
+        tdsInrCents: 12_000,
+      }),
+    ).toThrow("Salary paid cannot be negative.");
+  });
+
   it("returns calendar days for a valid payroll month", () => {
     expect(getDaysInPayrollMonth("2026-02")).toBe(28);
     expect(getDaysInPayrollMonth("2028-02")).toBe(29);
@@ -64,10 +106,15 @@ describe("payroll helpers", () => {
         employeeId: "employee_1",
         employeeName: "Jane Doe",
         source: "employee-default",
-        monthlyPaidInrCents: 250_000,
+        basicInrCents: 200_000,
+        specialAllowanceInrCents: 25_000,
+        insuranceInrCents: 5_000,
+        bonusInrCents: 0,
+        monthlyPaidInrCents: 260_000,
         daysWorked: 31,
         daysInMonth: 31,
-        salaryPaidInrCents: 250_000,
+        actualPaidInrCents: 260_000,
+        salaryPaidInrCents: 230_000,
         pfInrCents: 18_000,
         tdsInrCents: 12_000,
         status: "draft",
@@ -83,10 +130,15 @@ describe("payroll helpers", () => {
       month: "2026-07",
       employeeNameSnapshot: "Jane Snapshot",
       paidUsdInrRate: 84,
+      basicInrCents: 220_000,
+      specialAllowanceInrCents: 30_000,
+      insuranceInrCents: 10_000,
+      bonusInrCents: 0,
       monthlyPaidInrCents: 310_000,
       daysWorked: 15.5,
       daysInMonth: 31,
-      salaryPaidInrCents: 155_000,
+      actualPaidInrCents: 155_000,
+      salaryPaidInrCents: 105_000,
       pfInrCents: 20_000,
       tdsInrCents: 30_000,
       paidStatus: true,
@@ -108,10 +160,15 @@ describe("payroll helpers", () => {
         id: "salary_payment_1",
         employeeName: "Jane Snapshot",
         source: "monthly-payroll",
+        basicInrCents: 220_000,
+        specialAllowanceInrCents: 30_000,
+        insuranceInrCents: 10_000,
+        bonusInrCents: 0,
         monthlyPaidInrCents: 310_000,
         daysWorked: 15.5,
         daysInMonth: 31,
-        salaryPaidInrCents: 155_000,
+        actualPaidInrCents: 155_000,
+        salaryPaidInrCents: 105_000,
         pfInrCents: 20_000,
         tdsInrCents: 30_000,
         status: "verified",
@@ -137,10 +194,15 @@ describe("payroll helpers", () => {
           month: "2026-07",
           employeeNameSnapshot: "Saved Inactive Snapshot",
           paidUsdInrRate: 84,
+          basicInrCents: 260_000,
+          specialAllowanceInrCents: 0,
+          insuranceInrCents: 0,
+          bonusInrCents: 0,
           monthlyPaidInrCents: 310_000,
           daysWorked: 31,
           daysInMonth: 31,
-          salaryPaidInrCents: 310_000,
+          actualPaidInrCents: 310_000,
+          salaryPaidInrCents: 260_000,
           pfInrCents: 20_000,
           tdsInrCents: 30_000,
           paidStatus: true,
@@ -171,10 +233,15 @@ describe("payroll helpers", () => {
           month: "2026-07",
           employeeName: "Jane Doe",
           source: "employee-default",
-          monthlyPaidInrCents: 100_000,
+          basicInrCents: 80_000,
+          specialAllowanceInrCents: 10_000,
+          insuranceInrCents: 0,
+          bonusInrCents: 0,
+          monthlyPaidInrCents: 105_000,
           daysWorked: 15,
           daysInMonth: 30,
-          salaryPaidInrCents: 50_000,
+          actualPaidInrCents: 52_500,
+          salaryPaidInrCents: 37_500,
           pfInrCents: 10_000,
           tdsInrCents: 5_000,
           status: "draft",
@@ -182,10 +249,12 @@ describe("payroll helpers", () => {
       ]),
     ).toEqual({
       employeeCount: 1,
-      salaryPaidInrCents: 50_000,
+      monthlyPaidInrCents: 105_000,
+      actualPaidInrCents: 52_500,
+      salaryPaidInrCents: 37_500,
       pfInrCents: 10_000,
       tdsInrCents: 5_000,
-      netPaidInrCents: 35_000,
+      netPaidInrCents: 37_500,
     });
   });
 });

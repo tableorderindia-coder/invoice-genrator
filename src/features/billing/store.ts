@@ -101,6 +101,10 @@ type DbEmployee = {
   billing_rate_usd_cents: number;
   default_paid_usd_inr_rate?: number | null;
   default_actual_paid_inr_cents?: number | null;
+  default_basic_inr_cents?: number | null;
+  default_special_allowance_inr_cents?: number | null;
+  default_insurance_inr_cents?: number | null;
+  default_bonus_inr_cents?: number | null;
   default_pf_inr_cents?: number | null;
   default_tds_inr_cents?: number | null;
   hrs_per_week: number;
@@ -201,9 +205,11 @@ type DbDashboardCashFlowEntry = {
   cashout_usd_inr_rate: number;
   paid_usd_inr_rate: number;
   cash_in_inr_cents: number;
+  monthly_paid_inr_cents: number | null;
   pf_inr_cents: number;
   tds_inr_cents: number;
   actual_paid_inr_cents: number;
+  salary_paid_inr_cents: number | null;
   fx_commission_inr_cents: number;
   total_commission_usd_cents: number;
   commission_earned_inr_cents: number;
@@ -440,6 +446,10 @@ function mapEmployee(row: DbEmployee): Employee {
     billingRateUsdCents: row.billing_rate_usd_cents,
     defaultPaidUsdInrRate: Number(row.default_paid_usd_inr_rate ?? 0),
     defaultActualPaidInrCents: Number(row.default_actual_paid_inr_cents ?? 0),
+    defaultBasicInrCents: Number(row.default_basic_inr_cents ?? 0),
+    defaultSpecialAllowanceInrCents: Number(row.default_special_allowance_inr_cents ?? 0),
+    defaultInsuranceInrCents: Number(row.default_insurance_inr_cents ?? 0),
+    defaultBonusInrCents: Number(row.default_bonus_inr_cents ?? 0),
     defaultPfInrCents: Number(row.default_pf_inr_cents ?? 0),
     defaultTdsInrCents: Number(row.default_tds_inr_cents ?? 0),
     hrsPerWeek: Number(row.hrs_per_week),
@@ -1029,6 +1039,10 @@ export async function createEmployee(input: {
   billingRateUsdCents: number;
   defaultPaidUsdInrRate?: number;
   defaultActualPaidInrCents?: number;
+  defaultBasicInrCents?: number;
+  defaultSpecialAllowanceInrCents?: number;
+  defaultInsuranceInrCents?: number;
+  defaultBonusInrCents?: number;
   defaultPfInrCents?: number;
   defaultTdsInrCents?: number;
   hrsPerWeek: number;
@@ -1060,6 +1074,10 @@ export async function createEmployee(input: {
     billing_rate_usd_cents: input.billingRateUsdCents,
     default_paid_usd_inr_rate: input.defaultPaidUsdInrRate ?? 0,
     default_actual_paid_inr_cents: input.defaultActualPaidInrCents ?? 0,
+    default_basic_inr_cents: input.defaultBasicInrCents ?? 0,
+    default_special_allowance_inr_cents: input.defaultSpecialAllowanceInrCents ?? 0,
+    default_insurance_inr_cents: input.defaultInsuranceInrCents ?? 0,
+    default_bonus_inr_cents: input.defaultBonusInrCents ?? 0,
     default_pf_inr_cents: input.defaultPfInrCents ?? 0,
     default_tds_inr_cents: input.defaultTdsInrCents ?? 0,
     hrs_per_week: input.hrsPerWeek,
@@ -2005,6 +2023,10 @@ export async function updateEmployee(input: {
   billingRateUsdCents: number;
   defaultPaidUsdInrRate?: number;
   defaultActualPaidInrCents?: number;
+  defaultBasicInrCents?: number;
+  defaultSpecialAllowanceInrCents?: number;
+  defaultInsuranceInrCents?: number;
+  defaultBonusInrCents?: number;
   defaultPfInrCents?: number;
   defaultTdsInrCents?: number;
   hrsPerWeek: number;
@@ -2024,6 +2046,10 @@ export async function updateEmployee(input: {
     billing_rate_usd_cents: input.billingRateUsdCents,
     default_paid_usd_inr_rate: input.defaultPaidUsdInrRate ?? 0,
     default_actual_paid_inr_cents: input.defaultActualPaidInrCents ?? 0,
+    default_basic_inr_cents: input.defaultBasicInrCents ?? 0,
+    default_special_allowance_inr_cents: input.defaultSpecialAllowanceInrCents ?? 0,
+    default_insurance_inr_cents: input.defaultInsuranceInrCents ?? 0,
+    default_bonus_inr_cents: input.defaultBonusInrCents ?? 0,
     default_pf_inr_cents: input.defaultPfInrCents ?? 0,
     default_tds_inr_cents: input.defaultTdsInrCents ?? 0,
     hrs_per_week: input.hrsPerWeek,
@@ -2270,7 +2296,7 @@ export async function getPnDashboardData(input: {
   let cashFlowQuery = supabase
     .from("invoice_payment_employee_entries")
     .select(
-      "id, employee_id, payment_month, employee_name_snapshot, company_id, base_dollar_inward_usd_cents, onboarding_advance_usd_cents, reimbursement_usd_cents, reimbursement_labels_text, appraisal_advance_usd_cents, offboarding_deduction_usd_cents, effective_dollar_inward_usd_cents, cashout_usd_inr_rate, paid_usd_inr_rate, cash_in_inr_cents, pf_inr_cents, tds_inr_cents, actual_paid_inr_cents, fx_commission_inr_cents, total_commission_usd_cents, commission_earned_inr_cents, gross_earnings_inr_cents, days_worked, days_in_month, invoice_id",
+      "id, employee_id, payment_month, employee_name_snapshot, company_id, base_dollar_inward_usd_cents, onboarding_advance_usd_cents, reimbursement_usd_cents, reimbursement_labels_text, appraisal_advance_usd_cents, offboarding_deduction_usd_cents, effective_dollar_inward_usd_cents, cashout_usd_inr_rate, paid_usd_inr_rate, cash_in_inr_cents, monthly_paid_inr_cents, pf_inr_cents, tds_inr_cents, actual_paid_inr_cents, salary_paid_inr_cents, fx_commission_inr_cents, total_commission_usd_cents, commission_earned_inr_cents, gross_earnings_inr_cents, days_worked, days_in_month, invoice_id",
     )
     .eq("company_id", input.companyId);
 
@@ -2369,8 +2395,14 @@ export async function getPnDashboardData(input: {
         effectiveDollarInwardUsdCents,
         cashoutUsdInrRate: row.cashout_usd_inr_rate,
       });
+      const monthlyPaidInrCents =
+        row.monthly_paid_inr_cents && row.monthly_paid_inr_cents > 0
+          ? row.monthly_paid_inr_cents
+          : row.actual_paid_inr_cents;
       const salaryPaidInrCents =
-        row.actual_paid_inr_cents - row.pf_inr_cents - row.tds_inr_cents;
+        row.salary_paid_inr_cents && row.salary_paid_inr_cents > 0
+          ? row.salary_paid_inr_cents
+          : Math.max(0, row.actual_paid_inr_cents - row.pf_inr_cents - row.tds_inr_cents);
 
       return {
         employeeId: row.employee_id,
@@ -2388,6 +2420,7 @@ export async function getPnDashboardData(input: {
         effectiveDollarInwardUsdCents,
         cashoutUsdInrRate: row.cashout_usd_inr_rate,
         paidUsdInrRate: row.paid_usd_inr_rate,
+        monthlyPaidInrCents,
         pfInrCents: row.pf_inr_cents,
         tdsInrCents: row.tds_inr_cents,
         actualPaidInrCents: row.actual_paid_inr_cents,
@@ -2398,7 +2431,7 @@ export async function getPnDashboardData(input: {
         salaryPaidInrCents,
         netProfitInrCents: calculateEmployeeMonthNetInrCents({
           cashInInrCents,
-          salaryPaidInrCents: row.actual_paid_inr_cents,
+          salaryPaidInrCents,
         }),
       };
     })
@@ -2433,8 +2466,14 @@ export async function getPnDashboardData(input: {
         effectiveDollarInwardUsdCents,
         cashoutUsdInrRate: row.cashout_usd_inr_rate,
       });
+      const monthlyPaidInrCents =
+        row.monthly_paid_inr_cents && row.monthly_paid_inr_cents > 0
+          ? row.monthly_paid_inr_cents
+          : row.actual_paid_inr_cents;
       const salaryPaidInrCents =
-        row.actual_paid_inr_cents - row.pf_inr_cents - row.tds_inr_cents;
+        row.salary_paid_inr_cents && row.salary_paid_inr_cents > 0
+          ? row.salary_paid_inr_cents
+          : Math.max(0, row.actual_paid_inr_cents - row.pf_inr_cents - row.tds_inr_cents);
 
       return {
         rowId: row.id,
@@ -2457,6 +2496,7 @@ export async function getPnDashboardData(input: {
         cashInInrCents,
         cashoutUsdInrRate: row.cashout_usd_inr_rate,
         paidUsdInrRate: row.paid_usd_inr_rate,
+        monthlyPaidInrCents,
         salaryPaidInrCents,
         pfInrCents: row.pf_inr_cents,
         tdsInrCents: row.tds_inr_cents,
@@ -2467,7 +2507,7 @@ export async function getPnDashboardData(input: {
         grossEarningsInrCents: row.gross_earnings_inr_cents,
         netProfitInrCents: calculateEmployeeMonthNetInrCents({
           cashInInrCents,
-          salaryPaidInrCents: row.actual_paid_inr_cents,
+          salaryPaidInrCents,
         }),
         isSecurityDepositMonth: false,
       };

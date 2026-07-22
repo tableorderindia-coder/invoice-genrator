@@ -129,10 +129,6 @@ function netProfitColor(cents: number) {
   return "var(--text-primary)";
 }
 
-function getSalaryPaidInrCents(row: PnEmployeeEditableRow) {
-  return row.actualPaidInrCents - row.pfInrCents - row.tdsInrCents;
-}
-
 type EmployeeTablesProps = {
   data: PnDashboardData;
   returnTo: string;
@@ -380,6 +376,11 @@ function EmployeeTables({
         ),
     },
     {
+      key: "monthlyPaid",
+      label: "Monthly paid (INR)",
+      render: (row) => formatInr(row.monthlyPaidInrCents),
+    },
+    {
       key: "actualPaid",
       label: "Actual paid (INR)",
       render: (row) => (
@@ -444,8 +445,8 @@ function EmployeeTables({
     },
     {
       key: "salaryPaid",
-      label: "Salary paid",
-      render: (row) => formatInr(getSalaryPaidInrCents(row)),
+      label: "Salary paid (INR)",
+      render: (row) => formatInr(row.salaryPaidInrCents),
     },
     {
       key: "fxCommission",
@@ -533,6 +534,8 @@ function EmployeeTables({
         return formatInr(totals.cashInInrCents);
       case "paidRate":
         return formatRate(totals.paidUsdInrRate);
+      case "monthlyPaid":
+        return formatInr(totals.monthlyPaidInrCents);
       case "actualPaid":
         return formatInr(totals.actualPaidInrCents);
       case "pf":
@@ -540,9 +543,7 @@ function EmployeeTables({
       case "tds":
         return formatInr(totals.tdsInrCents);
       case "salaryPaid":
-        return formatInr(
-          totals.actualPaidInrCents - totals.pfInrCents - totals.tdsInrCents,
-        );
+        return formatInr(totals.salaryPaidInrCents);
       case "fxCommission":
         return formatInr(totals.fxCommissionInrCents);
       case "commissionEarned":
@@ -750,6 +751,11 @@ function PeriodTables({
       render: (row) => formatRate(row.paidUsdInrRate),
     },
     {
+      key: "monthlyPaid",
+      label: "Monthly paid (INR)",
+      render: (row) => formatInr(row.monthlyPaidInrCents),
+    },
+    {
       key: "actualPaid",
       label: "Actual paid (INR)",
       render: (row) => formatInr(row.actualPaidInrCents),
@@ -877,6 +883,8 @@ function PeriodTables({
         return formatInr(totals.cashInInrCents);
       case "paidRate":
         return formatRate(totals.paidUsdInrRate);
+      case "monthlyPaid":
+        return formatInr(totals.monthlyPaidInrCents);
       case "pf":
         return formatInr(totals.pfInrCents);
       case "tds":

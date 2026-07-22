@@ -150,10 +150,15 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
         {
           employeeId: "emp_1",
           employeeName: "Asha",
-          monthlyPaidInrCents: 20000000,
+          basicInrCents: 12000000,
+          specialAllowanceInrCents: 4000000,
+          insuranceInrCents: 1000000,
+          bonusInrCents: 500000,
+          monthlyPaidInrCents: 18000000,
           daysWorked: 15.5,
           daysInMonth: 31,
-          salaryPaidInrCents: 10000000,
+          actualPaidInrCents: 9000000,
+          salaryPaidInrCents: 8570000,
           pfInrCents: 180000,
           tdsInrCents: 250000,
           notes: "Verified",
@@ -175,10 +180,15 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
       rows: [
         expect.objectContaining({
           employeeId: "emp_1",
-          monthlyPaidInrCents: 20000000,
+          basicInrCents: 12000000,
+          specialAllowanceInrCents: 4000000,
+          insuranceInrCents: 1000000,
+          bonusInrCents: 500000,
+          monthlyPaidInrCents: 18000000,
           daysWorked: 15.5,
           daysInMonth: 31,
-          salaryPaidInrCents: 10000000,
+          actualPaidInrCents: 9000000,
+          salaryPaidInrCents: 8570000,
           notes: "Verified",
         }),
       ],
@@ -259,7 +269,10 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
     formData.set("hrsPerWeek", "40");
     formData.set("activeFrom", "2026-04-01");
     formData.set("defaultPaidUsdInrRate", "82.75");
-    formData.set("defaultActualPaidInr", "210000");
+    formData.set("defaultBasicInr", "205700");
+    formData.set("defaultSpecialAllowanceInr", "0");
+    formData.set("defaultInsuranceInr", "0");
+    formData.set("defaultBonusInr", "0");
     formData.set("defaultPfInr", "1800");
     formData.set("defaultTdsInr", "2500");
 
@@ -271,6 +284,7 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
       expect.objectContaining({
         defaultPaidUsdInrRate: 82.75,
         defaultActualPaidInrCents: 21000000,
+        defaultBasicInrCents: 20570000,
         defaultPfInrCents: 180000,
         defaultTdsInrCents: 250000,
       }),
@@ -290,7 +304,10 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
     formData.set("activeFrom", "2026-04-01");
     formData.set("isActive", "true");
     formData.set("defaultPaidUsdInrRate", "81.5");
-    formData.set("defaultActualPaidInr", "190000");
+    formData.set("defaultBasicInr", "186200");
+    formData.set("defaultSpecialAllowanceInr", "0");
+    formData.set("defaultInsuranceInr", "0");
+    formData.set("defaultBonusInr", "0");
     formData.set("defaultPfInr", "1600");
     formData.set("defaultTdsInr", "2200");
 
@@ -302,6 +319,7 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
       expect.objectContaining({
         defaultPaidUsdInrRate: 81.5,
         defaultActualPaidInrCents: 19000000,
+        defaultBasicInrCents: 18620000,
         defaultPfInrCents: 160000,
         defaultTdsInrCents: 220000,
       }),

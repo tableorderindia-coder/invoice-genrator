@@ -8,6 +8,8 @@ import { PendingSubmitButton } from "@/app/_components/pending-submit-button";
 import { saveMonthlyPayrollRowsAction } from "@/src/features/billing/actions";
 import {
   calculateActualPaidInrCents,
+  calculateMonthlyPaidInrCents,
+  calculateSalaryPaidInrCents,
   normalizePayrollDaysWorked,
   summarizePayrollRows,
   type MonthlyPayrollRow,
@@ -29,6 +31,34 @@ function centsFromInrInput(value: string) {
     return 0;
   }
   return Math.round(parsed * 100);
+}
+
+function calculateRowTotals(row: EditablePayrollRow) {
+  const monthlyPaidInrCents = calculateMonthlyPaidInrCents(row);
+  const actualPaidInrCents = calculateActualPaidInrCents({
+    monthlyPaidInrCents,
+    daysWorked: row.daysWorked,
+    daysInMonth: row.daysInMonth,
+  });
+  try {
+    return {
+      monthlyPaidInrCents,
+      actualPaidInrCents,
+      salaryPaidInrCents: calculateSalaryPaidInrCents({
+        actualPaidInrCents,
+        pfInrCents: row.pfInrCents,
+        tdsInrCents: row.tdsInrCents,
+      }),
+      needsReview: false,
+    };
+  } catch {
+    return {
+      monthlyPaidInrCents,
+      actualPaidInrCents,
+      salaryPaidInrCents: actualPaidInrCents - row.pfInrCents - row.tdsInrCents,
+      needsReview: true,
+    };
+  }
 }
 
 function toEditableRow(row: MonthlyPayrollRow): EditablePayrollRow {
@@ -58,40 +88,43 @@ export function SalaryMonthEditor({
   );
   const [updateEmployeeMaster, setUpdateEmployeeMaster] = useState(false);
   const [editableRows, setEditableRows] = useState(() => rows.map(toEditableRow));
+  const rowsWithTotals = useMemo(
+    () =>
+      editableRows.map((row) => ({
+        ...row,
+        ...calculateRowTotals(row),
+      })),
+    [editableRows],
+  );
+  const hasRowsNeedingReview = rowsWithTotals.some((row) => row.needsReview);
   const summary = useMemo(
     () =>
       summarizePayrollRows(
-        editableRows.map((row) => ({
-          ...row,
-          salaryPaidInrCents: calculateActualPaidInrCents({
-            monthlyPaidInrCents: row.monthlyPaidInrCents,
-            daysWorked: row.daysWorked,
-            daysInMonth: row.daysInMonth,
-          }),
-        })),
+        rowsWithTotals.filter((row) => !row.needsReview),
       ),
-    [editableRows],
+    [rowsWithTotals],
   );
   const rowsJson = useMemo(
     () =>
       JSON.stringify(
-        editableRows.map((row) => ({
+        rowsWithTotals.map((row) => ({
           employeeId: row.employeeId,
           employeeName: row.employeeName,
+          basicInrCents: row.basicInrCents,
+          specialAllowanceInrCents: row.specialAllowanceInrCents,
+          insuranceInrCents: row.insuranceInrCents,
+          bonusInrCents: row.bonusInrCents,
           monthlyPaidInrCents: row.monthlyPaidInrCents,
           daysWorked: row.daysWorked,
           daysInMonth: row.daysInMonth,
-          salaryPaidInrCents: calculateActualPaidInrCents({
-            monthlyPaidInrCents: row.monthlyPaidInrCents,
-            daysWorked: row.daysWorked,
-            daysInMonth: row.daysInMonth,
-          }),
+          actualPaidInrCents: row.actualPaidInrCents,
+          salaryPaidInrCents: row.salaryPaidInrCents,
           pfInrCents: row.pfInrCents,
           tdsInrCents: row.tdsInrCents,
           notes: row.notes,
         })),
       ),
-    [editableRows],
+    [rowsWithTotals],
   );
 
   function updateRow(employeeId: string, patch: Partial<EditablePayrollRow>) {
@@ -135,12 +168,12 @@ export function SalaryMonthEditor({
 
         <div className="rounded-2xl border px-4 py-3" style={{ borderColor: "var(--glass-border)" }}>
           <p className="text-xs" style={{ color: "var(--text-muted)" }}>Actual paid</p>
-          <p className="mt-1 text-lg font-semibold">{formatInr(summary.salaryPaidInrCents)}</p>
+          <p className="mt-1 text-lg font-semibold">{formatInr(summary.actualPaidInrCents)}</p>
         </div>
 
         <div className="rounded-2xl border px-4 py-3" style={{ borderColor: "var(--glass-border)" }}>
-          <p className="text-xs" style={{ color: "var(--text-muted)" }}>Net after PF/TDS</p>
-          <p className="mt-1 text-lg font-semibold">{formatInr(summary.netPaidInrCents)}</p>
+          <p className="text-xs" style={{ color: "var(--text-muted)" }}>Salary paid</p>
+          <p className="mt-1 text-lg font-semibold">{formatInr(summary.salaryPaidInrCents)}</p>
         </div>
       </div>
 
@@ -149,36 +182,39 @@ export function SalaryMonthEditor({
           <div>
             <h2 className="text-lg font-semibold">Salary sheet</h2>
             <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-              {summary.employeeCount} employees - PF {formatInr(summary.pfInrCents)} - TDS {formatInr(summary.tdsInrCents)}
+              {summary.employeeCount} employees - Monthly {formatInr(summary.monthlyPaidInrCents)} - PF {formatInr(summary.pfInrCents)} - TDS {formatInr(summary.tdsInrCents)}
             </p>
           </div>
           <div className="flex items-center gap-2 rounded-full px-3 py-1 text-xs" style={{ background: "rgba(99, 102, 241, 0.12)", color: "var(--text-accent)" }}>
             <BadgeCheck className="h-4 w-4" />
-            {status === "verified" ? "Ready for cash flow" : "Draft can be saved"}
+            {hasRowsNeedingReview
+              ? "Needs review"
+              : status === "verified"
+                ? "Ready for cash flow"
+                : "Draft can be saved"}
           </div>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="min-w-[980px] w-full text-left text-sm">
+          <table className="min-w-[1500px] w-full text-left text-sm">
             <thead style={{ color: "var(--text-muted)" }}>
               <tr className="border-b" style={{ borderColor: "var(--glass-border)" }}>
                 <th className="px-4 py-3 font-medium">Employee</th>
                 <th className="px-4 py-3 font-medium">Days worked</th>
-                <th className="px-4 py-3 font-medium">Monthly paid INR</th>
-                <th className="px-4 py-3 font-medium">Actual paid INR</th>
+                <th className="px-4 py-3 font-medium">Basic INR</th>
+                <th className="px-4 py-3 font-medium">Special allowance INR</th>
+                <th className="px-4 py-3 font-medium">Insurance INR</th>
+                <th className="px-4 py-3 font-medium">Bonus INR</th>
                 <th className="px-4 py-3 font-medium">PF INR</th>
                 <th className="px-4 py-3 font-medium">TDS INR</th>
+                <th className="px-4 py-3 font-medium">Monthly paid INR</th>
+                <th className="px-4 py-3 font-medium">Actual paid INR</th>
+                <th className="px-4 py-3 font-medium">Salary paid INR</th>
                 <th className="px-4 py-3 font-medium">Notes</th>
               </tr>
             </thead>
             <tbody>
-              {editableRows.map((row) => {
-                const actualPaidInrCents = calculateActualPaidInrCents({
-                  monthlyPaidInrCents: row.monthlyPaidInrCents,
-                  daysWorked: row.daysWorked,
-                  daysInMonth: row.daysInMonth,
-                });
-
+              {rowsWithTotals.map((row) => {
                 return (
                   <tr key={row.employeeId} className="border-b" style={{ borderColor: "var(--glass-border)" }}>
                     <td className="px-4 py-3 align-top">
@@ -221,24 +257,28 @@ export function SalaryMonthEditor({
                         of {row.daysInMonth} days
                       </p>
                     </td>
-                    <td className="px-4 py-3 align-top">
-                      <input
-                        className={`${inputClass} w-36`}
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={inrInputValue(row.monthlyPaidInrCents)}
-                        onChange={(event) =>
-                          updateRow(row.employeeId, {
-                            monthlyPaidInrCents: centsFromInrInput(event.currentTarget.value),
-                          })
-                        }
-                        aria-label={`${row.employeeName} monthly paid INR`}
-                      />
-                    </td>
-                    <td className="px-4 py-3 align-top">
-                      <p className="font-semibold">{formatInr(actualPaidInrCents)}</p>
-                    </td>
+                    {[
+                      ["basicInrCents", "basic INR"],
+                      ["specialAllowanceInrCents", "special allowance INR"],
+                      ["insuranceInrCents", "insurance INR"],
+                      ["bonusInrCents", "bonus INR"],
+                    ].map(([key, label]) => (
+                      <td key={key} className="px-4 py-3 align-top">
+                        <input
+                          className={`${inputClass} w-32`}
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={inrInputValue(row[key as keyof EditablePayrollRow] as number)}
+                          onChange={(event) =>
+                            updateRow(row.employeeId, {
+                              [key]: centsFromInrInput(event.currentTarget.value),
+                            } as Partial<EditablePayrollRow>)
+                          }
+                          aria-label={`${row.employeeName} ${label}`}
+                        />
+                      </td>
+                    ))}
                   <td className="px-4 py-3 align-top">
                     <input
                       className={`${inputClass} w-28`}
@@ -270,6 +310,22 @@ export function SalaryMonthEditor({
                     />
                   </td>
                   <td className="px-4 py-3 align-top">
+                    <p className="font-semibold">{formatInr(row.monthlyPaidInrCents)}</p>
+                  </td>
+                  <td className="px-4 py-3 align-top">
+                    <p className="font-semibold">{formatInr(row.actualPaidInrCents)}</p>
+                  </td>
+                  <td className="px-4 py-3 align-top">
+                    <p className="font-semibold" style={{ color: row.needsReview ? "#fca5a5" : undefined }}>
+                      {formatInr(row.salaryPaidInrCents)}
+                    </p>
+                    {row.needsReview ? (
+                      <p className="mt-1 text-xs font-semibold" style={{ color: "#fca5a5" }}>
+                        Needs review
+                      </p>
+                    ) : null}
+                  </td>
+                  <td className="px-4 py-3 align-top">
                     <textarea
                       className={`${inputClass} min-h-20 w-48`}
                       value={row.notes}
@@ -289,6 +345,7 @@ export function SalaryMonthEditor({
         className="gradient-btn inline-flex items-center gap-2"
         defaultText="Save salary month"
         pendingText="Saving..."
+        disabled={hasRowsNeedingReview}
       />
     </form>
   );

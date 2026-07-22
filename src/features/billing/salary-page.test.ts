@@ -22,13 +22,24 @@ describe("salary page", () => {
     expect(existsSync(resolve(projectRoot, "app/salary/_components/payslip-editor.tsx"))).toBe(false);
   });
 
-  it("renders the salary sheet with monthly paid and days worked instead of payment controls", () => {
+  it("renders the salary sheet with component earnings and calculated paid totals", () => {
     const editor = readProjectFile("app/salary/_components/salary-month-editor.tsx");
 
     expect(editor).toContain("Days worked");
+    expect(editor).toContain("Basic INR");
+    expect(editor).toContain("Special allowance INR");
+    expect(editor).toContain("Insurance INR");
+    expect(editor).toContain("Bonus INR");
+    expect(editor).toContain("PF INR");
+    expect(editor).toContain("TDS INR");
     expect(editor).toContain("Monthly paid INR");
     expect(editor).toContain("Actual paid INR");
+    expect(editor).toContain("Salary paid INR");
+    expect(editor).toContain("Needs review");
+    expect(editor).toContain("calculateMonthlyPaidInrCents");
     expect(editor).toContain("calculateActualPaidInrCents");
+    expect(editor).toContain("calculateSalaryPaidInrCents");
+    expect(editor).not.toContain("aria-label={`${row.employeeName} monthly paid INR`}");
     expect(editor).not.toContain("Peg rate");
     expect(editor).not.toContain("Paid date");
     expect(editor).not.toContain("Override note");
