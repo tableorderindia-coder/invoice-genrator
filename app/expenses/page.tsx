@@ -74,6 +74,16 @@ export default async function ExpensesPage({
     period.startMonth,
   )}&endMonth=${encodeURIComponent(period.endMonth)}`;
   const periodLabel = formatExpensePeriodLabel(period.startMonth, period.endMonth);
+  const buildExportHref = (input: { format: "csv" | "pdf" }) => {
+    const exportParams = new URLSearchParams();
+    for (const companyId of selectedCompanyIds) {
+      exportParams.append("companyIds", companyId);
+    }
+    exportParams.set("startMonth", period.startMonth);
+    exportParams.set("endMonth", period.endMonth);
+    exportParams.set("format", input.format);
+    return `/api/expenses/export?${exportParams.toString()}`;
+  };
 
   return (
     <Shell
@@ -194,7 +204,7 @@ export default async function ExpensesPage({
 
         {/* Right: Existing expenses */}
         <GlassPanel gradient>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h2 className="text-xl font-semibold" style={{ color: "var(--text-primary)" }}>
                 Expenses for {periodLabel}
@@ -203,13 +213,21 @@ export default async function ExpensesPage({
                 {selectedCompany?.name ?? "Selected companies"}
               </p>
             </div>
-            <div className="text-right">
-              <p className="text-xs uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
-                Total
-              </p>
-              <p className="text-lg font-bold" style={{ color: totalInrCents > 0 ? "#fca5a5" : "var(--text-primary)" }}>
-                {formatInr(totalInrCents)}
-              </p>
+            <div className="flex flex-wrap items-center justify-end gap-3 text-right">
+              <a className="btn-outline" href={buildExportHref({ format: "csv" })}>
+                Export CSV
+              </a>
+              <a className="btn-outline" href={buildExportHref({ format: "pdf" })}>
+                Export PDF
+              </a>
+              <div>
+                <p className="text-xs uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+                  Total
+                </p>
+                <p className="text-lg font-bold" style={{ color: totalInrCents > 0 ? "#fca5a5" : "var(--text-primary)" }}>
+                  {formatInr(totalInrCents)}
+                </p>
+              </div>
             </div>
           </div>
 

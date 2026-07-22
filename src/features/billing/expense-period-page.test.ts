@@ -28,4 +28,14 @@ describe("expenses period page", () => {
     expect(page).toContain('name="year" value={expense.year}');
     expect(page).toContain('name="month" value={expense.month}');
   });
+
+  it("renders CSV and PDF export links for the current expense filter", () => {
+    const page = readProjectFile("app/expenses/page.tsx");
+
+    expect(page).toContain("Export CSV");
+    expect(page).toContain("Export PDF");
+    expect(page).toContain("/api/expenses/export");
+    expect(page).toContain('format: "csv"');
+    expect(page).toContain('format: "pdf"');
+  });
 });
