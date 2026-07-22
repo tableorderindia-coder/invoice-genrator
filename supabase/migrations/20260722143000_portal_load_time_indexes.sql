@@ -7,8 +7,8 @@ create index if not exists invoices_company_created_idx
 create index if not exists invoice_teams_invoice_idx
   on public.invoice_teams (invoice_id);
 
-create index if not exists invoice_line_items_invoice_idx
-  on public.invoice_line_items (invoice_id);
+create index if not exists invoice_line_items_team_idx
+  on public.invoice_line_items (invoice_team_id);
 
 create index if not exists invoice_line_items_employee_idx
   on public.invoice_line_items (employee_id);
