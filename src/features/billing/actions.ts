@@ -1292,6 +1292,8 @@ export async function saveMonthlyPayrollRowsAction(formData: FormData) {
       rows: parseMonthlyPayrollRowsJson(getString(formData, "rowsJson")),
       actorUserId: context.profile.id,
       updateEmployeeMaster: getString(formData, "updateEmployeeMaster") === "true",
+      updateEmployeeIdentityFromImport:
+        getString(formData, "updateEmployeeIdentityFromImport") === "true",
     });
 
     await invalidateBillingCaches({ type: "salary", companyId, month });

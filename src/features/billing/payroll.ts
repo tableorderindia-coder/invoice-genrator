@@ -56,6 +56,11 @@ export type MonthlyPayrollRow = {
   overrideNote?: string;
   updatedAt?: string;
   employeeIsActive?: boolean;
+  panNumber?: string;
+  importedPanNumber?: string;
+  importedPfUan?: string;
+  importedDesignation?: string;
+  importedActiveFrom?: string;
 };
 
 export type MonthlyPayrollSummary = {
@@ -264,6 +269,7 @@ export function buildMonthlyPayrollRows(input: {
           overrideNote: payment.overrideNote,
           updatedAt: payment.updatedAt,
           employeeIsActive: employee.isActive,
+          panNumber: employee.panNumber,
         } satisfies MonthlyPayrollRow;
       }
 
@@ -320,6 +326,7 @@ export function buildMonthlyPayrollRows(input: {
         paidStatus: false,
         status: "draft",
         employeeIsActive: employee.isActive,
+        panNumber: employee.panNumber,
       } satisfies MonthlyPayrollRow;
     })
     .sort((left, right) => left.employeeName.localeCompare(right.employeeName));
