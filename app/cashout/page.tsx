@@ -12,10 +12,6 @@ import { formatMonthYear, formatUsd } from "@/src/features/billing/utils";
 
 export const dynamic = "force-dynamic";
 
-function todayIso() {
-  return new Date().toISOString().slice(0, 10);
-}
-
 export default async function CashoutPage({
   searchParams,
 }: {
@@ -140,34 +136,18 @@ export default async function CashoutPage({
                       </a>
                       <form
                         action={cashOutInvoiceAction}
-                        className="grid gap-2 md:grid-cols-4 md:items-center"
+                        className="grid w-full min-w-[520px] gap-3 sm:grid-cols-[minmax(190px,1fr)_minmax(150px,0.75fr)_auto] sm:items-center"
                       >
                         <input type="hidden" name="invoiceId" value={invoice.id} />
                         <input type="hidden" name="returnTo" value={returnTo} />
                         <input
-                          type="date"
-                          name="realizedAt"
-                          aria-label="Cashout date"
-                          defaultValue={todayIso()}
-                          max={todayIso()}
-                          className="min-w-36"
-                          style={{
-                            height: "44px",
-                            borderRadius: "14px",
-                            padding: "0 14px",
-                            border: "1px solid var(--glass-border)",
-                            background: "rgba(255,255,255,0.04)",
-                            color: "var(--text-primary)",
-                          }}
-                        />
-                        <input
                           type="number"
                           name="dollarInboundUsd"
-                          aria-label="Dollar inbound (USD)"
-                          placeholder="Dollar inbound (USD)"
+                          aria-label="Dollar inward (USD)"
+                          placeholder="Dollar inward (USD)"
                           min="0.01"
                           step="0.01"
-                          className="min-w-40"
+                          className="min-w-48"
                           style={{
                             height: "44px",
                             borderRadius: "14px",
@@ -180,11 +160,11 @@ export default async function CashoutPage({
                         <input
                           type="number"
                           name="usdInrRate"
-                          aria-label="Received / exchanged rate"
-                          placeholder="Received / exchanged rate"
+                          aria-label="USD/INR rate"
+                          placeholder="USD/INR rate"
                           min="0.01"
                           step="0.01"
-                          className="min-w-32"
+                          className="min-w-36"
                           style={{
                             height: "44px",
                             borderRadius: "14px",
@@ -216,7 +196,7 @@ export default async function CashoutPage({
         </div>
 
         <p className="mt-4 text-sm" style={{ color: "var(--text-muted)" }}>
-          Cashout records settlement date, actual dollar inbound, and received USD/INR rate.
+          Cashout records actual dollar inward and the received USD/INR rate.
         </p>
       </GlassPanel>
     </Shell>

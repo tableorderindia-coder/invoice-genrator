@@ -74,6 +74,10 @@ function getString(formData: FormData, key: string) {
   return String(formData.get(key) || "").trim();
 }
 
+function todayDateIso() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 function buildFlashRedirect(path: string, status: "success" | "error", message: string) {
   const separator = path.includes("?") ? "&" : "?";
   return `${path}${separator}flashStatus=${encodeURIComponent(status)}&flashMessage=${encodeURIComponent(message)}`;
@@ -938,11 +942,6 @@ export async function cashOutInvoiceAction(formData: FormData) {
   const returnTo = getString(formData, "returnTo") || "/cashout";
 
   try {
-    const realizedAt = getString(formData, "realizedAt");
-    if (!realizedAt) {
-      throw new Error("Select a cashout date.");
-    }
-
     const dollarInboundUsdCents = centsFromUsd(getString(formData, "dollarInboundUsd"));
     if (dollarInboundUsdCents <= 0) {
       throw new Error("Dollar inbound must be greater than 0.");
@@ -953,6 +952,7 @@ export async function cashOutInvoiceAction(formData: FormData) {
       "USD/INR rate",
     );
 
+    const realizedAt = todayDateIso();
     await cashOutInvoice(invoiceId, realizedAt, dollarInboundUsdCents, usdInrRate);
     await refreshPnSummariesForInvoice(invoiceId);
 
