@@ -22,11 +22,11 @@ import {
   PERIOD_DASHBOARD_COLUMN_OPTIONS,
 } from "../../src/features/billing/dashboard-column-options";
 import {
-  getCachedPnDashboardData,
   listCachedAvailablePaymentMonthsForCompanies,
   listCachedCompanies,
   listCachedEmployeesForCompanies,
 } from "../../src/features/billing/cached-store";
+import { getPnDashboardSummaryData } from "../../src/features/billing/pn-summary-store";
 import type { PnDashboardData, PnPeriodRow } from "../../src/features/billing/types";
 import { DashboardTables } from "./dashboard-tables";
 
@@ -276,7 +276,7 @@ export default async function DashboardPage({
             const companyEmployeeIds = effectiveEmployeeIds.filter(
               (employeeId) => employeeCompanyMap.get(employeeId) === companyId,
             );
-            return getCachedPnDashboardData({
+            return getPnDashboardSummaryData({
               companyId,
               periodType,
               employeeIds: employeeFilterActive

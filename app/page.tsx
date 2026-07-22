@@ -14,10 +14,10 @@ import {
   resolveOverviewMonthRange,
 } from "@/src/features/billing/overview-pnl-summary";
 import {
-  getCachedPnDashboardData,
   listCachedAvailablePaymentMonthsForCompanies,
   listCachedCompanies,
 } from "@/src/features/billing/cached-store";
+import { getPnDashboardSummaryData } from "@/src/features/billing/pn-summary-store";
 
 export const dynamic = "force-dynamic";
 
@@ -50,7 +50,7 @@ export default async function HomePage({
     Promise.all(
       selectedCompanies.map(async (company) => ({
         companyId: company.id,
-        data: await getCachedPnDashboardData({
+        data: await getPnDashboardSummaryData({
           companyId: company.id,
           periodType: "monthly",
         }),
