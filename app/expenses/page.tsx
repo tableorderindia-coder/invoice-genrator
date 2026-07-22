@@ -8,7 +8,8 @@ import {
   saveCompanyExpenseAction,
   deleteCompanyExpenseAction,
 } from "@/src/features/billing/actions";
-import { listCompanies, listCompanyExpensesForCompanies } from "@/src/features/billing/store";
+import { listCachedCompanies } from "@/src/features/billing/cached-store";
+import { listCompanyExpensesForCompanies } from "@/src/features/billing/store";
 import { resolveSelectedCompanyIds } from "@/src/features/billing/filter-selection";
 import { formatInr, formatMonthYear } from "@/src/features/billing/utils";
 import {
@@ -27,7 +28,7 @@ export default async function ExpensesPage({
 }) {
   const context = await requirePageAccess("expenses");
   const params = await searchParams;
-  const companies = filterCompaniesForAuthContext(await listCompanies(), context);
+  const companies = filterCompaniesForAuthContext(await listCachedCompanies(), context);
 
   const selectedCompanyIds = resolveSelectedCompanyIds({
     companyIds: params.companyIds,

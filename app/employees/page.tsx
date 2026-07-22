@@ -10,7 +10,10 @@ import {
   filterCompaniesForAuthContext,
 } from "@/src/features/billing/company-access";
 import { createEmployeeAction, updateEmployeeAction } from "@/src/features/billing/actions";
-import { listCompanies, listEmployeesForCompanies } from "@/src/features/billing/store";
+import {
+  listCachedCompanies,
+  listCachedEmployeesForCompanies,
+} from "@/src/features/billing/cached-store";
 import { buildWhatsAppHref } from "@/src/features/billing/employee-contact";
 import { employeeStatusLabel } from "@/src/features/billing/employee-status";
 import { resolveSelectedCompanyIds } from "@/src/features/billing/filter-selection";
@@ -35,13 +38,13 @@ export default async function EmployeesPage({
 }) {
   const context = await requirePageAccess("employees");
   const resolvedSearchParams = await searchParams;
-  const companies = filterCompaniesForAuthContext(await listCompanies(), context);
+  const companies = filterCompaniesForAuthContext(await listCachedCompanies(), context);
   const selectedCompanyIds = resolveSelectedCompanyIds({
     companyIds: resolvedSearchParams.companyIds,
     companyId: resolvedSearchParams.companyId,
     companies,
   });
-  const employees = await listEmployeesForCompanies(selectedCompanyIds);
+  const employees = await listCachedEmployeesForCompanies(selectedCompanyIds);
   const selectedCompany = selectedCompanyIds.length === 1
     ? companies.find((company) => company.id === selectedCompanyIds[0])
     : undefined;

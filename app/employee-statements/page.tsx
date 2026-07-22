@@ -14,10 +14,10 @@ import {
 } from "@/src/features/billing/employee-statements";
 import { listEmployeeStatementSections } from "@/src/features/billing/employee-statements-load";
 import {
-  listCompanies,
-  listEmployeesForCompanies,
-  listInvoicesForCompanies,
-} from "@/src/features/billing/store";
+  listCachedCompanies,
+  listCachedEmployeesForCompanies,
+  listCachedInvoicesForCompanies,
+} from "@/src/features/billing/cached-store";
 import { resolveSelectedCompanyIds } from "@/src/features/billing/filter-selection";
 import { formatDate } from "@/src/features/billing/utils";
 
@@ -43,15 +43,15 @@ export default async function EmployeeStatementsPage({
   const context = await requirePageAccess("employee-statements");
   const resolved = await searchParams;
   const filters = parseEmployeeStatementFilters(resolved);
-  const companies = filterCompaniesForAuthContext(await listCompanies(), context);
+  const companies = filterCompaniesForAuthContext(await listCachedCompanies(), context);
   const selectedCompanyIds = resolveSelectedCompanyIds({
     companyIds: resolved.companyIds,
     companyId: filters.companyId,
     companies,
   });
   const [employees, invoices] = await Promise.all([
-    listEmployeesForCompanies(selectedCompanyIds),
-    listInvoicesForCompanies(selectedCompanyIds),
+    listCachedEmployeesForCompanies(selectedCompanyIds),
+    listCachedInvoicesForCompanies(selectedCompanyIds),
   ]);
   const availableMonths = getUniqueInvoiceMonths(
     invoices.map((invoice) => `${invoice.year}-${String(invoice.month).padStart(2, "0")}`),

@@ -252,6 +252,7 @@ export function Shell({
                 <Link
                   key={link.href}
                   href={href}
+                  prefetch={false}
                   onClick={(event) => handleNavClick(event, href)}
                   className="flex h-10 items-center gap-3 rounded-xl px-3 font-medium transition-all"
                   style={{
@@ -313,6 +314,7 @@ export function Shell({
                   <Link
                     key={link.href}
                     href={href}
+                    prefetch={false}
                     onClick={(event) => handleNavClick(event, href)}
                     className="flex h-10 shrink-0 items-center gap-2 rounded-xl px-3 font-medium transition-all"
                     style={{
