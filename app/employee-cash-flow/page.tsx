@@ -25,7 +25,7 @@ import {
   resolveSelectedCompanyIds,
   resolveSavedCashFlowFilters,
 } from "@/src/features/billing/filter-selection";
-import { listCompanies } from "@/src/features/billing/store";
+import { listCachedCompanies } from "@/src/features/billing/cached-store";
 import {
   aggregateEmployeeCashFlowEditableEntries,
   type EmployeeCashFlowEditableEntry,
@@ -54,7 +54,7 @@ export default async function EmployeeCashFlowPage({
 }) {
   const context = await requirePageAccess("employee-cash-flow");
   const resolved = await searchParams;
-  const companies = filterCompaniesForAuthContext(await listCompanies(), context);
+  const companies = filterCompaniesForAuthContext(await listCachedCompanies(), context);
 
   const selectedCompanyIds = resolveSelectedCompanyIds({
     companyIds: resolved.companyIds,

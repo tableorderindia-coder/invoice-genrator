@@ -11,7 +11,10 @@ import {
   updateInvoiceStatusAction,
 } from "@/src/features/billing/actions";
 import { resolveSelectedCompanyIds } from "@/src/features/billing/filter-selection";
-import { listCompanies, listInvoicesForCompanies } from "@/src/features/billing/store";
+import {
+  listCachedCompanies,
+  listCachedInvoicesForCompanies,
+} from "@/src/features/billing/cached-store";
 import { formatDate, formatMonthYear, formatUsd } from "@/src/features/billing/utils";
 
 export const dynamic = "force-dynamic";
@@ -39,13 +42,13 @@ export default async function InvoicesPage({
 }) {
   const context = await requirePageAccess("invoices");
   const resolvedSearchParams = await searchParams;
-  const companies = filterCompaniesForAuthContext(await listCompanies(), context);
+  const companies = filterCompaniesForAuthContext(await listCachedCompanies(), context);
   const selectedCompanyIds = resolveSelectedCompanyIds({
     companyIds: resolvedSearchParams.companyIds,
     companyId: resolvedSearchParams.companyId,
     companies,
   });
-  const invoices = await listInvoicesForCompanies(selectedCompanyIds);
+  const invoices = await listCachedInvoicesForCompanies(selectedCompanyIds);
   const companyMap = new Map(companies.map((company) => [company.id, company.name]));
   const filteredInvoicesParams = new URLSearchParams();
   for (const companyId of selectedCompanyIds) {

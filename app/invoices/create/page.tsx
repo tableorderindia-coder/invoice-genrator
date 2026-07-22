@@ -7,9 +7,11 @@ import { CreateInvoiceForm } from "./create-invoice-form";
 import { CreateInvoiceSubmitButton } from "./submit-button";
 import {
   listAvailableTeamNamesForCompanies,
-  listCompanies,
-  listInvoicesForCompanies,
 } from "@/src/features/billing/store";
+import {
+  listCachedCompanies,
+  listCachedInvoicesForCompanies,
+} from "@/src/features/billing/cached-store";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +24,7 @@ export default async function CreateInvoicePage({
   }>;
 }) {
   const context = await requirePageAccess("invoices");
-  const companies = filterCompaniesForAuthContext(await listCompanies(), context);
+  const companies = filterCompaniesForAuthContext(await listCachedCompanies(), context);
   const resolvedSearchParams = await searchParams;
   const flashStatus = Array.isArray(resolvedSearchParams.flashStatus)
     ? resolvedSearchParams.flashStatus[0]
@@ -32,7 +34,7 @@ export default async function CreateInvoicePage({
     : resolvedSearchParams.flashMessage;
   const companyIds = companies.map((company) => company.id);
   const [invoices, availableTeamNamesByCompany] = await Promise.all([
-    listInvoicesForCompanies(companyIds),
+    listCachedInvoicesForCompanies(companyIds),
     listAvailableTeamNamesForCompanies(companyIds),
   ]);
 

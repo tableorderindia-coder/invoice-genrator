@@ -22,11 +22,11 @@ import {
   PERIOD_DASHBOARD_COLUMN_OPTIONS,
 } from "../../src/features/billing/dashboard-column-options";
 import {
-  getPnDashboardData,
-  listCompanies,
-  listEmployeesForCompanies,
-  listAvailablePaymentMonthsForCompanies,
-} from "../../src/features/billing/store";
+  getCachedPnDashboardData,
+  listCachedAvailablePaymentMonthsForCompanies,
+  listCachedCompanies,
+  listCachedEmployeesForCompanies,
+} from "../../src/features/billing/cached-store";
 import type { PnDashboardData, PnPeriodRow } from "../../src/features/billing/types";
 import { DashboardTables } from "./dashboard-tables";
 
@@ -136,7 +136,7 @@ export default async function DashboardPage({
 }) {
   const context = await requirePageAccess("dashboard");
   const resolved = await searchParams;
-  const companies = filterCompaniesForAuthContext(await listCompanies(), context);
+  const companies = filterCompaniesForAuthContext(await listCachedCompanies(), context);
   const selectedCompanyIds = resolveSelectedCompanyIds({
     companyIds: resolved.companyIds,
     companyId: resolved.companyId,
@@ -156,11 +156,11 @@ export default async function DashboardPage({
   const allEmployeesSelected = allEmployeesValue === "1";
   const selectedEmployeeIds = normalizeMultiSelectValue(resolved.employeeIds);
 
-  const employees = await listEmployeesForCompanies(selectedCompanyIds);
+  const employees = await listCachedEmployeesForCompanies(selectedCompanyIds);
   const employeeCompanyMap = new Map(
     employees.map((employee) => [employee.id, employee.companyId] as const),
   );
-  const availableMonths = await listAvailablePaymentMonthsForCompanies(selectedCompanyIds);
+  const availableMonths = await listCachedAvailablePaymentMonthsForCompanies(selectedCompanyIds);
 
   const effectiveEmployeeIds =
     allEmployeesSelected || selectedEmployeeIds.length === 0
@@ -276,7 +276,7 @@ export default async function DashboardPage({
             const companyEmployeeIds = effectiveEmployeeIds.filter(
               (employeeId) => employeeCompanyMap.get(employeeId) === companyId,
             );
-            return getPnDashboardData({
+            return getCachedPnDashboardData({
               companyId,
               periodType,
               employeeIds: employeeFilterActive

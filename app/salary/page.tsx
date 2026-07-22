@@ -5,8 +5,8 @@ import { Shell } from "@/app/_components/shell";
 import { requirePageAccess } from "@/lib/auth/server";
 import { filterCompaniesForAuthContext } from "@/src/features/billing/company-access";
 import { resolveSelectedCompanyIds } from "@/src/features/billing/filter-selection";
-import { listMonthlyPayrollRows } from "@/src/features/billing/payroll-store";
-import { listCompanies } from "@/src/features/billing/store";
+import { listCachedMonthlyPayrollRows } from "@/src/features/billing/cached-payroll-store";
+import { listCachedCompanies } from "@/src/features/billing/cached-store";
 import { formatMonthYear } from "@/src/features/billing/utils";
 import { SalaryMonthEditor } from "./_components/salary-month-editor";
 
@@ -46,7 +46,7 @@ export default async function SalaryPage({
 }) {
   const context = await requirePageAccess("salary");
   const resolved = await searchParams;
-  const companies = filterCompaniesForAuthContext(await listCompanies(), context);
+  const companies = filterCompaniesForAuthContext(await listCachedCompanies(), context);
 
   const selectedCompanyIds = resolveSelectedCompanyIds({
     companyIds: resolved.companyIds,
@@ -64,7 +64,7 @@ export default async function SalaryPage({
     .join("&");
   const returnTo = `/salary?${companyScopeParams}&month=${encodeURIComponent(selectedMonth)}`;
   const payrollRows = singleCompanySelected
-    ? await listMonthlyPayrollRows({ companyId: selectedCompanyId, month: selectedMonth })
+    ? await listCachedMonthlyPayrollRows({ companyId: selectedCompanyId, month: selectedMonth })
     : [];
 
   return (

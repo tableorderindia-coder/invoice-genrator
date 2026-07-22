@@ -5,7 +5,8 @@ import {
   filterCompaniesForAuthContext,
 } from "@/src/features/billing/company-access";
 import { saveFounderWithdrawalsAction } from "../../src/features/billing/actions";
-import { getFounderBalanceData, listCompanies } from "../../src/features/billing/store";
+import { listCachedCompanies } from "../../src/features/billing/cached-store";
+import { getFounderBalanceData } from "../../src/features/billing/store";
 import { resolveSelectedCompanyIds } from "../../src/features/billing/filter-selection";
 import { FoundersBalanceTable } from "./founders-balance-table";
 import type { FounderBalanceModel } from "../../src/features/billing/founders-balance";
@@ -99,7 +100,7 @@ export default async function FoundersBalancePage({
 }) {
   const context = await requirePageAccess("dashboard");
   const resolved = await searchParams;
-  const companies = filterCompaniesForAuthContext(await listCompanies(), context);
+  const companies = filterCompaniesForAuthContext(await listCachedCompanies(), context);
   const selectedCompanyIds = resolveSelectedCompanyIds({
     companyIds: resolved.companyIds,
     companyId: resolved.companyId,

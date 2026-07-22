@@ -1,10 +1,14 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { requireCompanyPageEditAccess, requirePageEditAccess } from "@/lib/auth/server";
 import { buildInvoiceAdjustmentPayload } from "./adjustments";
+import {
+  getBillingInvalidationTags,
+  type BillingInvalidationInput,
+} from "./cache-tags";
 import { parseInvoiceHeaderFormInput } from "./invoice-editor";
 import { defaultEmployeeCashFlowPaidDate } from "./employee-cash-flow-page-state";
 import {
@@ -66,6 +70,12 @@ function getString(formData: FormData, key: string) {
 function buildFlashRedirect(path: string, status: "success" | "error", message: string) {
   const separator = path.includes("?") ? "&" : "?";
   return `${path}${separator}flashStatus=${encodeURIComponent(status)}&flashMessage=${encodeURIComponent(message)}`;
+}
+
+function invalidateBillingCache(input: BillingInvalidationInput) {
+  for (const tag of getBillingInvalidationTags(input)) {
+    updateTag(tag);
+  }
 }
 
 function getDraftReturnPath(formData: FormData, invoiceId: string) {
@@ -184,6 +194,7 @@ export async function createCompanyAction(formData: FormData) {
     defaultNote: getString(formData, "defaultNote"),
   });
 
+  invalidateBillingCache({ type: "company" });
   revalidatePath("/");
   revalidatePath("/companies");
   redirect("/companies");
@@ -191,13 +202,15 @@ export async function createCompanyAction(formData: FormData) {
 
 export async function updateCompanyAction(formData: FormData) {
   await requirePageEditAccess('companies');
+  const companyId = getString(formData, "companyId");
   await updateCompany({
-    companyId: getString(formData, "companyId"),
+    companyId,
     name: getString(formData, "name"),
     billingAddress: getString(formData, "billingAddress"),
     defaultNote: getString(formData, "defaultNote"),
   });
 
+  invalidateBillingCache({ type: "company", companyId });
   revalidatePath("/");
   revalidatePath("/companies");
   redirect("/companies");
@@ -205,6 +218,7 @@ export async function updateCompanyAction(formData: FormData) {
 
 export async function createEmployeeAction(formData: FormData) {
   await requirePageEditAccess('employees');
+  const companyId = getString(formData, "companyId");
   const defaultBasicInrCents = getNonNegativeCentsOrThrow(
     getString(formData, "defaultBasicInr"),
     "Basic",
@@ -230,7 +244,7 @@ export async function createEmployeeAction(formData: FormData) {
     "TDS",
   );
   await createEmployee({
-    companyId: getString(formData, "companyId"),
+    companyId,
     fullName: getString(formData, "fullName"),
     panNumber: getString(formData, "panNumber") || undefined,
     pfUan: getString(formData, "pfUan") || undefined,
@@ -261,6 +275,7 @@ export async function createEmployeeAction(formData: FormData) {
     activeTo: getString(formData, "activeTo") || undefined,
   });
 
+  invalidateBillingCache({ type: "employee", companyId });
   revalidatePath("/");
   revalidatePath("/employees");
   redirect("/employees");
@@ -268,6 +283,7 @@ export async function createEmployeeAction(formData: FormData) {
 
 export async function updateEmployeeAction(formData: FormData) {
   await requirePageEditAccess('employees');
+  const companyId = getString(formData, "companyId");
   const defaultBasicInrCents = getNonNegativeCentsOrThrow(
     getString(formData, "defaultBasicInr"),
     "Basic",
@@ -294,7 +310,7 @@ export async function updateEmployeeAction(formData: FormData) {
   );
   await updateEmployee({
     employeeId: getString(formData, "employeeId"),
-    companyId: getString(formData, "companyId"),
+    companyId,
     fullName: getString(formData, "fullName"),
     panNumber: getString(formData, "panNumber") || undefined,
     pfUan: getString(formData, "pfUan") || undefined,
@@ -326,6 +342,7 @@ export async function updateEmployeeAction(formData: FormData) {
     isActive: getString(formData, "isActive") === "true",
   });
 
+  invalidateBillingCache({ type: "employee", companyId });
   revalidatePath("/employees");
   revalidatePath("/invoices");
   revalidatePath("/salary");
@@ -343,8 +360,9 @@ export async function createInvoiceDraftAction(formData: FormData) {
 
   let redirectTo = "/invoices/create";
   try {
+    const companyId = getString(formData, "companyId");
     const invoice = await createInvoiceDraft({
-      companyId: getString(formData, "companyId"),
+      companyId,
       month: Number.parseInt(getString(formData, "month"), 10),
       year: Number.parseInt(getString(formData, "year"), 10),
       invoiceNumber: getString(formData, "invoiceNumber"),
@@ -355,6 +373,7 @@ export async function createInvoiceDraftAction(formData: FormData) {
       selectedTeamNames,
     });
 
+    invalidateBillingCache({ type: "invoice", companyId });
     revalidatePath("/");
     revalidatePath("/invoices");
     revalidatePath("/invoices/create");
@@ -1055,6 +1074,7 @@ export async function saveCompanyExpenseAction(formData: FormData) {
       amountInrCents,
     });
 
+    invalidateBillingCache({ type: "expense", companyId });
     revalidatePath("/expenses");
     revalidatePath("/dashboard");
   } catch (error) {
@@ -1181,6 +1201,7 @@ export async function saveInvoicePaymentEmployeeEntriesAction(formData: FormData
       });
     }
 
+    invalidateBillingCache({ type: "cashflow", companyId, month: paymentMonth });
     revalidatePath("/employee-cash-flow");
   } catch (error) {
     redirect(
@@ -1197,6 +1218,7 @@ export async function saveInvoicePaymentEmployeeEntriesAction(formData: FormData
 
 export async function saveMonthlyPayrollRowsAction(formData: FormData) {
   const companyId = getString(formData, "companyId");
+  const month = normalizePayrollMonthKey(getString(formData, "month"));
   const returnTo = getString(formData, "returnTo") || "/salary";
 
   if (!companyId) {
@@ -1208,13 +1230,14 @@ export async function saveMonthlyPayrollRowsAction(formData: FormData) {
   try {
     await saveMonthlyPayrollRows({
       companyId,
-      month: normalizePayrollMonthKey(getString(formData, "month")),
+      month,
       status: parsePayrollStatus(getString(formData, "status") || "draft"),
       rows: parseMonthlyPayrollRowsJson(getString(formData, "rowsJson")),
       actorUserId: context.profile.id,
       updateEmployeeMaster: getString(formData, "updateEmployeeMaster") === "true",
     });
 
+    invalidateBillingCache({ type: "salary", companyId, month });
     revalidatePath("/salary");
     revalidatePath("/employee-cash-flow");
     revalidatePath("/dashboard");
@@ -1301,10 +1324,14 @@ export async function updateSavedEmployeeCashFlowEntryAction(formData: FormData)
   const returnTo = getString(formData, "returnTo") || "/employee-cash-flow";
 
   try {
-    await updateSavedEmployeeCashFlowEntry(
-      parseSavedEmployeeCashFlowEntryJson(getString(formData, "entryJson")),
-    );
+    const entry = parseSavedEmployeeCashFlowEntryJson(getString(formData, "entryJson"));
+    await updateSavedEmployeeCashFlowEntry(entry);
 
+    invalidateBillingCache({
+      type: "cashflow",
+      companyId: entry.companyId,
+      month: entry.paymentMonth,
+    });
     revalidatePath("/employee-cash-flow");
   } catch (error) {
     redirect(

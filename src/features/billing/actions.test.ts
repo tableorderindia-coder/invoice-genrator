@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const revalidatePathMock = vi.fn();
+const updateTagMock = vi.fn();
 const redirectMock = vi.fn((path: string) => {
   throw new Error(`REDIRECT:${path}`);
 });
@@ -20,6 +21,7 @@ const requireCompanyPageEditAccessMock = vi.fn();
 
 vi.mock("next/cache", () => ({
   revalidatePath: revalidatePathMock,
+  updateTag: updateTagMock,
 }));
 
 vi.mock("next/navigation", () => ({
@@ -81,6 +83,7 @@ vi.mock("./payslip-store", () => ({
 describe("updateDashboardEmployeeCashFlowEntryAction", () => {
   beforeEach(() => {
     revalidatePathMock.mockReset();
+    updateTagMock.mockReset();
     redirectMock.mockClear();
     updateDashboardEmployeeCashFlowEntryMock.mockReset();
     updateDashboardEmployeeCashFlowEntryMock.mockResolvedValue(undefined);
@@ -193,6 +196,11 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
         }),
       ],
     });
+    expect(updateTagMock).toHaveBeenCalledWith("billing:salary:comp_1");
+    expect(updateTagMock).toHaveBeenCalledWith("billing:salary:comp_1:2026-07");
+    expect(updateTagMock).toHaveBeenCalledWith("billing:cashflow:comp_1");
+    expect(updateTagMock).toHaveBeenCalledWith("billing:dashboard:comp_1");
+    expect(updateTagMock).toHaveBeenCalledWith("billing:overview:comp_1");
     expect(revalidatePathMock).toHaveBeenCalledWith("/salary");
     expect(revalidatePathMock).toHaveBeenCalledWith("/employee-cash-flow");
   });
@@ -289,6 +297,9 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
         defaultTdsInrCents: 250000,
       }),
     );
+    expect(updateTagMock).toHaveBeenCalledWith("billing:employees:comp_1");
+    expect(updateTagMock).toHaveBeenCalledWith("billing:salary:comp_1");
+    expect(updateTagMock).toHaveBeenCalledWith("billing:dashboard:comp_1");
   });
 
   it("passes employee cash-flow defaults through employee updates", async () => {
@@ -324,6 +335,9 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
         defaultTdsInrCents: 220000,
       }),
     );
+    expect(updateTagMock).toHaveBeenCalledWith("billing:employees:comp_1");
+    expect(updateTagMock).toHaveBeenCalledWith("billing:cashflow:comp_1");
+    expect(updateTagMock).toHaveBeenCalledWith("billing:overview:comp_1");
   });
 
   it("passes days worked through to the dashboard cash-flow update", async () => {
@@ -427,6 +441,10 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
         paymentDate: "2026-04-25",
       }),
     );
+    expect(updateTagMock).toHaveBeenCalledWith("billing:cashflow:comp_1");
+    expect(updateTagMock).toHaveBeenCalledWith("billing:cashflow:comp_1:2026-04");
+    expect(updateTagMock).toHaveBeenCalledWith("billing:dashboard:comp_1");
+    expect(updateTagMock).toHaveBeenCalledWith("billing:overview:comp_1");
   });
 
   it("rejects employee cash flow saves when the entries payload is missing", async () => {

@@ -14,10 +14,10 @@ import {
   resolveOverviewMonthRange,
 } from "@/src/features/billing/overview-pnl-summary";
 import {
-  getPnDashboardData,
-  listAvailablePaymentMonthsForCompanies,
-  listCompanies,
-} from "@/src/features/billing/store";
+  getCachedPnDashboardData,
+  listCachedAvailablePaymentMonthsForCompanies,
+  listCachedCompanies,
+} from "@/src/features/billing/cached-store";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +33,7 @@ export default async function HomePage({
 }) {
   const context = await requirePageAccess("overview");
   const resolved = await searchParams;
-  const companies = filterCompaniesForAuthContext(await listCompanies(), context);
+  const companies = filterCompaniesForAuthContext(await listCachedCompanies(), context);
   const selectedCompanyIds = resolveSelectedCompanyIds({
     companyIds: resolved.companyIds,
     companyId: resolved.companyId,
@@ -46,11 +46,11 @@ export default async function HomePage({
     selectedCompanyIds.length >= companies.length &&
     companies.every((company) => selectedCompanyIdSet.has(company.id));
   const [availableMonths, companyDashboardData] = await Promise.all([
-    listAvailablePaymentMonthsForCompanies(selectedCompanyIds),
+    listCachedAvailablePaymentMonthsForCompanies(selectedCompanyIds),
     Promise.all(
       selectedCompanies.map(async (company) => ({
         companyId: company.id,
-        data: await getPnDashboardData({
+        data: await getCachedPnDashboardData({
           companyId: company.id,
           periodType: "monthly",
         }),
