@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import PDFDocument from "pdfkit";
 
 import {
   buildDashboardCompanyCsv,
@@ -166,5 +167,22 @@ describe("dashboard export", () => {
 
     expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
     expect(pdf.length).toBeGreaterThan(1000);
+  });
+
+  it("draws bordered table cells so dashboard columns do not visually merge", async () => {
+    const rectSpy = vi.spyOn(PDFDocument.prototype, "rect");
+
+    await buildDashboardExportPdf({
+      title: "Dashboard export",
+      subtitle: "Arena - July 2026",
+      rows: [
+        ["Period", "Dollar inward USD", "Salary paid INR", "Net P/L INR"],
+        ["July 2026", "$1,000", "85700.00", "+ 10000.00"],
+        ["Totals", "$1,000", "85700.00", "+ 10000.00"],
+      ],
+    });
+
+    expect(rectSpy.mock.calls.length).toBeGreaterThanOrEqual(12);
+    rectSpy.mockRestore();
   });
 });
