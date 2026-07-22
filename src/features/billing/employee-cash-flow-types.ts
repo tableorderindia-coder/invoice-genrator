@@ -22,6 +22,10 @@ export type EmployeeCashFlowMonthRow = {
   reimbursementInrCents: number;
   appraisalAdvanceInrCents: number;
   paidUsdInrRate: number;
+  monthlyPaidInrCents: number;
+  actualPaidInrCents: number;
+  pfInrCents: number;
+  tdsInrCents: number;
   cashInInrCents: number;
   salaryPaidInrCents: number;
   pendingAmountInrCents: number;
@@ -56,9 +60,11 @@ export type EmployeeCashFlowEntryWriteInput = {
   offboardingDeductionUsdCents: number;
   cashoutUsdInrRate: number;
   paidUsdInrRate: number;
+  monthlyPaidInrCents: number;
   pfInrCents: number;
   tdsInrCents: number;
   actualPaidInrCents: number;
+  salaryPaidInrCents: number;
   fxCommissionInrCents: number;
   totalCommissionUsdCents: number;
   commissionEarnedInrCents: number;

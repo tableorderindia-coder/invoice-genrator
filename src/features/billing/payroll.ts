@@ -11,9 +11,14 @@ export type MonthlyPayrollPayment = {
   month: string;
   employeeNameSnapshot: string;
   paidUsdInrRate: number;
+  basicInrCents: number;
+  specialAllowanceInrCents: number;
+  insuranceInrCents: number;
+  bonusInrCents: number;
   monthlyPaidInrCents: number;
   daysWorked: number;
   daysInMonth: number;
+  actualPaidInrCents: number;
   salaryPaidInrCents: number;
   pfInrCents: number;
   tdsInrCents: number;
@@ -33,9 +38,14 @@ export type MonthlyPayrollRow = {
   employeeName: string;
   source: PayrollSource;
   paidUsdInrRate: number;
+  basicInrCents: number;
+  specialAllowanceInrCents: number;
+  insuranceInrCents: number;
+  bonusInrCents: number;
   monthlyPaidInrCents: number;
   daysWorked: number;
   daysInMonth: number;
+  actualPaidInrCents: number;
   salaryPaidInrCents: number;
   pfInrCents: number;
   tdsInrCents: number;
@@ -50,6 +60,8 @@ export type MonthlyPayrollRow = {
 
 export type MonthlyPayrollSummary = {
   employeeCount: number;
+  monthlyPaidInrCents: number;
+  actualPaidInrCents: number;
   salaryPaidInrCents: number;
   pfInrCents: number;
   tdsInrCents: number;
@@ -89,6 +101,29 @@ export function normalizePayrollDaysWorked(input: number, daysInMonth: number) {
   return Math.min(rounded, daysInMonth);
 }
 
+function nonNegativeCents(value: number | undefined) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.round(value ?? 0));
+}
+
+export function calculateMonthlyPaidInrCents(input: {
+  basicInrCents: number;
+  specialAllowanceInrCents: number;
+  insuranceInrCents: number;
+  bonusInrCents: number;
+  pfInrCents: number;
+  tdsInrCents: number;
+}) {
+  return (
+    nonNegativeCents(input.basicInrCents) +
+    nonNegativeCents(input.specialAllowanceInrCents) +
+    nonNegativeCents(input.insuranceInrCents) +
+    nonNegativeCents(input.bonusInrCents) +
+    nonNegativeCents(input.pfInrCents) +
+    nonNegativeCents(input.tdsInrCents)
+  );
+}
+
 export function calculateActualPaidInrCents(input: {
   monthlyPaidInrCents: number;
   daysWorked: number;
@@ -100,6 +135,48 @@ export function calculateActualPaidInrCents(input: {
   }
   const daysWorked = normalizePayrollDaysWorked(input.daysWorked, input.daysInMonth);
   return Math.round((monthlyPaidInrCents * daysWorked) / input.daysInMonth);
+}
+
+export function calculateSalaryPaidInrCents(input: {
+  actualPaidInrCents: number;
+  pfInrCents: number;
+  tdsInrCents: number;
+}) {
+  const salaryPaidInrCents =
+    nonNegativeCents(input.actualPaidInrCents) -
+    nonNegativeCents(input.pfInrCents) -
+    nonNegativeCents(input.tdsInrCents);
+  if (salaryPaidInrCents < 0) {
+    throw new Error("Salary paid cannot be negative.");
+  }
+  return salaryPaidInrCents;
+}
+
+function buildFallbackBasicInrCents(input: {
+  monthlyPaidInrCents: number;
+  pfInrCents: number;
+  tdsInrCents: number;
+}) {
+  return Math.max(
+    0,
+    nonNegativeCents(input.monthlyPaidInrCents) -
+      nonNegativeCents(input.pfInrCents) -
+      nonNegativeCents(input.tdsInrCents),
+  );
+}
+
+function hasSalaryComponentSplit(input: {
+  basicInrCents?: number;
+  specialAllowanceInrCents?: number;
+  insuranceInrCents?: number;
+  bonusInrCents?: number;
+}) {
+  return (
+    nonNegativeCents(input.basicInrCents) > 0 ||
+    nonNegativeCents(input.specialAllowanceInrCents) > 0 ||
+    nonNegativeCents(input.insuranceInrCents) > 0 ||
+    nonNegativeCents(input.bonusInrCents) > 0
+  );
 }
 
 export function buildMonthlyPayrollRows(input: {
@@ -127,10 +204,36 @@ export function buildMonthlyPayrollRows(input: {
       if (payment) {
         const daysInMonth = payment.daysInMonth > 0 ? payment.daysInMonth : defaultDaysInMonth;
         const daysWorked = normalizePayrollDaysWorked(payment.daysWorked, daysInMonth);
-        const monthlyPaidInrCents =
+        const baseMonthlyPaidInrCents =
           payment.monthlyPaidInrCents > 0
             ? payment.monthlyPaidInrCents
-            : payment.salaryPaidInrCents;
+            : payment.actualPaidInrCents > 0
+              ? payment.actualPaidInrCents
+              : payment.salaryPaidInrCents + payment.pfInrCents + payment.tdsInrCents;
+        const componentSplitExists = hasSalaryComponentSplit(payment);
+        const basicInrCents = componentSplitExists
+          ? payment.basicInrCents
+          : buildFallbackBasicInrCents({
+              monthlyPaidInrCents: baseMonthlyPaidInrCents,
+              pfInrCents: payment.pfInrCents,
+              tdsInrCents: payment.tdsInrCents,
+            });
+        const specialAllowanceInrCents = componentSplitExists ? payment.specialAllowanceInrCents : 0;
+        const insuranceInrCents = componentSplitExists ? payment.insuranceInrCents : 0;
+        const bonusInrCents = componentSplitExists ? payment.bonusInrCents : 0;
+        const monthlyPaidInrCents = calculateMonthlyPaidInrCents({
+          basicInrCents,
+          specialAllowanceInrCents,
+          insuranceInrCents,
+          bonusInrCents,
+          pfInrCents: payment.pfInrCents,
+          tdsInrCents: payment.tdsInrCents,
+        });
+        const actualPaidInrCents = calculateActualPaidInrCents({
+          monthlyPaidInrCents,
+          daysWorked,
+          daysInMonth,
+        });
         return {
           id: payment.id,
           employeeId: employee.id,
@@ -139,13 +242,18 @@ export function buildMonthlyPayrollRows(input: {
           employeeName: payment.employeeNameSnapshot || employee.fullName,
           source: "monthly-payroll",
           paidUsdInrRate: payment.paidUsdInrRate,
+          basicInrCents,
+          specialAllowanceInrCents,
+          insuranceInrCents,
+          bonusInrCents,
           monthlyPaidInrCents,
           daysWorked,
           daysInMonth,
-          salaryPaidInrCents: calculateActualPaidInrCents({
-            monthlyPaidInrCents,
-            daysWorked,
-            daysInMonth,
+          actualPaidInrCents,
+          salaryPaidInrCents: calculateSalaryPaidInrCents({
+            actualPaidInrCents,
+            pfInrCents: payment.pfInrCents,
+            tdsInrCents: payment.tdsInrCents,
           }),
           pfInrCents: payment.pfInrCents,
           tdsInrCents: payment.tdsInrCents,
@@ -159,6 +267,34 @@ export function buildMonthlyPayrollRows(input: {
         } satisfies MonthlyPayrollRow;
       }
 
+      const employeeComponentSplitExists = hasSalaryComponentSplit({
+        basicInrCents: employee.defaultBasicInrCents,
+        specialAllowanceInrCents: employee.defaultSpecialAllowanceInrCents,
+        insuranceInrCents: employee.defaultInsuranceInrCents,
+        bonusInrCents: employee.defaultBonusInrCents,
+      });
+      const basicInrCents = employeeComponentSplitExists
+        ? employee.defaultBasicInrCents
+        : buildFallbackBasicInrCents({
+            monthlyPaidInrCents: employee.defaultActualPaidInrCents,
+            pfInrCents: employee.defaultPfInrCents,
+            tdsInrCents: employee.defaultTdsInrCents,
+          });
+      const specialAllowanceInrCents = employeeComponentSplitExists
+        ? employee.defaultSpecialAllowanceInrCents
+        : 0;
+      const insuranceInrCents = employeeComponentSplitExists ? employee.defaultInsuranceInrCents : 0;
+      const bonusInrCents = employeeComponentSplitExists ? employee.defaultBonusInrCents : 0;
+      const monthlyPaidInrCents = calculateMonthlyPaidInrCents({
+        basicInrCents,
+        specialAllowanceInrCents,
+        insuranceInrCents,
+        bonusInrCents,
+        pfInrCents: employee.defaultPfInrCents,
+        tdsInrCents: employee.defaultTdsInrCents,
+      });
+      const actualPaidInrCents = monthlyPaidInrCents;
+
       return {
         employeeId: employee.id,
         companyId: input.companyId,
@@ -166,10 +302,19 @@ export function buildMonthlyPayrollRows(input: {
         employeeName: employee.fullName,
         source: "employee-default",
         paidUsdInrRate: employee.defaultPaidUsdInrRate,
-        monthlyPaidInrCents: employee.defaultActualPaidInrCents,
+        basicInrCents,
+        specialAllowanceInrCents,
+        insuranceInrCents,
+        bonusInrCents,
+        monthlyPaidInrCents,
         daysWorked: defaultDaysInMonth,
         daysInMonth: defaultDaysInMonth,
-        salaryPaidInrCents: employee.defaultActualPaidInrCents,
+        actualPaidInrCents,
+        salaryPaidInrCents: calculateSalaryPaidInrCents({
+          actualPaidInrCents,
+          pfInrCents: employee.defaultPfInrCents,
+          tdsInrCents: employee.defaultTdsInrCents,
+        }),
         pfInrCents: employee.defaultPfInrCents,
         tdsInrCents: employee.defaultTdsInrCents,
         paidStatus: false,
@@ -184,17 +329,17 @@ export function summarizePayrollRows(rows: MonthlyPayrollRow[]): MonthlyPayrollS
   return rows.reduce(
     (summary, row) => ({
       employeeCount: summary.employeeCount + 1,
+      monthlyPaidInrCents: summary.monthlyPaidInrCents + row.monthlyPaidInrCents,
+      actualPaidInrCents: summary.actualPaidInrCents + row.actualPaidInrCents,
       salaryPaidInrCents: summary.salaryPaidInrCents + row.salaryPaidInrCents,
       pfInrCents: summary.pfInrCents + row.pfInrCents,
       tdsInrCents: summary.tdsInrCents + row.tdsInrCents,
-      netPaidInrCents:
-        summary.netPaidInrCents +
-        row.salaryPaidInrCents -
-        row.pfInrCents -
-        row.tdsInrCents,
+      netPaidInrCents: summary.netPaidInrCents + row.salaryPaidInrCents,
     }),
     {
       employeeCount: 0,
+      monthlyPaidInrCents: 0,
+      actualPaidInrCents: 0,
       salaryPaidInrCents: 0,
       pfInrCents: 0,
       tdsInrCents: 0,

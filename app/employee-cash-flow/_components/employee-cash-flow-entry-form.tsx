@@ -35,6 +35,7 @@ type AvailableEmployee = {
   fullName: string;
   companyId: string;
   defaultPaidUsdInrRate?: number;
+  defaultMonthlyPaidInrCents?: number;
   defaultActualPaidInrCents?: number;
   defaultPfInrCents?: number;
   defaultTdsInrCents?: number;
@@ -74,26 +75,26 @@ function deriveCardMetrics(entry: EmployeeCashFlowEditableEntry) {
     receivedUsdInrRate: entry.cashoutUsdInrRate,
     pegUsdInrRate: entry.paidUsdInrRate,
   });
-  const actualPaidInrCents = entry.actualPaidInrCents;
+  const salaryPaidInrCents = entry.salaryPaidInrCents;
   const netInrCents = calculateEmployeeMonthNetInrCents({
     cashInInrCents,
-    salaryPaidInrCents: actualPaidInrCents,
+    salaryPaidInrCents,
   });
 
   return {
     effectiveDollarInwardUsdCents,
     cashInInrCents,
-    salaryPaidInrCents: actualPaidInrCents,
+    salaryPaidInrCents,
     fxCommissionInrCents: payoutMetrics.fxCommissionInrCents,
     totalCommissionUsdCents: payoutMetrics.totalCommissionUsdCents,
     commissionEarnedInrCents: payoutMetrics.commissionEarnedInrCents,
     grossEarningsInrCents:
       payoutMetrics.fxCommissionInrCents + payoutMetrics.commissionEarnedInrCents,
-    pendingAmountInrCents: cashInInrCents - actualPaidInrCents,
+    pendingAmountInrCents: cashInInrCents - salaryPaidInrCents,
     netInrCents,
     status: resolveEmployeeCashFlowStatus({
       effectiveDollarInwardUsdCents,
-      salaryPaidInrCents: actualPaidInrCents,
+      salaryPaidInrCents,
       netInrCents,
     }),
   };
@@ -621,6 +622,22 @@ export default function EmployeeCashFlowEntryForm({
 
                 <label className="block">
                   <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
+                    Monthly paid (INR)
+                  </span>
+                  <input
+                    value={toCurrencyInput(entry.monthlyPaidInrCents)}
+                    onChange={(event) =>
+                      updateEntry(entry.id, {
+                        monthlyPaidInrCents: fromCurrencyInput(event.target.value),
+                      })
+                    }
+                    className={cardInputClass()}
+                    inputMode="decimal"
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
                     Actual paid (INR)
                   </span>
                   <input
@@ -662,6 +679,17 @@ export default function EmployeeCashFlowEntryForm({
                       })
                     }
                     className={cardInputClass()}
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
+                    Salary paid (INR)
+                  </span>
+                  <input
+                    value={toCurrencyInput(entry.salaryPaidInrCents)}
+                    className={cardInputClass()}
+                    readOnly
                   />
                 </label>
 
@@ -771,7 +799,7 @@ export default function EmployeeCashFlowEntryForm({
                   ["Reimbursements / Expenses INR", formatInr(Math.round(entry.reimbursementUsdCents * entry.cashoutUsdInrRate))],
                   ["Appraisal advance INR", formatInr(Math.round(entry.appraisalAdvanceUsdCents * entry.cashoutUsdInrRate))],
                   ["Cash in INR", formatInr(metrics.cashInInrCents)],
-                  ["Total paid INR", formatInr(metrics.salaryPaidInrCents)],
+                  ["Salary paid INR", formatInr(metrics.salaryPaidInrCents)],
                   ["Pending amount", formatInr(metrics.pendingAmountInrCents)],
                   ["Net result", formatInr(metrics.netInrCents)],
                 ].map(([label, value]) => (

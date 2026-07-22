@@ -116,8 +116,17 @@ export default async function EmployeesPage({
                 <Field label="Peg rate">
                   <input name="defaultPaidUsdInrRate" type="number" min="0" step="1" className={inputClass} placeholder="0" defaultValue="0" />
                 </Field>
-                <Field label="Monthly paid (INR)">
-                  <input name="defaultActualPaidInr" type="number" min="0" step="0.01" className={inputClass} placeholder="0.00" defaultValue="0" />
+                <Field label="Basic (INR)">
+                  <input name="defaultBasicInr" type="number" min="0" step="0.01" className={inputClass} placeholder="0.00" defaultValue="0" />
+                </Field>
+                <Field label="Special allowance (INR)">
+                  <input name="defaultSpecialAllowanceInr" type="number" min="0" step="0.01" className={inputClass} placeholder="0.00" defaultValue="0" />
+                </Field>
+                <Field label="Insurance (INR)">
+                  <input name="defaultInsuranceInr" type="number" min="0" step="0.01" className={inputClass} placeholder="0.00" defaultValue="0" />
+                </Field>
+                <Field label="Bonus (INR)">
+                  <input name="defaultBonusInr" type="number" min="0" step="0.01" className={inputClass} placeholder="0.00" defaultValue="0" />
                 </Field>
                 <Field label="PF (INR)">
                   <input name="defaultPfInr" type="number" min="0" step="0.01" className={inputClass} placeholder="0.00" defaultValue="0" />
@@ -201,8 +210,17 @@ export default async function EmployeesPage({
                   <Field label="Peg rate">
                     <input name="defaultPaidUsdInrRate" type="number" min="0" step="1" className={inputClass} defaultValue={formatWholeRateInput(selectedEmployee?.defaultPaidUsdInrRate)} />
                   </Field>
-                  <Field label="Monthly paid (INR)">
-                    <input name="defaultActualPaidInr" type="number" min="0" step="0.01" className={inputClass} defaultValue={selectedEmployee ? (selectedEmployee.defaultActualPaidInrCents / 100).toFixed(2) : "0"} />
+                  <Field label="Basic (INR)">
+                    <input name="defaultBasicInr" type="number" min="0" step="0.01" className={inputClass} defaultValue={selectedEmployee ? (selectedEmployee.defaultBasicInrCents / 100).toFixed(2) : "0"} />
+                  </Field>
+                  <Field label="Special allowance (INR)">
+                    <input name="defaultSpecialAllowanceInr" type="number" min="0" step="0.01" className={inputClass} defaultValue={selectedEmployee ? (selectedEmployee.defaultSpecialAllowanceInrCents / 100).toFixed(2) : "0"} />
+                  </Field>
+                  <Field label="Insurance (INR)">
+                    <input name="defaultInsuranceInr" type="number" min="0" step="0.01" className={inputClass} defaultValue={selectedEmployee ? (selectedEmployee.defaultInsuranceInrCents / 100).toFixed(2) : "0"} />
+                  </Field>
+                  <Field label="Bonus (INR)">
+                    <input name="defaultBonusInr" type="number" min="0" step="0.01" className={inputClass} defaultValue={selectedEmployee ? (selectedEmployee.defaultBonusInrCents / 100).toFixed(2) : "0"} />
                   </Field>
                   <Field label="PF (INR)">
                     <input name="defaultPfInr" type="number" min="0" step="0.01" className={inputClass} defaultValue={selectedEmployee ? (selectedEmployee.defaultPfInrCents / 100).toFixed(2) : "0"} />

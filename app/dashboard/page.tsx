@@ -86,6 +86,7 @@ function mergePeriodRows(rows: PnPeriodRow[]): PnPeriodRow[] {
         cashoutUsdInrRate: weightedRate(bucket, "cashoutUsdInrRate"),
         cashInInrCents: sum((row) => row.cashInInrCents),
         paidUsdInrRate: weightedRate(bucket, "paidUsdInrRate"),
+        monthlyPaidInrCents: sum((row) => row.monthlyPaidInrCents),
         pfInrCents: sum((row) => row.pfInrCents),
         tdsInrCents: sum((row) => row.tdsInrCents),
         actualPaidInrCents: sum((row) => row.actualPaidInrCents),

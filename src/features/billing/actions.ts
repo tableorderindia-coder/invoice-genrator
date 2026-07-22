@@ -49,6 +49,7 @@ import type { InvoiceStatus } from "./types";
 import { centsFromUsd } from "./utils";
 import { parseFounderWithdrawalRows } from "./founders-balance";
 import {
+  calculateMonthlyPaidInrCents,
   normalizePayrollMonthKey,
   type PayrollStatus,
 } from "./payroll";
@@ -204,6 +205,30 @@ export async function updateCompanyAction(formData: FormData) {
 
 export async function createEmployeeAction(formData: FormData) {
   await requirePageEditAccess('employees');
+  const defaultBasicInrCents = getNonNegativeCentsOrThrow(
+    getString(formData, "defaultBasicInr"),
+    "Basic",
+  );
+  const defaultSpecialAllowanceInrCents = getNonNegativeCentsOrThrow(
+    getString(formData, "defaultSpecialAllowanceInr"),
+    "Special allowance",
+  );
+  const defaultInsuranceInrCents = getNonNegativeCentsOrThrow(
+    getString(formData, "defaultInsuranceInr"),
+    "Insurance",
+  );
+  const defaultBonusInrCents = getNonNegativeCentsOrThrow(
+    getString(formData, "defaultBonusInr"),
+    "Bonus",
+  );
+  const defaultPfInrCents = getNonNegativeCentsOrThrow(
+    getString(formData, "defaultPfInr"),
+    "PF",
+  );
+  const defaultTdsInrCents = getNonNegativeCentsOrThrow(
+    getString(formData, "defaultTdsInr"),
+    "TDS",
+  );
   await createEmployee({
     companyId: getString(formData, "companyId"),
     fullName: getString(formData, "fullName"),
@@ -217,18 +242,20 @@ export async function createEmployeeAction(formData: FormData) {
       getString(formData, "defaultPaidUsdInrRate") || "0",
       "Peg rate",
     ),
-    defaultActualPaidInrCents: getNonNegativeCentsOrThrow(
-      getString(formData, "defaultActualPaidInr"),
-      "Monthly paid",
-    ),
-    defaultPfInrCents: getNonNegativeCentsOrThrow(
-      getString(formData, "defaultPfInr"),
-      "PF",
-    ),
-    defaultTdsInrCents: getNonNegativeCentsOrThrow(
-      getString(formData, "defaultTdsInr"),
-      "TDS",
-    ),
+    defaultActualPaidInrCents: calculateMonthlyPaidInrCents({
+      basicInrCents: defaultBasicInrCents,
+      specialAllowanceInrCents: defaultSpecialAllowanceInrCents,
+      insuranceInrCents: defaultInsuranceInrCents,
+      bonusInrCents: defaultBonusInrCents,
+      pfInrCents: defaultPfInrCents,
+      tdsInrCents: defaultTdsInrCents,
+    }),
+    defaultBasicInrCents,
+    defaultSpecialAllowanceInrCents,
+    defaultInsuranceInrCents,
+    defaultBonusInrCents,
+    defaultPfInrCents,
+    defaultTdsInrCents,
     hrsPerWeek: Number.parseFloat(getString(formData, "hrsPerWeek")),
     activeFrom: getString(formData, "activeFrom"),
     activeTo: getString(formData, "activeTo") || undefined,
@@ -241,6 +268,30 @@ export async function createEmployeeAction(formData: FormData) {
 
 export async function updateEmployeeAction(formData: FormData) {
   await requirePageEditAccess('employees');
+  const defaultBasicInrCents = getNonNegativeCentsOrThrow(
+    getString(formData, "defaultBasicInr"),
+    "Basic",
+  );
+  const defaultSpecialAllowanceInrCents = getNonNegativeCentsOrThrow(
+    getString(formData, "defaultSpecialAllowanceInr"),
+    "Special allowance",
+  );
+  const defaultInsuranceInrCents = getNonNegativeCentsOrThrow(
+    getString(formData, "defaultInsuranceInr"),
+    "Insurance",
+  );
+  const defaultBonusInrCents = getNonNegativeCentsOrThrow(
+    getString(formData, "defaultBonusInr"),
+    "Bonus",
+  );
+  const defaultPfInrCents = getNonNegativeCentsOrThrow(
+    getString(formData, "defaultPfInr"),
+    "PF",
+  );
+  const defaultTdsInrCents = getNonNegativeCentsOrThrow(
+    getString(formData, "defaultTdsInr"),
+    "TDS",
+  );
   await updateEmployee({
     employeeId: getString(formData, "employeeId"),
     companyId: getString(formData, "companyId"),
@@ -255,18 +306,20 @@ export async function updateEmployeeAction(formData: FormData) {
       getString(formData, "defaultPaidUsdInrRate") || "0",
       "Peg rate",
     ),
-    defaultActualPaidInrCents: getNonNegativeCentsOrThrow(
-      getString(formData, "defaultActualPaidInr"),
-      "Monthly paid",
-    ),
-    defaultPfInrCents: getNonNegativeCentsOrThrow(
-      getString(formData, "defaultPfInr"),
-      "PF",
-    ),
-    defaultTdsInrCents: getNonNegativeCentsOrThrow(
-      getString(formData, "defaultTdsInr"),
-      "TDS",
-    ),
+    defaultActualPaidInrCents: calculateMonthlyPaidInrCents({
+      basicInrCents: defaultBasicInrCents,
+      specialAllowanceInrCents: defaultSpecialAllowanceInrCents,
+      insuranceInrCents: defaultInsuranceInrCents,
+      bonusInrCents: defaultBonusInrCents,
+      pfInrCents: defaultPfInrCents,
+      tdsInrCents: defaultTdsInrCents,
+    }),
+    defaultBasicInrCents,
+    defaultSpecialAllowanceInrCents,
+    defaultInsuranceInrCents,
+    defaultBonusInrCents,
+    defaultPfInrCents,
+    defaultTdsInrCents,
     hrsPerWeek: Number.parseFloat(getString(formData, "hrsPerWeek")),
     activeFrom: getString(formData, "activeFrom"),
     activeTo: getString(formData, "activeTo") || undefined,

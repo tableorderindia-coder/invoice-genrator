@@ -27,6 +27,10 @@ export type Employee = {
   billingRateUsdCents: number;
   defaultPaidUsdInrRate: number;
   defaultActualPaidInrCents: number;
+  defaultBasicInrCents: number;
+  defaultSpecialAllowanceInrCents: number;
+  defaultInsuranceInrCents: number;
+  defaultBonusInrCents: number;
   defaultPfInrCents: number;
   defaultTdsInrCents: number;
   hrsPerWeek: number;
@@ -138,9 +142,11 @@ export type PnEmployeeMonthRow = {
   appraisalAdvanceInrCents: number;
   cashoutUsdInrRate: number;
   paidUsdInrRate: number;
+  monthlyPaidInrCents: number;
   pfInrCents: number;
   tdsInrCents: number;
   actualPaidInrCents: number;
+  salaryPaidInrCents: number;
   fxCommissionInrCents: number;
   totalCommissionUsdCents: number;
   commissionEarnedInrCents: number;
@@ -175,6 +181,7 @@ export type PnEmployeeEditableRow = {
   cashInInrCents: number;
   cashoutUsdInrRate: number;
   paidUsdInrRate: number;
+  monthlyPaidInrCents: number;
   salaryPaidInrCents: number;
   pfInrCents: number;
   tdsInrCents: number;
@@ -211,6 +218,7 @@ export type PnPeriodRow = {
   cashoutUsdInrRate: number;
   cashInInrCents: number;
   paidUsdInrRate: number;
+  monthlyPaidInrCents: number;
   pfInrCents: number;
   tdsInrCents: number;
   actualPaidInrCents: number;

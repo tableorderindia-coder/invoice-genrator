@@ -38,9 +38,11 @@ describe("employee cash flow saved rows rendering", () => {
             offboardingDeductionUsdCents: 0,
             cashoutUsdInrRate: 84,
             paidUsdInrRate: 80,
+            monthlyPaidInrCents: 30_000,
             actualPaidInrCents: 9_999,
             pfInrCents: 0,
             tdsInrCents: 0,
+            salaryPaidInrCents: 9_999,
             fxCommissionInrCents: 0,
             totalCommissionUsdCents: 0,
             commissionEarnedInrCents: 0,
@@ -54,15 +56,17 @@ describe("employee cash flow saved rows rendering", () => {
     );
 
     const headerCells = screen.getAllByRole("columnheader");
-    expect(headerCells).toHaveLength(16);
+    expect(headerCells).toHaveLength(18);
     expect(
       screen.getByRole("columnheader", { name: "Final effective inward $" }),
     ).not.toBeNull();
+    expect(screen.getByRole("columnheader", { name: "Monthly paid INR" })).not.toBeNull();
     expect(screen.getByRole("columnheader", { name: "Actual paid INR" })).not.toBeNull();
+    expect(screen.getByRole("columnheader", { name: "Salary paid INR" })).not.toBeNull();
     expect(screen.queryByRole("columnheader", { name: "Total paid INR" })).toBeNull();
 
     const bodyRow = screen.getAllByRole("row")[1];
-    expect(bodyRow.querySelectorAll("td")).toHaveLength(16);
+    expect(bodyRow.querySelectorAll("td")).toHaveLength(18);
   });
 
   it("renders cramped saved-row editable fields with explicit minimum widths", () => {
@@ -89,9 +93,11 @@ describe("employee cash flow saved rows rendering", () => {
             offboardingDeductionUsdCents: 0,
             cashoutUsdInrRate: 84,
             paidUsdInrRate: 80,
+            monthlyPaidInrCents: 30_000,
             actualPaidInrCents: 9_999,
             pfInrCents: 0,
             tdsInrCents: 0,
+            salaryPaidInrCents: 9_999,
             fxCommissionInrCents: 0,
             totalCommissionUsdCents: 0,
             commissionEarnedInrCents: 0,
@@ -138,9 +144,11 @@ describe("employee cash flow saved rows rendering", () => {
             offboardingDeductionUsdCents: 0,
             cashoutUsdInrRate: 87.87,
             paidUsdInrRate: 86,
+            monthlyPaidInrCents: 30_000,
             actualPaidInrCents: 9_999,
             pfInrCents: 0,
             tdsInrCents: 0,
+            salaryPaidInrCents: 9_999,
             fxCommissionInrCents: 0,
             totalCommissionUsdCents: 0,
             commissionEarnedInrCents: 0,
