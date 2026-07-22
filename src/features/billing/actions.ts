@@ -62,6 +62,13 @@ import {
   type SaveMonthlyPayrollRowInput,
 } from "./payroll-store";
 import { prepareAndSavePayslips, savePayslipRecord } from "./payslip-store";
+import {
+  getCompanyExpenseCompanyId,
+  getEmployeeCashFlowEntryCompanyId,
+  getInvoiceCompanyId,
+  rebuildPnSummariesForCompany,
+  rebuildPnSummariesForInvoice,
+} from "./pn-summary-store";
 
 function getString(formData: FormData, key: string) {
   return String(formData.get(key) || "").trim();
@@ -75,6 +82,18 @@ function buildFlashRedirect(path: string, status: "success" | "error", message: 
 function invalidateBillingCache(input: BillingInvalidationInput) {
   for (const tag of getBillingInvalidationTags(input)) {
     updateTag(tag);
+  }
+}
+
+async function refreshPnSummariesForCompany(companyId: string | undefined) {
+  if (companyId) {
+    await rebuildPnSummariesForCompany(companyId);
+  }
+}
+
+async function refreshPnSummariesForInvoice(invoiceId: string) {
+  if (invoiceId) {
+    await rebuildPnSummariesForInvoice(invoiceId);
   }
 }
 
@@ -374,6 +393,7 @@ export async function createInvoiceDraftAction(formData: FormData) {
     });
 
     invalidateBillingCache({ type: "invoice", companyId });
+    await refreshPnSummariesForCompany(companyId);
     revalidatePath("/");
     revalidatePath("/invoices");
     revalidatePath("/invoices/create");
@@ -413,6 +433,7 @@ export async function addInvoiceTeamAction(formData: FormData) {
     }
 
     await addInvoiceTeam(invoiceId, teamName);
+    await refreshPnSummariesForInvoice(invoiceId);
 
     revalidatePath(`/invoices/${invoiceId}`);
     revalidatePath(`/invoices/drafts/${invoiceId}`);
@@ -447,6 +468,7 @@ export async function assignInvoiceMemberAction(formData: FormData) {
       invoiceTeamId,
       employeeId,
     });
+    await refreshPnSummariesForInvoice(invoiceId);
 
     revalidatePath(`/invoices/${invoiceId}`);
     revalidatePath(`/invoices/drafts/${invoiceId}`);
@@ -476,6 +498,7 @@ export async function deleteInvoiceTeamAction(formData: FormData) {
     }
 
     await deleteInvoiceTeam(invoiceId, invoiceTeamId);
+    await refreshPnSummariesForInvoice(invoiceId);
 
     revalidatePath(`/invoices/${invoiceId}`);
     revalidatePath(`/invoices/drafts/${invoiceId}`);
@@ -506,6 +529,7 @@ export async function deleteInvoiceLineItemAction(formData: FormData) {
     }
 
     await deleteInvoiceLineItem(invoiceId, lineItemId);
+    await refreshPnSummariesForInvoice(invoiceId);
 
     revalidatePath(`/invoices/${invoiceId}`);
     revalidatePath(`/invoices/drafts/${invoiceId}`);
@@ -545,6 +569,7 @@ export async function updateInvoiceLineItemAction(formData: FormData) {
       daysWorked,
       billingRateUsdCents: centsFromUsd(getString(formData, "billingRateUsd")),
     });
+    await refreshPnSummariesForInvoice(invoiceId);
 
     revalidatePath(`/invoices/${invoiceId}`);
     revalidatePath(`/invoices/drafts/${invoiceId}`);
@@ -578,6 +603,7 @@ export async function updateInvoiceLineItemTotalAction(formData: FormData) {
       lineItemId,
       billedTotalUsdCents: wholeUsdCentsFromInput(getString(formData, "billedTotalUsd")),
     });
+    await refreshPnSummariesForInvoice(invoiceId);
 
     revalidatePath(`/invoices/${invoiceId}`);
     revalidatePath(`/invoices/drafts/${invoiceId}`);
@@ -612,6 +638,7 @@ export async function updateInvoiceTeamTotalAction(formData: FormData) {
       invoiceTeamId,
       totalUsdCents: wholeUsdCentsFromInput(getString(formData, "teamTotalUsd")),
     });
+    await refreshPnSummariesForInvoice(invoiceId);
 
     revalidatePath(`/invoices/${invoiceId}`);
     revalidatePath(`/invoices/drafts/${invoiceId}`);
@@ -640,6 +667,7 @@ export async function updateInvoiceGrandTotalAction(formData: FormData) {
       invoiceId,
       grandTotalUsdCents: wholeUsdCentsFromInput(getString(formData, "grandTotalUsd")),
     });
+    await refreshPnSummariesForInvoice(invoiceId);
 
     revalidatePath(`/invoices/${invoiceId}`);
     revalidatePath(`/invoices/drafts/${invoiceId}`);
@@ -675,10 +703,13 @@ export async function updateInvoiceHeaderAction(formData: FormData) {
       status: getString(formData, "status"),
     });
 
+    const previousCompanyId = await getInvoiceCompanyId(invoiceId);
     await updateInvoiceHeader({
       invoiceId,
       ...parsed,
     });
+    await refreshPnSummariesForCompany(previousCompanyId);
+    await refreshPnSummariesForCompany(parsed.companyId);
 
     revalidatePath(`/invoices/${invoiceId}`);
     revalidatePath(`/invoices/drafts/${invoiceId}`);
@@ -734,6 +765,7 @@ export async function addInvoiceAdjustmentAction(formData: FormData) {
       invoiceId,
       ...payload,
     });
+    await refreshPnSummariesForInvoice(invoiceId);
 
     revalidatePath(`/invoices/${invoiceId}`);
     revalidatePath(`/invoices/drafts/${invoiceId}`);
@@ -763,6 +795,7 @@ export async function deleteInvoiceAdjustmentAction(formData: FormData) {
     }
 
     await deleteInvoiceAdjustment(invoiceId, adjustmentId);
+    await refreshPnSummariesForInvoice(invoiceId);
 
     revalidatePath(`/invoices/${invoiceId}`);
     revalidatePath(`/invoices/drafts/${invoiceId}`);
@@ -796,6 +829,7 @@ export async function updateInvoiceAdjustmentAmountAction(formData: FormData) {
       adjustmentId,
       amountUsdCents: wholeUsdCentsFromInput(getString(formData, "amountUsd")),
     });
+    await refreshPnSummariesForInvoice(invoiceId);
 
     revalidatePath(`/invoices/${invoiceId}`);
     revalidatePath(`/invoices/drafts/${invoiceId}`);
@@ -821,6 +855,7 @@ export async function updateInvoiceNoteAction(formData: FormData) {
 
   try {
     await updateInvoiceNote(invoiceId, getString(formData, "noteText"));
+    await refreshPnSummariesForInvoice(invoiceId);
 
     revalidatePath(`/invoices/${invoiceId}`);
     revalidatePath(`/invoices/drafts/${invoiceId}`);
@@ -845,6 +880,7 @@ export async function updateInvoiceStatusAction(formData: FormData) {
   try {
     const status = getString(formData, "status") as InvoiceStatus;
     await updateInvoiceStatus(invoiceId, status);
+    await refreshPnSummariesForInvoice(invoiceId);
 
     revalidatePath(`/invoices/${invoiceId}`);
     revalidatePath(`/invoices/drafts/${invoiceId}`);
@@ -874,7 +910,9 @@ export async function deleteInvoiceAction(formData: FormData) {
       throw new Error("Invoice id is required.");
     }
 
+    const companyId = await getInvoiceCompanyId(invoiceId);
     await deleteInvoice(invoiceId);
+    await refreshPnSummariesForCompany(companyId);
 
     revalidatePath(`/invoices/${invoiceId}`);
     revalidatePath(`/invoices/drafts/${invoiceId}`);
@@ -916,6 +954,7 @@ export async function cashOutInvoiceAction(formData: FormData) {
     );
 
     await cashOutInvoice(invoiceId, realizedAt, dollarInboundUsdCents, usdInrRate);
+    await refreshPnSummariesForInvoice(invoiceId);
 
     revalidatePath(`/invoices/${invoiceId}`);
     revalidatePath(`/invoices/drafts/${invoiceId}`);
@@ -997,6 +1036,7 @@ export async function updateDashboardEmployeeCashFlowEntryAction(formData: FormD
       throw new Error("Actual paid cannot be negative.");
     }
 
+    const companyId = await getEmployeeCashFlowEntryCompanyId(entryId);
     await updateDashboardEmployeeCashFlowEntry({
       entryId,
       daysWorked,
@@ -1012,6 +1052,7 @@ export async function updateDashboardEmployeeCashFlowEntryAction(formData: FormD
       tdsInrCents,
       actualPaidInrCents,
     });
+    await refreshPnSummariesForCompany(companyId);
 
     revalidatePath("/dashboard");
     revalidatePath("/employee-cash-flow");
@@ -1075,6 +1116,7 @@ export async function saveCompanyExpenseAction(formData: FormData) {
     });
 
     invalidateBillingCache({ type: "expense", companyId });
+    await refreshPnSummariesForCompany(companyId);
     revalidatePath("/expenses");
     revalidatePath("/dashboard");
   } catch (error) {
@@ -1128,7 +1170,9 @@ export async function deleteCompanyExpenseAction(formData: FormData) {
       throw new Error("Expense ID is required.");
     }
 
+    const companyId = await getCompanyExpenseCompanyId(expenseId);
     await deleteCompanyExpense(expenseId);
+    await refreshPnSummariesForCompany(companyId);
 
     revalidatePath("/expenses");
     revalidatePath("/dashboard");
@@ -1202,6 +1246,7 @@ export async function saveInvoicePaymentEmployeeEntriesAction(formData: FormData
     }
 
     invalidateBillingCache({ type: "cashflow", companyId, month: paymentMonth });
+    await refreshPnSummariesForCompany(companyId);
     revalidatePath("/employee-cash-flow");
   } catch (error) {
     redirect(
@@ -1238,6 +1283,7 @@ export async function saveMonthlyPayrollRowsAction(formData: FormData) {
     });
 
     invalidateBillingCache({ type: "salary", companyId, month });
+    await refreshPnSummariesForCompany(companyId);
     revalidatePath("/salary");
     revalidatePath("/employee-cash-flow");
     revalidatePath("/dashboard");
@@ -1332,6 +1378,7 @@ export async function updateSavedEmployeeCashFlowEntryAction(formData: FormData)
       companyId: entry.companyId,
       month: entry.paymentMonth,
     });
+    await refreshPnSummariesForCompany(entry.companyId);
     revalidatePath("/employee-cash-flow");
   } catch (error) {
     redirect(
@@ -1356,7 +1403,9 @@ export async function deleteSavedEmployeeCashFlowEntryAction(formData: FormData)
       throw new Error("Employee cash flow row is required.");
     }
 
+    const companyId = await getEmployeeCashFlowEntryCompanyId(entryId);
     await deleteSavedEmployeeCashFlowEntry(entryId);
+    await refreshPnSummariesForCompany(companyId);
     revalidatePath("/employee-cash-flow");
   } catch (error) {
     redirect(

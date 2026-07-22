@@ -18,6 +18,11 @@ const prepareAndSavePayslipsMock = vi.fn();
 const savePayslipRecordMock = vi.fn();
 const upsertCompanyExpenseMock = vi.fn();
 const requireCompanyPageEditAccessMock = vi.fn();
+const rebuildPnSummariesForCompanyMock = vi.fn();
+const rebuildPnSummariesForInvoiceMock = vi.fn();
+const getInvoiceCompanyIdMock = vi.fn();
+const getCompanyExpenseCompanyIdMock = vi.fn();
+const getEmployeeCashFlowEntryCompanyIdMock = vi.fn();
 
 vi.mock("next/cache", () => ({
   revalidatePath: revalidatePathMock,
@@ -80,6 +85,14 @@ vi.mock("./payslip-store", () => ({
   savePayslipRecord: savePayslipRecordMock,
 }));
 
+vi.mock("./pn-summary-store", () => ({
+  rebuildPnSummariesForCompany: rebuildPnSummariesForCompanyMock,
+  rebuildPnSummariesForInvoice: rebuildPnSummariesForInvoiceMock,
+  getInvoiceCompanyId: getInvoiceCompanyIdMock,
+  getCompanyExpenseCompanyId: getCompanyExpenseCompanyIdMock,
+  getEmployeeCashFlowEntryCompanyId: getEmployeeCashFlowEntryCompanyIdMock,
+}));
+
 describe("updateDashboardEmployeeCashFlowEntryAction", () => {
   beforeEach(() => {
     revalidatePathMock.mockReset();
@@ -108,6 +121,16 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
     savePayslipRecordMock.mockResolvedValue(undefined);
     upsertCompanyExpenseMock.mockReset();
     upsertCompanyExpenseMock.mockResolvedValue("expense_1");
+    rebuildPnSummariesForCompanyMock.mockReset();
+    rebuildPnSummariesForCompanyMock.mockResolvedValue(undefined);
+    rebuildPnSummariesForInvoiceMock.mockReset();
+    rebuildPnSummariesForInvoiceMock.mockResolvedValue(undefined);
+    getInvoiceCompanyIdMock.mockReset();
+    getInvoiceCompanyIdMock.mockResolvedValue("comp_1");
+    getCompanyExpenseCompanyIdMock.mockReset();
+    getCompanyExpenseCompanyIdMock.mockResolvedValue("company_1");
+    getEmployeeCashFlowEntryCompanyIdMock.mockReset();
+    getEmployeeCashFlowEntryCompanyIdMock.mockResolvedValue("comp_1");
     requireCompanyPageEditAccessMock.mockReset();
     requireCompanyPageEditAccessMock.mockResolvedValue({
       profile: { id: "admin_1", role: "admin" },
