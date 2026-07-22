@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import PDFDocument from "pdfkit";
 
 import {
   buildExpenseExportCsv,
@@ -58,5 +59,18 @@ describe("expense export", () => {
 
     expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
     expect(pdf.length).toBeGreaterThan(1000);
+  });
+
+  it("draws bordered table cells so expense columns do not visually merge", async () => {
+    const rectSpy = vi.spyOn(PDFDocument.prototype, "rect");
+
+    await buildExpenseExportPdf({
+      companyLabel: "Arena",
+      periodLabel: "June 2026 - July 2026",
+      expenses,
+    });
+
+    expect(rectSpy.mock.calls.length).toBeGreaterThanOrEqual((expenses.length + 2) * 3);
+    rectSpy.mockRestore();
   });
 });

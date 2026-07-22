@@ -4,6 +4,7 @@ import {
   buildEmployeeSectionTotals,
   buildPeriodTotals,
 } from "./dashboard-table-totals";
+import { drawPdfTable, splitWidePdfTable } from "./pdf-table";
 import type { OverviewPnlSummaryRow } from "./overview-pnl-summary";
 import type {
   PnDashboardData,
@@ -304,24 +305,37 @@ export async function buildDashboardExportPdf(input: {
   const doc = new PDFDocument({ size: "A4", layout: "landscape", margin: 24 });
   let y = 72;
   const pageWidth = doc.page.width - 48;
-  const columnWidth = Math.max(28, pageWidth / Math.max(1, input.rows[0]?.length ?? 1));
 
   doc.font("Helvetica-Bold").fontSize(16).text(input.title, 24, 24);
   doc.font("Helvetica").fontSize(9).text(input.subtitle, 24, 46);
 
-  for (const [rowIndex, row] of input.rows.entries()) {
-    if (y > doc.page.height - 48) {
+  const tableChunks = splitWidePdfTable(input.rows, 8);
+  for (const [chunkIndex, rows] of tableChunks.entries()) {
+    if (chunkIndex > 0) {
       doc.addPage();
-      y = 36;
+      y = 48;
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(10)
+        .fillColor("#0f172a")
+        .text(`${input.title} (${chunkIndex + 1}/${tableChunks.length})`, 24, 24);
     }
-    doc.font(rowIndex === 0 || row[0] === "Totals" ? "Helvetica-Bold" : "Helvetica").fontSize(7);
-    row.forEach((cell, columnIndex) => {
-      doc.text(cell, 24 + columnIndex * columnWidth, y, {
-        width: columnWidth - 4,
-        ellipsis: true,
-      });
+    const firstColumnWidth = Math.min(120, Math.max(82, pageWidth * 0.18));
+    const remainingWidth = pageWidth - firstColumnWidth;
+    const otherColumnCount = Math.max(1, (rows[0]?.length ?? 1) - 1);
+    const widths = [
+      firstColumnWidth,
+      ...Array.from({ length: otherColumnCount }, () => remainingWidth / otherColumnCount),
+    ];
+    y = drawPdfTable(doc, {
+      x: 24,
+      y,
+      widths,
+      rows,
+      pageBottom: doc.page.height - 36,
+      fontSize: 7,
+      padding: 3,
     });
-    y += 16;
   }
 
   return pdfBuffer(doc);

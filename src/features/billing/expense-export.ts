@@ -1,5 +1,6 @@
 import PDFDocument from "pdfkit";
 
+import { drawPdfTable } from "./pdf-table";
 import type { CompanyExpense } from "./types";
 import { formatMonthYear } from "./utils";
 
@@ -55,41 +56,24 @@ export async function buildExpenseExportPdf(input: {
   const rows = buildExpenseExportRows(input.expenses);
   const tableX = 36;
   const widths = [120, 280, 100];
-  let y = 104;
+  const y = 104;
 
   doc.fontSize(18).font("Helvetica-Bold").text("Company Expenses", 36, 36);
   doc.fontSize(10).font("Helvetica").text(input.companyLabel, 36, 62);
   doc.text(input.periodLabel, 36, 78);
 
-  function drawHeader() {
-    doc.font("Helvetica-Bold").fontSize(9);
-    ["Month", "Expense label", "Expense INR"].forEach((label, index) => {
-      doc.text(label, tableX + widths.slice(0, index).reduce((sum, width) => sum + width, 0), y, {
-        width: widths[index],
-      });
-    });
-    y += 18;
-    doc.moveTo(tableX, y - 6).lineTo(tableX + widths.reduce((sum, width) => sum + width, 0), y - 6).stroke();
-    doc.font("Helvetica").fontSize(9);
-  }
-
-  drawHeader();
-  for (const row of rows) {
-    if (y > 760) {
-      doc.addPage();
-      y = 48;
-      drawHeader();
-    }
-    const isTotal = row.month === "Total";
-    doc.font(isTotal ? "Helvetica-Bold" : "Helvetica");
-    doc.text(row.month, tableX, y, { width: widths[0] });
-    doc.text(row.label, tableX + widths[0], y, { width: widths[1] });
-    doc.text(row.amountInr, tableX + widths[0] + widths[1], y, {
-      width: widths[2],
-      align: "right",
-    });
-    y += 18;
-  }
+  drawPdfTable(doc, {
+    x: tableX,
+    y,
+    widths,
+    rows: [
+      ["Month", "Expense label", "Expense INR"],
+      ...rows.map((row) => [row.month, row.label, row.amountInr]),
+    ],
+    pageBottom: 780,
+    fontSize: 9,
+    padding: 5,
+  });
 
   return pdfBuffer(doc);
 }
