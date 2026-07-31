@@ -132,7 +132,11 @@ export function calculateEmployeePayoutMetrics({
   const marginMetrics = calculatePegRateMarginMetrics({
     dollarInwardUsdCents,
     actualPaidInrCents,
-    pegUsdInrRate,
+    pegUsdInrRate: resolveEffectivePaidUsdInrRate({
+      paidUsdInrRate: pegUsdInrRate,
+      dollarInwardUsdCents,
+      actualPaidInrCents,
+    }),
     receivedUsdInrRate,
   });
 
@@ -141,6 +145,31 @@ export function calculateEmployeePayoutMetrics({
     fxCommissionInrCents: marginMetrics.forexGainInrCents,
     commissionEarnedInrCents: marginMetrics.operatingMarginInrCents,
   };
+}
+
+export function resolveEffectivePaidUsdInrRate({
+  paidUsdInrRate,
+  dollarInwardUsdCents,
+  actualPaidInrCents,
+}: {
+  paidUsdInrRate: number;
+  dollarInwardUsdCents: number;
+  actualPaidInrCents: number;
+}) {
+  if (Number.isFinite(paidUsdInrRate) && paidUsdInrRate > 0) {
+    return paidUsdInrRate;
+  }
+
+  if (
+    Number.isFinite(dollarInwardUsdCents) &&
+    dollarInwardUsdCents > 0 &&
+    Number.isFinite(actualPaidInrCents) &&
+    actualPaidInrCents > 0
+  ) {
+    return actualPaidInrCents / dollarInwardUsdCents;
+  }
+
+  return 0;
 }
 
 export function calculatePegRateMarginMetrics({

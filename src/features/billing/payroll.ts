@@ -207,6 +207,10 @@ export function buildMonthlyPayrollRows(input: {
     .map((employee) => {
       const payment = paymentsByEmployeeId.get(employee.id);
       if (payment) {
+        const paidUsdInrRate =
+          payment.paidUsdInrRate > 0
+            ? payment.paidUsdInrRate
+            : employee.defaultPaidUsdInrRate;
         const daysInMonth = payment.daysInMonth > 0 ? payment.daysInMonth : defaultDaysInMonth;
         const daysWorked = normalizePayrollDaysWorked(payment.daysWorked, daysInMonth);
         const baseMonthlyPaidInrCents =
@@ -246,7 +250,7 @@ export function buildMonthlyPayrollRows(input: {
           month,
           employeeName: payment.employeeNameSnapshot || employee.fullName,
           source: "monthly-payroll",
-          paidUsdInrRate: payment.paidUsdInrRate,
+          paidUsdInrRate,
           basicInrCents,
           specialAllowanceInrCents,
           insuranceInrCents,

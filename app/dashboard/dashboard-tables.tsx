@@ -22,7 +22,6 @@ import {
   formatRateInput,
   formatSignedInr,
   formatUsd,
-  formatWholeRateInput,
 } from "../../src/features/billing/utils";
 import { getVisibleToggleColumns } from "../../src/features/billing/dashboard-column-visibility";
 
@@ -363,8 +362,8 @@ function EmployeeTables({
             type="number"
             name="paidUsdInrRate"
             min="0"
-            step="1"
-            defaultValue={formatWholeRateInput(row.paidUsdInrRate)}
+            step="0.0001"
+            defaultValue={formatRateInput(row.paidUsdInrRate)}
             className={inputClass}
             style={{
               minWidth: "7rem",
