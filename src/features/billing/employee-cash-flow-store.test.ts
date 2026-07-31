@@ -368,4 +368,74 @@ describe("employee cash flow store shaping", () => {
       notes: "Salary override: Admin requested June salary import.",
     });
   });
+
+  it("keeps the employee master peg rate when saved salary details have a zero rate", () => {
+    const entries = buildInvoiceCashFlowFallbackEntries({
+      invoice: {
+        id: "inv_2026_007",
+        invoice_number: "2026/007",
+        company_id: "comp_1",
+        month: 7,
+        year: 2026,
+        status: "cashed_out",
+      },
+      invoicePayment: null,
+      lineItems: [
+        {
+          id: "line_1",
+          employee_id: "emp_1",
+          employee_name_snapshot: "Asha Rao",
+          billed_total_usd_cents: 400_000,
+          manual_total_usd_cents: null,
+          days_worked: 31,
+        },
+      ],
+      availableEmployees: [
+        {
+          id: "emp_1",
+          fullName: "Asha Rao",
+          companyId: "comp_1",
+          defaultPaidUsdInrRate: 85,
+          defaultActualPaidInrCents: 180_000_00,
+          defaultPfInrCents: 1_250_00,
+          defaultTdsInrCents: 2_750_00,
+          onboardingAdvanceUsdCents: 0,
+          reimbursementUsdCents: 0,
+          reimbursementLabelsText: "",
+          appraisalAdvanceUsdCents: 0,
+          offboardingDeductionUsdCents: 0,
+        },
+      ],
+      salaryPaymentsByEmployeeId: new Map([
+        [
+          "emp_1",
+          {
+            employee_id: "emp_1",
+            paid_usd_inr_rate: 0,
+            monthly_paid_inr_cents: 220_000_00,
+            actual_paid_inr_cents: 220_000_00,
+            salary_paid_inr_cents: 215_500_00,
+            pf_inr_cents: 1_500_00,
+            tds_inr_cents: 3_000_00,
+            days_worked: 31,
+            days_in_month: 31,
+            override_note: null,
+          },
+        ],
+      ]),
+      onboardingByEmployeeName: new Map(),
+      reimbursementByEmployeeName: new Map(),
+      reimbursementLabelsByEmployeeName: new Map(),
+      appraisalByEmployeeName: new Map(),
+      offboardingByEmployeeName: new Map(),
+      realization: {
+        invoice_id: "inv_2026_007",
+        dollar_inbound_usd_cents: 0,
+        usd_inr_rate: 95,
+      },
+      daysInMonth: 31,
+    });
+
+    expect(entries[0]?.paidUsdInrRate).toBe(85);
+  });
 });

@@ -282,6 +282,38 @@ describe("dashboard tables rendering", () => {
     expect(screen.queryByText("85.6667")).toBeNull();
   });
 
+  it("keeps editable employee peg rates as decimals", () => {
+    render(
+      createElement(DashboardTables, {
+        view: "employee",
+        periodType: "monthly",
+        data: {
+          ...baseData,
+          employeeEditableSections: [
+            {
+              ...baseData.employeeEditableSections[0],
+              rows: [
+                {
+                  ...employeeRow,
+                  paidUsdInrRate: 95.2,
+                },
+              ],
+            },
+          ],
+        },
+        returnTo: "/dashboard",
+        employeeColumnKeys: allEmployeeColumnKeys,
+        periodColumnKeys: allPeriodColumnKeys,
+        updateDashboardEmployeeCashFlowEntryAction: vi.fn(async () => {}),
+      }),
+    );
+
+    const pegInput = screen.getByDisplayValue("95.2") as HTMLInputElement;
+    expect(pegInput.name).toBe("paidUsdInrRate");
+    expect(pegInput.step).toBe("0.0001");
+    expect(screen.queryByDisplayValue("95")).toBeNull();
+  });
+
   it("renders only selected employee columns plus fixed columns", () => {
     render(
       createElement(DashboardTables, {

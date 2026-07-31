@@ -222,12 +222,20 @@ export async function saveMonthlyPayrollRows(input: {
     }
   }
 
-  const { data: existingRows, error: existingError } = await supabase
-    .from("employee_salary_payments")
-    .select("id, employee_id")
-    .eq("company_id", input.companyId)
-    .eq("month", month);
+  const [existingRowsResult, employeeRowsResult] = await Promise.all([
+    supabase
+      .from("employee_salary_payments")
+      .select("id, employee_id")
+      .eq("company_id", input.companyId)
+      .eq("month", month),
+    supabase
+      .from("employees")
+      .select("id, default_paid_usd_inr_rate")
+      .eq("company_id", input.companyId),
+  ]);
+  const { data: existingRows, error: existingError } = existingRowsResult;
   if (existingError) throw existingError;
+  if (employeeRowsResult.error) throw employeeRowsResult.error;
 
   const existingIdByEmployeeId = new Map(
     (existingRows ?? []).map((row) => [
@@ -235,36 +243,49 @@ export async function saveMonthlyPayrollRows(input: {
       String((row as { id: string }).id),
     ]),
   );
+  const employeePaidRateById = new Map(
+    (employeeRowsResult.data ?? []).map((row) => [
+      String((row as { id: string }).id),
+      Number((row as { default_paid_usd_inr_rate?: number | null }).default_paid_usd_inr_rate ?? 0),
+    ]),
+  );
 
-  const rows = input.rows.map((row) => ({
-    id: existingIdByEmployeeId.get(row.employeeId) ?? nextPayrollId(),
-    employee_id: row.employeeId,
-    company_id: input.companyId,
-    month,
-    employee_name_snapshot: row.employeeName,
-    paid_usd_inr_rate: row.paidUsdInrRate ?? 0,
-    basic_inr_cents: row.basicInrCents,
-    special_allowance_inr_cents: row.specialAllowanceInrCents,
-    insurance_inr_cents: row.insuranceInrCents,
-    bonus_inr_cents: row.bonusInrCents,
-    monthly_paid_inr_cents: row.monthlyPaidInrCents,
-    days_worked: row.daysWorked,
-    days_in_month: row.daysInMonth,
-    actual_paid_inr_cents: row.actualPaidInrCents,
-    salary_paid_inr_cents: row.salaryPaidInrCents,
-    pf_inr_cents: row.pfInrCents,
-    tds_inr_cents: row.tdsInrCents,
-    paid_status: row.paidStatus ?? false,
-    paid_date: row.paidDate ?? null,
-    status: input.status,
-    verified_at: input.status === "verified" ? timestamp : null,
-    verified_by: input.status === "verified" ? input.actorUserId : null,
-    notes: row.notes || null,
-    override_note: row.overrideNote || null,
-    override_at: row.overrideNote ? timestamp : null,
-    override_by: row.overrideNote ? input.actorUserId : null,
-    updated_at: timestamp,
-  }));
+  const rows = input.rows.map((row) => {
+    const paidUsdInrRate =
+      row.paidUsdInrRate && row.paidUsdInrRate > 0
+        ? row.paidUsdInrRate
+        : employeePaidRateById.get(row.employeeId) ?? 0;
+
+    return {
+      id: existingIdByEmployeeId.get(row.employeeId) ?? nextPayrollId(),
+      employee_id: row.employeeId,
+      company_id: input.companyId,
+      month,
+      employee_name_snapshot: row.employeeName,
+      paid_usd_inr_rate: paidUsdInrRate,
+      basic_inr_cents: row.basicInrCents,
+      special_allowance_inr_cents: row.specialAllowanceInrCents,
+      insurance_inr_cents: row.insuranceInrCents,
+      bonus_inr_cents: row.bonusInrCents,
+      monthly_paid_inr_cents: row.monthlyPaidInrCents,
+      days_worked: row.daysWorked,
+      days_in_month: row.daysInMonth,
+      actual_paid_inr_cents: row.actualPaidInrCents,
+      salary_paid_inr_cents: row.salaryPaidInrCents,
+      pf_inr_cents: row.pfInrCents,
+      tds_inr_cents: row.tdsInrCents,
+      paid_status: row.paidStatus ?? false,
+      paid_date: row.paidDate ?? null,
+      status: input.status,
+      verified_at: input.status === "verified" ? timestamp : null,
+      verified_by: input.status === "verified" ? input.actorUserId : null,
+      notes: row.notes || null,
+      override_note: row.overrideNote || null,
+      override_at: row.overrideNote ? timestamp : null,
+      override_by: row.overrideNote ? input.actorUserId : null,
+      updated_at: timestamp,
+    };
+  });
 
   if (rows.length > 0) {
     const { error } = await supabase.from("employee_salary_payments").upsert(rows, {
@@ -275,9 +296,14 @@ export async function saveMonthlyPayrollRows(input: {
 
   if (input.updateEmployeeMaster) {
     for (const row of input.rows) {
+      const paidUsdInrRate =
+        row.paidUsdInrRate && row.paidUsdInrRate > 0
+          ? row.paidUsdInrRate
+          : employeePaidRateById.get(row.employeeId) ?? 0;
       const { error } = await supabase
         .from("employees")
         .update({
+          ...(paidUsdInrRate > 0 ? { default_paid_usd_inr_rate: paidUsdInrRate } : {}),
           default_actual_paid_inr_cents: row.monthlyPaidInrCents,
           default_basic_inr_cents: row.basicInrCents,
           default_special_allowance_inr_cents: row.specialAllowanceInrCents,

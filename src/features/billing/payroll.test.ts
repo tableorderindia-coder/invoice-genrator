@@ -177,6 +177,39 @@ describe("payroll helpers", () => {
     );
   });
 
+  it("uses the employee master peg rate when a saved salary row has a zero rate", () => {
+    const rows = buildMonthlyPayrollRows({
+      companyId: "company_1",
+      month: "2026-07",
+      employees: [employee({ defaultPaidUsdInrRate: 85 })],
+      payments: [
+        {
+          id: "salary_payment_1",
+          employeeId: "employee_1",
+          companyId: "company_1",
+          month: "2026-07",
+          employeeNameSnapshot: "Jane Snapshot",
+          paidUsdInrRate: 0,
+          basicInrCents: 220_000,
+          specialAllowanceInrCents: 30_000,
+          insuranceInrCents: 10_000,
+          bonusInrCents: 0,
+          monthlyPaidInrCents: 310_000,
+          daysWorked: 31,
+          daysInMonth: 31,
+          actualPaidInrCents: 310_000,
+          salaryPaidInrCents: 260_000,
+          pfInrCents: 20_000,
+          tdsInrCents: 30_000,
+          paidStatus: true,
+          status: "verified",
+        },
+      ],
+    });
+
+    expect(rows[0]?.paidUsdInrRate).toBe(85);
+  });
+
   it("keeps saved payroll rows for inactive employees without creating new inactive rows", () => {
     const rows = buildMonthlyPayrollRows({
       companyId: "company_1",

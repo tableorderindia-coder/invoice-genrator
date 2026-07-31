@@ -128,6 +128,21 @@ describe("billing domain", () => {
     });
   });
 
+  it("treats a zero paid rate as missing and infers it from actual paid", () => {
+    expect(
+      calculateEmployeePayoutMetrics({
+        dollarInwardUsdCents: 606_700,
+        actualPaidInrCents: 57_677_400,
+        receivedUsdInrRate: 95.06,
+        pegUsdInrRate: 0,
+      }),
+    ).toEqual({
+      totalCommissionUsdCents: 606_700,
+      fxCommissionInrCents: -4_498,
+      commissionEarnedInrCents: 0,
+    });
+  });
+
   it("prefers manual line and team totals when present", () => {
     expect(
       resolveEffectiveLineItemTotalUsdCents({

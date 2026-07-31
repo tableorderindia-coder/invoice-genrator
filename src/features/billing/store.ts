@@ -1,8 +1,10 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
+  calculateEmployeePayoutMetrics,
   calculateLineItemTotals,
   createRealizationRecord,
   resolveEffectiveLineItemTotalUsdCents,
+  resolveEffectivePaidUsdInrRate,
   resolveEffectiveTeamTotalUsdCents,
   sortInvoiceLineItemsByRate,
 } from "./domain";
@@ -2403,6 +2405,17 @@ export async function getPnDashboardData(input: {
         row.salary_paid_inr_cents && row.salary_paid_inr_cents > 0
           ? row.salary_paid_inr_cents
           : Math.max(0, row.actual_paid_inr_cents - row.pf_inr_cents - row.tds_inr_cents);
+      const paidUsdInrRate = resolveEffectivePaidUsdInrRate({
+        paidUsdInrRate: row.paid_usd_inr_rate,
+        dollarInwardUsdCents: effectiveDollarInwardUsdCents,
+        actualPaidInrCents: row.actual_paid_inr_cents,
+      });
+      const payoutMetrics = calculateEmployeePayoutMetrics({
+        dollarInwardUsdCents: effectiveDollarInwardUsdCents,
+        actualPaidInrCents: row.actual_paid_inr_cents,
+        receivedUsdInrRate: row.cashout_usd_inr_rate,
+        pegUsdInrRate: paidUsdInrRate,
+      });
 
       return {
         employeeId: row.employee_id,
@@ -2419,14 +2432,14 @@ export async function getPnDashboardData(input: {
         offboardingDeductionUsdCents: Math.abs(row.offboarding_deduction_usd_cents),
         effectiveDollarInwardUsdCents,
         cashoutUsdInrRate: row.cashout_usd_inr_rate,
-        paidUsdInrRate: row.paid_usd_inr_rate,
+        paidUsdInrRate,
         monthlyPaidInrCents,
         pfInrCents: row.pf_inr_cents,
         tdsInrCents: row.tds_inr_cents,
         actualPaidInrCents: row.actual_paid_inr_cents,
-        fxCommissionInrCents: row.fx_commission_inr_cents,
-        totalCommissionUsdCents: row.total_commission_usd_cents,
-        commissionEarnedInrCents: row.commission_earned_inr_cents,
+        fxCommissionInrCents: payoutMetrics.fxCommissionInrCents,
+        totalCommissionUsdCents: payoutMetrics.totalCommissionUsdCents,
+        commissionEarnedInrCents: payoutMetrics.commissionEarnedInrCents,
         cashInInrCents,
         salaryPaidInrCents,
         netProfitInrCents: calculateEmployeeMonthNetInrCents({
@@ -2474,6 +2487,19 @@ export async function getPnDashboardData(input: {
         row.salary_paid_inr_cents && row.salary_paid_inr_cents > 0
           ? row.salary_paid_inr_cents
           : Math.max(0, row.actual_paid_inr_cents - row.pf_inr_cents - row.tds_inr_cents);
+      const paidUsdInrRate = resolveEffectivePaidUsdInrRate({
+        paidUsdInrRate: row.paid_usd_inr_rate,
+        dollarInwardUsdCents: effectiveDollarInwardUsdCents,
+        actualPaidInrCents: row.actual_paid_inr_cents,
+      });
+      const payoutMetrics = calculateEmployeePayoutMetrics({
+        dollarInwardUsdCents: effectiveDollarInwardUsdCents,
+        actualPaidInrCents: row.actual_paid_inr_cents,
+        receivedUsdInrRate: row.cashout_usd_inr_rate,
+        pegUsdInrRate: paidUsdInrRate,
+      });
+      const grossEarningsInrCents =
+        payoutMetrics.fxCommissionInrCents + payoutMetrics.commissionEarnedInrCents;
 
       return {
         rowId: row.id,
@@ -2495,16 +2521,16 @@ export async function getPnDashboardData(input: {
         effectiveDollarInwardUsdCents,
         cashInInrCents,
         cashoutUsdInrRate: row.cashout_usd_inr_rate,
-        paidUsdInrRate: row.paid_usd_inr_rate,
+        paidUsdInrRate,
         monthlyPaidInrCents,
         salaryPaidInrCents,
         pfInrCents: row.pf_inr_cents,
         tdsInrCents: row.tds_inr_cents,
         actualPaidInrCents: row.actual_paid_inr_cents,
-        fxCommissionInrCents: row.fx_commission_inr_cents,
-        totalCommissionUsdCents: row.total_commission_usd_cents,
-        commissionEarnedInrCents: row.commission_earned_inr_cents,
-        grossEarningsInrCents: row.gross_earnings_inr_cents,
+        fxCommissionInrCents: payoutMetrics.fxCommissionInrCents,
+        totalCommissionUsdCents: payoutMetrics.totalCommissionUsdCents,
+        commissionEarnedInrCents: payoutMetrics.commissionEarnedInrCents,
+        grossEarningsInrCents,
         netProfitInrCents: calculateEmployeeMonthNetInrCents({
           cashInInrCents,
           salaryPaidInrCents,

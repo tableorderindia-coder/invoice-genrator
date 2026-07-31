@@ -20,8 +20,8 @@ import { resolveSelectedCompanyIds } from "@/src/features/billing/filter-selecti
 import {
   formatInr,
   formatRate,
+  formatRateInput,
   formatUsd,
-  formatWholeRateInput,
 } from "@/src/features/billing/utils";
 
 export const dynamic = "force-dynamic";
@@ -117,7 +117,7 @@ export default async function EmployeesPage({
                   <input name="billingRateUsd" type="number" min="0" step="0.01" required className={inputClass} placeholder="0.00" />
                 </Field>
                 <Field label="Peg rate">
-                  <input name="defaultPaidUsdInrRate" type="number" min="0" step="1" className={inputClass} placeholder="0" defaultValue="0" />
+                  <input name="defaultPaidUsdInrRate" type="number" min="0" step="0.0001" className={inputClass} placeholder="0" defaultValue="0" />
                 </Field>
                 <Field label="Basic (INR)">
                   <input name="defaultBasicInr" type="number" min="0" step="0.01" className={inputClass} placeholder="0.00" defaultValue="0" />
@@ -211,7 +211,7 @@ export default async function EmployeesPage({
                     <input name="billingRateUsd" type="number" min="0" step="0.01" required className={inputClass} defaultValue={selectedEmployee ? (selectedEmployee.billingRateUsdCents / 100).toFixed(2) : ""} />
                   </Field>
                   <Field label="Peg rate">
-                    <input name="defaultPaidUsdInrRate" type="number" min="0" step="1" className={inputClass} defaultValue={formatWholeRateInput(selectedEmployee?.defaultPaidUsdInrRate)} />
+                    <input name="defaultPaidUsdInrRate" type="number" min="0" step="0.0001" className={inputClass} defaultValue={formatRateInput(selectedEmployee?.defaultPaidUsdInrRate)} />
                   </Field>
                   <Field label="Basic (INR)">
                     <input name="defaultBasicInr" type="number" min="0" step="0.01" className={inputClass} defaultValue={selectedEmployee ? (selectedEmployee.defaultBasicInrCents / 100).toFixed(2) : "0"} />

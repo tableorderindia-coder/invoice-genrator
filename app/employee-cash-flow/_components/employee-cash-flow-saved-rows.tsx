@@ -18,7 +18,6 @@ import {
   formatInr,
   formatRateInput,
   formatUsd,
-  formatWholeRateInput,
 } from "../../../src/features/billing/utils";
 
 function toCurrencyInput(value: number) {
@@ -272,8 +271,8 @@ export default function EmployeeCashFlowSavedRows({
                             <td>
                               <input
                                 type="number"
-                                step="1"
-                                value={formatWholeRateInput(row.paidUsdInrRate)}
+                                step="0.0001"
+                                value={formatRateInput(row.paidUsdInrRate)}
                                 onChange={(event) =>
                                   updateRow(row.id, {
                                     paidUsdInrRate:

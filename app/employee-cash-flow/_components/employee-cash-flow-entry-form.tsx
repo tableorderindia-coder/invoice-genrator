@@ -27,7 +27,6 @@ import {
   formatInr,
   formatRateInput,
   formatUsd,
-  formatWholeRateInput,
 } from "@/src/features/billing/utils";
 
 type AvailableEmployee = {
@@ -609,8 +608,8 @@ export default function EmployeeCashFlowEntryForm({
                   </span>
                   <input
                     type="number"
-                    step="1"
-                    value={formatWholeRateInput(entry.paidUsdInrRate)}
+                    step="0.0001"
+                    value={formatRateInput(entry.paidUsdInrRate)}
                     onChange={(event) =>
                       updateEntry(entry.id, {
                         paidUsdInrRate: Number.parseFloat(event.target.value || "0") || 0,

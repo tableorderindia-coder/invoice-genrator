@@ -224,11 +224,15 @@ function withSalaryPaymentDefaults<
 >(entry: TEntry, salaryPayment?: DbMonthlySalaryPayment) {
   if (!salaryPayment) return entry;
 
+  const paidUsdInrRate =
+    salaryPayment.paid_usd_inr_rate && salaryPayment.paid_usd_inr_rate > 0
+      ? Number(salaryPayment.paid_usd_inr_rate)
+      : entry.paidUsdInrRate;
   const next = {
     ...entry,
     daysWorked: Number(salaryPayment.days_worked ?? entry.daysWorked),
     daysInMonth: Number(salaryPayment.days_in_month ?? entry.daysInMonth),
-    paidUsdInrRate: Number(salaryPayment.paid_usd_inr_rate ?? entry.paidUsdInrRate),
+    paidUsdInrRate,
     monthlyPaidInrCents: Number(
       salaryPayment.monthly_paid_inr_cents ?? entry.monthlyPaidInrCents,
     ),
