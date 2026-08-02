@@ -902,8 +902,12 @@ export async function updateInvoiceStatusAction(formData: FormData) {
 
   try {
     const status = getString(formData, "status") as InvoiceStatus;
+    const companyId = await getInvoiceCompanyId(invoiceId);
     await updateInvoiceStatus(invoiceId, status);
     await refreshPnSummariesForInvoice(invoiceId);
+    if (companyId) {
+      await invalidateBillingCaches({ type: "invoice", companyId });
+    }
 
     revalidatePath(`/invoices/${invoiceId}`);
     revalidatePath(`/invoices/drafts/${invoiceId}`);
@@ -972,8 +976,12 @@ export async function cashOutInvoiceAction(formData: FormData) {
     );
 
     const realizedAt = todayDateIso();
+    const companyId = await getInvoiceCompanyId(invoiceId);
     await cashOutInvoice(invoiceId, realizedAt, dollarInboundUsdCents, usdInrRate);
     await refreshPnSummariesForInvoice(invoiceId);
+    if (companyId) {
+      await invalidateBillingCaches({ type: "invoice", companyId });
+    }
 
     revalidatePath(`/invoices/${invoiceId}`);
     revalidatePath(`/invoices/drafts/${invoiceId}`);
