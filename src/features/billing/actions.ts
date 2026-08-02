@@ -258,6 +258,7 @@ export async function updateCompanyAction(formData: FormData) {
 
 export async function createEmployeeAction(formData: FormData) {
   await requirePageEditAccess('employees');
+  const returnTo = getString(formData, "returnTo") || "/employees";
   const companyId = getString(formData, "companyId");
   const defaultBasicInrCents = getNonNegativeCentsOrThrow(
     getString(formData, "defaultBasicInr"),
@@ -318,11 +319,12 @@ export async function createEmployeeAction(formData: FormData) {
   await invalidateBillingCaches({ type: "employee", companyId });
   revalidatePath("/");
   revalidatePath("/employees");
-  redirect("/employees");
+  redirect(returnTo);
 }
 
 export async function updateEmployeeAction(formData: FormData) {
   await requirePageEditAccess('employees');
+  const returnTo = getString(formData, "returnTo") || "/employees";
   const companyId = getString(formData, "companyId");
   const defaultBasicInrCents = getNonNegativeCentsOrThrow(
     getString(formData, "defaultBasicInr"),
@@ -388,7 +390,7 @@ export async function updateEmployeeAction(formData: FormData) {
   revalidatePath("/salary");
   revalidatePath("/dashboard");
   revalidatePath("/employee-statements");
-  redirect("/employees");
+  redirect(returnTo);
 }
 
 export async function createInvoiceDraftAction(formData: FormData) {

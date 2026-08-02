@@ -64,6 +64,9 @@ export default async function EmployeesPage({
     .join("&");
   const addHref = companyQuery ? `/employees?tab=add&${companyQuery}` : "/employees?tab=add";
   const editHref = companyQuery ? `/employees?tab=edit&${companyQuery}` : "/employees?tab=edit";
+  const editReturnTo = selectedEmployee
+    ? `${editHref}&employeeId=${encodeURIComponent(selectedEmployee.id)}`
+    : editHref;
   const canCreateEmployee = selectedCompanyIds.length === 1;
 
   return (
@@ -86,6 +89,7 @@ export default async function EmployeesPage({
 
           {activeTab === "add" ? (
             <form action={createEmployeeAction} data-unsaved-form>
+              <input type="hidden" name="returnTo" value={addHref} />
               <h2 className="mt-4 text-xl font-semibold" style={{ color: "var(--text-primary)" }}>
                 Add employee
               </h2>
@@ -183,6 +187,7 @@ export default async function EmployeesPage({
                 </AutoApplyFilterForm>
               </div>
               <form action={updateEmployeeAction} data-unsaved-form>
+                <input type="hidden" name="returnTo" value={editReturnTo} />
                 {selectedEmployee ? <input type="hidden" name="employeeId" value={selectedEmployee.id} /> : null}
                 {selectedEmployee ? <input type="hidden" name="companyId" value={selectedEmployee.companyId} /> : null}
                 <div className="mt-5 grid gap-4 md:grid-cols-2">
