@@ -324,7 +324,7 @@ export async function createEmployeeAction(formData: FormData) {
 
 export async function updateEmployeeAction(formData: FormData) {
   await requirePageEditAccess('employees');
-  const returnTo = getString(formData, "returnTo") || "/employees";
+  let returnTo = getString(formData, "returnTo") || "/employees";
   const companyId = getString(formData, "companyId");
   const defaultBasicInrCents = getNonNegativeCentsOrThrow(
     getString(formData, "defaultBasicInr"),
@@ -390,6 +390,7 @@ export async function updateEmployeeAction(formData: FormData) {
   revalidatePath("/salary");
   revalidatePath("/dashboard");
   revalidatePath("/employee-statements");
+  returnTo = buildFlashRedirect(returnTo, "success", "Employee updated.");
   redirect(returnTo);
 }
 
