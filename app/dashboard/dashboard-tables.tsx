@@ -1,14 +1,17 @@
 "use client";
 
-import type { ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { PendingActionButton } from "../_components/pending-action-button";
 import { inputClass } from "../_components/field";
 import {
   buildEmployeeSectionTotals,
   buildPeriodTotals,
 } from "../../src/features/billing/dashboard-table-totals";
-import { calculatePnPeriodNetPlInrCents } from "../../src/features/billing/pn-dashboard";
+import {
+  calculatePnEmployeeAdvanceInrCents,
+  calculatePnEmployeeNetPlInrCents,
+  calculatePnPeriodNetPlInrCents,
+} from "../../src/features/billing/pn-dashboard";
 import type {
   PnDashboardData,
   PnEmployeeEditableRow,
@@ -24,6 +27,14 @@ import {
   formatUsd,
 } from "../../src/features/billing/utils";
 import { getVisibleToggleColumns } from "../../src/features/billing/dashboard-column-visibility";
+import { buildDashboardExportHref } from "../../src/features/billing/dashboard-export-options";
+
+type DashboardExportHrefs = {
+  tableCsv: string;
+  tablePdf: string;
+  companyCsv: string;
+  companyPdf: string;
+};
 
 type DashboardTablesProps = {
   view: "employee" | "period";
@@ -32,6 +43,7 @@ type DashboardTablesProps = {
   returnTo: string;
   employeeColumnKeys: string[];
   periodColumnKeys: string[];
+  exportHrefs?: DashboardExportHrefs;
   updateDashboardEmployeeCashFlowEntryAction: (formData: FormData) => Promise<void>;
 };
 
@@ -57,61 +69,89 @@ export function DashboardTables({
   returnTo,
   employeeColumnKeys,
   periodColumnKeys,
+  exportHrefs,
   updateDashboardEmployeeCashFlowEntryAction,
 }: DashboardTablesProps) {
-  const [showDetails, setShowDetails] = useState(() => {
-    if (typeof window === "undefined") return false;
-    const saved = localStorage.getItem("dashboardShowDetails");
-    if (!saved) return false;
-    try {
-      return JSON.parse(saved);
-    } catch {
-      return false;
-    }
-  });
-
-  useEffect(() => {
-    window.localStorage.setItem("dashboardShowDetails", JSON.stringify(showDetails));
-  }, [showDetails]);
-
-  const toggleColumns = useMemo(
-    () => getVisibleToggleColumns(showDetails),
-    [showDetails],
+  const [includeExpenses, setIncludeExpenses] = useStoredBoolean(
+    "dashboardIncludeExpenses",
   );
-
-  const toggleButton = (
-    <button
-      type="button"
-      onClick={() => setShowDetails((prev: boolean) => !prev)}
-      className="btn-outline"
-      title="Toggle Details"
-    >
-      {showDetails ? "🙈 Hide details" : "👁 Show details"}
-    </button>
+  const [includeAdvances, setIncludeAdvances] = useStoredBoolean(
+    "dashboardIncludeAdvances",
   );
+  const [includeReimbursements, setIncludeReimbursements] = useStoredBoolean(
+    "dashboardIncludeReimbursements",
+  );
+  const toggleColumns = getVisibleToggleColumns(true);
 
-  if (view === "employee") {
-    return (
+  const table =
+    view === "employee" ? (
       <EmployeeTables
         data={data}
         returnTo={returnTo}
         selectedColumnKeys={employeeColumnKeys}
         toggleColumns={toggleColumns}
-        toggleButton={toggleButton}
+        includeAdvances={includeAdvances}
+        setIncludeAdvances={setIncludeAdvances}
         updateDashboardEmployeeCashFlowEntryAction={updateDashboardEmployeeCashFlowEntryAction}
       />
+    ) : (
+      <PeriodTables
+        data={data}
+        periodType={periodType}
+        selectedColumnKeys={periodColumnKeys}
+        toggleColumns={toggleColumns}
+        includeExpenses={includeExpenses}
+        setIncludeExpenses={setIncludeExpenses}
+        includeAdvances={includeAdvances}
+        setIncludeAdvances={setIncludeAdvances}
+        includeReimbursements={includeReimbursements}
+        setIncludeReimbursements={setIncludeReimbursements}
+      />
     );
-  }
+
+  const exportOptions = {
+    includeExpenses,
+    includeAdvances,
+    includeReimbursements,
+  };
 
   return (
-    <PeriodTables
-      data={data}
-      periodType={periodType}
-      selectedColumnKeys={periodColumnKeys}
-      toggleColumns={toggleColumns}
-      toggleButton={toggleButton}
-    />
+    <div className="space-y-4">
+      {exportHrefs ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <a className="btn-outline" href={buildDashboardExportHref(exportHrefs.tableCsv, exportOptions)}>
+            Export CSV
+          </a>
+          <a className="btn-outline" href={buildDashboardExportHref(exportHrefs.tablePdf, exportOptions)}>
+            Export PDF
+          </a>
+        </div>
+      ) : null}
+      {table}
+    </div>
   );
+}
+
+function useStoredBoolean(key: string) {
+  const [value, setValue] = useState(true);
+  const [storageLoaded, setStorageLoaded] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem(key);
+    try {
+      setValue(saved === null ? true : Boolean(JSON.parse(saved)));
+    } catch {
+      setValue(true);
+    }
+    setStorageLoaded(true);
+  }, [key]);
+
+  useEffect(() => {
+    if (!storageLoaded) return;
+    localStorage.setItem(key, JSON.stringify(value));
+  }, [key, storageLoaded, value]);
+
+  return [value, setValue] as const;
 }
 
 type ToggleColumn = ReturnType<typeof getVisibleToggleColumns>[number];
@@ -128,12 +168,42 @@ function netProfitColor(cents: number) {
   return "var(--text-primary)";
 }
 
+function accountingCheckboxHeader(input: {
+  label: string;
+  ariaLabel: string;
+  checked: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <div className="flex flex-col items-start gap-1">
+      <label
+        className="flex cursor-pointer select-none items-center gap-1.5"
+        style={{
+          fontSize: "0.65rem",
+          color: input.checked ? "#6ee7b7" : "var(--text-muted)",
+        }}
+      >
+        <input
+          type="checkbox"
+          aria-label={input.ariaLabel}
+          checked={input.checked}
+          onChange={(event) => input.onChange(event.target.checked)}
+          style={{ accentColor: "var(--accent-1)", width: 13, height: 13 }}
+        />
+        In P/L
+      </label>
+      <span>{input.label}</span>
+    </div>
+  );
+}
+
 type EmployeeTablesProps = {
   data: PnDashboardData;
   returnTo: string;
   selectedColumnKeys: string[];
   toggleColumns: ToggleColumn[];
-  toggleButton: ReactNode;
+  includeAdvances: boolean;
+  setIncludeAdvances: (value: boolean) => void;
   updateDashboardEmployeeCashFlowEntryAction: (formData: FormData) => Promise<void>;
 };
 
@@ -142,11 +212,30 @@ function EmployeeTables({
   returnTo,
   selectedColumnKeys,
   toggleColumns,
-  toggleButton,
+  includeAdvances,
+  setIncludeAdvances,
   updateDashboardEmployeeCashFlowEntryAction,
 }: EmployeeTablesProps) {
   const renderToggleCell = (key: ToggleColumn["key"], row: PnEmployeeEditableRow) => {
     const formId = `dashboard-payout-${row.payoutId}`;
+    if (row.isSalaryOnly) {
+      switch (key) {
+        case "dollarInward":
+          return formatUsd(row.dollarInwardUsdCents);
+        case "onboardingAdvance":
+          return formatUsd(row.onboardingAdvanceUsdCents);
+        case "reimbursements":
+          return formatUsd(row.reimbursementUsdCents);
+        case "reimbursementLabels":
+          return row.reimbursementLabelsText || "-";
+        case "appraisalAdvance":
+          return formatUsd(row.appraisalAdvanceUsdCents);
+        case "offboardingDeduction":
+          return formatUsd(row.offboardingDeductionUsdCents);
+        case "effectiveDollarInward":
+          return formatUsd(row.effectiveDollarInwardUsdCents);
+      }
+    }
     switch (key) {
       case "dollarInward":
         return (
@@ -274,43 +363,27 @@ function EmployeeTables({
     {
       key: "daysWorked",
       label: "Days worked",
-      render: (row) => (
-        <>
-          <form
-            id={`dashboard-payout-${row.payoutId}`}
-            action={updateDashboardEmployeeCashFlowEntryAction}
-          ></form>
+      render: (row) => row.isSalaryOnly ? (
+        <span>{row.daysWorked} / {row.daysInMonth}</span>
+      ) : (
+        <div className="flex items-center gap-2">
           <input
-            type="hidden"
             form={`dashboard-payout-${row.payoutId}`}
-            name="payoutId"
-            value={row.payoutId}
+            type="number"
+            name="daysWorked"
+            min="1"
+            step="1"
+            defaultValue={row.daysWorked}
+            className={inputClass}
+            style={{
+              minWidth: "6rem",
+              border: "1px solid var(--glass-border)",
+              background: "rgba(255,255,255,0.04)",
+              color: "var(--text-primary)",
+            }}
           />
-          <input
-            type="hidden"
-            form={`dashboard-payout-${row.payoutId}`}
-            name="returnTo"
-            value={returnTo}
-          />
-          <div className="flex items-center gap-2">
-            <input
-              form={`dashboard-payout-${row.payoutId}`}
-              type="number"
-              name="daysWorked"
-              min="1"
-              step="1"
-              defaultValue={row.daysWorked}
-              className={inputClass}
-              style={{
-                minWidth: "6rem",
-                border: "1px solid var(--glass-border)",
-                background: "rgba(255,255,255,0.04)",
-                color: "var(--text-primary)",
-              }}
-            />
-            <span style={{ color: "var(--text-muted)" }}>/ {row.daysInMonth}</span>
-          </div>
-        </>
+          <span style={{ color: "var(--text-muted)" }}>/ {row.daysInMonth}</span>
+        </div>
       ),
     },
   ];
@@ -318,8 +391,10 @@ function EmployeeTables({
   const employeeSuffixColumns: Column<PnEmployeeEditableRow>[] = [
     {
       key: "cashoutRate",
-      label: "Received / exchanged rate",
-      render: (row) => (
+      label: "Cashout rate",
+      render: (row) => row.isSalaryOnly ? (
+        <span style={{ color: "var(--text-muted)" }}>-</span>
+      ) : (
         <input
           form={`dashboard-payout-${row.payoutId}`}
           type="number"
@@ -346,7 +421,9 @@ function EmployeeTables({
       key: "paidRate",
       label: "Peg rate",
       render: (row) =>
-        row.isSecurityDepositMonth ? (
+        row.isSalaryOnly ? (
+          formatRate(row.paidUsdInrRate)
+        ) : row.isSecurityDepositMonth ? (
           <>
             <input
               type="hidden"
@@ -382,7 +459,9 @@ function EmployeeTables({
     {
       key: "actualPaid",
       label: "Actual paid (INR)",
-      render: (row) => (
+      render: (row) => row.isSalaryOnly ? (
+        formatInr(row.actualPaidInrCents)
+      ) : (
         <input
           form={`dashboard-payout-${row.payoutId}`}
           type="number"
@@ -401,9 +480,16 @@ function EmployeeTables({
       ),
     },
     {
+      key: "salaryPaid",
+      label: "Salary paid (INR)",
+      render: (row) => formatInr(row.salaryPaidInrCents),
+    },
+    {
       key: "pf",
       label: "PF (INR)",
-      render: (row) => (
+      render: (row) => row.isSalaryOnly ? (
+        formatInr(row.pfInrCents)
+      ) : (
         <input
           form={`dashboard-payout-${row.payoutId}`}
           type="number"
@@ -424,7 +510,9 @@ function EmployeeTables({
     {
       key: "tds",
       label: "TDS (INR)",
-      render: (row) => (
+      render: (row) => row.isSalaryOnly ? (
+        formatInr(row.tdsInrCents)
+      ) : (
         <input
           form={`dashboard-payout-${row.payoutId}`}
           type="number"
@@ -443,11 +531,6 @@ function EmployeeTables({
       ),
     },
     {
-      key: "salaryPaid",
-      label: "Salary paid (INR)",
-      render: (row) => formatInr(row.salaryPaidInrCents),
-    },
-    {
       key: "fxCommission",
       label: "Forex gain (INR)",
       render: (row) => formatInr(row.fxCommissionInrCents),
@@ -459,28 +542,103 @@ function EmployeeTables({
     },
     {
       key: "grossEarnings",
-      label: "Total earning (INR)",
+      label: "Gross P&L (INR)",
       render: (row) => formatInr(row.grossEarningsInrCents),
     },
     {
+      key: "advances",
+      label: "__custom_advances__",
+      render: (row) => formatInr(calculatePnEmployeeAdvanceInrCents(row)),
+    },
+    {
       key: "netProfit",
-      label: "Net Profit (INR)",
-      render: (row) => (
-        <span style={{ color: netProfitColor(row.netProfitInrCents) }}>
-          {formatSignedInr(row.netProfitInrCents)}
-        </span>
-      ),
+      label: "Net P/L (INR)",
+      render: (row) => {
+        const netPl = calculatePnEmployeeNetPlInrCents(row, { includeAdvances });
+        return (
+          <span style={{ color: netProfitColor(netPl) }}>
+            {formatSignedInr(netPl)}
+          </span>
+        );
+      },
     },
     {
       key: "actions",
       label: "Actions",
-      render: (row) => (
-        <PendingActionButton
-          form={`dashboard-payout-${row.payoutId}`}
-          className="btn-outline"
-          defaultText="Update"
-          pendingText="Updating..."
-        />
+      render: (row) => row.isSalaryOnly ? (
+        <span style={{ color: "var(--text-muted)" }}>Salary only</span>
+      ) : (
+        <>
+          <form
+            id={`dashboard-payout-${row.payoutId}`}
+            action={updateDashboardEmployeeCashFlowEntryAction}
+          >
+            <input type="hidden" name="payoutId" value={row.payoutId} />
+            <input type="hidden" name="returnTo" value={returnTo} />
+            <input type="hidden" name="daysWorked" value={row.daysWorked} />
+            <input
+              type="hidden"
+              name="dollarInwardUsd"
+              value={(row.dollarInwardUsdCents / 100).toFixed(2)}
+            />
+            <input
+              type="hidden"
+              name="onboardingAdvanceUsd"
+              value={(row.onboardingAdvanceUsdCents / 100).toFixed(2)}
+            />
+            <input
+              type="hidden"
+              name="reimbursementUsd"
+              value={(row.reimbursementUsdCents / 100).toFixed(2)}
+            />
+            <input
+              type="hidden"
+              name="reimbursementLabelsText"
+              value={row.reimbursementLabelsText}
+            />
+            <input
+              type="hidden"
+              name="appraisalAdvanceUsd"
+              value={(row.appraisalAdvanceUsdCents / 100).toFixed(2)}
+            />
+            <input
+              type="hidden"
+              name="offboardingDeductionUsd"
+              value={(row.offboardingDeductionUsdCents / 100).toFixed(2)}
+            />
+            <input
+              type="hidden"
+              name="cashoutUsdInrRate"
+              value={formatRateInput(row.cashoutUsdInrRate)}
+            />
+            <input
+              type="hidden"
+              name="paidUsdInrRate"
+              value={formatRateInput(row.paidUsdInrRate)}
+            />
+            <input
+              type="hidden"
+              name="pfInr"
+              value={(row.pfInrCents / 100).toFixed(2)}
+            />
+            <input
+              type="hidden"
+              name="tdsInr"
+              value={(row.tdsInrCents / 100).toFixed(2)}
+            />
+            <input
+              type="hidden"
+              name="actualPaidInr"
+              value={(row.actualPaidInrCents / 100).toFixed(2)}
+            />
+          </form>
+          <PendingActionButton
+            form={`dashboard-payout-${row.payoutId}`}
+            className="btn-outline"
+            defaultText="Update"
+            pendingText="Updating..."
+          />
+        </>
       ),
     },
   ];
@@ -549,12 +707,18 @@ function EmployeeTables({
         return formatInr(totals.commissionEarnedInrCents);
       case "grossEarnings":
         return formatInr(totals.grossEarningsInrCents);
-      case "netProfit":
+      case "advances":
+        return formatInr(totals.advancesInrCents);
+      case "netProfit": {
+        const netPl = includeAdvances
+          ? totals.netPlInrCents
+          : totals.netPlBeforeAdvancesInrCents;
         return (
-          <span style={{ color: netProfitColor(totals.netProfitInrCents) }}>
-            {formatSignedInr(totals.netProfitInrCents)}
+          <span style={{ color: netProfitColor(netPl) }}>
+            {formatSignedInr(netPl)}
           </span>
         );
+      }
       case "actions":
         return "";
       default:
@@ -562,9 +726,30 @@ function EmployeeTables({
     }
   };
 
+  const renderEmployeeHeader = (column: Column<PnEmployeeEditableRow>) =>
+    column.key === "advances"
+      ? accountingCheckboxHeader({
+          label: "Advances (INR)",
+          ariaLabel: "Include advances in Net P/L",
+          checked: includeAdvances,
+          onChange: setIncludeAdvances,
+        })
+      : column.label;
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-end">{toggleButton}</div>
+      <div className="flex items-center gap-1.5 text-xs" style={{ color: "var(--text-muted)" }}>
+        <span
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: "50%",
+            background: includeAdvances ? "#6ee7b7" : "#fca5a5",
+            display: "inline-block",
+          }}
+        />
+        Advances: {includeAdvances ? "in P/L" : "excluded"}
+      </div>
       {data.employeeEditableSections.map((section) => (
         <div
           key={section.employeeId}
@@ -585,7 +770,7 @@ function EmployeeTables({
               <thead>
                 <tr>
                   {columns.map((column) => (
-                    <th key={column.key}>{column.label}</th>
+                    <th key={column.key}>{renderEmployeeHeader(column)}</th>
                   ))}
                 </tr>
               </thead>
@@ -630,7 +815,12 @@ type PeriodTablesProps = {
   periodType: PnPeriodType;
   selectedColumnKeys: string[];
   toggleColumns: ToggleColumn[];
-  toggleButton: ReactNode;
+  includeExpenses: boolean;
+  setIncludeExpenses: (value: boolean) => void;
+  includeAdvances: boolean;
+  setIncludeAdvances: (value: boolean) => void;
+  includeReimbursements: boolean;
+  setIncludeReimbursements: (value: boolean) => void;
 };
 
 function PeriodTables({
@@ -638,44 +828,17 @@ function PeriodTables({
   periodType,
   selectedColumnKeys,
   toggleColumns,
-  toggleButton,
+  includeExpenses,
+  setIncludeExpenses,
+  includeAdvances,
+  setIncludeAdvances,
+  includeReimbursements,
+  setIncludeReimbursements,
 }: PeriodTablesProps) {
-  const [includeExpenses, setIncludeExpenses] = useState(() => {
-    if (typeof window === "undefined") return true;
-    const saved = localStorage.getItem("dashboardIncludeExpenses");
-    if (saved === null) return true;
-    try {
-      return JSON.parse(saved);
-    } catch {
-      return true;
-    }
-  });
-  const [includeReimbursements, setIncludeReimbursements] = useState(() => {
-    if (typeof window === "undefined") return true;
-    const saved = localStorage.getItem("dashboardIncludeReimbursements");
-    if (saved === null) return true;
-    try {
-      return JSON.parse(saved);
-    } catch {
-      return true;
-    }
-  });
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("dashboardIncludeExpenses", JSON.stringify(includeExpenses));
-    }
-  }, [includeExpenses]);
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("dashboardIncludeReimbursements", JSON.stringify(includeReimbursements));
-    }
-  }, [includeReimbursements]);
-
-  // Compute dynamic Net P/L for each row
   const computeNetPl = (row: PnPeriodRow) => {
     return calculatePnPeriodNetPlInrCents(row, {
       includeExpenses,
+      includeAdvances,
       includeReimbursements,
     });
   };
@@ -717,26 +880,10 @@ function PeriodTables({
     },
   ];
 
-  // Checkbox header label helper
-  const checkboxHeader = (label: string, checked: boolean, onChange: (v: boolean) => void) => (
-    <div className="flex flex-col items-start gap-1">
-      <label className="flex items-center gap-1.5 cursor-pointer select-none" style={{ fontSize: "0.65rem", color: checked ? "#6ee7b7" : "var(--text-muted)" }}>
-        <input
-          type="checkbox"
-          checked={checked}
-          onChange={(e) => onChange(e.target.checked)}
-          style={{ accentColor: "var(--accent-1)", width: 13, height: 13 }}
-        />
-        In P/L
-      </label>
-      <span>{label}</span>
-    </div>
-  );
-
   const periodSuffixColumns: Column<PnPeriodRow>[] = [
     {
       key: "cashoutRate",
-      label: "Received / exchanged rate",
+      label: "Cashout rate",
       render: (row) => formatRate(row.cashoutUsdInrRate),
     },
     {
@@ -760,6 +907,11 @@ function PeriodTables({
       render: (row) => formatInr(row.actualPaidInrCents),
     },
     {
+      key: "salaryPaid",
+      label: "Salary paid (INR)",
+      render: (row) => formatInr(row.salaryPaidInrCents),
+    },
+    {
       key: "pf",
       label: "PF (INR)",
       render: (row) => formatInr(row.pfInrCents),
@@ -768,11 +920,6 @@ function PeriodTables({
       key: "tds",
       label: "TDS (INR)",
       render: (row) => formatInr(row.tdsInrCents),
-    },
-    {
-      key: "salaryPaid",
-      label: "Salary paid (INR)",
-      render: (row) => formatInr(row.salaryPaidInrCents),
     },
     {
       key: "fxCommission",
@@ -786,7 +933,7 @@ function PeriodTables({
     },
     {
       key: "grossEarnings",
-      label: "Total earning (INR)",
+      label: "Gross P&L (INR)",
       render: (row) => formatInr(row.grossEarningsInrCents),
     },
   ];
@@ -799,6 +946,15 @@ function PeriodTables({
       render: (row) => (
         <span style={{ color: row.expensesInrCents > 0 ? "#fca5a5" : "var(--text-primary)" }}>
           {formatInr(row.expensesInrCents)}
+        </span>
+      ),
+    },
+    {
+      key: "advances",
+      label: "__custom_advances__",
+      render: (row) => (
+        <span style={{ color: row.advancesInrCents > 0 ? "#fca5a5" : "var(--text-primary)" }}>
+          {formatInr(row.advancesInrCents)}
         </span>
       ),
     },
@@ -848,6 +1004,7 @@ function PeriodTables({
 
   const periodTotals = buildPeriodTotals(data.periodRows, {
     includeExpenses,
+    includeAdvances,
     includeReimbursements,
   });
 
@@ -900,6 +1057,8 @@ function PeriodTables({
         return formatInr(totals.grossEarningsInrCents);
       case "expenses":
         return formatInr(totals.expensesInrCents);
+      case "advances":
+        return formatInr(totals.advancesInrCents);
       case "companyReimbursementUsd":
         return formatUsd(totals.companyReimbursementUsdCents);
       case "companyReimbursementInr":
@@ -918,13 +1077,36 @@ function PeriodTables({
   // Custom header rendering to inject checkboxes
   const renderHeader = (column: Column<PnPeriodRow>) => {
     if (column.key === "expenses") {
-      return checkboxHeader("Expenses (INR)", includeExpenses, setIncludeExpenses);
+      return accountingCheckboxHeader({
+        label: "Expenses (INR)",
+        ariaLabel: "Include expenses in Net P/L",
+        checked: includeExpenses,
+        onChange: setIncludeExpenses,
+      });
+    }
+    if (column.key === "advances") {
+      return accountingCheckboxHeader({
+        label: "Advances (INR)",
+        ariaLabel: "Include advances in Net P/L",
+        checked: includeAdvances,
+        onChange: setIncludeAdvances,
+      });
     }
     if (column.key === "companyReimbursementUsd") {
-      return checkboxHeader("Reimb. (USD)", includeReimbursements, setIncludeReimbursements);
+      return accountingCheckboxHeader({
+        label: "Reimb. (USD)",
+        ariaLabel: "Include reimbursements in Net P/L",
+        checked: includeReimbursements,
+        onChange: setIncludeReimbursements,
+      });
     }
     if (column.key === "companyReimbursementInr") {
-      return checkboxHeader("Reimb. (INR)", includeReimbursements, setIncludeReimbursements);
+      return accountingCheckboxHeader({
+        label: "Reimb. (INR)",
+        ariaLabel: "Include reimbursements in Net P/L",
+        checked: includeReimbursements,
+        onChange: setIncludeReimbursements,
+      });
     }
     return column.label;
   };
@@ -938,11 +1120,14 @@ function PeriodTables({
             Expenses: {includeExpenses ? "in P/L" : "excluded"}
           </span>
           <span className="flex items-center gap-1.5">
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: includeAdvances ? "#6ee7b7" : "#fca5a5", display: "inline-block" }} />
+            Advances: {includeAdvances ? "in P/L" : "excluded"}
+          </span>
+          <span className="flex items-center gap-1.5">
             <span style={{ width: 8, height: 8, borderRadius: "50%", background: includeReimbursements ? "#6ee7b7" : "#fca5a5", display: "inline-block" }} />
             Reimbursements: {includeReimbursements ? "in P/L" : "excluded"}
           </span>
         </div>
-        {toggleButton}
       </div>
       <div
         className="overflow-x-auto rounded-2xl"

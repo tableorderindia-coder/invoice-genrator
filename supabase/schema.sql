@@ -11,6 +11,7 @@ create table if not exists public.profiles (
   email text not null unique,
   role text not null check (role in ('admin', 'user')) default 'user',
   must_change_password boolean not null default true,
+  overview_exclude_onboarding_advance_from_net_pl boolean not null default false,
   created_at timestamptz not null default timezone('utc', now())
 );
 

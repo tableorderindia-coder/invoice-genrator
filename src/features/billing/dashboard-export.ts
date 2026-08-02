@@ -4,6 +4,10 @@ import {
   buildEmployeeSectionTotals,
   buildPeriodTotals,
 } from "./dashboard-table-totals";
+import {
+  calculatePnEmployeeAdvanceInrCents,
+  calculatePnEmployeeNetPlInrCents,
+} from "./pn-dashboard";
 import { drawPdfTable, splitWidePdfTable } from "./pdf-table";
 import type { OverviewPnlSummaryRow } from "./overview-pnl-summary";
 import type {
@@ -45,7 +49,11 @@ function periodLabel(row: PnPeriodRow, periodType: PnPeriodType) {
   return formatMonthYear(row.month ?? 1, row.year);
 }
 
-function employeeRow(employeeName: string, row: PnEmployeeEditableRow) {
+function employeeRow(
+  employeeName: string,
+  row: PnEmployeeEditableRow,
+  options: { includeAdvances: boolean },
+) {
   return [
     employeeName,
     formatMonthYear(row.month, row.year),
@@ -72,11 +80,16 @@ function employeeRow(employeeName: string, row: PnEmployeeEditableRow) {
     formatUsd(row.totalCommissionUsdCents),
     formatInr(row.commissionEarnedInrCents),
     formatInr(row.grossEarningsInrCents),
-    formatSignedInr(row.netProfitInrCents),
+    formatInr(calculatePnEmployeeAdvanceInrCents(row)),
+    formatSignedInr(calculatePnEmployeeNetPlInrCents(row, options)),
   ];
 }
 
-function employeeTotalRow(employeeName: string, rows: PnEmployeeEditableRow[]) {
+function employeeTotalRow(
+  employeeName: string,
+  rows: PnEmployeeEditableRow[],
+  options: { includeAdvances: boolean },
+) {
   const totals = buildEmployeeSectionTotals(rows);
   return [
     employeeName,
@@ -104,11 +117,19 @@ function employeeTotalRow(employeeName: string, rows: PnEmployeeEditableRow[]) {
     formatUsd(totals.totalCommissionUsdCents),
     formatInr(totals.commissionEarnedInrCents),
     formatInr(totals.grossEarningsInrCents),
-    formatSignedInr(totals.netProfitInrCents),
+    formatInr(totals.advancesInrCents),
+    formatSignedInr(
+      options.includeAdvances
+        ? totals.netPlInrCents
+        : totals.netPlBeforeAdvancesInrCents,
+    ),
   ];
 }
 
-export function buildDashboardEmployeeTable(data: PnDashboardData): CsvTable {
+export function buildDashboardEmployeeTable(
+  data: PnDashboardData,
+  options: { includeAdvances: boolean } = { includeAdvances: true },
+): CsvTable {
   const headers = [
     "Employee",
     "Month",
@@ -134,24 +155,32 @@ export function buildDashboardEmployeeTable(data: PnDashboardData): CsvTable {
     "Forex gain INR",
     "Total commission USD",
     "Operating margin INR",
-    "Total earning INR",
-    "Net Profit INR",
+    "Gross P&L INR",
+    "Advances INR",
+    "Net P/L INR",
   ];
   const rows = data.employeeEditableSections.flatMap((section) => [
-    ...section.rows.map((row) => employeeRow(section.employeeName, row)),
-    employeeTotalRow("Totals", section.rows),
+    ...section.rows.map((row) => employeeRow(section.employeeName, row, options)),
+    employeeTotalRow("Totals", section.rows, options),
   ]);
   return { headers, rows };
 }
 
-export function buildDashboardEmployeeCsv(data: PnDashboardData) {
-  return csvFromTable(buildDashboardEmployeeTable(data));
+export function buildDashboardEmployeeCsv(
+  data: PnDashboardData,
+  options: { includeAdvances: boolean } = { includeAdvances: true },
+) {
+  return csvFromTable(buildDashboardEmployeeTable(data, options));
 }
 
 export function buildDashboardPeriodTable(
   data: PnDashboardData,
   periodType: PnPeriodType,
-  options: { includeExpenses: boolean; includeReimbursements: boolean },
+  options: {
+    includeExpenses: boolean;
+    includeAdvances: boolean;
+    includeReimbursements: boolean;
+  },
 ): CsvTable {
   const headers = [
     "Period",
@@ -175,8 +204,9 @@ export function buildDashboardPeriodTable(
     "Forex gain INR",
     "Total commission USD",
     "Operating margin INR",
-    "Total earning INR",
+    "Gross P&L INR",
     "Expenses INR",
+    "Advances INR",
     "Company reimbursements USD",
     "Company reimbursements INR",
     "Net P/L INR",
@@ -205,6 +235,7 @@ export function buildDashboardPeriodTable(
     formatInr(row.commissionEarnedInrCents),
     formatInr(row.grossEarningsInrCents),
     formatInr(row.expensesInrCents),
+    formatInr(row.advancesInrCents),
     formatUsd(row.companyReimbursementUsdCents),
     formatInr(row.companyReimbursementInrCents),
     formatSignedInr(buildPeriodTotals([row], options).netPlInrCents),
@@ -234,6 +265,7 @@ export function buildDashboardPeriodTable(
     formatInr(totals.commissionEarnedInrCents),
     formatInr(totals.grossEarningsInrCents),
     formatInr(totals.expensesInrCents),
+    formatInr(totals.advancesInrCents),
     formatUsd(totals.companyReimbursementUsdCents),
     formatInr(totals.companyReimbursementInrCents),
     formatSignedInr(totals.netPlInrCents),
@@ -244,7 +276,11 @@ export function buildDashboardPeriodTable(
 export function buildDashboardPeriodCsv(
   data: PnDashboardData,
   periodType: PnPeriodType,
-  options: { includeExpenses: boolean; includeReimbursements: boolean },
+  options: {
+    includeExpenses: boolean;
+    includeAdvances: boolean;
+    includeReimbursements: boolean;
+  },
 ) {
   return csvFromTable(buildDashboardPeriodTable(data, periodType, options));
 }
@@ -263,8 +299,9 @@ export function buildDashboardCompanyTable(rows: OverviewPnlSummaryRow[]): CsvTa
     "FX commission INR",
     "Total commission USD",
     "Commission earned INR",
-    "Gross earnings INR",
+    "Gross P&L INR",
     "Expenses INR",
+    "Advances INR",
     "Reimbursements USD",
     "Reimbursements INR",
     "Net P/L INR",
@@ -286,6 +323,7 @@ export function buildDashboardCompanyTable(rows: OverviewPnlSummaryRow[]): CsvTa
       formatInr(row.totals.commissionEarnedInrCents),
       formatInr(row.totals.grossEarningsInrCents),
       formatInr(row.totals.expensesInrCents),
+      formatInr(row.totals.advancesInrCents),
       formatUsd(row.totals.companyReimbursementUsdCents),
       formatInr(row.totals.companyReimbursementInrCents),
       formatSignedInr(row.totals.netPlInrCents),

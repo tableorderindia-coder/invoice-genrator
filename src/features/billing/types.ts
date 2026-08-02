@@ -192,6 +192,7 @@ export type PnEmployeeEditableRow = {
   grossEarningsInrCents: number;
   netProfitInrCents: number;
   isSecurityDepositMonth: boolean;
+  isSalaryOnly?: boolean;
 };
 
 export type PnEmployeeEditableSection = {
@@ -208,6 +209,7 @@ export type PnPeriodRow = {
   fiscalLabel?: string;
   dollarInwardUsdCents: number;
   onboardingAdvanceUsdCents: number;
+  advancesInrCents: number;
   reimbursementUsdCents: number;
   reimbursementLabelsText: string;
   reimbursementInrCents: number;

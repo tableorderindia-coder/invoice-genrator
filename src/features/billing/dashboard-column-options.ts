@@ -8,8 +8,8 @@ export const EMPLOYEE_DASHBOARD_COLUMN_OPTIONS = [
   { value: "appraisalAdvance", label: "Appraisal advance" },
   { value: "appraisalAdvanceInr", label: "Appraisal advance (INR)" },
   { value: "offboardingDeduction", label: "Offboarding deduction" },
-  { value: "effectiveDollarInward", label: "Effective dollar inward" },
-  { value: "cashoutRate", label: "Received / exchanged rate" },
+  { value: "effectiveDollarInward", label: "Total effective dollar inward (USD)" },
+  { value: "cashoutRate", label: "Cashout rate" },
   { value: "cashIn", label: "Total Cash Inward (INR)" },
   { value: "paidRate", label: "Peg rate" },
   { value: "monthlyPaid", label: "Monthly paid (INR)" },
@@ -19,8 +19,9 @@ export const EMPLOYEE_DASHBOARD_COLUMN_OPTIONS = [
   { value: "salaryPaid", label: "Salary paid (INR)" },
   { value: "fxCommission", label: "Forex gain (INR)" },
   { value: "commissionEarned", label: "Operating margin (INR)" },
-  { value: "grossEarnings", label: "Total earning (INR)" },
-  { value: "netProfit", label: "Net Profit (INR)" },
+  { value: "grossEarnings", label: "Gross P&L (INR)" },
+  { value: "advances", label: "Advances (INR)" },
+  { value: "netProfit", label: "Net P/L (INR)" },
 ];
 
 export const PERIOD_DASHBOARD_COLUMN_OPTIONS = [
@@ -32,8 +33,8 @@ export const PERIOD_DASHBOARD_COLUMN_OPTIONS = [
   { value: "appraisalAdvance", label: "Appraisal advance" },
   { value: "appraisalAdvanceInr", label: "Appraisal advance (INR)" },
   { value: "offboardingDeduction", label: "Offboarding deduction" },
-  { value: "effectiveDollarInward", label: "Effective dollar inward" },
-  { value: "cashoutRate", label: "Received / exchanged rate" },
+  { value: "effectiveDollarInward", label: "Total effective dollar inward (USD)" },
+  { value: "cashoutRate", label: "Cashout rate" },
   { value: "cashIn", label: "Total Cash Inward (INR)" },
   { value: "paidRate", label: "Peg rate" },
   { value: "monthlyPaid", label: "Monthly paid (INR)" },
@@ -43,9 +44,37 @@ export const PERIOD_DASHBOARD_COLUMN_OPTIONS = [
   { value: "salaryPaid", label: "Salary paid (INR)" },
   { value: "fxCommission", label: "Forex gain (INR)" },
   { value: "commissionEarned", label: "Operating margin (INR)" },
-  { value: "grossEarnings", label: "Total earning (INR)" },
+  { value: "grossEarnings", label: "Gross P&L (INR)" },
   { value: "expenses", label: "Expenses (INR)" },
+  { value: "advances", label: "Advances (INR)" },
   { value: "companyReimbursementUsd", label: "Reimb. (USD)" },
   { value: "companyReimbursementInr", label: "Reimb. (INR)" },
   { value: "netPl", label: "Net P/L (INR)" },
+];
+
+export const DEFAULT_EMPLOYEE_DASHBOARD_COLUMNS = [
+  "effectiveDollarInward",
+  "cashoutRate",
+  "salaryPaid",
+  "pf",
+  "tds",
+  "fxCommission",
+  "commissionEarned",
+  "grossEarnings",
+  "advances",
+  "netProfit",
+];
+
+export const DEFAULT_PERIOD_DASHBOARD_COLUMNS = [
+  "effectiveDollarInward",
+  "cashoutRate",
+  "salaryPaid",
+  "pf",
+  "tds",
+  "fxCommission",
+  "commissionEarned",
+  "grossEarnings",
+  "expenses",
+  "advances",
+  "netPl",
 ];

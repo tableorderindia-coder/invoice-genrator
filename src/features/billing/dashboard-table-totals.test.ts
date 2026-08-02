@@ -25,7 +25,7 @@ const employeeRows: PnEmployeeEditableRow[] = [
     appraisalAdvanceInrCents: 80_00,
     offboardingDeductionUsdCents: 0,
     effectiveDollarInwardUsdCents: 98_00,
-    cashInInrCents: 8_000_00,
+    cashInInrCents: 18_200_00,
     cashoutUsdInrRate: 80,
     paidUsdInrRate: 75,
     salaryPaidInrCents: 14_500_00,
@@ -57,7 +57,7 @@ const employeeRows: PnEmployeeEditableRow[] = [
     appraisalAdvanceInrCents: 0,
     offboardingDeductionUsdCents: 1_00,
     effectiveDollarInwardUsdCents: 199_00,
-    cashInInrCents: 16_000_00,
+    cashInInrCents: 10_300_00,
     cashoutUsdInrRate: 82,
     paidUsdInrRate: 78,
     salaryPaidInrCents: 7_500_00,
@@ -79,6 +79,7 @@ const periodRows: PnPeriodRow[] = [
     month: 4,
     dollarInwardUsdCents: 100_00,
     onboardingAdvanceUsdCents: 5_00,
+    advancesInrCents: 400_00,
     reimbursementUsdCents: 4_00,
     reimbursementLabelsText: "Taxi",
     reimbursementInrCents: 320_00,
@@ -107,6 +108,7 @@ const periodRows: PnPeriodRow[] = [
     month: 5,
     dollarInwardUsdCents: 200_00,
     onboardingAdvanceUsdCents: 0,
+    advancesInrCents: 0,
     reimbursementUsdCents: 3_00,
     reimbursementLabelsText: "Food",
     reimbursementInrCents: 240_00,
@@ -138,7 +140,8 @@ describe("dashboard table totals", () => {
 
     expect(totals.daysWorked).toBe(30);
     expect(totals.actualPaidInrCents).toBe(23_100_00);
-    expect(totals.netProfitInrCents).toBe(21_000_00);
+    expect(totals.advancesInrCents).toBe(400_00);
+    expect(totals.netPlInrCents).toBe(5_000_00);
     expect(totals.cashoutUsdInrRate).toBeCloseTo(81.3401, 3);
     expect(totals.paidUsdInrRate).toBeCloseTo(77.0101, 3);
   });
@@ -146,11 +149,13 @@ describe("dashboard table totals", () => {
   it("computes period totals and respects P/L toggles", () => {
     const totals = buildPeriodTotals(periodRows, {
       includeExpenses: false,
+      includeAdvances: true,
       includeReimbursements: true,
     });
 
     expect(totals.expensesInrCents).toBe(1_500_00);
     expect(totals.companyReimbursementInrCents).toBe(240_00);
-    expect(totals.netPlInrCents).toBe(21_240_00);
+    expect(totals.advancesInrCents).toBe(400_00);
+    expect(totals.netPlInrCents).toBe(5_240_00);
   });
 });

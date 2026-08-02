@@ -19,7 +19,10 @@ export type PnEmployeeMonthSummaryRow = PnEmployeeEditableRow & {
   sourceUpdatedAt?: string | null;
 };
 
-export type PnCompanyMonthSummaryRow = Omit<PnPeriodRow, "month" | "fiscalLabel"> & {
+export type PnCompanyMonthSummaryRow = Omit<
+  PnPeriodRow,
+  "month" | "fiscalLabel" | "advancesInrCents"
+> & {
   companyId: string;
   paymentMonth: string;
   month: number;
@@ -247,6 +250,7 @@ function toEmployeeSummaryRow(row: DbEmployeeSummary): PnEmployeeMonthSummaryRow
     grossEarningsInrCents: numberValue(row.gross_earnings_inr_cents),
     netProfitInrCents: numberValue(row.net_profit_inr_cents),
     isSecurityDepositMonth: row.is_security_deposit_month,
+    isSalaryOnly: (row.payout_id ?? "").startsWith("salary_only:"),
     sourceUpdatedAt: row.source_updated_at,
     rebuiltAt: row.rebuilt_at,
   };
@@ -364,7 +368,20 @@ function buildEmployeeSections(rows: PnEmployeeMonthSummaryRow[]): PnEmployeeSec
     .sort((left, right) => left.employeeName.localeCompare(right.employeeName));
 }
 
-function rollupCompanyRows(rows: PnCompanyMonthSummaryRow[], periodType: PnPeriodType): PnPeriodRow[] {
+function buildAdvancesInrByMonth(rows: PnEmployeeMonthSummaryRow[]) {
+  const totals = new Map<string, number>();
+  for (const row of rows) {
+    const converted = Math.round(row.onboardingAdvanceUsdCents * row.cashoutUsdInrRate);
+    totals.set(row.paymentMonth, (totals.get(row.paymentMonth) ?? 0) + converted);
+  }
+  return totals;
+}
+
+function rollupCompanyRows(
+  rows: PnCompanyMonthSummaryRow[],
+  periodType: PnPeriodType,
+  advancesInrByMonth: Map<string, number>,
+): PnPeriodRow[] {
   if (periodType === "monthly") {
     return [...rows]
       .map((row) => ({
@@ -372,6 +389,7 @@ function rollupCompanyRows(rows: PnCompanyMonthSummaryRow[], periodType: PnPerio
         month: row.month,
         dollarInwardUsdCents: row.dollarInwardUsdCents,
         onboardingAdvanceUsdCents: row.onboardingAdvanceUsdCents,
+        advancesInrCents: advancesInrByMonth.get(row.paymentMonth) ?? 0,
         reimbursementUsdCents: row.reimbursementUsdCents,
         reimbursementLabelsText: row.reimbursementLabelsText,
         reimbursementInrCents: row.reimbursementInrCents,
@@ -424,6 +442,10 @@ function rollupCompanyRows(rows: PnCompanyMonthSummaryRow[], periodType: PnPerio
         fiscalLabel: fiscalLabel(first),
         dollarInwardUsdCents: sumCompanyRows(bucket, "dollarInwardUsdCents"),
         onboardingAdvanceUsdCents: sumCompanyRows(bucket, "onboardingAdvanceUsdCents"),
+        advancesInrCents: bucket.reduce(
+          (sum, row) => sum + (advancesInrByMonth.get(row.paymentMonth) ?? 0),
+          0,
+        ),
         reimbursementUsdCents: sumCompanyRows(bucket, "reimbursementUsdCents"),
         reimbursementLabelsText: [...reimbursementLabels].join(", "),
         reimbursementInrCents: sumCompanyRows(bucket, "reimbursementInrCents"),
@@ -456,13 +478,15 @@ export function buildPnDashboardDataFromSummaryRows(input: {
   companyId: string;
   periodType: PnPeriodType;
   employeeRows: PnEmployeeMonthSummaryRow[];
+  advanceRows?: PnEmployeeMonthSummaryRow[];
   companyRows: PnCompanyMonthSummaryRow[];
 }): PnDashboardData {
+  const advancesInrByMonth = buildAdvancesInrByMonth(input.advanceRows ?? input.employeeRows);
   return {
     companyId: input.companyId,
     employeeEditableSections: buildEmployeeEditableSections(input.employeeRows),
     employeeSections: buildEmployeeSections(input.employeeRows),
-    periodRows: rollupCompanyRows(input.companyRows, input.periodType),
+    periodRows: rollupCompanyRows(input.companyRows, input.periodType, advancesInrByMonth),
   };
 }
 
@@ -524,10 +548,15 @@ export async function getPnDashboardSummaryData(input: {
     ]);
   }
 
+  const advanceRows = input.employeeIds
+    ? await listEmployeeSummaryRows({ ...input, employeeIds: undefined })
+    : employeeRows;
+
   return buildPnDashboardDataFromSummaryRows({
     companyId: input.companyId,
     periodType: input.periodType,
     employeeRows,
+    advanceRows,
     companyRows,
   });
 }

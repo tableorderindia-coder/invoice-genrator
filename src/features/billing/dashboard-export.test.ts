@@ -3,11 +3,17 @@ import PDFDocument from "pdfkit";
 
 import {
   buildDashboardCompanyCsv,
+  buildDashboardCompanyTable,
   buildDashboardEmployeeCsv,
+  buildDashboardEmployeeTable,
   buildDashboardExportPdf,
   buildDashboardPeriodCsv,
+  buildDashboardPeriodTable,
 } from "./dashboard-export";
-import type { OverviewPnlSummaryRow } from "./overview-pnl-summary";
+import {
+  buildOverviewCompanySummaryRows,
+  type OverviewPnlSummaryRow,
+} from "./overview-pnl-summary";
 import type { PnDashboardData } from "./types";
 
 const dashboardData: PnDashboardData = {
@@ -62,6 +68,7 @@ const dashboardData: PnDashboardData = {
       month: 7,
       dollarInwardUsdCents: 100000,
       onboardingAdvanceUsdCents: 10000,
+      advancesInrCents: 840000,
       reimbursementUsdCents: 5000,
       reimbursementLabelsText: "Laptop",
       reimbursementInrCents: 420000,
@@ -99,6 +106,7 @@ const companyRows: OverviewPnlSummaryRow[] = [
       daysWorked: null,
       dollarInwardUsdCents: 100000,
       onboardingAdvanceUsdCents: 10000,
+      advancesInrCents: 840000,
       reimbursementUsdCents: 5000,
       reimbursementInrCents: 420000,
       appraisalAdvanceUsdCents: 2000,
@@ -127,22 +135,40 @@ const companyRows: OverviewPnlSummaryRow[] = [
 
 describe("dashboard export", () => {
   it("exports employee view with all dashboard columns and totals", () => {
-    const csv = buildDashboardEmployeeCsv(dashboardData);
+    const csv = buildDashboardEmployeeCsv(dashboardData, { includeAdvances: true });
 
     expect(csv).toContain("Employee,Month,Invoice");
     expect(csv).toContain("Total commission USD");
+    expect(csv).toContain("Advances INR,Net P/L INR");
+    expect(csv).toContain("- ₹960.00");
     expect(csv).toContain('"Ankit Singh","July 2026","INV-1"');
     expect(csv).toContain('"Totals","",""');
+  });
+
+  it("matches employee export Net P/L to the advance inclusion state", () => {
+    const included = buildDashboardEmployeeTable(dashboardData, {
+      includeAdvances: true,
+    });
+    const excluded = buildDashboardEmployeeTable(dashboardData, {
+      includeAdvances: false,
+    });
+
+    expect(included.rows[0]?.at(-1)).toBe("- ₹960.00");
+    expect(included.rows[1]?.at(-1)).toBe("- ₹960.00");
+    expect(excluded.rows[0]?.at(-1)).toBe("+ ₹7,440.00");
+    expect(excluded.rows[1]?.at(-1)).toBe("+ ₹7,440.00");
   });
 
   it("exports period view with all period columns and totals", () => {
     const csv = buildDashboardPeriodCsv(dashboardData, "monthly", {
       includeExpenses: true,
+      includeAdvances: true,
       includeReimbursements: true,
     });
 
     expect(csv).toContain("Period,Dollar inward USD");
-    expect(csv).toContain("Expenses INR,Company reimbursements USD,Company reimbursements INR,Net P/L INR");
+    expect(csv).toContain("Expenses INR,Advances INR,Company reimbursements USD,Company reimbursements INR,Net P/L INR");
+    expect(csv).toContain("+ ₹8,340.00");
     expect(csv).toContain('"July 2026"');
     expect(csv).toContain('"Totals"');
   });
@@ -153,7 +179,36 @@ describe("dashboard export", () => {
     expect(csv).toContain("Company,Period,Total dollar inward");
     expect(csv).toContain('"Arena","July 2026"');
     expect(csv).toContain("Net P/L INR");
+    expect(csv).toContain("Advances INR");
   });
+
+  it.each([
+    { includeExpenses: false, includeAdvances: false, includeReimbursements: false, net: "+ ₹11,340.00" },
+    { includeExpenses: false, includeAdvances: false, includeReimbursements: true, net: "+ ₹19,740.00" },
+    { includeExpenses: false, includeAdvances: true, includeReimbursements: false, net: "+ ₹2,940.00" },
+    { includeExpenses: false, includeAdvances: true, includeReimbursements: true, net: "+ ₹11,340.00" },
+    { includeExpenses: true, includeAdvances: false, includeReimbursements: false, net: "+ ₹8,340.00" },
+    { includeExpenses: true, includeAdvances: false, includeReimbursements: true, net: "+ ₹16,740.00" },
+    { includeExpenses: true, includeAdvances: true, includeReimbursements: false, net: "- ₹60.00" },
+    { includeExpenses: true, includeAdvances: true, includeReimbursements: true, net: "+ ₹8,340.00" },
+  ])(
+    "uses the visible accounting state for period and company export tables: $includeExpenses/$includeAdvances/$includeReimbursements",
+    (options) => {
+      const periodTable = buildDashboardPeriodTable(dashboardData, "monthly", options);
+      const summaryRows = buildOverviewCompanySummaryRows({
+        companies: [{ id: "company_1", name: "Arena" }],
+        dashboardDataByCompanyId: new Map([["company_1", dashboardData]]),
+        monthKeys: ["2026-07"],
+        periodLabel: "July 2026",
+        accountingOptions: options,
+      });
+      const companyTable = buildDashboardCompanyTable(summaryRows);
+
+      expect(periodTable.rows[0]?.at(-1)).toBe(options.net);
+      expect(periodTable.rows[1]?.at(-1)).toBe(options.net);
+      expect(companyTable.rows[0]?.at(-1)).toBe(options.net);
+    },
+  );
 
   it("renders dashboard export PDF buffers", async () => {
     const pdf = await buildDashboardExportPdf({

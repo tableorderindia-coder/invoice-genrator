@@ -168,8 +168,10 @@ type AdjustmentAwareEmployee = {
   defaultPaidUsdInrRate?: number;
   defaultMonthlyPaidInrCents?: number;
   defaultActualPaidInrCents?: number;
+  defaultSalaryPaidInrCents?: number;
   defaultPfInrCents?: number;
   defaultTdsInrCents?: number;
+  defaultDaysWorked?: number;
   onboardingAdvanceUsdCents: number;
   reimbursementUsdCents: number;
   reimbursementLabelsText: string;
@@ -331,7 +333,10 @@ export function appendMissingAdjustmentEntries(input: {
         employee.onboardingAdvanceUsdCents > 0 ||
         employee.reimbursementUsdCents > 0 ||
         employee.appraisalAdvanceUsdCents > 0 ||
-        employee.offboardingDeductionUsdCents > 0,
+        employee.offboardingDeductionUsdCents > 0 ||
+        (employee.defaultSalaryPaidInrCents ?? 0) > 0 ||
+        (employee.defaultPfInrCents ?? 0) > 0 ||
+        (employee.defaultTdsInrCents ?? 0) > 0,
     )
     .map((employee) => ({
       id: nextCashFlowId("cash_entry"),
@@ -342,7 +347,7 @@ export function appendMissingAdjustmentEntries(input: {
       invoiceNumber: input.invoiceNumber,
       employeeId: employee.id,
       employeeNameSnapshot: employee.fullName,
-      daysWorked: 0,
+      daysWorked: employee.defaultDaysWorked ?? 0,
       daysInMonth: input.daysInMonth,
       baseDollarInwardUsdCents: 0,
       onboardingAdvanceUsdCents: employee.onboardingAdvanceUsdCents,
@@ -350,18 +355,37 @@ export function appendMissingAdjustmentEntries(input: {
       reimbursementLabelsText: employee.reimbursementLabelsText,
       appraisalAdvanceUsdCents: employee.appraisalAdvanceUsdCents,
       offboardingDeductionUsdCents: employee.offboardingDeductionUsdCents,
+      effectiveDollarInwardUsdCents: calculateEffectiveDollarInwardUsdCents({
+        baseDollarInwardUsdCents: 0,
+        onboardingAdvanceUsdCents: employee.onboardingAdvanceUsdCents,
+        reimbursementUsdCents: employee.reimbursementUsdCents,
+        appraisalAdvanceUsdCents: employee.appraisalAdvanceUsdCents,
+        offboardingDeductionUsdCents: employee.offboardingDeductionUsdCents,
+      }),
       cashoutUsdInrRate: input.cashoutUsdInrRate,
       paidUsdInrRate: employee.defaultPaidUsdInrRate ?? 0,
       monthlyPaidInrCents:
         employee.defaultMonthlyPaidInrCents ?? employee.defaultActualPaidInrCents ?? 0,
+      cashInInrCents: calculateCashInInrCents({
+        effectiveDollarInwardUsdCents: calculateEffectiveDollarInwardUsdCents({
+          baseDollarInwardUsdCents: 0,
+          onboardingAdvanceUsdCents: employee.onboardingAdvanceUsdCents,
+          reimbursementUsdCents: employee.reimbursementUsdCents,
+          appraisalAdvanceUsdCents: employee.appraisalAdvanceUsdCents,
+          offboardingDeductionUsdCents: employee.offboardingDeductionUsdCents,
+        }),
+        cashoutUsdInrRate: input.cashoutUsdInrRate,
+      }),
       pfInrCents: employee.defaultPfInrCents ?? 0,
       tdsInrCents: employee.defaultTdsInrCents ?? 0,
       actualPaidInrCents: employee.defaultActualPaidInrCents ?? 0,
-      salaryPaidInrCents: safeSalaryPaidInrCents({
-        actualPaidInrCents: employee.defaultActualPaidInrCents ?? 0,
-        pfInrCents: employee.defaultPfInrCents ?? 0,
-        tdsInrCents: employee.defaultTdsInrCents ?? 0,
-      }),
+      salaryPaidInrCents:
+        employee.defaultSalaryPaidInrCents ??
+        safeSalaryPaidInrCents({
+          actualPaidInrCents: employee.defaultActualPaidInrCents ?? 0,
+          pfInrCents: employee.defaultPfInrCents ?? 0,
+          tdsInrCents: employee.defaultTdsInrCents ?? 0,
+        }),
       fxCommissionInrCents: 0,
       totalCommissionUsdCents: 0,
       commissionEarnedInrCents: 0,
@@ -369,7 +393,7 @@ export function appendMissingAdjustmentEntries(input: {
       isNonInvoiceEmployee: true,
       isPaid: false,
       paidAt: undefined,
-      notes: `Imported from invoice adjustment for ${input.paymentMonth}.`,
+      notes: `Included from salary or invoice adjustments for ${input.paymentMonth}.`,
     }));
 
   return [...input.entries, ...missingAdjustmentEntries];
@@ -926,6 +950,8 @@ export async function getInvoicePaymentPrefillData(input: {
       ),
       defaultPfInrCents: Number(payroll?.pf_inr_cents ?? row.default_pf_inr_cents ?? 0),
       defaultTdsInrCents: Number(payroll?.tds_inr_cents ?? row.default_tds_inr_cents ?? 0),
+      defaultSalaryPaidInrCents: Number(payroll?.salary_paid_inr_cents ?? 0),
+      defaultDaysWorked: Number(payroll?.days_worked ?? 0),
       onboardingAdvanceUsdCents:
         onboardingByEmployeeName.get(normalizeEmployeeNameForMatch(employeeName)) ?? 0,
       reimbursementUsdCents:
@@ -1421,23 +1447,23 @@ export async function deleteSavedEmployeeCashFlowEntry(entryId: string) {
 export async function updateDashboardEmployeeCashFlowEntry(input: {
   entryId: string;
   daysWorked?: number;
-  dollarInwardUsdCents: number;
-  onboardingAdvanceUsdCents: number;
-  reimbursementUsdCents: number;
-  reimbursementLabelsText: string;
-  appraisalAdvanceUsdCents: number;
-  offboardingDeductionUsdCents: number;
-  cashoutUsdInrRate: number;
-  paidUsdInrRate: number;
-  pfInrCents: number;
-  tdsInrCents: number;
-  actualPaidInrCents: number;
+  dollarInwardUsdCents?: number;
+  onboardingAdvanceUsdCents?: number;
+  reimbursementUsdCents?: number;
+  reimbursementLabelsText?: string;
+  appraisalAdvanceUsdCents?: number;
+  offboardingDeductionUsdCents?: number;
+  cashoutUsdInrRate?: number;
+  paidUsdInrRate?: number;
+  pfInrCents?: number;
+  tdsInrCents?: number;
+  actualPaidInrCents?: number;
 }) {
   const supabase = await getSupabaseOrThrow();
   const { data: currentRow, error: currentError } = await supabase
     .from("invoice_payment_employee_entries")
     .select(
-      "id, days_worked, days_in_month, base_dollar_inward_usd_cents, onboarding_advance_usd_cents, reimbursement_usd_cents, reimbursement_labels_text, appraisal_advance_usd_cents, offboarding_deduction_usd_cents",
+      "id, days_worked, days_in_month, base_dollar_inward_usd_cents, onboarding_advance_usd_cents, reimbursement_usd_cents, reimbursement_labels_text, appraisal_advance_usd_cents, offboarding_deduction_usd_cents, cashout_usd_inr_rate, paid_usd_inr_rate, pf_inr_cents, tds_inr_cents, actual_paid_inr_cents",
     )
     .eq("id", input.entryId)
     .single();
@@ -1454,49 +1480,73 @@ export async function updateDashboardEmployeeCashFlowEntry(input: {
     | "reimbursement_labels_text"
     | "appraisal_advance_usd_cents"
     | "offboarding_deduction_usd_cents"
+    | "cashout_usd_inr_rate"
+    | "paid_usd_inr_rate"
+    | "pf_inr_cents"
+    | "tds_inr_cents"
+    | "actual_paid_inr_cents"
   >;
 
-  const baseDollarInwardUsdCents = input.dollarInwardUsdCents;
-  const offboardingDeductionUsdCents = Math.abs(input.offboardingDeductionUsdCents);
+  const baseDollarInwardUsdCents =
+    input.dollarInwardUsdCents ?? current.base_dollar_inward_usd_cents;
+  const onboardingAdvanceUsdCents =
+    input.onboardingAdvanceUsdCents ?? current.onboarding_advance_usd_cents;
+  const reimbursementUsdCents =
+    input.reimbursementUsdCents ?? current.reimbursement_usd_cents;
+  const reimbursementLabelsText =
+    input.reimbursementLabelsText ?? current.reimbursement_labels_text ?? "";
+  const appraisalAdvanceUsdCents =
+    input.appraisalAdvanceUsdCents ?? current.appraisal_advance_usd_cents;
+  const offboardingDeductionUsdCents = Math.abs(
+    input.offboardingDeductionUsdCents ?? current.offboarding_deduction_usd_cents,
+  );
+  const cashoutUsdInrRate =
+    input.cashoutUsdInrRate ?? Number(current.cashout_usd_inr_rate);
+  const paidUsdInrRate =
+    input.paidUsdInrRate ?? Number(current.paid_usd_inr_rate);
+  const pfInrCents = input.pfInrCents ?? current.pf_inr_cents;
+  const tdsInrCents = input.tdsInrCents ?? current.tds_inr_cents;
+  const actualPaidInrCents =
+    input.actualPaidInrCents ?? current.actual_paid_inr_cents;
   const effectiveDollarInwardUsdCents = calculateEffectiveDollarInwardUsdCents({
     baseDollarInwardUsdCents,
-    onboardingAdvanceUsdCents: input.onboardingAdvanceUsdCents,
-    reimbursementUsdCents: input.reimbursementUsdCents,
-    appraisalAdvanceUsdCents: input.appraisalAdvanceUsdCents,
+    onboardingAdvanceUsdCents,
+    reimbursementUsdCents,
+    appraisalAdvanceUsdCents,
     offboardingDeductionUsdCents,
   });
   const payoutMetrics = calculateEmployeePayoutMetrics({
     dollarInwardUsdCents: effectiveDollarInwardUsdCents,
-    actualPaidInrCents: input.actualPaidInrCents,
-    receivedUsdInrRate: input.cashoutUsdInrRate,
-    pegUsdInrRate: input.paidUsdInrRate,
+    actualPaidInrCents,
+    receivedUsdInrRate: cashoutUsdInrRate,
+    pegUsdInrRate: paidUsdInrRate,
   });
   const salaryPaidInrCents = safeSalaryPaidInrCents({
-    actualPaidInrCents: input.actualPaidInrCents,
-    pfInrCents: input.pfInrCents,
-    tdsInrCents: input.tdsInrCents,
+    actualPaidInrCents,
+    pfInrCents,
+    tdsInrCents,
   });
   const { error } = await supabase
     .from("invoice_payment_employee_entries")
     .update({
       days_worked: input.daysWorked ?? current.days_worked,
       base_dollar_inward_usd_cents: baseDollarInwardUsdCents,
-      onboarding_advance_usd_cents: input.onboardingAdvanceUsdCents,
-      reimbursement_usd_cents: input.reimbursementUsdCents,
-      reimbursement_labels_text: input.reimbursementLabelsText || null,
-      appraisal_advance_usd_cents: input.appraisalAdvanceUsdCents,
+      onboarding_advance_usd_cents: onboardingAdvanceUsdCents,
+      reimbursement_usd_cents: reimbursementUsdCents,
+      reimbursement_labels_text: reimbursementLabelsText || null,
+      appraisal_advance_usd_cents: appraisalAdvanceUsdCents,
       offboarding_deduction_usd_cents: offboardingDeductionUsdCents,
       effective_dollar_inward_usd_cents: effectiveDollarInwardUsdCents,
-      cashout_usd_inr_rate: input.cashoutUsdInrRate,
-      paid_usd_inr_rate: input.paidUsdInrRate,
+      cashout_usd_inr_rate: cashoutUsdInrRate,
+      paid_usd_inr_rate: paidUsdInrRate,
       cash_in_inr_cents: calculateCashInInrCents({
         effectiveDollarInwardUsdCents,
-        cashoutUsdInrRate: input.cashoutUsdInrRate,
+        cashoutUsdInrRate,
       }),
-      monthly_paid_inr_cents: input.actualPaidInrCents,
-      pf_inr_cents: input.pfInrCents,
-      tds_inr_cents: input.tdsInrCents,
-      actual_paid_inr_cents: input.actualPaidInrCents,
+      monthly_paid_inr_cents: actualPaidInrCents,
+      pf_inr_cents: pfInrCents,
+      tds_inr_cents: tdsInrCents,
+      actual_paid_inr_cents: actualPaidInrCents,
       salary_paid_inr_cents: salaryPaidInrCents,
       fx_commission_inr_cents: payoutMetrics.fxCommissionInrCents,
       total_commission_usd_cents: payoutMetrics.totalCommissionUsdCents,

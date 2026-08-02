@@ -281,7 +281,7 @@ export function Shell({
         </aside>
 
         <main className="min-w-0 flex-1">
-          <header className="glass-nav sticky top-3 z-40 mb-6 flex flex-col gap-4 px-4 py-3 lg:hidden">
+          <header className="glass-nav mb-6 flex flex-col gap-4 px-4 py-3 lg:hidden">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div

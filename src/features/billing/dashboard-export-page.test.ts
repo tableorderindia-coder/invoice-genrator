@@ -12,9 +12,11 @@ function readProjectFile(path: string) {
 describe("dashboard export page", () => {
   it("renders CSV and PDF export links for the current dashboard filters", () => {
     const page = readProjectFile("app/dashboard/page.tsx");
+    const tables = readProjectFile("app/dashboard/dashboard-tables.tsx");
 
-    expect(page).toContain("Export CSV");
-    expect(page).toContain("Export PDF");
+    expect(tables).toContain("Export CSV");
+    expect(tables).toContain("Export PDF");
+    expect(tables).toContain("buildDashboardExportHref");
     expect(page).toContain("/api/dashboard/export");
     expect(page).toContain('format: "csv"');
     expect(page).toContain('format: "pdf"');

@@ -12,6 +12,7 @@ import {
   buildDashboardPeriodTable,
 } from "@/src/features/billing/dashboard-export";
 import { buildPeriodTotals } from "@/src/features/billing/dashboard-table-totals";
+import { resolveDashboardExportOptions } from "@/src/features/billing/dashboard-export-options";
 import {
   normalizeMultiSelectValue,
   resolveSelectedCompanyIds,
@@ -22,12 +23,13 @@ import {
   formatOverviewPeriodLabel,
 } from "@/src/features/billing/overview-pnl-summary";
 import { getPnDashboardSummaryData } from "@/src/features/billing/pn-summary-store";
+import { mergePnPeriodRows } from "@/src/features/billing/pn-dashboard";
 import {
   listCachedAvailablePaymentMonthsForCompanies,
   listCachedCompanies,
   listCachedEmployeesForCompanies,
 } from "@/src/features/billing/cached-store";
-import type { PnDashboardData, PnPeriodRow, PnPeriodType } from "@/src/features/billing/types";
+import type { PnDashboardData, PnPeriodType } from "@/src/features/billing/types";
 import { sanitizeDownloadFilename } from "@/src/features/billing/utils";
 
 type SearchInput = Record<string, string | string[] | undefined>;
@@ -53,87 +55,12 @@ function searchInput(params: URLSearchParams): SearchInput {
   };
 }
 
-function weightedRate(rows: PnPeriodRow[], rateKey: "cashoutUsdInrRate" | "paidUsdInrRate") {
-  const eligibleRows = rateKey === "paidUsdInrRate"
-    ? rows.filter((row) => row.paidUsdInrRate > 0)
-    : rows;
-  const totalWeight = eligibleRows.reduce(
-    (sum, row) => sum + row.effectiveDollarInwardUsdCents,
-    0,
-  );
-  if (totalWeight <= 0) return 0;
-  return (
-    eligibleRows.reduce(
-      (sum, row) => sum + row[rateKey] * row.effectiveDollarInwardUsdCents,
-      0,
-    ) / totalWeight
-  );
-}
-
-function mergePeriodRows(rows: PnPeriodRow[]): PnPeriodRow[] {
-  const grouped = new Map<string, PnPeriodRow[]>();
-  for (const row of rows) {
-    const key = row.fiscalLabel ?? `${row.year}-${String(row.month ?? 0).padStart(2, "0")}`;
-    grouped.set(key, [...(grouped.get(key) ?? []), row]);
-  }
-
-  return [...grouped.values()]
-    .map((bucket) => {
-      const first = bucket[0]!;
-      const sum = (pick: (row: PnPeriodRow) => number) =>
-        bucket.reduce((total, row) => total + pick(row), 0);
-      const reimbursementLabelsText = [
-        ...new Set(
-          bucket
-            .flatMap((row) => row.reimbursementLabelsText.split(","))
-            .map((label) => label.trim())
-            .filter(Boolean),
-        ),
-      ].join(", ");
-
-      return {
-        year: first.year,
-        month: first.month,
-        fiscalLabel: first.fiscalLabel,
-        dollarInwardUsdCents: sum((row) => row.dollarInwardUsdCents),
-        onboardingAdvanceUsdCents: sum((row) => row.onboardingAdvanceUsdCents),
-        reimbursementUsdCents: sum((row) => row.reimbursementUsdCents),
-        reimbursementLabelsText,
-        reimbursementInrCents: sum((row) => row.reimbursementInrCents),
-        appraisalAdvanceUsdCents: sum((row) => row.appraisalAdvanceUsdCents),
-        appraisalAdvanceInrCents: sum((row) => row.appraisalAdvanceInrCents),
-        offboardingDeductionUsdCents: sum((row) => row.offboardingDeductionUsdCents),
-        effectiveDollarInwardUsdCents: sum((row) => row.effectiveDollarInwardUsdCents),
-        cashoutUsdInrRate: weightedRate(bucket, "cashoutUsdInrRate"),
-        cashInInrCents: sum((row) => row.cashInInrCents),
-        paidUsdInrRate: weightedRate(bucket, "paidUsdInrRate"),
-        monthlyPaidInrCents: sum((row) => row.monthlyPaidInrCents),
-        pfInrCents: sum((row) => row.pfInrCents),
-        tdsInrCents: sum((row) => row.tdsInrCents),
-        actualPaidInrCents: sum((row) => row.actualPaidInrCents),
-        salaryPaidInrCents: sum((row) => row.salaryPaidInrCents),
-        fxCommissionInrCents: sum((row) => row.fxCommissionInrCents),
-        totalCommissionUsdCents: sum((row) => row.totalCommissionUsdCents),
-        commissionEarnedInrCents: sum((row) => row.commissionEarnedInrCents),
-        grossEarningsInrCents: sum((row) => row.grossEarningsInrCents),
-        expensesInrCents: sum((row) => row.expensesInrCents),
-        companyReimbursementUsdCents: sum((row) => row.companyReimbursementUsdCents),
-        companyReimbursementInrCents: sum((row) => row.companyReimbursementInrCents),
-        netPlInrCents: sum((row) => row.netPlInrCents),
-      };
-    })
-    .sort(
-      (left, right) =>
-        left.year * 100 + (left.month ?? 0) - (right.year * 100 + (right.month ?? 0)),
-    );
-}
-
 function mergeDashboardData(companyIds: string[], data: PnDashboardData[]): PnDashboardData {
   return {
     companyId: companyIds.join(","),
     employeeEditableSections: data.flatMap((item) => item.employeeEditableSections),
     employeeSections: data.flatMap((item) => item.employeeSections),
-    periodRows: mergePeriodRows(data.flatMap((item) => item.periodRows)),
+    periodRows: mergePnPeriodRows(data.flatMap((item) => item.periodRows)),
   };
 }
 
@@ -158,6 +85,7 @@ export async function GET(request: Request) {
   const resolved = searchInput(searchParams);
   const format = searchParams.get("format") === "pdf" ? "pdf" : "csv";
   const scope = searchParams.get("scope") === "company" ? "company" : "table";
+  const includeOptions = resolveDashboardExportOptions(searchParams);
   const selectedPeriodTypeRaw = Array.isArray(resolved.periodType)
     ? resolved.periodType[0]
     : resolved.periodType;
@@ -244,10 +172,11 @@ export async function GET(request: Request) {
       dashboardDataByCompanyId: monthlyDataByCompanyId,
       monthKeys: effectivePaymentMonths,
       periodLabel,
+      accountingOptions: includeOptions,
     });
     const exportRows =
       companyRows.length > 1
-        ? [...companyRows, buildOverviewGrandTotalRow(companyRows, periodLabel)]
+        ? [...companyRows, buildOverviewGrandTotalRow(companyRows, periodLabel, includeOptions)]
         : companyRows;
     const table = buildDashboardCompanyTable(exportRows);
     const filename = `dashboard-company-${periodLabel}.${format}`;
@@ -267,7 +196,6 @@ export async function GET(request: Request) {
   }
 
   if (view === "period") {
-    const includeOptions = { includeExpenses: true, includeReimbursements: true };
     const table = buildDashboardPeriodTable(data, periodType, includeOptions);
     const totals = buildPeriodTotals(data.periodRows, includeOptions);
     const filename = `dashboard-${periodType}-${periodLabel}.${format}`;
@@ -286,7 +214,8 @@ export async function GET(request: Request) {
     });
   }
 
-  const table = buildDashboardEmployeeTable(data);
+  const employeeOptions = { includeAdvances: includeOptions.includeAdvances };
+  const table = buildDashboardEmployeeTable(data, employeeOptions);
   const filename = `dashboard-employees-${periodLabel}.${format}`;
   if (format === "pdf") {
     const pdf = await buildDashboardExportPdf({
@@ -299,7 +228,7 @@ export async function GET(request: Request) {
     });
   }
 
-  return new NextResponse(buildDashboardEmployeeCsv(data), {
+  return new NextResponse(buildDashboardEmployeeCsv(data, employeeOptions), {
     headers: responseHeaders(filename, "text/csv; charset=utf-8"),
   });
 }
