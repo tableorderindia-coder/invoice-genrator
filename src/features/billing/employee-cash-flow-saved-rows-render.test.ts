@@ -212,7 +212,8 @@ describe("employee cash flow saved rows rendering", () => {
     );
 
     const pegInput = screen.getByDisplayValue("95.2") as HTMLInputElement;
-    expect(pegInput.step).toBe("0.0001");
+    expect(pegInput.type).toBe("text");
+    expect(pegInput.inputMode).toBe("decimal");
     expect(screen.queryByDisplayValue("95")).toBeNull();
   });
 });

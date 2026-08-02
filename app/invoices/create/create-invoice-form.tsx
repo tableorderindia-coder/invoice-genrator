@@ -5,6 +5,7 @@ import { formatDuplicateInvoiceOptionLabel } from "@/src/features/billing/invoic
 import { formatDate } from "@/src/features/billing/utils";
 
 import { Field, inputClass } from "../../_components/field";
+import { NumericInput } from "../../_components/numeric-input";
 
 type CompanyOption = {
   id: string;
@@ -59,14 +60,14 @@ export function CreateInvoiceForm(props: CreateInvoiceFormProps) {
         </select>
       </Field>
       <Field label="Month">
-        <input
+        <NumericInput
           name="month"
-          type="number"
+          precision={0}
           min="1"
           max="12"
           value={month}
-          onChange={(event) => {
-            const nextMonth = event.target.value;
+          onValueChange={(value) => {
+            const nextMonth = value;
             setMonth(nextMonth);
             syncBillingDuration(nextMonth, year);
           }}
@@ -75,12 +76,12 @@ export function CreateInvoiceForm(props: CreateInvoiceFormProps) {
         />
       </Field>
       <Field label="Year">
-        <input
+        <NumericInput
           name="year"
-          type="number"
+          precision={0}
           value={year}
-          onChange={(event) => {
-            const nextYear = event.target.value;
+          onValueChange={(value) => {
+            const nextYear = value;
             setYear(nextYear);
             syncBillingDuration(month, nextYear);
           }}

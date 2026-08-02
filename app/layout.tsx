@@ -1,6 +1,16 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import NextTopLoader from "nextjs-toploader";
+import { cookies } from "next/headers";
+import {
+  normalizePortalUiMode,
+  PORTAL_UI_MODE_COOKIE,
+} from "@/src/features/ui/portal-ui-mode";
+import {
+  normalizeSidebarCollapsed,
+  SIDEBAR_COLLAPSED_COOKIE,
+} from "@/src/features/ui/sidebar-preference";
+import { SidebarPreferenceProvider } from "./_components/sidebar-preference-provider";
 import "./globals.css";
 
 const inter = localFont({
@@ -16,13 +26,24 @@ export const metadata: Metadata = {
     "Monthly staffing invoice generation, cash-out tracking, and realized profit dashboard.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const cookieStore = await cookies();
+  const uiMode = normalizePortalUiMode(cookieStore.get(PORTAL_UI_MODE_COOKIE)?.value);
+  const sidebarCollapsed = normalizeSidebarCollapsed(
+    cookieStore.get(SIDEBAR_COLLAPSED_COOKIE)?.value,
+  );
+
   return (
-    <html lang="en" className={`${inter.variable} h-full antialiased`}>
+    <html
+      lang="en"
+      className={`${inter.variable} h-full antialiased`}
+      data-ui-mode={uiMode}
+      data-sidebar-collapsed={sidebarCollapsed}
+    >
       <body className="min-h-full flex flex-col relative overflow-x-hidden">
         {/* Animated background orbs */}
         <div aria-hidden="true">
@@ -52,7 +73,9 @@ export default function RootLayout({
              crawl={true}
              showAtBottom={false}
           />
-          {children}
+          <SidebarPreferenceProvider initialCollapsed={sidebarCollapsed}>
+            {children}
+          </SidebarPreferenceProvider>
         </div>
       </body>
     </html>

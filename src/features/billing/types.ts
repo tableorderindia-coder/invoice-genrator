@@ -242,6 +242,34 @@ export type PnDashboardData = {
   periodRows: PnPeriodRow[];
 };
 
+export type DashboardBulkUpdateRowInput = {
+  payoutId: string;
+  employeeName: string;
+  periodLabel: string;
+  daysWorked: number;
+  dollarInwardUsdCents: number;
+  onboardingAdvanceUsdCents: number;
+  reimbursementUsdCents: number;
+  reimbursementLabelsText: string;
+  appraisalAdvanceUsdCents: number;
+  offboardingDeductionUsdCents: number;
+  cashoutUsdInrRate: number;
+  paidUsdInrRate: number;
+  pfInrCents: number;
+  tdsInrCents: number;
+  actualPaidInrCents: number;
+};
+
+export type DashboardBulkUpdateResult = {
+  savedPayoutIds: string[];
+  failedRows: Array<{
+    payoutId: string;
+    employeeName: string;
+    periodLabel: string;
+    message: string;
+  }>;
+};
+
 export type CompanyExpense = {
   id: string;
   companyId: string;

@@ -2,6 +2,7 @@
 
 import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from "react";
 import { useFormStatus } from "react-dom";
+import { LoaderCircle } from "lucide-react";
 
 type PendingSubmitButtonProps = {
   defaultText: ReactNode;
@@ -24,13 +25,17 @@ export function PendingSubmitButton({
       type="submit"
       {...buttonProps}
       disabled={effectiveDisabled}
+      aria-busy={pending}
       style={
         effectiveDisabled
           ? { opacity: 0.6, cursor: "not-allowed", ...style }
           : style
       }
     >
-      {pending ? pendingText ?? defaultText : defaultText}
+      <span className="inline-flex min-w-max items-center justify-center gap-2">
+        {pending ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : null}
+        {pending ? pendingText ?? defaultText : defaultText}
+      </span>
     </button>
   );
 }

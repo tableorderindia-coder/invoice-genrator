@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 import { PendingActionButton } from "../_components/pending-action-button";
 import { inputClass } from "../_components/field";
+import { NumericInput } from "../_components/numeric-input";
 import {
   buildEmployeeSectionTotals,
   buildPeriodTotals,
@@ -28,6 +29,12 @@ import {
 } from "../../src/features/billing/utils";
 import { getVisibleToggleColumns } from "../../src/features/billing/dashboard-column-visibility";
 import { buildDashboardExportHref } from "../../src/features/billing/dashboard-export-options";
+import type { PortalUiMode } from "../../src/features/ui/portal-ui-mode";
+import type {
+  DashboardBulkUpdateResult,
+  DashboardBulkUpdateRowInput,
+} from "../../src/features/billing/types";
+import { UnifiedEmployeeTable } from "./unified-employee-table";
 
 type DashboardExportHrefs = {
   tableCsv: string;
@@ -44,7 +51,11 @@ type DashboardTablesProps = {
   employeeColumnKeys: string[];
   periodColumnKeys: string[];
   exportHrefs?: DashboardExportHrefs;
+  uiMode?: PortalUiMode;
   updateDashboardEmployeeCashFlowEntryAction: (formData: FormData) => Promise<void>;
+  bulkUpdateDashboardEmployeeCashFlowEntriesAction?: (
+    rows: DashboardBulkUpdateRowInput[],
+  ) => Promise<DashboardBulkUpdateResult>;
 };
 
 const EMPLOYEE_ALWAYS_VISIBLE_COLUMN_KEYS = new Set(["month", "actions"]);
@@ -70,7 +81,9 @@ export function DashboardTables({
   employeeColumnKeys,
   periodColumnKeys,
   exportHrefs,
+  uiMode = "legacy",
   updateDashboardEmployeeCashFlowEntryAction,
+  bulkUpdateDashboardEmployeeCashFlowEntriesAction,
 }: DashboardTablesProps) {
   const [includeExpenses, setIncludeExpenses] = useStoredBoolean(
     "dashboardIncludeExpenses",
@@ -84,7 +97,16 @@ export function DashboardTables({
   const toggleColumns = getVisibleToggleColumns(true);
 
   const table =
-    view === "employee" ? (
+    view === "employee" && uiMode === "saas" && bulkUpdateDashboardEmployeeCashFlowEntriesAction ? (
+      <UnifiedEmployeeTable
+        data={data}
+        selectedColumnKeys={employeeColumnKeys}
+        includeAdvances={includeAdvances}
+        setIncludeAdvances={setIncludeAdvances}
+        exportHrefs={exportHrefs}
+        bulkUpdateAction={bulkUpdateDashboardEmployeeCashFlowEntriesAction}
+      />
+    ) : view === "employee" ? (
       <EmployeeTables
         data={data}
         returnTo={returnTo}
@@ -106,6 +128,7 @@ export function DashboardTables({
         setIncludeAdvances={setIncludeAdvances}
         includeReimbursements={includeReimbursements}
         setIncludeReimbursements={setIncludeReimbursements}
+        uiMode={uiMode}
       />
     );
 
@@ -117,7 +140,7 @@ export function DashboardTables({
 
   return (
     <div className="space-y-4">
-      {exportHrefs ? (
+      {exportHrefs && !(view === "employee" && uiMode === "saas") ? (
         <div className="flex flex-wrap items-center gap-2">
           <a className="btn-outline" href={buildDashboardExportHref(exportHrefs.tableCsv, exportOptions)}>
             Export CSV
@@ -133,24 +156,31 @@ export function DashboardTables({
 }
 
 function useStoredBoolean(key: string) {
-  const [value, setValue] = useState(true);
-  const [storageLoaded, setStorageLoaded] = useState(false);
-
-  useEffect(() => {
-    const saved = localStorage.getItem(key);
+  const eventName = `eassyonboard:storage:${key}`;
+  const subscribe = useCallback((callback: () => void) => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === key) callback();
+    };
+    window.addEventListener("storage", onStorage);
+    window.addEventListener(eventName, callback);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener(eventName, callback);
+    };
+  }, [eventName, key]);
+  const getSnapshot = useCallback(() => {
     try {
-      setValue(saved === null ? true : Boolean(JSON.parse(saved)));
+      const saved = localStorage.getItem(key);
+      return saved === null ? true : Boolean(JSON.parse(saved));
     } catch {
-      setValue(true);
+      return true;
     }
-    setStorageLoaded(true);
   }, [key]);
-
-  useEffect(() => {
-    if (!storageLoaded) return;
-    localStorage.setItem(key, JSON.stringify(value));
-  }, [key, storageLoaded, value]);
-
+  const value = useSyncExternalStore(subscribe, getSnapshot, () => true);
+  const setValue = useCallback((next: boolean) => {
+    localStorage.setItem(key, JSON.stringify(next));
+    window.dispatchEvent(new Event(eventName));
+  }, [eventName, key]);
   return [value, setValue] as const;
 }
 
@@ -239,12 +269,11 @@ function EmployeeTables({
     switch (key) {
       case "dollarInward":
         return (
-          <input
+          <NumericInput
             form={formId}
-            type="number"
             name="dollarInwardUsd"
             min="0"
-            step="0.01"
+            precision={2}
             defaultValue={(row.dollarInwardUsdCents / 100).toFixed(2)}
             className={inputClass}
             style={{
@@ -257,12 +286,11 @@ function EmployeeTables({
         );
       case "onboardingAdvance":
         return (
-          <input
+          <NumericInput
             form={formId}
-            type="number"
             name="onboardingAdvanceUsd"
             min="0"
-            step="0.01"
+            precision={2}
             defaultValue={(row.onboardingAdvanceUsdCents / 100).toFixed(2)}
             className={inputClass}
             style={{
@@ -275,12 +303,11 @@ function EmployeeTables({
         );
       case "reimbursements":
         return (
-          <input
+          <NumericInput
             form={formId}
-            type="number"
             name="reimbursementUsd"
             min="0"
-            step="0.01"
+            precision={2}
             defaultValue={(row.reimbursementUsdCents / 100).toFixed(2)}
             className={inputClass}
             style={{
@@ -311,12 +338,11 @@ function EmployeeTables({
         return formatInr(row.reimbursementInrCents);
       case "appraisalAdvance":
         return (
-          <input
+          <NumericInput
             form={formId}
-            type="number"
             name="appraisalAdvanceUsd"
             min="0"
-            step="0.01"
+            precision={2}
             defaultValue={(row.appraisalAdvanceUsdCents / 100).toFixed(2)}
             className={inputClass}
             style={{
@@ -331,12 +357,11 @@ function EmployeeTables({
         return formatInr(row.appraisalAdvanceInrCents);
       case "offboardingDeduction":
         return (
-          <input
+          <NumericInput
             form={formId}
-            type="number"
             name="offboardingDeductionUsd"
             min="0"
-            step="0.01"
+            precision={2}
             defaultValue={(row.offboardingDeductionUsdCents / 100).toFixed(2)}
             className={inputClass}
             style={{
@@ -367,12 +392,11 @@ function EmployeeTables({
         <span>{row.daysWorked} / {row.daysInMonth}</span>
       ) : (
         <div className="flex items-center gap-2">
-          <input
+          <NumericInput
             form={`dashboard-payout-${row.payoutId}`}
-            type="number"
             name="daysWorked"
             min="1"
-            step="1"
+            precision={0}
             defaultValue={row.daysWorked}
             className={inputClass}
             style={{
@@ -395,12 +419,11 @@ function EmployeeTables({
       render: (row) => row.isSalaryOnly ? (
         <span style={{ color: "var(--text-muted)" }}>-</span>
       ) : (
-        <input
+        <NumericInput
           form={`dashboard-payout-${row.payoutId}`}
-          type="number"
           name="cashoutUsdInrRate"
           min="0"
-          step="0.01"
+          precision={2}
           defaultValue={formatRateInput(row.cashoutUsdInrRate)}
           className={inputClass}
           style={{
@@ -434,12 +457,11 @@ function EmployeeTables({
             <span style={{ color: "var(--text-muted)" }}>-</span>
           </>
         ) : (
-          <input
+          <NumericInput
             form={`dashboard-payout-${row.payoutId}`}
-            type="number"
             name="paidUsdInrRate"
             min="0"
-            step="0.0001"
+            precision={4}
             defaultValue={formatRateInput(row.paidUsdInrRate)}
             className={inputClass}
             style={{
@@ -462,12 +484,11 @@ function EmployeeTables({
       render: (row) => row.isSalaryOnly ? (
         formatInr(row.actualPaidInrCents)
       ) : (
-        <input
+        <NumericInput
           form={`dashboard-payout-${row.payoutId}`}
-          type="number"
           name="actualPaidInr"
           min="0"
-          step="0.01"
+          precision={2}
           defaultValue={(row.actualPaidInrCents / 100).toFixed(2)}
           className={inputClass}
           style={{
@@ -490,12 +511,11 @@ function EmployeeTables({
       render: (row) => row.isSalaryOnly ? (
         formatInr(row.pfInrCents)
       ) : (
-        <input
+        <NumericInput
           form={`dashboard-payout-${row.payoutId}`}
-          type="number"
           name="pfInr"
           min="0"
-          step="0.01"
+          precision={2}
           defaultValue={(row.pfInrCents / 100).toFixed(2)}
           className={inputClass}
           style={{
@@ -513,12 +533,11 @@ function EmployeeTables({
       render: (row) => row.isSalaryOnly ? (
         formatInr(row.tdsInrCents)
       ) : (
-        <input
+        <NumericInput
           form={`dashboard-payout-${row.payoutId}`}
-          type="number"
           name="tdsInr"
           min="0"
-          step="0.01"
+          precision={2}
           defaultValue={(row.tdsInrCents / 100).toFixed(2)}
           className={inputClass}
           style={{
@@ -821,6 +840,7 @@ type PeriodTablesProps = {
   setIncludeAdvances: (value: boolean) => void;
   includeReimbursements: boolean;
   setIncludeReimbursements: (value: boolean) => void;
+  uiMode: PortalUiMode;
 };
 
 function PeriodTables({
@@ -834,6 +854,7 @@ function PeriodTables({
   setIncludeAdvances,
   includeReimbursements,
   setIncludeReimbursements,
+  uiMode,
 }: PeriodTablesProps) {
   const computeNetPl = (row: PnPeriodRow) => {
     return calculatePnPeriodNetPlInrCents(row, {
@@ -1130,10 +1151,10 @@ function PeriodTables({
         </div>
       </div>
       <div
-        className="overflow-x-auto rounded-2xl"
+        className={uiMode === "saas" ? "unified-dashboard-scroll" : "overflow-x-auto rounded-2xl"}
         style={{ border: "1px solid var(--glass-border)" }}
       >
-        <table className="glass-table min-w-max">
+        <table className={uiMode === "saas" ? "unified-dashboard-table unified-period-table" : "glass-table min-w-max"}>
           <thead>
             <tr>
               {columns.map((column) => (

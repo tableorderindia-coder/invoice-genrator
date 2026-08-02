@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 
 import { inputClass } from "@/app/_components/field";
 import { PendingSubmitButton } from "@/app/_components/pending-submit-button";
+import { NumericInput } from "@/app/_components/numeric-input";
 import { saveInvoicePaymentEmployeeEntriesAction } from "@/src/features/billing/actions";
 import { calculateEmployeePayoutMetrics } from "@/src/features/billing/domain";
 import {
@@ -476,15 +477,15 @@ export default function EmployeeCashFlowEntryForm({
                   <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
                     Days worked
                   </span>
-                  <input
+                  <NumericInput
                     value={String(entry.daysWorked)}
-                    onChange={(event) =>
+                    precision={0}
+                    onValueChange={(value) =>
                       updateEntry(entry.id, {
-                        daysWorked: Number.parseInt(event.target.value || "0", 10) || 0,
+                        daysWorked: Number.parseInt(value || "0", 10) || 0,
                       })
                     }
                     className={cardInputClass()}
-                    inputMode="decimal"
                   />
                 </label>
 
@@ -492,15 +493,15 @@ export default function EmployeeCashFlowEntryForm({
                   <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
                     Dollar inward
                   </span>
-                  <input
+                  <NumericInput
                     value={toCurrencyInput(entry.baseDollarInwardUsdCents)}
-                    onChange={(event) =>
+                    precision={2}
+                    onValueChange={(value) =>
                       updateEntry(entry.id, {
-                        baseDollarInwardUsdCents: fromCurrencyInput(event.target.value),
+                        baseDollarInwardUsdCents: fromCurrencyInput(value),
                       })
                     }
                     className={cardInputClass()}
-                    inputMode="decimal"
                   />
                 </label>
 
@@ -508,15 +509,15 @@ export default function EmployeeCashFlowEntryForm({
                   <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
                     Onboarding advance
                   </span>
-                  <input
+                  <NumericInput
                     value={toCurrencyInput(entry.onboardingAdvanceUsdCents)}
-                    onChange={(event) =>
+                    precision={2}
+                    onValueChange={(value) =>
                       updateEntry(entry.id, {
-                        onboardingAdvanceUsdCents: fromCurrencyInput(event.target.value),
+                        onboardingAdvanceUsdCents: fromCurrencyInput(value),
                       })
                     }
                     className={cardInputClass()}
-                    inputMode="decimal"
                   />
                 </label>
 
@@ -524,15 +525,15 @@ export default function EmployeeCashFlowEntryForm({
                   <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
                     Reimbursements / Expenses
                   </span>
-                  <input
+                  <NumericInput
                     value={toCurrencyInput(entry.reimbursementUsdCents)}
-                    onChange={(event) =>
+                    precision={2}
+                    onValueChange={(value) =>
                       updateEntry(entry.id, {
-                        reimbursementUsdCents: fromCurrencyInput(event.target.value),
+                        reimbursementUsdCents: fromCurrencyInput(value),
                       })
                     }
                     className={cardInputClass()}
-                    inputMode="decimal"
                   />
                 </label>
 
@@ -548,7 +549,6 @@ export default function EmployeeCashFlowEntryForm({
                       })
                     }
                     className={cardInputClass()}
-                    inputMode="decimal"
                   />
                 </label>
 
@@ -556,15 +556,15 @@ export default function EmployeeCashFlowEntryForm({
                   <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
                     Appraisal advance
                   </span>
-                  <input
+                  <NumericInput
                     value={toCurrencyInput(entry.appraisalAdvanceUsdCents)}
-                    onChange={(event) =>
+                    precision={2}
+                    onValueChange={(value) =>
                       updateEntry(entry.id, {
-                        appraisalAdvanceUsdCents: fromCurrencyInput(event.target.value),
+                        appraisalAdvanceUsdCents: fromCurrencyInput(value),
                       })
                     }
                     className={cardInputClass()}
-                    inputMode="decimal"
                   />
                 </label>
 
@@ -572,15 +572,15 @@ export default function EmployeeCashFlowEntryForm({
                   <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
                     Offboarding deduction
                   </span>
-                  <input
+                  <NumericInput
                     value={toCurrencyInput(entry.offboardingDeductionUsdCents)}
-                    onChange={(event) =>
+                    precision={2}
+                    onValueChange={(value) =>
                       updateEntry(entry.id, {
-                        offboardingDeductionUsdCents: fromCurrencyInput(event.target.value),
+                        offboardingDeductionUsdCents: fromCurrencyInput(value),
                       })
                     }
                     className={cardInputClass()}
-                    inputMode="decimal"
                   />
                 </label>
 
@@ -588,17 +588,15 @@ export default function EmployeeCashFlowEntryForm({
                   <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
                     Received / exchanged rate
                   </span>
-                  <input
-                    type="number"
-                    step="0.01"
+                  <NumericInput
+                    precision={2}
                     value={formatRateInput(entry.cashoutUsdInrRate)}
-                    onChange={(event) =>
+                    onValueChange={(value) =>
                       updateEntry(entry.id, {
-                        cashoutUsdInrRate: Number.parseFloat(event.target.value || "0") || 0,
+                        cashoutUsdInrRate: Number.parseFloat(value || "0") || 0,
                       })
                     }
                     className={cardInputClass()}
-                    inputMode="decimal"
                   />
                 </label>
 
@@ -606,13 +604,12 @@ export default function EmployeeCashFlowEntryForm({
                   <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
                     Peg rate
                   </span>
-                  <input
-                    type="number"
-                    step="0.0001"
+                  <NumericInput
+                    precision={4}
                     value={formatRateInput(entry.paidUsdInrRate)}
-                    onChange={(event) =>
+                    onValueChange={(value) =>
                       updateEntry(entry.id, {
-                        paidUsdInrRate: Number.parseFloat(event.target.value || "0") || 0,
+                        paidUsdInrRate: Number.parseFloat(value || "0") || 0,
                       })
                     }
                     className={cardInputClass()}
@@ -623,15 +620,15 @@ export default function EmployeeCashFlowEntryForm({
                   <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
                     Monthly paid (INR)
                   </span>
-                  <input
+                  <NumericInput
                     value={toCurrencyInput(entry.monthlyPaidInrCents)}
-                    onChange={(event) =>
+                    precision={2}
+                    onValueChange={(value) =>
                       updateEntry(entry.id, {
-                        monthlyPaidInrCents: fromCurrencyInput(event.target.value),
+                        monthlyPaidInrCents: fromCurrencyInput(value),
                       })
                     }
                     className={cardInputClass()}
-                    inputMode="decimal"
                   />
                 </label>
 
@@ -639,15 +636,15 @@ export default function EmployeeCashFlowEntryForm({
                   <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
                     Actual paid (INR)
                   </span>
-                  <input
+                  <NumericInput
                     value={toCurrencyInput(entry.actualPaidInrCents)}
-                    onChange={(event) =>
+                    precision={2}
+                    onValueChange={(value) =>
                       updateEntry(entry.id, {
-                        actualPaidInrCents: fromCurrencyInput(event.target.value),
+                        actualPaidInrCents: fromCurrencyInput(value),
                       })
                     }
                     className={cardInputClass()}
-                    inputMode="decimal"
                   />
                 </label>
 
@@ -655,11 +652,12 @@ export default function EmployeeCashFlowEntryForm({
                   <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
                     PF (INR)
                   </span>
-                  <input
+                  <NumericInput
                     value={toCurrencyInput(entry.pfInrCents)}
-                    onChange={(event) =>
+                    precision={2}
+                    onValueChange={(value) =>
                       updateEntry(entry.id, {
-                        pfInrCents: fromCurrencyInput(event.target.value),
+                        pfInrCents: fromCurrencyInput(value),
                       })
                     }
                     className={cardInputClass()}
@@ -670,11 +668,12 @@ export default function EmployeeCashFlowEntryForm({
                   <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
                     TDS (INR)
                   </span>
-                  <input
+                  <NumericInput
                     value={toCurrencyInput(entry.tdsInrCents)}
-                    onChange={(event) =>
+                    precision={2}
+                    onValueChange={(value) =>
                       updateEntry(entry.id, {
-                        tdsInrCents: fromCurrencyInput(event.target.value),
+                        tdsInrCents: fromCurrencyInput(value),
                       })
                     }
                     className={cardInputClass()}

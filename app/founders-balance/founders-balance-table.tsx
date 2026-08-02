@@ -5,6 +5,7 @@ import { useFormStatus } from "react-dom";
 
 import { inputClass } from "../_components/field";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
+import { NumericInput } from "../_components/numeric-input";
 import {
   FOUNDER_BALANCE_FOUNDERS,
   type FounderBalanceModel,
@@ -40,11 +41,10 @@ function FounderWithdrawalInput({
 }) {
   const { pending } = useFormStatus();
   return (
-    <input
-      type="number"
+    <NumericInput
       name={name}
       min="0"
-      step="0.01"
+      precision={2}
       defaultValue={formatInputAmount(defaultValue)}
       disabled={disabled || pending}
       className={inputClass}

@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { inputClass } from "@/app/_components/field";
 import { PendingSubmitButton } from "@/app/_components/pending-submit-button";
+import { NumericInput } from "@/app/_components/numeric-input";
 import { saveEmployeeStatementAction } from "@/src/features/billing/actions";
 import {
   buildEmployeeStatementDateRangeLabel,
@@ -236,32 +237,30 @@ export default function EmployeeStatementEditor(props: {
                     {row.invoiceNumber}
                   </td>
                   <td className="px-4 py-3 align-top">
-                    <input
-                      type="number"
-                      step="0.01"
+                    <NumericInput
+                      precision={2}
                       value={formatUsdInput(row.dollarInwardUsdCents)}
-                      onChange={(event) =>
+                      onValueChange={(value) =>
                         updateRow(
                           row.monthKey,
                           row.invoiceId,
                           "dollarInwardUsdCents",
-                          event.target.value,
+                          value,
                         )
                       }
                       className={`${inputClass} min-w-[8rem] text-right`}
                     />
                   </td>
                   <td className="px-4 py-3 align-top">
-                    <input
-                      type="number"
-                      step="0.01"
+                    <NumericInput
+                      precision={2}
                       value={formatUsdInput(row.onboardingAdvanceUsdCents)}
-                      onChange={(event) =>
+                      onValueChange={(value) =>
                         updateRow(
                           row.monthKey,
                           row.invoiceId,
                           "onboardingAdvanceUsdCents",
-                          event.target.value,
+                          value,
                         )
                       }
                       className={`${inputClass} min-w-[8rem] text-right`}
@@ -269,16 +268,15 @@ export default function EmployeeStatementEditor(props: {
                   </td>
                   <td className="px-4 py-3 align-top">
                     <div className="space-y-2">
-                      <input
-                        type="number"
-                        step="0.01"
+                      <NumericInput
+                        precision={2}
                         value={formatUsdInput(row.reimbursementUsdCents)}
-                        onChange={(event) =>
+                        onValueChange={(value) =>
                           updateRow(
                             row.monthKey,
                             row.invoiceId,
                             "reimbursementUsdCents",
-                            event.target.value,
+                            value,
                           )
                         }
                         className={`${inputClass} min-w-[8rem] text-right`}
@@ -300,32 +298,30 @@ export default function EmployeeStatementEditor(props: {
                     </div>
                   </td>
                   <td className="px-4 py-3 align-top">
-                    <input
-                      type="number"
-                      step="0.01"
+                    <NumericInput
+                      precision={2}
                       value={formatUsdInput(row.appraisalAdvanceUsdCents)}
-                      onChange={(event) =>
+                      onValueChange={(value) =>
                         updateRow(
                           row.monthKey,
                           row.invoiceId,
                           "appraisalAdvanceUsdCents",
-                          event.target.value,
+                          value,
                         )
                       }
                       className={`${inputClass} min-w-[8rem] text-right`}
                     />
                   </td>
                   <td className="px-4 py-3 align-top">
-                    <input
-                      type="number"
-                      step="0.01"
+                    <NumericInput
+                      precision={2}
                       value={formatUsdInput(row.offboardingDeductionUsdCents)}
-                      onChange={(event) =>
+                      onValueChange={(value) =>
                         updateRow(
                           row.monthKey,
                           row.invoiceId,
                           "offboardingDeductionUsdCents",
-                          event.target.value,
+                          value,
                         )
                       }
                       className={`${inputClass} min-w-[8rem] text-right`}
@@ -338,11 +334,10 @@ export default function EmployeeStatementEditor(props: {
                   </td>
                   <td className="px-4 py-3 align-top">
                     {row.monthlyDollarPaidUsdCents === null ? null : (
-                      <input
-                        type="number"
-                        step="0.01"
+                      <NumericInput
+                        precision={2}
                         value={formatUsdInput(row.monthlyDollarPaidUsdCents)}
-                        onChange={(event) => updateMonthPaid(row.monthKey, event.target.value)}
+                        onValueChange={(value) => updateMonthPaid(row.monthKey, value)}
                         className={`${inputClass} min-w-[8rem] text-right`}
                       />
                     )}

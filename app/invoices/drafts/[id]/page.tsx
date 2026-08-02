@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Shell } from "../../../_components/shell";
 import { GlassPanel } from "../../../_components/glass-panel";
 import { inputClass } from "../../../_components/field";
+import { NumericInput } from "../../../_components/numeric-input";
 import { PendingActionButton } from "../../../_components/pending-action-button";
 import { PendingSubmitButton } from "../../../_components/pending-submit-button";
 import { requirePageAccess } from "@/lib/auth/server";
@@ -133,9 +134,9 @@ export default async function DraftInvoicePage({
                 </label>
                 <label className="space-y-2 text-sm" style={{ color: "var(--text-secondary)" }}>
                   <span>Billing month</span>
-                  <input
+                  <NumericInput
                     name="month"
-                    type="number"
+                    precision={0}
                     min="1"
                     max="12"
                     defaultValue={detail.invoice.month}
@@ -145,9 +146,9 @@ export default async function DraftInvoicePage({
                 </label>
                 <label className="space-y-2 text-sm" style={{ color: "var(--text-secondary)" }}>
                   <span>Billing year</span>
-                  <input
+                  <NumericInput
                     name="year"
-                    type="number"
+                    precision={0}
                     min="2000"
                     max="2100"
                     defaultValue={detail.invoice.year}
@@ -253,10 +254,9 @@ export default async function DraftInvoicePage({
                 <form action={updateInvoiceGrandTotalAction} className="flex items-center gap-2">
                   <input type="hidden" name="invoiceId" value={detail.invoice.id} />
                   <input type="hidden" name="returnTo" value={returnTo} />
-                  <input
+                  <NumericInput
                     name="grandTotalUsd"
-                    type="number"
-                    step="1"
+                    precision={0}
                     min="0"
                     defaultValue={Math.round(detail.invoice.grandTotalUsdCents / 100)}
                     className={inputClass}
@@ -395,11 +395,10 @@ export default async function DraftInvoicePage({
                         <input type="hidden" name="invoiceId" value={detail.invoice.id} />
                         <input type="hidden" name="invoiceTeamId" value={team.id} />
                         <input type="hidden" name="returnTo" value={returnTo} />
-                        <input
+                        <NumericInput
                           name="teamTotalUsd"
-                          type="number"
+                          precision={0}
                           min="0"
-                          step="1"
                           defaultValue={Math.round((team.totalUsdCents ?? 0) / 100)}
                           className={inputClass}
                           style={{ minWidth: "8rem" }}
@@ -453,11 +452,10 @@ export default async function DraftInvoicePage({
                               <input type="hidden" form={`line-item-${lineItem.id}`} name="invoiceId" value={detail.invoice.id} />
                               <input type="hidden" form={`line-item-${lineItem.id}`} name="lineItemId" value={lineItem.id} />
                               <input type="hidden" form={`line-item-${lineItem.id}`} name="returnTo" value={returnTo} />
-                              <input
+                              <NumericInput
                                 form={`line-item-${lineItem.id}`}
                                 name="billingRateUsd"
-                                type="number"
-                                step="0.01"
+                                precision={2}
                                 min="0"
                                 defaultValue={(lineItem.billingRateUsdCents / 100).toFixed(2)}
                                 className={inputClass}
@@ -465,11 +463,10 @@ export default async function DraftInvoicePage({
                               />
                             </td>
                             <td>
-                              <input
+                              <NumericInput
                                 form={`line-item-${lineItem.id}`}
                                 name="hrsPerWeek"
-                                type="number"
-                                step="0.01"
+                                precision={2}
                                 min="0"
                                 defaultValue={lineItem.hrsPerWeek}
                                 className={inputClass}
@@ -477,11 +474,10 @@ export default async function DraftInvoicePage({
                               />
                             </td>
                             <td>
-                              <input
+                              <NumericInput
                                 form={`line-item-${lineItem.id}`}
                                 name="daysWorked"
-                                type="number"
-                                step="1"
+                                precision={0}
                                 min="1"
                                 defaultValue={lineItem.daysWorked}
                                 className={inputClass}
@@ -493,11 +489,10 @@ export default async function DraftInvoicePage({
                                 <input type="hidden" name="invoiceId" value={detail.invoice.id} />
                                 <input type="hidden" name="lineItemId" value={lineItem.id} />
                                 <input type="hidden" name="returnTo" value={returnTo} />
-                                <input
+                                <NumericInput
                                   name="billedTotalUsd"
-                                  type="number"
+                                  precision={0}
                                   min="0"
-                                  step="1"
                                   defaultValue={Math.round(lineItem.billedTotalUsdCents / 100)}
                                   className={inputClass}
                                   style={{ minWidth: "8rem" }}

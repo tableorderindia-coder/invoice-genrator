@@ -6,6 +6,7 @@ import * as XLSX from "xlsx";
 
 import { Field, inputClass } from "@/app/_components/field";
 import { PendingSubmitButton } from "@/app/_components/pending-submit-button";
+import { NumericInput } from "@/app/_components/numeric-input";
 import { saveMonthlyPayrollRowsAction } from "@/src/features/billing/actions";
 import {
   calculateActualPaidInrCents,
@@ -485,15 +486,14 @@ export function SalaryMonthEditor({
                       </p>
                     </td>
                     <td className="px-4 py-3 align-top">
-                      <input
+                      <NumericInput
                         className={`${inputClass} w-28`}
-                        type="number"
                         min="0"
                         max={row.daysInMonth}
-                        step="0.01"
+                        precision={2}
                         value={row.daysWorked}
-                        onChange={(event) => {
-                          const parsed = Number.parseFloat(event.currentTarget.value || "0");
+                        onValueChange={(value) => {
+                          const parsed = Number.parseFloat(value || "0");
                           updateRow(row.employeeId, {
                             daysWorked: normalizePayrollDaysWorked(parsed, row.daysInMonth),
                           });
@@ -511,15 +511,14 @@ export function SalaryMonthEditor({
                       ["bonusInrCents", "bonus INR"],
                     ].map(([key, label]) => (
                       <td key={key} className="px-4 py-3 align-top">
-                        <input
+                        <NumericInput
                           className={`${inputClass} w-32`}
-                          type="number"
                           min="0"
-                          step="0.01"
+                          precision={2}
                           value={inrInputValue(row[key as keyof EditablePayrollRow] as number)}
-                          onChange={(event) =>
+                          onValueChange={(value) =>
                             updateRow(row.employeeId, {
-                              [key]: centsFromInrInput(event.currentTarget.value),
+                              [key]: centsFromInrInput(value),
                             } as Partial<EditablePayrollRow>)
                           }
                           aria-label={`${row.employeeName} ${label}`}
@@ -527,30 +526,28 @@ export function SalaryMonthEditor({
                       </td>
                     ))}
                   <td className="px-4 py-3 align-top">
-                    <input
+                    <NumericInput
                       className={`${inputClass} w-28`}
-                      type="number"
                       min="0"
-                      step="0.01"
+                      precision={2}
                       value={inrInputValue(row.pfInrCents)}
-                      onChange={(event) =>
+                      onValueChange={(value) =>
                         updateRow(row.employeeId, {
-                          pfInrCents: centsFromInrInput(event.currentTarget.value),
+                          pfInrCents: centsFromInrInput(value),
                         })
                       }
                       aria-label={`${row.employeeName} PF INR`}
                     />
                   </td>
                   <td className="px-4 py-3 align-top">
-                    <input
+                    <NumericInput
                       className={`${inputClass} w-28`}
-                      type="number"
                       min="0"
-                      step="0.01"
+                      precision={2}
                       value={inrInputValue(row.tdsInrCents)}
-                      onChange={(event) =>
+                      onValueChange={(value) =>
                         updateRow(row.employeeId, {
-                          tdsInrCents: centsFromInrInput(event.currentTarget.value),
+                          tdsInrCents: centsFromInrInput(value),
                         })
                       }
                       aria-label={`${row.employeeName} TDS INR`}

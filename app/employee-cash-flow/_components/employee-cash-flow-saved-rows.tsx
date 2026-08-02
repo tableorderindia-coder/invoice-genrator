@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 
 import { inputClass } from "../../_components/field";
+import { NumericInput } from "../../_components/numeric-input";
 import {
   deleteSavedEmployeeCashFlowEntryAction,
   updateSavedEmployeeCashFlowEntryAction,
@@ -170,45 +171,45 @@ export default function EmployeeCashFlowSavedRows({
                               />
                             </td>
                             <td>
-                              <input
+                              <NumericInput
                                 value={toCurrencyInput(row.baseDollarInwardUsdCents)}
-                                onChange={(event) =>
+                                precision={2}
+                                onValueChange={(value) =>
                                   updateRow(row.id, {
                                     baseDollarInwardUsdCents: fromCurrencyInput(
-                                      event.target.value,
+                                      value,
                                     ),
                                   })
                                 }
                                 className={`${inputClass} min-w-[8rem]`}
-                                inputMode="decimal"
                               />
                             </td>
                             <td>
-                              <input
+                              <NumericInput
                                 value={toCurrencyInput(row.onboardingAdvanceUsdCents)}
-                                onChange={(event) =>
+                                precision={2}
+                                onValueChange={(value) =>
                                   updateRow(row.id, {
                                     onboardingAdvanceUsdCents: fromCurrencyInput(
-                                      event.target.value,
+                                      value,
                                     ),
                                   })
                                 }
                                 className={`${inputClass} min-w-[8rem]`}
-                                inputMode="decimal"
                               />
                             </td>
                             <td>
-                              <input
+                              <NumericInput
                                 value={toCurrencyInput(row.reimbursementUsdCents)}
-                                onChange={(event) =>
+                                precision={2}
+                                onValueChange={(value) =>
                                   updateRow(row.id, {
                                     reimbursementUsdCents: fromCurrencyInput(
-                                      event.target.value,
+                                      value,
                                     ),
                                   })
                                 }
                                 className={`${inputClass} min-w-[8rem]`}
-                                inputMode="decimal"
                               />
                             </td>
                             <td>
@@ -223,112 +224,108 @@ export default function EmployeeCashFlowSavedRows({
                               />
                             </td>
                             <td>
-                              <input
+                              <NumericInput
                                 value={toCurrencyInput(row.appraisalAdvanceUsdCents)}
-                                onChange={(event) =>
+                                precision={2}
+                                onValueChange={(value) =>
                                   updateRow(row.id, {
                                     appraisalAdvanceUsdCents: fromCurrencyInput(
-                                      event.target.value,
+                                      value,
                                     ),
                                   })
                                 }
                                 className={`${inputClass} min-w-[8rem]`}
-                                inputMode="decimal"
                               />
                             </td>
                             <td>
-                              <input
+                              <NumericInput
                                 value={toCurrencyInput(row.offboardingDeductionUsdCents)}
-                                onChange={(event) =>
+                                precision={2}
+                                onValueChange={(value) =>
                                   updateRow(row.id, {
                                     offboardingDeductionUsdCents: fromCurrencyInput(
-                                      event.target.value,
+                                      value,
                                     ),
                                   })
                                 }
                                 className={`${inputClass} min-w-[8rem]`}
-                                inputMode="decimal"
                               />
                             </td>
                             <td className="font-semibold">
                               {formatUsd(finalEffectiveDollarInwardUsdCents)}
                             </td>
                             <td>
-                              <input
-                                type="number"
-                                step="0.01"
+                              <NumericInput
+                                precision={2}
                                 value={formatRateInput(row.cashoutUsdInrRate)}
-                                onChange={(event) =>
+                                onValueChange={(value) =>
                                   updateRow(row.id, {
                                     cashoutUsdInrRate:
-                                      Number.parseFloat(event.target.value || "0") || 0,
+                                      Number.parseFloat(value || "0") || 0,
                                   })
                                 }
                                 className={`${inputClass} min-w-[7rem]`}
-                                inputMode="decimal"
                               />
                             </td>
                             <td>
-                              <input
-                                type="number"
-                                step="0.0001"
+                              <NumericInput
+                                precision={4}
                                 value={formatRateInput(row.paidUsdInrRate)}
-                                onChange={(event) =>
+                                onValueChange={(value) =>
                                   updateRow(row.id, {
                                     paidUsdInrRate:
-                                      Number.parseFloat(event.target.value || "0") || 0,
+                                      Number.parseFloat(value || "0") || 0,
                                   })
                                 }
                                 className={`${inputClass} min-w-[7rem]`}
-                                inputMode="decimal"
                               />
                             </td>
                             <td>
-                              <input
+                              <NumericInput
                                 value={toCurrencyInput(row.monthlyPaidInrCents)}
-                                onChange={(event) =>
+                                precision={2}
+                                onValueChange={(value) =>
                                   updateRow(row.id, {
-                                    monthlyPaidInrCents: fromCurrencyInput(event.target.value),
+                                    monthlyPaidInrCents: fromCurrencyInput(value),
                                   })
                                 }
                                 className={`${inputClass} min-w-[8rem]`}
-                                inputMode="decimal"
                               />
                             </td>
                             <td>
-                              <input
+                              <NumericInput
                                 value={toCurrencyInput(row.actualPaidInrCents)}
-                                onChange={(event) =>
+                                precision={2}
+                                onValueChange={(value) =>
                                   updateRow(row.id, {
-                                    actualPaidInrCents: fromCurrencyInput(event.target.value),
+                                    actualPaidInrCents: fromCurrencyInput(value),
                                   })
                                 }
                                 className={`${inputClass} min-w-[8rem]`}
-                                inputMode="decimal"
                               />
                             </td>
                             <td>
-                              <input
+                              <NumericInput
                                 value={toCurrencyInput(row.pfInrCents)}
-                                onChange={(event) =>
+                                precision={2}
+                                onValueChange={(value) =>
                                   updateRow(row.id, {
-                                    pfInrCents: fromCurrencyInput(event.target.value),
+                                    pfInrCents: fromCurrencyInput(value),
                                   })
                                 }
                                 className={`${inputClass} min-w-[8rem]`}
-                                inputMode="decimal"
                               />
                             </td>
                             <td>
-                              <input
+                              <NumericInput
                                 value={toCurrencyInput(row.tdsInrCents)}
-                                onChange={(event) =>
+                                precision={2}
+                                onValueChange={(value) =>
                                   updateRow(row.id, {
-                                    tdsInrCents: fromCurrencyInput(event.target.value),
+                                    tdsInrCents: fromCurrencyInput(value),
                                   })
                                 }
                                 className={`${inputClass} min-w-[8rem]`}
-                                inputMode="decimal"
                               />
                             </td>
                             <td className="font-semibold">{formatInr(row.salaryPaidInrCents)}</td>

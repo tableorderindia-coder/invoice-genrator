@@ -2,6 +2,7 @@
 
 import type { CSSProperties, ReactNode } from "react";
 import { useState } from "react";
+import { LoaderCircle } from "lucide-react";
 
 type PendingActionButtonProps = {
   className?: string;
@@ -28,6 +29,7 @@ export function PendingActionButton({
       type="button"
       className={className}
       disabled={effectiveDisabled}
+      aria-busy={pending}
       onClick={(event) => {
         if (!effectiveDisabled) {
           const targetForm = form
@@ -45,7 +47,10 @@ export function PendingActionButton({
           : style
       }
     >
-      {pending ? pendingText ?? defaultText : defaultText}
+      <span className="inline-flex min-w-max items-center justify-center gap-2">
+        {pending ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : null}
+        {pending ? pendingText ?? defaultText : defaultText}
+      </span>
     </button>
   );
 }

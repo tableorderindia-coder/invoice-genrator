@@ -49,7 +49,11 @@ import {
   upsertInvoicePayment,
 } from "./employee-cash-flow-store";
 import { parseExpenseMonthKeyParts } from "./expense-period";
-import type { InvoiceStatus } from "./types";
+import type {
+  DashboardBulkUpdateResult,
+  DashboardBulkUpdateRowInput,
+  InvoiceStatus,
+} from "./types";
 import { centsFromUsd } from "./utils";
 import { parseFounderWithdrawalRows } from "./founders-balance";
 import {
@@ -1099,6 +1103,92 @@ export async function updateDashboardEmployeeCashFlowEntryAction(formData: FormD
   }
 
   redirect(buildFlashRedirect(returnTo, "success", "Dashboard cash flow row updated."));
+}
+
+function validateDashboardBulkRow(row: DashboardBulkUpdateRowInput) {
+  if (!row.payoutId) throw new Error("Cash-flow row is missing an id.");
+  if (!Number.isFinite(row.daysWorked) || row.daysWorked <= 0) {
+    throw new Error("Days worked must be greater than 0.");
+  }
+  const nonNegativeFields: Array<[string, number]> = [
+    ["Dollars inward", row.dollarInwardUsdCents],
+    ["Onboarding advance", row.onboardingAdvanceUsdCents],
+    ["Reimbursements / Expenses", row.reimbursementUsdCents],
+    ["Appraisal advance", row.appraisalAdvanceUsdCents],
+    ["Offboarding deduction", row.offboardingDeductionUsdCents],
+    ["Cashout USD/INR rate", row.cashoutUsdInrRate],
+    ["Paid USD/INR rate", row.paidUsdInrRate],
+    ["PF", row.pfInrCents],
+    ["TDS", row.tdsInrCents],
+    ["Actual paid", row.actualPaidInrCents],
+  ];
+  for (const [label, value] of nonNegativeFields) {
+    if (!Number.isFinite(value) || value < 0) {
+      throw new Error(`${label} cannot be negative.`);
+    }
+  }
+}
+
+export async function bulkUpdateDashboardEmployeeCashFlowEntriesAction(
+  rows: DashboardBulkUpdateRowInput[],
+): Promise<DashboardBulkUpdateResult> {
+  await requirePageEditAccess("dashboard");
+  const result: DashboardBulkUpdateResult = { savedPayoutIds: [], failedRows: [] };
+  const companyIds = new Set<string>();
+
+  for (let offset = 0; offset < rows.length; offset += 10) {
+    const batch = rows.slice(offset, offset + 10);
+    const batchResults = await Promise.all(
+      batch.map(async (row) => {
+        try {
+          validateDashboardBulkRow(row);
+          const companyId = await getEmployeeCashFlowEntryCompanyId(row.payoutId);
+          await updateDashboardEmployeeCashFlowEntry({
+            entryId: row.payoutId,
+            daysWorked: row.daysWorked,
+            dollarInwardUsdCents: row.dollarInwardUsdCents,
+            onboardingAdvanceUsdCents: row.onboardingAdvanceUsdCents,
+            reimbursementUsdCents: row.reimbursementUsdCents,
+            reimbursementLabelsText: row.reimbursementLabelsText,
+            appraisalAdvanceUsdCents: row.appraisalAdvanceUsdCents,
+            offboardingDeductionUsdCents: row.offboardingDeductionUsdCents,
+            cashoutUsdInrRate: row.cashoutUsdInrRate,
+            paidUsdInrRate: row.paidUsdInrRate,
+            pfInrCents: row.pfInrCents,
+            tdsInrCents: row.tdsInrCents,
+            actualPaidInrCents: row.actualPaidInrCents,
+          });
+          return { row, companyId, error: null };
+        } catch (error) {
+          return { row, companyId: null, error };
+        }
+      }),
+    );
+
+    for (const item of batchResults) {
+      if (item.error) {
+        result.failedRows.push({
+          payoutId: item.row.payoutId,
+          employeeName: item.row.employeeName,
+          periodLabel: item.row.periodLabel,
+          message: getErrorMessage(item.error, "Unable to update dashboard row."),
+        });
+      } else {
+        result.savedPayoutIds.push(item.row.payoutId);
+        if (item.companyId) companyIds.add(item.companyId);
+      }
+    }
+  }
+
+  await Promise.all(
+    [...companyIds].map(async (companyId) => {
+      await invalidateBillingCaches({ type: "cashflow", companyId });
+      await refreshPnSummariesForCompany(companyId);
+    }),
+  );
+  revalidatePath("/dashboard");
+  revalidatePath("/employee-cash-flow");
+  return result;
 }
 
 export async function saveCompanyExpenseAction(formData: FormData) {
