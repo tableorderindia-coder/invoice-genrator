@@ -1,6 +1,7 @@
 import { Shell } from "../_components/shell";
 import { GlassPanel } from "../_components/glass-panel";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
+import { NumericInput } from "../_components/numeric-input";
 import { requirePageAccess } from "@/lib/auth/server";
 import { filterCompaniesForAuthContext } from "@/src/features/billing/company-access";
 import { resolveSelectedCompanyIds } from "@/src/features/billing/filter-selection";
@@ -140,13 +141,12 @@ export default async function CashoutPage({
                       >
                         <input type="hidden" name="invoiceId" value={invoice.id} />
                         <input type="hidden" name="returnTo" value={returnTo} />
-                        <input
-                          type="number"
+                        <NumericInput
                           name="dollarInboundUsd"
                           aria-label="Dollar inward (USD)"
                           placeholder="Dollar inward (USD)"
                           min="0.01"
-                          step="0.01"
+                          precision={2}
                           className="min-w-48"
                           style={{
                             height: "44px",
@@ -157,13 +157,12 @@ export default async function CashoutPage({
                             color: "var(--text-primary)",
                           }}
                         />
-                        <input
-                          type="number"
+                        <NumericInput
                           name="usdInrRate"
                           aria-label="USD/INR rate"
                           placeholder="USD/INR rate"
                           min="0.01"
-                          step="0.01"
+                          precision={2}
                           className="min-w-36"
                           style={{
                             height: "44px",

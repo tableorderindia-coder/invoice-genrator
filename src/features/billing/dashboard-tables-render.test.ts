@@ -13,6 +13,10 @@ import {
 } from "./dashboard-column-options";
 import type { PnDashboardData, PnEmployeeEditableRow, PnPeriodRow } from "./types";
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: vi.fn() }),
+}));
+
 const allEmployeeColumnKeys = EMPLOYEE_DASHBOARD_COLUMN_OPTIONS.map(
   (option) => option.value,
 );
@@ -131,6 +135,81 @@ describe("dashboard tables rendering", () => {
   beforeEach(() => {
     cleanup();
     window.localStorage.clear();
+  });
+
+  it("renders the SaaS employee view as one unified spreadsheet with frozen coordinates", () => {
+    render(
+      createElement(DashboardTables, {
+        view: "employee",
+        periodType: "monthly",
+        data: baseData,
+        returnTo: "/dashboard",
+        employeeColumnKeys: DEFAULT_EMPLOYEE_DASHBOARD_COLUMNS,
+        periodColumnKeys: DEFAULT_PERIOD_DASHBOARD_COLUMNS,
+        uiMode: "saas",
+        updateDashboardEmployeeCashFlowEntryAction: vi.fn(async () => {}),
+        bulkUpdateDashboardEmployeeCashFlowEntriesAction: vi.fn(async () => ({
+          savedPayoutIds: [],
+          failedRows: [],
+        })),
+      }),
+    );
+
+    expect(screen.getAllByRole("table")).toHaveLength(1);
+    const table = screen.getByRole("table");
+    const headers = within(table).getAllByRole("columnheader");
+    expect(headers[0]?.textContent).toBe("Employee");
+    expect(headers[0]?.className).toContain("sticky-employee-column");
+    expect(headers[1]?.textContent).toBe("Period");
+    expect(headers[1]?.className).toContain("sticky-period-column");
+    expect(screen.getByRole("searchbox", { name: "Search employees" })).toBeTruthy();
+    expect(screen.getByText("Subtotal")).toBeTruthy();
+    expect(screen.getByText("Grand total")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Edit" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "P&L" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Payroll" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Cash Flow" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Detailed" })).toBeTruthy();
+  });
+
+  it("shows an employee name once across that employee's rows and subtotal", () => {
+    render(
+      createElement(DashboardTables, {
+        view: "employee",
+        periodType: "monthly",
+        data: {
+          ...baseData,
+          employeeEditableSections: [
+            {
+              ...baseData.employeeEditableSections[0],
+              rows: [
+                employeeRow,
+                {
+                  ...employeeRow,
+                  payoutId: "payout_2",
+                  invoiceId: "inv_2",
+                  invoiceNumber: "INV-2",
+                  month: 5,
+                },
+              ],
+            },
+          ],
+        },
+        returnTo: "/dashboard",
+        employeeColumnKeys: DEFAULT_EMPLOYEE_DASHBOARD_COLUMNS,
+        periodColumnKeys: DEFAULT_PERIOD_DASHBOARD_COLUMNS,
+        uiMode: "saas",
+        updateDashboardEmployeeCashFlowEntryAction: vi.fn(async () => {}),
+        bulkUpdateDashboardEmployeeCashFlowEntriesAction: vi.fn(async () => ({
+          savedPayoutIds: [],
+          failedRows: [],
+        })),
+      }),
+    );
+
+    const employeeCell = screen.getByRole("rowheader", { name: "Alice" });
+    expect(screen.getAllByText("Alice")).toHaveLength(1);
+    expect(employeeCell.getAttribute("rowspan")).toBe("3");
   });
 
   it("renders a totals row aligned to the visible employee columns", () => {
@@ -313,12 +392,12 @@ describe("dashboard tables rendering", () => {
     expect(formData.get("offboardingDeductionUsd")).toBe("0.00");
     expect(formData.get("cashoutUsdInrRate")).toBe("80");
     expect(formData.get("paidUsdInrRate")).toBe("75");
-    expect(formData.get("pfInr")).toBe("500.00");
-    expect(formData.get("tdsInr")).toBe("200.00");
+    expect(formData.get("pfInr")).toBe("500");
+    expect(formData.get("tdsInr")).toBe("200");
     expect(formData.get("actualPaidInr")).toBe("15200.00");
 
     const visiblePfInput = container.querySelector(
-      'input[type="number"][name="pfInr"]',
+      'input[type="text"][name="pfInr"]',
     ) as HTMLInputElement;
     fireEvent.change(visiblePfInput, { target: { value: "777.25" } });
     expect(new FormData(form as HTMLFormElement).get("pfInr")).toBe("777.25");
@@ -451,10 +530,10 @@ describe("dashboard tables rendering", () => {
     );
 
     const pegInput = document.querySelector(
-      'input[type="number"][name="paidUsdInrRate"]',
+      'input[type="text"][name="paidUsdInrRate"]',
     ) as HTMLInputElement;
     expect(pegInput.name).toBe("paidUsdInrRate");
-    expect(pegInput.step).toBe("0.0001");
+    expect(pegInput.inputMode).toBe("decimal");
     expect(screen.queryByDisplayValue("95")).toBeNull();
   });
 

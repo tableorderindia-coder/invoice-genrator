@@ -2,6 +2,7 @@ import { Shell } from "../_components/shell";
 import { GlassPanel } from "../_components/glass-panel";
 import { Field, inputClass } from "../_components/field";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
+import { NumericInput } from "../_components/numeric-input";
 import { requirePageAccess } from "@/lib/auth/server";
 import { filterCompaniesForAuthContext } from "@/src/features/billing/company-access";
 import {
@@ -178,10 +179,9 @@ export default async function ExpensesPage({
                 />
               </Field>
               <Field label="Amount (INR)">
-                <input
+                <NumericInput
                   name="amountInr"
-                  type="number"
-                  step="0.01"
+                  precision={2}
                   min="0"
                   required
                   className={inputClass}
@@ -262,10 +262,9 @@ export default async function ExpensesPage({
                     <input type="hidden" name="month" value={expense.month} />
                     <input type="hidden" name="label" value={expense.label} />
                     <input type="hidden" name="returnTo" value={returnUrl} />
-                    <input
+                    <NumericInput
                       name="amountInr"
-                      type="number"
-                      step="0.01"
+                      precision={2}
                       min="0"
                       defaultValue={(expense.amountInrCents / 100).toFixed(2)}
                       className={inputClass}

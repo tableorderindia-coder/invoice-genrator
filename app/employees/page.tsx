@@ -4,6 +4,7 @@ import { Shell } from "../_components/shell";
 import { GlassPanel } from "../_components/glass-panel";
 import { Field, inputClass } from "../_components/field";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
+import { NumericInput } from "../_components/numeric-input";
 import { StaggerGrid } from "../_components/stagger-grid";
 import { requirePageAccess } from "@/lib/auth/server";
 import {
@@ -114,31 +115,31 @@ export default async function EmployeesPage({
                   <input name="defaultTeam" required className={inputClass} placeholder="Data Engineering" />
                 </Field>
                 <Field label="Billing rate (USD/hr)">
-                  <input name="billingRateUsd" type="number" min="0" step="0.01" required className={inputClass} placeholder="0.00" />
+                  <NumericInput name="billingRateUsd" min={0} precision={2} required className={inputClass} placeholder="0" />
                 </Field>
                 <Field label="Peg rate">
-                  <input name="defaultPaidUsdInrRate" type="number" min="0" step="0.0001" className={inputClass} placeholder="0" defaultValue="0" />
+                  <NumericInput name="defaultPaidUsdInrRate" min={0} precision={4} className={inputClass} placeholder="0" defaultValue="0" />
                 </Field>
                 <Field label="Basic (INR)">
-                  <input name="defaultBasicInr" type="number" min="0" step="0.01" className={inputClass} placeholder="0.00" defaultValue="0" />
+                  <NumericInput name="defaultBasicInr" min={0} precision={2} className={inputClass} placeholder="0" defaultValue="0" />
                 </Field>
                 <Field label="Special allowance (INR)">
-                  <input name="defaultSpecialAllowanceInr" type="number" min="0" step="0.01" className={inputClass} placeholder="0.00" defaultValue="0" />
+                  <NumericInput name="defaultSpecialAllowanceInr" min={0} precision={2} className={inputClass} placeholder="0" defaultValue="0" />
                 </Field>
                 <Field label="Insurance (INR)">
-                  <input name="defaultInsuranceInr" type="number" min="0" step="0.01" className={inputClass} placeholder="0.00" defaultValue="0" />
+                  <NumericInput name="defaultInsuranceInr" min={0} precision={2} className={inputClass} placeholder="0" defaultValue="0" />
                 </Field>
                 <Field label="Bonus (INR)">
-                  <input name="defaultBonusInr" type="number" min="0" step="0.01" className={inputClass} placeholder="0.00" defaultValue="0" />
+                  <NumericInput name="defaultBonusInr" min={0} precision={2} className={inputClass} placeholder="0" defaultValue="0" />
                 </Field>
                 <Field label="PF (INR)">
-                  <input name="defaultPfInr" type="number" min="0" step="0.01" className={inputClass} placeholder="0.00" defaultValue="0" />
+                  <NumericInput name="defaultPfInr" min={0} precision={2} className={inputClass} placeholder="0" defaultValue="0" />
                 </Field>
                 <Field label="TDS (INR)">
-                  <input name="defaultTdsInr" type="number" min="0" step="0.01" className={inputClass} placeholder="0.00" defaultValue="0" />
+                  <NumericInput name="defaultTdsInr" min={0} precision={2} className={inputClass} placeholder="0" defaultValue="0" />
                 </Field>
                 <Field label="Hrs per week">
-                  <input name="hrsPerWeek" type="number" min="0" step="0.01" required className={inputClass} placeholder="40" />
+                  <NumericInput name="hrsPerWeek" min={0} precision={2} required className={inputClass} placeholder="40" />
                 </Field>
                 <Field label="Active from">
                   <input name="activeFrom" type="date" required className={inputClass} />
@@ -208,31 +209,31 @@ export default async function EmployeesPage({
                     <input name="defaultTeam" required className={inputClass} defaultValue={selectedEmployee?.defaultTeam} />
                   </Field>
                   <Field label="Billing rate (USD/hr)">
-                    <input name="billingRateUsd" type="number" min="0" step="0.01" required className={inputClass} defaultValue={selectedEmployee ? (selectedEmployee.billingRateUsdCents / 100).toFixed(2) : ""} />
+                    <NumericInput name="billingRateUsd" min={0} precision={2} required className={inputClass} defaultValue={selectedEmployee ? selectedEmployee.billingRateUsdCents / 100 : ""} />
                   </Field>
                   <Field label="Peg rate">
-                    <input name="defaultPaidUsdInrRate" type="number" min="0" step="0.0001" className={inputClass} defaultValue={formatRateInput(selectedEmployee?.defaultPaidUsdInrRate)} />
+                    <NumericInput name="defaultPaidUsdInrRate" min={0} precision={4} className={inputClass} defaultValue={formatRateInput(selectedEmployee?.defaultPaidUsdInrRate)} />
                   </Field>
                   <Field label="Basic (INR)">
-                    <input name="defaultBasicInr" type="number" min="0" step="0.01" className={inputClass} defaultValue={selectedEmployee ? (selectedEmployee.defaultBasicInrCents / 100).toFixed(2) : "0"} />
+                    <NumericInput name="defaultBasicInr" min={0} precision={2} className={inputClass} defaultValue={selectedEmployee ? selectedEmployee.defaultBasicInrCents / 100 : "0"} />
                   </Field>
                   <Field label="Special allowance (INR)">
-                    <input name="defaultSpecialAllowanceInr" type="number" min="0" step="0.01" className={inputClass} defaultValue={selectedEmployee ? (selectedEmployee.defaultSpecialAllowanceInrCents / 100).toFixed(2) : "0"} />
+                    <NumericInput name="defaultSpecialAllowanceInr" min={0} precision={2} className={inputClass} defaultValue={selectedEmployee ? selectedEmployee.defaultSpecialAllowanceInrCents / 100 : "0"} />
                   </Field>
                   <Field label="Insurance (INR)">
-                    <input name="defaultInsuranceInr" type="number" min="0" step="0.01" className={inputClass} defaultValue={selectedEmployee ? (selectedEmployee.defaultInsuranceInrCents / 100).toFixed(2) : "0"} />
+                    <NumericInput name="defaultInsuranceInr" min={0} precision={2} className={inputClass} defaultValue={selectedEmployee ? selectedEmployee.defaultInsuranceInrCents / 100 : "0"} />
                   </Field>
                   <Field label="Bonus (INR)">
-                    <input name="defaultBonusInr" type="number" min="0" step="0.01" className={inputClass} defaultValue={selectedEmployee ? (selectedEmployee.defaultBonusInrCents / 100).toFixed(2) : "0"} />
+                    <NumericInput name="defaultBonusInr" min={0} precision={2} className={inputClass} defaultValue={selectedEmployee ? selectedEmployee.defaultBonusInrCents / 100 : "0"} />
                   </Field>
                   <Field label="PF (INR)">
-                    <input name="defaultPfInr" type="number" min="0" step="0.01" className={inputClass} defaultValue={selectedEmployee ? (selectedEmployee.defaultPfInrCents / 100).toFixed(2) : "0"} />
+                    <NumericInput name="defaultPfInr" min={0} precision={2} className={inputClass} defaultValue={selectedEmployee ? selectedEmployee.defaultPfInrCents / 100 : "0"} />
                   </Field>
                   <Field label="TDS (INR)">
-                    <input name="defaultTdsInr" type="number" min="0" step="0.01" className={inputClass} defaultValue={selectedEmployee ? (selectedEmployee.defaultTdsInrCents / 100).toFixed(2) : "0"} />
+                    <NumericInput name="defaultTdsInr" min={0} precision={2} className={inputClass} defaultValue={selectedEmployee ? selectedEmployee.defaultTdsInrCents / 100 : "0"} />
                   </Field>
                   <Field label="Hrs per week">
-                    <input name="hrsPerWeek" type="number" min="0" step="0.01" required className={inputClass} defaultValue={selectedEmployee?.hrsPerWeek} />
+                    <NumericInput name="hrsPerWeek" min={0} precision={2} required className={inputClass} defaultValue={selectedEmployee?.hrsPerWeek} />
                   </Field>
                   <Field label="Active from">
                     <input name="activeFrom" type="date" required className={inputClass} defaultValue={selectedEmployee?.activeFrom} />

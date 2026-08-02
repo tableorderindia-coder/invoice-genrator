@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 
 import { Field, inputClass } from "@/app/_components/field";
 import { PendingSubmitButton } from "@/app/_components/pending-submit-button";
+import { NumericInput } from "@/app/_components/numeric-input";
 import {
   buildAdjustmentDuplicateSignature,
   buildAdjustmentFormEmployeeDefaults,
@@ -198,10 +199,9 @@ function AdjustmentGroup({
                 <input type="hidden" name="invoiceId" value={invoiceId} />
                 <input type="hidden" name="adjustmentId" value={adjustment.id} />
                 <input type="hidden" name="returnTo" value={returnTo} />
-                <input
+                <NumericInput
                   name="amountUsd"
-                  type="number"
-                  step="1"
+                  precision={0}
                   className={inputClass}
                   defaultValue={Math.round(adjustment.amountUsdCents / 100)}
                   style={{ minWidth: "8rem" }}
@@ -460,17 +460,16 @@ export function AdjustmentForms({
             {form.type === "reimbursement" ? null : (
               <>
                 <Field label="Rate ($/hr)">
-                  <input
+                  <NumericInput
                     name="rateUsd"
-                    type="number"
-                    step="0.01"
+                    precision={2}
                     min="0"
                     placeholder="Enter hourly rate"
                     className={`${inputClass} min-h-14`}
                     value={form.rateUsd}
-                    onChange={(event) =>
+                    onValueChange={(value) =>
                       setForm((current) => {
-                        const nextRateUsd = event.target.value;
+                        const nextRateUsd = value;
                         return {
                           ...current,
                           rateUsd: nextRateUsd,
@@ -485,17 +484,16 @@ export function AdjustmentForms({
                   />
                 </Field>
                 <Field label="Hrs per week">
-                  <input
+                  <NumericInput
                     name="hrsPerWeek"
-                    type="number"
-                    step="0.01"
+                    precision={2}
                     min="0"
                     placeholder="Enter hrs per week"
                     className={`${inputClass} min-h-14`}
                     value={form.hrsPerWeek}
-                    onChange={(event) =>
+                    onValueChange={(value) =>
                       setForm((current) => {
-                        const nextHours = event.target.value;
+                        const nextHours = value;
                         return {
                           ...current,
                           hrsPerWeek: nextHours,
@@ -510,17 +508,16 @@ export function AdjustmentForms({
                   />
                 </Field>
                 <Field label={daysFieldCopy.label}>
-                  <input
+                  <NumericInput
                     name="daysWorked"
-                    type="number"
-                    step="1"
+                    precision={0}
                     min="1"
                     placeholder={daysFieldCopy.placeholder}
                     className={`${inputClass} min-h-14`}
                     value={form.daysWorked}
-                    onChange={(event) =>
+                    onValueChange={(value) =>
                       setForm((current) => {
-                        const nextDaysWorked = event.target.value;
+                        const nextDaysWorked = value;
                         return {
                           ...current,
                           daysWorked: nextDaysWorked,
@@ -542,16 +539,15 @@ export function AdjustmentForms({
               </>
             )}
             <Field label="Total">
-              <input
+              <NumericInput
                 name="amountUsd"
-                type="number"
-                step="1"
+                precision={0}
                 min="0"
                 value={form.amountUsd}
                 aria-label="Total"
                 className={`${inputClass} min-h-14`}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, amountUsd: event.target.value }))
+                onValueChange={(value) =>
+                  setForm((current) => ({ ...current, amountUsd: value }))
                 }
               />
             </Field>

@@ -68,9 +68,9 @@ describe("employee statement editor rendering", () => {
       }),
     );
 
-    expect(screen.getByDisplayValue("2600.00").className).toContain("min-w-[8rem]");
-    expect(screen.getByDisplayValue("4064.00").className).toContain("min-w-[8rem]");
-    expect(screen.getByDisplayValue("500.00").className).toContain("min-w-[8rem]");
+    expect(screen.getByDisplayValue("2600").className).toContain("min-w-[8rem]");
+    expect(screen.getByDisplayValue("4064").className).toContain("min-w-[8rem]");
+    expect(screen.getByDisplayValue("500").className).toContain("min-w-[8rem]");
     expect(screen.getByDisplayValue("Laptop reimbursement label text").className).toContain(
       "min-w-[14rem]",
     );
@@ -82,13 +82,13 @@ describe("employee statement editor rendering", () => {
     );
 
     expect(orderedInputs).toEqual([
-      "839.00",
-      "0.00",
-      "0.00",
+      "839",
+      "0",
+      "0",
       "Laptop reimbursement label text",
-      "500.00",
-      "0.00",
-      "4064.00",
+      "500",
+      "0",
+      "4064",
     ]);
   });
 });

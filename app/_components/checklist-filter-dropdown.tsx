@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { normalizeMultiSelectValue } from "../../src/features/billing/filter-selection";
 
@@ -55,6 +55,8 @@ export function ChecklistFilterDropdown({
   emptyValue,
 }: ChecklistFilterDropdownProps) {
   const panelId = useId();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const optionValues = options.map((option) => option.value);
   const [open, setOpen] = useState(false);
   const [selectedValues, setSelectedValues] = useState<string[]>(() =>
@@ -74,6 +76,51 @@ export function ChecklistFilterDropdown({
     optionValues.length > 0 &&
     optionValues.every((value) => selectedValueSet.has(value));
 
+  useEffect(() => {
+    if (!open) return;
+
+    const closeAndRestoreFocus = () => {
+      setOpen(false);
+      triggerRef.current?.focus();
+    };
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        event.preventDefault();
+        closeAndRestoreFocus();
+      }
+    };
+    const handleClick = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        closeAndRestoreFocus();
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeAndRestoreFocus();
+      }
+    };
+    const handleOtherDropdown = (event: Event) => {
+      if ((event as CustomEvent<string>).detail !== panelId) {
+        setOpen(false);
+      }
+    };
+    const form = rootRef.current?.closest("form");
+
+    document.addEventListener("pointerdown", handlePointerDown, true);
+    document.addEventListener("click", handleClick, true);
+    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("checklist-dropdown-open", handleOtherDropdown);
+    form?.addEventListener("submit", closeAndRestoreFocus);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown, true);
+      document.removeEventListener("click", handleClick, true);
+      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("checklist-dropdown-open", handleOtherDropdown);
+      form?.removeEventListener("submit", closeAndRestoreFocus);
+    };
+  }, [open, panelId]);
+
   function setOptionValue(value: string, checked: boolean) {
     setSelectedValues((currentValues) => {
       const nextValues = checked
@@ -88,7 +135,7 @@ export function ChecklistFilterDropdown({
   }
 
   return (
-    <div className={`relative inline-flex min-w-[14rem] flex-col ${open ? "z-50" : "z-10"}`}>
+    <div ref={rootRef} className={`relative inline-flex min-w-[14rem] flex-col ${open ? "z-50" : "z-10"}`}>
       {visibleSelectedValues.length === 0 && emptyValue ? (
         <input type="hidden" name={name} value={emptyValue} />
       ) : null}
@@ -97,10 +144,21 @@ export function ChecklistFilterDropdown({
       ))}
 
       <button
+        ref={triggerRef}
         type="button"
         aria-controls={panelId}
         aria-expanded={open}
-        onClick={() => setOpen((current) => !current)}
+        onClick={() =>
+          setOpen((current) => {
+            const next = !current;
+            if (next) {
+              document.dispatchEvent(
+                new CustomEvent("checklist-dropdown-open", { detail: panelId }),
+              );
+            }
+            return next;
+          })
+        }
         className="inline-flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-sm font-medium transition-colors"
         style={{
           borderColor: "var(--glass-border)",
@@ -125,7 +183,7 @@ export function ChecklistFilterDropdown({
           id={panelId}
           role="group"
           aria-label={`${label} filters`}
-          className="absolute left-0 top-full z-[100] mt-2 w-72 rounded-2xl border p-3 shadow-xl"
+          className="absolute left-0 top-full z-[100] mt-2 max-h-[min(24rem,calc(100vh-6rem))] w-72 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-lg border p-3 shadow-xl"
           style={{
             borderColor: "var(--glass-border)",
             background: "rgba(15, 17, 24, 0.98)",

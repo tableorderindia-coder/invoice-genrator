@@ -1,4 +1,5 @@
 import { GlassPanel } from "../_components/glass-panel";
+import { cookies } from "next/headers";
 import { Shell } from "../_components/shell";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
 import { ChecklistFilterDropdown } from "../_components/checklist-filter-dropdown";
@@ -7,6 +8,7 @@ import {
 } from "@/src/features/billing/company-access";
 import { requirePageAccess } from "@/lib/auth/server";
 import {
+  bulkUpdateDashboardEmployeeCashFlowEntriesAction,
   updateDashboardEmployeeCashFlowEntryAction,
 } from "../../src/features/billing/actions";
 import { employeeStatusLabel } from "../../src/features/billing/employee-status";
@@ -32,6 +34,10 @@ import { getPnDashboardSummaryData } from "../../src/features/billing/pn-summary
 import { mergePnPeriodRows } from "../../src/features/billing/pn-dashboard";
 import type { PnDashboardData } from "../../src/features/billing/types";
 import { DashboardTables } from "./dashboard-tables";
+import {
+  normalizePortalUiMode,
+  PORTAL_UI_MODE_COOKIE,
+} from "../../src/features/ui/portal-ui-mode";
 
 export const dynamic = "force-dynamic";
 
@@ -63,6 +69,8 @@ export default async function DashboardPage({
   }>;
 }) {
   const context = await requirePageAccess("dashboard");
+  const cookieStore = await cookies();
+  const uiMode = normalizePortalUiMode(cookieStore.get(PORTAL_UI_MODE_COOKIE)?.value);
   const resolved = await searchParams;
   const companies = filterCompaniesForAuthContext(await listCachedCompanies(), context);
   const selectedCompanyIds = resolveSelectedCompanyIds({
@@ -363,8 +371,12 @@ export default async function DashboardPage({
               companyCsv: companyCsvExportHref,
               companyPdf: companyPdfExportHref,
             }}
+            uiMode={uiMode}
             updateDashboardEmployeeCashFlowEntryAction={
               updateDashboardEmployeeCashFlowEntryAction
+            }
+            bulkUpdateDashboardEmployeeCashFlowEntriesAction={
+              bulkUpdateDashboardEmployeeCashFlowEntriesAction
             }
           />
         </GlassPanel>
@@ -454,8 +466,12 @@ export default async function DashboardPage({
               companyCsv: companyCsvExportHref,
               companyPdf: companyPdfExportHref,
             }}
+            uiMode={uiMode}
             updateDashboardEmployeeCashFlowEntryAction={
               updateDashboardEmployeeCashFlowEntryAction
+            }
+            bulkUpdateDashboardEmployeeCashFlowEntriesAction={
+              bulkUpdateDashboardEmployeeCashFlowEntriesAction
             }
           />
         </GlassPanel>

@@ -519,6 +519,63 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
     });
   });
 
+  it("bulk updates valid dashboard rows and reports failed rows without redirecting", async () => {
+    updateDashboardEmployeeCashFlowEntryMock
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error("Database rejected the row."));
+    getEmployeeCashFlowEntryCompanyIdMock.mockResolvedValue("comp_1");
+    const { bulkUpdateDashboardEmployeeCashFlowEntriesAction } = await import("./actions");
+
+    const result = await bulkUpdateDashboardEmployeeCashFlowEntriesAction([
+      {
+        payoutId: "cash_1",
+        employeeName: "Ankit",
+        periodLabel: "July 2026",
+        daysWorked: 22,
+        dollarInwardUsdCents: 100_000,
+        onboardingAdvanceUsdCents: 0,
+        reimbursementUsdCents: 0,
+        reimbursementLabelsText: "",
+        appraisalAdvanceUsdCents: 0,
+        offboardingDeductionUsdCents: 0,
+        cashoutUsdInrRate: 84.5,
+        paidUsdInrRate: 83,
+        pfInrCents: 1_800_00,
+        tdsInrCents: 0,
+        actualPaidInrCents: 80_000_00,
+      },
+      {
+        payoutId: "cash_2",
+        employeeName: "Pavani",
+        periodLabel: "July 2026",
+        daysWorked: 22,
+        dollarInwardUsdCents: 90_000,
+        onboardingAdvanceUsdCents: 0,
+        reimbursementUsdCents: 0,
+        reimbursementLabelsText: "",
+        appraisalAdvanceUsdCents: 0,
+        offboardingDeductionUsdCents: 0,
+        cashoutUsdInrRate: 84.5,
+        paidUsdInrRate: 83,
+        pfInrCents: 1_800_00,
+        tdsInrCents: 0,
+        actualPaidInrCents: 75_000_00,
+      },
+    ]);
+
+    expect(result.savedPayoutIds).toEqual(["cash_1"]);
+    expect(result.failedRows).toEqual([
+      expect.objectContaining({
+        payoutId: "cash_2",
+        employeeName: "Pavani",
+        periodLabel: "July 2026",
+        message: "Database rejected the row.",
+      }),
+    ]);
+    expect(updateDashboardEmployeeCashFlowEntryMock).toHaveBeenCalledTimes(2);
+    expect(revalidatePathMock).toHaveBeenCalledWith("/dashboard");
+  });
+
   it("passes manual actual paid values through compose cash-flow saves", async () => {
     const { saveInvoicePaymentEmployeeEntriesAction } = await import("./actions");
     const formData = new FormData();
