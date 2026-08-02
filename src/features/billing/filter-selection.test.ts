@@ -18,6 +18,10 @@ import {
   ChecklistFilterDropdown,
   getChecklistFilterTriggerLabel,
 } from "../../../app/_components/checklist-filter-dropdown";
+import {
+  DEFAULT_EMPLOYEE_DASHBOARD_COLUMNS,
+  DEFAULT_PERIOD_DASHBOARD_COLUMNS,
+} from "./dashboard-column-options";
 
 describe("filter selection helpers", () => {
   it("normalizes repeated and comma-separated multi-select values", () => {
@@ -242,13 +246,60 @@ describe("filter selection helpers", () => {
     ).toEqual(["cashIn", "salaryPaid"]);
   });
 
-  it("treats an empty dashboard column selection as all columns", () => {
+  it("uses dashboard defaults only when the column parameter is absent", () => {
     expect(
       resolveDashboardColumnSelection({
         selectedColumns: undefined,
         allowedColumns: ["cashIn", "salaryPaid", "netProfit"],
+        defaultColumns: ["salaryPaid", "netProfit"],
       }),
-    ).toEqual(["cashIn", "salaryPaid", "netProfit"]);
+    ).toEqual(["salaryPaid", "netProfit"]);
+  });
+
+  it("defines the stakeholder employee and period defaults in accounting order", () => {
+    expect(DEFAULT_EMPLOYEE_DASHBOARD_COLUMNS).toEqual([
+      "effectiveDollarInward",
+      "cashoutRate",
+      "salaryPaid",
+      "pf",
+      "tds",
+      "fxCommission",
+      "commissionEarned",
+      "grossEarnings",
+      "advances",
+      "netProfit",
+    ]);
+    expect(DEFAULT_PERIOD_DASHBOARD_COLUMNS).toEqual([
+      "effectiveDollarInward",
+      "cashoutRate",
+      "salaryPaid",
+      "pf",
+      "tds",
+      "fxCommission",
+      "commissionEarned",
+      "grossEarnings",
+      "expenses",
+      "advances",
+      "netPl",
+    ]);
+  });
+
+  it("preserves an explicit empty dashboard column selection", () => {
+    expect(
+      buildDashboardFilterFieldEntries({
+        companyId: "comp_1",
+        periodType: "monthly",
+        view: "employee",
+        employeeColumns: [],
+        periodColumns: [],
+      }),
+    ).toEqual([
+      { name: "companyId", value: "comp_1" },
+      { name: "periodType", value: "monthly" },
+      { name: "view", value: "employee" },
+      { name: "employeeColumns", value: "__none__" },
+      { name: "periodColumns", value: "__none__" },
+    ]);
   });
 
   it("omits stale employee and month selections from period filter load forms", () => {
@@ -336,6 +387,24 @@ describe("filter selection helpers", () => {
         (input) => (input as HTMLInputElement).value,
       ),
     ).toEqual(["emp_1", "emp_2"]);
+  });
+
+  it("submits a sentinel for an explicit empty checklist selection", () => {
+    const { container } = render(
+      createElement(ChecklistFilterDropdown, {
+        name: "employeeColumns",
+        label: "Columns",
+        options: [{ value: "cashIn", label: "Cash inward" }],
+        defaultSelectedValues: [],
+        emptyValue: "__none__",
+      }),
+    );
+
+    expect(
+      [...container.querySelectorAll('input[type="hidden"][name="employeeColumns"]')].map(
+        (input) => (input as HTMLInputElement).value,
+      ),
+    ).toEqual(["__none__"]);
   });
 
   it("raises checklist dropdown stacking when the panel is open", () => {

@@ -491,6 +491,34 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
     expect(revalidatePathMock).toHaveBeenCalledWith("/employee-cash-flow");
   });
 
+  it("leaves omitted dashboard fields undefined so stored values are preserved", async () => {
+    const { updateDashboardEmployeeCashFlowEntryAction } = await import("./actions");
+    const formData = new FormData();
+    formData.set("payoutId", "cash_1");
+    formData.set("returnTo", "/dashboard");
+    formData.set("daysWorked", "24");
+
+    await expect(updateDashboardEmployeeCashFlowEntryAction(formData)).rejects.toThrow(
+      "REDIRECT:/dashboard?flashStatus=success&flashMessage=Dashboard%20cash%20flow%20row%20updated.",
+    );
+
+    expect(updateDashboardEmployeeCashFlowEntryMock).toHaveBeenCalledWith({
+      entryId: "cash_1",
+      daysWorked: 24,
+      dollarInwardUsdCents: undefined,
+      onboardingAdvanceUsdCents: undefined,
+      reimbursementUsdCents: undefined,
+      reimbursementLabelsText: undefined,
+      appraisalAdvanceUsdCents: undefined,
+      offboardingDeductionUsdCents: undefined,
+      cashoutUsdInrRate: undefined,
+      paidUsdInrRate: undefined,
+      pfInrCents: undefined,
+      tdsInrCents: undefined,
+      actualPaidInrCents: undefined,
+    });
+  });
+
   it("passes manual actual paid values through compose cash-flow saves", async () => {
     const { saveInvoicePaymentEmployeeEntriesAction } = await import("./actions");
     const formData = new FormData();

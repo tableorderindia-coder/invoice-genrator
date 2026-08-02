@@ -69,7 +69,7 @@ describe("external integration and stale profit cleanup", () => {
     const types = readProjectFile("src/features/billing/types.ts");
 
     expect(overview).toContain("P&L Overview");
-    expect(overviewTable).toContain("Net P/L INR");
+    expect(overviewTable).toContain('label: "Net P&L"');
     expect(overview).not.toMatch(/Realized profit|USD only in phase 1|getDashboardMetrics/);
     expect(employees).not.toMatch(/realizedProfit|formatSignedUsd|getDashboardMetrics/);
     expect(employees).not.toContain("getPnDashboardData");

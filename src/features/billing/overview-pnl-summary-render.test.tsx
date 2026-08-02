@@ -1,102 +1,179 @@
 // @vitest-environment jsdom
 
-import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const mocks = vi.hoisted(() => ({
+  savePreference: vi.fn(
+    async (_value: boolean): Promise<{ ok: boolean; message?: string }> => ({ ok: true }),
+  ),
+}));
+
+vi.mock("../../../app/overview-actions", () => ({
+  saveOverviewAdvancePreferenceAction: mocks.savePreference,
+}));
 
 import { OverviewPnlSummaryTable } from "../../../app/overview-pnl-summary-table";
-import type { OverviewPnlSummaryRow } from "./overview-pnl-summary";
+import type { OverviewMonthlyPnlRow } from "./overview-pnl-summary";
 
-const baseTotals = {
-  daysWorked: null,
-  dollarInwardUsdCents: 100_00,
-  onboardingAdvanceUsdCents: 0,
-  reimbursementUsdCents: 0,
-  reimbursementInrCents: 0,
-  appraisalAdvanceUsdCents: 0,
-  appraisalAdvanceInrCents: 0,
-  offboardingDeductionUsdCents: 0,
-  effectiveDollarInwardUsdCents: 100_00,
-  cashoutUsdInrRate: 80,
-  cashInInrCents: 8_000_00,
-  paidUsdInrRate: 78,
-  monthlyPaidInrCents: 8_000_00,
-  actualPaidInrCents: 7_720_00,
-  pfInrCents: 500_00,
-  tdsInrCents: 200_00,
-  salaryPaidInrCents: 7_020_00,
-  fxCommissionInrCents: 1_000_00,
-  totalCommissionUsdCents: 10_00,
-  commissionEarnedInrCents: 2_000_00,
-  grossEarningsInrCents: 3_000_00,
-  expensesInrCents: 300_00,
-  companyReimbursementUsdCents: 2_00,
-  companyReimbursementInrCents: 160_00,
-  netPlInrCents: 4_860_00,
-};
-
-const rows: OverviewPnlSummaryRow[] = [
+const rows: OverviewMonthlyPnlRow[] = [
   {
-    companyId: "company_1",
-    companyName: "Wizard Commerce",
+    monthKey: "2026-07",
     periodLabel: "July 2026",
-    sourcePeriodRows: [],
-    totals: baseTotals,
-  },
-  {
-    companyId: "__total__",
-    companyName: "Total",
-    periodLabel: "July 2026",
-    sourcePeriodRows: [],
-    totals: {
-      ...baseTotals,
-      dollarInwardUsdCents: 200_00,
-      netPlInrCents: 9_720_00,
-    },
+    effectiveDollarInwardUsdCents: 100_00,
+    cashoutUsdInrRate: 90,
+    effectiveInwardInrCents: 9_000_00,
+    salaryPaidInrCents: 6_000_00,
+    pfInrCents: 500_00,
+    tdsInrCents: 300_00,
+    expensesInrCents: 200_00,
+    advancesInrCents: 900_00,
+    fxGainInrCents: 500_00,
+    operatingMarginInrCents: 1_700_00,
+    grossPnlInrCents: 2_200_00,
+    netPnlBeforeAdvanceInrCents: 2_000_00,
   },
 ];
 
 describe("overview P&L summary table", () => {
-  it("renders the core P&L columns and total row", () => {
-    render(<OverviewPnlSummaryTable rows={rows} />);
+  afterEach(cleanup);
+
+  beforeEach(() => {
+    mocks.savePreference.mockReset();
+    mocks.savePreference.mockResolvedValue({ ok: true });
+  });
+
+  it("renders the stakeholder columns in the requested order with totals", () => {
+    render(
+      <OverviewPnlSummaryTable
+        rows={rows}
+        initialExcludeAdvanceDeduction={false}
+        preferenceLoadFailed={false}
+      />,
+    );
 
     const table = screen.getByRole("table");
-    const headers = within(table)
-      .getAllByRole("columnheader")
+    const labelRow = within(table).getByTestId("overview-column-labels");
+    const headers = within(labelRow)
+      .getAllByTestId("overview-column-label")
       .map((header) => header.textContent?.replace(/\s+/g, " ").trim());
 
     expect(headers).toEqual([
-      "Company",
-      "Period",
-      "Total dollar inward",
-      "Total cash inward INR",
-      "Monthly paid INR",
-      "Actual paid INR",
-      "Salary paid INR",
-      "PF paid INR",
-      "TDS paid INR",
-      "FX commission INR",
-      "Total commission USD",
-      "Commission earned INR",
-      "Gross earnings INR",
-      "Expenses INR",
-      "Reimbursements USD",
-      "Reimbursements INR",
-      "Net P/L INR",
+      "Effective dollar inward (USD)",
+      "Cashout rate",
+      "Total effective INR inward",
+      "Total salary paid",
+      "PF",
+      "TDS",
+      "Forex gain",
+      "Operating margin",
+      "Total earning (Gross P&L)",
+      "Expenses (INR)",
+      "Advances (INR)",
+      "Net P&L",
     ]);
-    expect(screen.getByText("Wizard Commerce")).not.toBeNull();
-    expect(screen.getByText("Total")).not.toBeNull();
+    expect(screen.getByRole("columnheader", { name: "Period" })).not.toBeNull();
+    expect(screen.getByText("July 2026")).not.toBeNull();
+    expect(screen.getByText("Totals")).not.toBeNull();
+    expect(screen.getAllByText("+ ₹1,100.00")).toHaveLength(2);
+    expect(screen.getByText("Totals").className).toContain("py-4");
   });
 
-  it("does not render the old cockpit overview content", () => {
-    render(<OverviewPnlSummaryTable rows={rows} />);
+  it("optimistically excludes the advance deduction and persists the choice", async () => {
+    render(
+      <OverviewPnlSummaryTable
+        rows={rows}
+        initialExcludeAdvanceDeduction={false}
+        preferenceLoadFailed={false}
+      />,
+    );
 
-    expect(screen.queryByText("Monthly workflow")).toBeNull();
-    expect(screen.queryByText("Recent invoices")).toBeNull();
-    expect(screen.queryByText("Ready for cashout")).toBeNull();
+    const checkbox = screen.getByRole("checkbox", { name: "Exclude advance deduction" });
+    fireEvent.click(checkbox);
+
+    expect(screen.getAllByText("+ ₹2,000.00")).toHaveLength(2);
+    await waitFor(() => expect(mocks.savePreference).toHaveBeenCalledWith(true));
+  });
+
+  it("restores a persisted checked preference", () => {
+    render(
+      <OverviewPnlSummaryTable
+        rows={rows}
+        initialExcludeAdvanceDeduction
+        preferenceLoadFailed={false}
+      />,
+    );
+
+    const checkbox = screen.getByRole("checkbox", { name: "Exclude advance deduction" });
+    expect((checkbox as HTMLInputElement).checked).toBe(true);
+    expect(screen.getAllByText("+ ₹2,000.00")).toHaveLength(2);
+  });
+
+  it("rolls back the checkbox and figures when saving fails", async () => {
+    mocks.savePreference.mockResolvedValue({
+      ok: false,
+      message: "Could not save the Overview preference.",
+    });
+    render(
+      <OverviewPnlSummaryTable
+        rows={rows}
+        initialExcludeAdvanceDeduction={false}
+        preferenceLoadFailed={false}
+      />,
+    );
+
+    const checkbox = screen.getByRole("checkbox", { name: "Exclude advance deduction" });
+    fireEvent.click(checkbox);
+
+    await waitFor(() =>
+      expect((checkbox as HTMLInputElement).checked).toBe(false),
+    );
+    expect(screen.getByText("Could not save the Overview preference.")).not.toBeNull();
+    expect(screen.getAllByText("+ ₹1,100.00")).toHaveLength(2);
+  });
+
+  it("rolls back when the server action request rejects", async () => {
+    mocks.savePreference.mockRejectedValue(new Error("offline"));
+    render(
+      <OverviewPnlSummaryTable
+        rows={rows}
+        initialExcludeAdvanceDeduction={false}
+        preferenceLoadFailed={false}
+      />,
+    );
+
+    const checkbox = screen.getByRole("checkbox", { name: "Exclude advance deduction" });
+    fireEvent.click(checkbox);
+
+    await waitFor(() =>
+      expect((checkbox as HTMLInputElement).checked).toBe(false),
+    );
+    expect(screen.getByText("Could not save the Overview preference.")).not.toBeNull();
+    expect(screen.getAllByText("+ ₹1,100.00")).toHaveLength(2);
+  });
+
+  it("shows the conservative fallback warning when the preference cannot load", () => {
+    render(
+      <OverviewPnlSummaryTable
+        rows={rows}
+        initialExcludeAdvanceDeduction={false}
+        preferenceLoadFailed
+      />,
+    );
+
+    expect(
+      screen.getByText("Preference could not be loaded. Advances are being deducted."),
+    ).not.toBeNull();
   });
 
   it("renders a clear empty state", () => {
-    render(<OverviewPnlSummaryTable rows={[]} />);
+    render(
+      <OverviewPnlSummaryTable
+        rows={[]}
+        initialExcludeAdvanceDeduction={false}
+        preferenceLoadFailed={false}
+      />,
+    );
 
     expect(screen.getByText("No P&L data found for the selected period.")).not.toBeNull();
   });

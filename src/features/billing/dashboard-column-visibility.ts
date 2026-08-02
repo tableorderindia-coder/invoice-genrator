@@ -29,7 +29,7 @@ const middleExpandable: ToggleColumn[] = [
 ];
 
 const rightFixed: ToggleColumn[] = [
-  { key: "effectiveDollarInward", label: "Effective dollar inward" },
+  { key: "effectiveDollarInward", label: "Total effective dollar inward (USD)" },
 ];
 
 export function getVisibleToggleColumns(showDetails: boolean) {

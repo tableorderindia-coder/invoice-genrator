@@ -4,6 +4,10 @@ import {
   buildPnEmployeeEditableSections,
   buildPnEmployeeSections,
   buildPnPeriodRows,
+  buildPnSalaryOnlySourceRows,
+  calculatePnEmployeeAdvanceInrCents,
+  calculatePnEmployeeNetPlInrCents,
+  mergePnPeriodRows,
   sumPnPeriodNetPlInrCents,
   type PnEditableSourceRow,
   type PnSourceRow,
@@ -160,6 +164,7 @@ const periodRowBase = {
   month: 1,
   dollarInwardUsdCents: 0,
   onboardingAdvanceUsdCents: 0,
+  advancesInrCents: 0,
   reimbursementUsdCents: 0,
   reimbursementLabelsText: "",
   reimbursementInrCents: 0,
@@ -186,6 +191,158 @@ const periodRowBase = {
 };
 
 describe("pn dashboard aggregations", () => {
+  it("builds salary-only rows that reduce employee and period P&L", () => {
+    const rows = buildPnSalaryOnlySourceRows({
+      existingEmployeeMonthKeys: new Set(),
+      salaryRows: [
+        {
+          id: "salary_1",
+          employeeId: "employee_kiran",
+          employeeName: "B Kiran Suresh",
+          paymentMonth: "2026-07",
+          daysWorked: 31,
+          daysInMonth: 31,
+          paidUsdInrRate: 85.5,
+          monthlyPaidInrCents: 50_000_00,
+          salaryPaidInrCents: 50_000_00,
+          pfInrCents: 0,
+          tdsInrCents: 0,
+          actualPaidInrCents: 50_000_00,
+        },
+      ],
+    });
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      rowId: "salary_only:salary_1",
+      employeeId: "employee_kiran",
+      invoiceNumber: "Salary only",
+      effectiveDollarInwardUsdCents: 0,
+      grossEarningsInrCents: -50_000_00,
+      netProfitInrCents: -50_000_00,
+      isSalaryOnly: true,
+    });
+
+    const periodRows = buildPnPeriodRows({
+      rows,
+      periodType: "monthly",
+      expenseByKey: new Map(),
+      companyLevelReimbursementUsdByKey: new Map(),
+    });
+    expect(periodRows[0]).toMatchObject({
+      salaryPaidInrCents: 50_000_00,
+      grossEarningsInrCents: -50_000_00,
+      netPlInrCents: -50_000_00,
+    });
+  });
+
+  it("does not duplicate a salary row when cash flow already covers that month", () => {
+    expect(
+      buildPnSalaryOnlySourceRows({
+        existingEmployeeMonthKeys: new Set(["employee_kiran|2026-07"]),
+        salaryRows: [
+          {
+            id: "salary_1",
+            employeeId: "employee_kiran",
+            employeeName: "B Kiran Suresh",
+            paymentMonth: "2026-07",
+            daysWorked: 31,
+            daysInMonth: 31,
+            paidUsdInrRate: 85.5,
+            monthlyPaidInrCents: 50_000_00,
+            salaryPaidInrCents: 50_000_00,
+            pfInrCents: 0,
+            tdsInrCents: 0,
+            actualPaidInrCents: 50_000_00,
+          },
+        ],
+      }),
+    ).toEqual([]);
+  });
+  it("calculates Pavani's advance and corrected employee net p/l", () => {
+    const row = {
+      ...editableSampleRows[0],
+      onboardingAdvanceUsdCents: 693_400,
+      cashoutUsdInrRate: 94.361,
+      cashInInrCents: 88_067_121,
+      salaryPaidInrCents: 40_882_700,
+      pfInrCents: 360_000,
+      tdsInrCents: 9_079_800,
+      grossEarningsInrCents: 37_744_621,
+    };
+
+    expect(calculatePnEmployeeAdvanceInrCents(row)).toBe(65_429_917);
+    expect(calculatePnEmployeeNetPlInrCents(row, { includeAdvances: true })).toBe(
+      -27_685_296,
+    );
+    expect(calculatePnEmployeeNetPlInrCents(row, { includeAdvances: false })).toBe(
+      37_744_621,
+    );
+  });
+
+  it("derives employee net p/l from effective INR and the complete payout", () => {
+    const row = {
+      ...editableSampleRows[0],
+      cashInInrCents: 1_000_000,
+      salaryPaidInrCents: 600_000,
+      pfInrCents: 50_000,
+      tdsInrCents: 25_000,
+      onboardingAdvanceUsdCents: 10_000,
+      cashoutUsdInrRate: 80,
+      grossEarningsInrCents: 1,
+    };
+
+    expect(calculatePnEmployeeNetPlInrCents(row, { includeAdvances: true })).toBe(
+      -475_000,
+    );
+    expect(calculatePnEmployeeNetPlInrCents(row, { includeAdvances: false })).toBe(
+      325_000,
+    );
+  });
+
+  it("matches Wizard Commerce June 2026 with expenses and advances included", () => {
+    expect(
+      sumPnPeriodNetPlInrCents(
+        [
+          {
+            ...periodRowBase,
+            grossEarningsInrCents: 118_357_942,
+            expensesInrCents: 31_282_700,
+            advancesInrCents: 168_481_166,
+          },
+        ],
+        {
+          includeExpenses: true,
+          includeAdvances: true,
+          includeReimbursements: true,
+        },
+      ),
+    ).toBe(-81_405_924);
+  });
+
+  it("merges multi-company periods after row-level advance conversion", () => {
+    const merged = mergePnPeriodRows([
+      {
+        ...periodRowBase,
+        effectiveDollarInwardUsdCents: 100_00,
+        cashoutUsdInrRate: 80,
+        cashInInrCents: 8_000_00,
+        advancesInrCents: 800_00,
+      },
+      {
+        ...periodRowBase,
+        effectiveDollarInwardUsdCents: 200_00,
+        cashoutUsdInrRate: 90,
+        cashInInrCents: 18_000_00,
+        advancesInrCents: 1_800_00,
+      },
+    ]);
+
+    expect(merged).toHaveLength(1);
+    expect(merged[0].advancesInrCents).toBe(2_600_00);
+    expect(merged[0].cashoutUsdInrRate).toBeCloseTo(86.6667, 4);
+  });
+
   it("builds employee sections with gross totals per employee", () => {
     const sections = buildPnEmployeeSections(sampleRows);
     expect(sections).toHaveLength(2);
@@ -212,6 +369,7 @@ describe("pn dashboard aggregations", () => {
     expect(monthly).toHaveLength(2);
     expect(monthly[0].month).toBe(1);
     expect(monthly[0].grossEarningsInrCents).toBe(200000);
+    expect(monthly[0].advancesInrCents).toBe(0);
     expect(monthly[0].reimbursementUsdCents).toBe(20000);
     expect(monthly[0].reimbursementInrCents).toBe(1664000);
     expect(monthly[0].appraisalAdvanceUsdCents).toBe(5000);
@@ -229,6 +387,21 @@ describe("pn dashboard aggregations", () => {
     expect(monthly[1].expensesInrCents).toBe(90000);
     expect(monthly[1].companyReimbursementInrCents).toBe(417500);
     expect(monthly[1].netPlInrCents).toBe(6183250);
+  });
+
+  it("converts each employee advance before aggregating mixed cashout rates", () => {
+    const monthly = buildPnPeriodRows({
+      rows: [
+        { ...sampleRows[0], onboardingAdvanceUsdCents: 100_00, cashoutUsdInrRate: 80 },
+        { ...sampleRows[2], year: 2026, month: 1, onboardingAdvanceUsdCents: 200_00, cashoutUsdInrRate: 90 },
+      ],
+      periodType: "monthly",
+      expenseByKey: new Map(),
+      companyLevelReimbursementUsdByKey: new Map(),
+    });
+
+    expect(monthly[0].onboardingAdvanceUsdCents).toBe(300_00);
+    expect(monthly[0].advancesInrCents).toBe(26_000_00);
   });
 
   it("builds yearly period rows from cash-flow net profit even without outflow", () => {
@@ -456,16 +629,18 @@ describe("pn dashboard aggregations", () => {
     expect(sumPnPeriodNetPlInrCents([
       {
         ...periodRowBase,
-        netPlInrCents: 1_000_00,
+        grossEarningsInrCents: 1_000_00,
+        advancesInrCents: 200_00,
         companyReimbursementInrCents: 250_00,
         expensesInrCents: 100_00,
       },
       {
         ...periodRowBase,
-        netPlInrCents: 500_00,
+        grossEarningsInrCents: 500_00,
+        advancesInrCents: 100_00,
         companyReimbursementInrCents: 50_00,
         expensesInrCents: 25_00,
       },
-    ])).toBe(1_675_00);
+    ])).toBe(1_375_00);
   });
 });

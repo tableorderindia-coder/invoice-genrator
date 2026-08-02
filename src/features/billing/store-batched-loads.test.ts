@@ -95,24 +95,35 @@ describe("batched billing store loads", () => {
   });
 
   it("loads available payment months for selected companies with one company_id in query", async () => {
-    mocks.state.response = {
-      data: [
-        { payment_month: "2026-06" },
-        { payment_month: "2026-07" },
-        { payment_month: "2026-06" },
-      ],
-      error: null,
+    mocks.state.tableResponses = {
+      invoice_payment_employee_entries: {
+        data: [
+          { payment_month: "2026-06" },
+          { payment_month: "2026-07" },
+          { payment_month: "2026-06" },
+        ],
+        error: null,
+      },
+      employee_salary_payments: {
+        data: [{ month: "2026-08" }, { month: "2026-07" }],
+        error: null,
+      },
     };
 
     const months = await listAvailablePaymentMonthsForCompanies(["company_a", "company_b"]);
 
-    expect(mocks.supabase.from).toHaveBeenCalledTimes(1);
+    expect(mocks.supabase.from).toHaveBeenCalledTimes(2);
     expect(mocks.supabase.from).toHaveBeenCalledWith("invoice_payment_employee_entries");
+    expect(mocks.supabase.from).toHaveBeenCalledWith("employee_salary_payments");
     expect(mocks.state.chains[0]?.in).toHaveBeenCalledWith("company_id", [
       "company_a",
       "company_b",
     ]);
-    expect(months).toEqual(["2026-07", "2026-06"]);
+    expect(mocks.state.chains[1]?.in).toHaveBeenCalledWith("company_id", [
+      "company_a",
+      "company_b",
+    ]);
+    expect(months).toEqual(["2026-08", "2026-07", "2026-06"]);
   });
 
   it("loads company expenses for selected companies with one company_id in query", async () => {

@@ -24,9 +24,8 @@ describe("stage one cleanup", () => {
       /findLatestInvoiceForCompany|export async function addInvoiceLineItem|export async function upsertDashboardExpense/,
     );
     expect(store).toContain("async function addInvoiceLineItem");
-    expect(dashboard).toContain(
-      "Total earning (INR) = Operating margin (INR) + Forex gain (INR).",
-    );
+    expect(dashboard).not.toContain("Total earning (INR)");
+    expect(dashboard).not.toContain("Employee Cash Flow net profit");
   });
 
   it("keeps dead components, template assets, and gsap out of the project", () => {

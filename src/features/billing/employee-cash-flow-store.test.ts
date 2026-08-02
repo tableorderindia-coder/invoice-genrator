@@ -214,6 +214,48 @@ describe("employee cash flow store shaping", () => {
     ]);
   });
 
+  it("adds salary-only employees into cash flow even without invoice rows", () => {
+    const entries = appendMissingAdjustmentEntries({
+      entries: [],
+      availableEmployees: [
+        {
+          id: "emp_salary_only",
+          fullName: "B Kiran Suresh",
+          companyId: "comp_1",
+          defaultPaidUsdInrRate: 85.5,
+          defaultMonthlyPaidInrCents: 50_000_00,
+          defaultActualPaidInrCents: 50_000_00,
+          defaultSalaryPaidInrCents: 50_000_00,
+          defaultPfInrCents: 0,
+          defaultTdsInrCents: 0,
+          defaultDaysWorked: 31,
+          onboardingAdvanceUsdCents: 0,
+          reimbursementUsdCents: 0,
+          reimbursementLabelsText: "",
+          appraisalAdvanceUsdCents: 0,
+          offboardingDeductionUsdCents: 0,
+        },
+      ],
+      paymentMonth: "2026-07",
+      daysInMonth: 31,
+      cashoutUsdInrRate: 94.36,
+      invoiceId: "inv_1",
+      invoiceNumber: "INV-1",
+    });
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      employeeId: "emp_salary_only",
+      employeeNameSnapshot: "B Kiran Suresh",
+      daysWorked: 31,
+      baseDollarInwardUsdCents: 0,
+      effectiveDollarInwardUsdCents: 0,
+      actualPaidInrCents: 50_000_00,
+      salaryPaidInrCents: 50_000_00,
+      isNonInvoiceEmployee: true,
+    });
+  });
+
   it("falls back to invoice line items when payouts are missing", () => {
     const entries = buildInvoiceCashFlowFallbackEntries({
       invoice: {

@@ -998,54 +998,70 @@ export async function updateDashboardEmployeeCashFlowEntryAction(formData: FormD
       throw new Error("Days worked must be greater than 0.");
     }
 
-    const dollarInwardUsdCents = centsFromUsd(getString(formData, "dollarInwardUsd"));
-    if (dollarInwardUsdCents < 0) {
+    const optionalString = (key: string) =>
+      formData.has(key) ? getString(formData, key) : undefined;
+    const optionalCents = (key: string) => {
+      const value = optionalString(key);
+      return value === undefined ? undefined : centsFromUsd(value);
+    };
+
+    const dollarInwardUsdCents = optionalCents("dollarInwardUsd");
+    if (dollarInwardUsdCents !== undefined && dollarInwardUsdCents < 0) {
       throw new Error("Dollars inward cannot be negative.");
     }
-    const onboardingAdvanceUsdCents = centsFromUsd(getString(formData, "onboardingAdvanceUsd"));
-    if (onboardingAdvanceUsdCents < 0) {
+    const onboardingAdvanceUsdCents = optionalCents("onboardingAdvanceUsd");
+    if (onboardingAdvanceUsdCents !== undefined && onboardingAdvanceUsdCents < 0) {
       throw new Error("Onboarding advance cannot be negative.");
     }
-    const reimbursementUsdCents = centsFromUsd(getString(formData, "reimbursementUsd"));
-    if (reimbursementUsdCents < 0) {
+    const reimbursementUsdCents = optionalCents("reimbursementUsd");
+    if (reimbursementUsdCents !== undefined && reimbursementUsdCents < 0) {
       throw new Error("Reimbursements / Expenses cannot be negative.");
     }
-    const reimbursementLabelsText = getString(formData, "reimbursementLabelsText");
-    const appraisalAdvanceUsdCents = centsFromUsd(getString(formData, "appraisalAdvanceUsd"));
-    if (appraisalAdvanceUsdCents < 0) {
+    const reimbursementLabelsText = optionalString("reimbursementLabelsText");
+    const appraisalAdvanceUsdCents = optionalCents("appraisalAdvanceUsd");
+    if (appraisalAdvanceUsdCents !== undefined && appraisalAdvanceUsdCents < 0) {
       throw new Error("Appraisal advance cannot be negative.");
     }
-    const offboardingDeductionUsdCents = centsFromUsd(
-      getString(formData, "offboardingDeductionUsd"),
-    );
-    if (offboardingDeductionUsdCents < 0) {
+    const offboardingDeductionUsdCents = optionalCents("offboardingDeductionUsd");
+    if (offboardingDeductionUsdCents !== undefined && offboardingDeductionUsdCents < 0) {
       throw new Error("Offboarding deduction cannot be negative.");
     }
 
-    const cashoutUsdInrRate = Number.parseFloat(getString(formData, "cashoutUsdInrRate"));
-    if (!Number.isFinite(cashoutUsdInrRate) || cashoutUsdInrRate < 0) {
+    const cashoutUsdInrRateRaw = optionalString("cashoutUsdInrRate");
+    const cashoutUsdInrRate = cashoutUsdInrRateRaw === undefined
+      ? undefined
+      : Number.parseFloat(cashoutUsdInrRateRaw);
+    if (
+      cashoutUsdInrRate !== undefined &&
+      (!Number.isFinite(cashoutUsdInrRate) || cashoutUsdInrRate < 0)
+    ) {
       throw new Error("Cashout USD/INR rate cannot be negative.");
     }
 
-    const paidUsdInrRateRaw = getString(formData, "paidUsdInrRate");
-    const paidUsdInrRate = paidUsdInrRateRaw
+    const paidUsdInrRateRaw = optionalString("paidUsdInrRate");
+    const paidUsdInrRate = paidUsdInrRateRaw === undefined
+      ? undefined
+      : paidUsdInrRateRaw
       ? Number.parseFloat(paidUsdInrRateRaw)
       : 0;
-    if (!Number.isFinite(paidUsdInrRate) || paidUsdInrRate < 0) {
+    if (
+      paidUsdInrRate !== undefined &&
+      (!Number.isFinite(paidUsdInrRate) || paidUsdInrRate < 0)
+    ) {
       throw new Error("Paid USD/INR rate cannot be negative.");
     }
-    const pfInrCents = centsFromUsd(getString(formData, "pfInr"));
-    if (pfInrCents < 0) {
+    const pfInrCents = optionalCents("pfInr");
+    if (pfInrCents !== undefined && pfInrCents < 0) {
       throw new Error("PF cannot be negative.");
     }
 
-    const tdsInrCents = centsFromUsd(getString(formData, "tdsInr"));
-    if (tdsInrCents < 0) {
+    const tdsInrCents = optionalCents("tdsInr");
+    if (tdsInrCents !== undefined && tdsInrCents < 0) {
       throw new Error("TDS cannot be negative.");
     }
 
-    const actualPaidInrCents = centsFromUsd(getString(formData, "actualPaidInr"));
-    if (actualPaidInrCents < 0) {
+    const actualPaidInrCents = optionalCents("actualPaidInr");
+    if (actualPaidInrCents !== undefined && actualPaidInrCents < 0) {
       throw new Error("Actual paid cannot be negative.");
     }
 

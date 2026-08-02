@@ -1,4 +1,5 @@
 import type {
+  PnEmployeeEditableRow,
   PnEmployeeEditableSection,
   PnEmployeeMonthRow,
   PnEmployeeSection,
@@ -50,6 +51,22 @@ export type PnEditableSourceRow = PnSourceRow & {
   grossEarningsInrCents: number;
   netProfitInrCents: number;
   isSecurityDepositMonth?: boolean;
+  isSalaryOnly?: boolean;
+};
+
+export type PnSalaryOnlySourceInput = {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  paymentMonth: string;
+  daysWorked: number;
+  daysInMonth: number;
+  paidUsdInrRate: number;
+  monthlyPaidInrCents: number;
+  salaryPaidInrCents: number;
+  pfInrCents: number;
+  tdsInrCents: number;
+  actualPaidInrCents: number;
 };
 
 const monthKey = (year: number, month: number) => `${year}-${String(month).padStart(2, "0")}`;
@@ -67,6 +84,152 @@ const averageRate = (rows: PnSourceRow[], key: "cashoutUsdInrRate" | "paidUsdInr
   return positive.reduce((sum, value) => sum + value, 0) / positive.length;
 };
 
+export function buildPnSalaryOnlySourceRows(input: {
+  salaryRows: PnSalaryOnlySourceInput[];
+  existingEmployeeMonthKeys: Set<string>;
+}): PnEditableSourceRow[] {
+  return input.salaryRows.flatMap((salary) => {
+    if (
+      input.existingEmployeeMonthKeys.has(
+        `${salary.employeeId}|${salary.paymentMonth}`,
+      )
+    ) {
+      return [];
+    }
+
+    const [yearPart, monthPart] = salary.paymentMonth.split("-");
+    const year = Number.parseInt(yearPart ?? "", 10);
+    const month = Number.parseInt(monthPart ?? "", 10);
+    const totalPayoutInrCents =
+      salary.salaryPaidInrCents + salary.pfInrCents + salary.tdsInrCents;
+    if (
+      !Number.isFinite(year) ||
+      !Number.isFinite(month) ||
+      month < 1 ||
+      month > 12 ||
+      totalPayoutInrCents <= 0
+    ) {
+      return [];
+    }
+
+    return [
+      {
+        rowId: `salary_only:${salary.id}`,
+        invoiceId: "",
+        invoiceNumber: "Salary only",
+        employeeId: salary.employeeId,
+        employeeName: salary.employeeName,
+        year,
+        month,
+        daysWorked: salary.daysWorked,
+        daysInMonth: salary.daysInMonth,
+        dollarInwardUsdCents: 0,
+        baseDollarInwardUsdCents: 0,
+        onboardingAdvanceUsdCents: 0,
+        reimbursementUsdCents: 0,
+        reimbursementLabelsText: "",
+        appraisalAdvanceUsdCents: 0,
+        offboardingDeductionUsdCents: 0,
+        effectiveDollarInwardUsdCents: 0,
+        cashoutUsdInrRate: 0,
+        paidUsdInrRate: salary.paidUsdInrRate,
+        monthlyPaidInrCents: salary.monthlyPaidInrCents,
+        pfInrCents: salary.pfInrCents,
+        tdsInrCents: salary.tdsInrCents,
+        actualPaidInrCents: salary.actualPaidInrCents,
+        fxCommissionInrCents: 0,
+        totalCommissionUsdCents: 0,
+        commissionEarnedInrCents: -totalPayoutInrCents,
+        cashInInrCents: 0,
+        salaryPaidInrCents: salary.salaryPaidInrCents,
+        grossEarningsInrCents: -totalPayoutInrCents,
+        netProfitInrCents: -totalPayoutInrCents,
+        isSecurityDepositMonth: false,
+        isSalaryOnly: true,
+      },
+    ];
+  });
+}
+
+function weightedPeriodRate(
+  rows: PnPeriodRow[],
+  rateKey: "cashoutUsdInrRate" | "paidUsdInrRate",
+) {
+  const eligibleRows = rateKey === "paidUsdInrRate"
+    ? rows.filter((row) => row.paidUsdInrRate > 0)
+    : rows;
+  const totalWeight = eligibleRows.reduce(
+    (sum, row) => sum + row.effectiveDollarInwardUsdCents,
+    0,
+  );
+  if (totalWeight <= 0) return 0;
+  return (
+    eligibleRows.reduce(
+      (sum, row) => sum + row[rateKey] * row.effectiveDollarInwardUsdCents,
+      0,
+    ) / totalWeight
+  );
+}
+
+export function mergePnPeriodRows(rows: PnPeriodRow[]): PnPeriodRow[] {
+  const grouped = new Map<string, PnPeriodRow[]>();
+  for (const row of rows) {
+    const key = row.fiscalLabel ?? `${row.year}-${String(row.month ?? 0).padStart(2, "0")}`;
+    grouped.set(key, [...(grouped.get(key) ?? []), row]);
+  }
+
+  return [...grouped.values()]
+    .map((bucket) => {
+      const first = bucket[0]!;
+      const sum = (pick: (row: PnPeriodRow) => number) =>
+        bucket.reduce((total, row) => total + pick(row), 0);
+      const reimbursementLabelsText = [
+        ...new Set(
+          bucket
+            .flatMap((row) => row.reimbursementLabelsText.split(","))
+            .map((label) => label.trim())
+            .filter(Boolean),
+        ),
+      ].join(", ");
+
+      return {
+        year: first.year,
+        month: first.month,
+        fiscalLabel: first.fiscalLabel,
+        dollarInwardUsdCents: sum((row) => row.dollarInwardUsdCents),
+        onboardingAdvanceUsdCents: sum((row) => row.onboardingAdvanceUsdCents),
+        advancesInrCents: sum((row) => row.advancesInrCents),
+        reimbursementUsdCents: sum((row) => row.reimbursementUsdCents),
+        reimbursementLabelsText,
+        reimbursementInrCents: sum((row) => row.reimbursementInrCents),
+        appraisalAdvanceUsdCents: sum((row) => row.appraisalAdvanceUsdCents),
+        appraisalAdvanceInrCents: sum((row) => row.appraisalAdvanceInrCents),
+        offboardingDeductionUsdCents: sum((row) => row.offboardingDeductionUsdCents),
+        effectiveDollarInwardUsdCents: sum((row) => row.effectiveDollarInwardUsdCents),
+        cashoutUsdInrRate: weightedPeriodRate(bucket, "cashoutUsdInrRate"),
+        cashInInrCents: sum((row) => row.cashInInrCents),
+        paidUsdInrRate: weightedPeriodRate(bucket, "paidUsdInrRate"),
+        monthlyPaidInrCents: sum((row) => row.monthlyPaidInrCents),
+        pfInrCents: sum((row) => row.pfInrCents),
+        tdsInrCents: sum((row) => row.tdsInrCents),
+        actualPaidInrCents: sum((row) => row.actualPaidInrCents),
+        salaryPaidInrCents: sum((row) => row.salaryPaidInrCents),
+        fxCommissionInrCents: sum((row) => row.fxCommissionInrCents),
+        totalCommissionUsdCents: sum((row) => row.totalCommissionUsdCents),
+        commissionEarnedInrCents: sum((row) => row.commissionEarnedInrCents),
+        grossEarningsInrCents: sum((row) => row.grossEarningsInrCents),
+        expensesInrCents: sum((row) => row.expensesInrCents),
+        companyReimbursementUsdCents: sum((row) => row.companyReimbursementUsdCents),
+        companyReimbursementInrCents: sum((row) => row.companyReimbursementInrCents),
+        netPlInrCents: sum((row) => row.netPlInrCents),
+      };
+    })
+    .sort(
+      (left, right) =>
+        left.year * 100 + (left.month ?? 0) - (right.year * 100 + (right.month ?? 0)),
+    );
+}
+
 const sumBy = (rows: PnSourceRow[], key: keyof PnSourceRow) =>
   rows.reduce((sum, row) => sum + Number(row[key]), 0);
 
@@ -76,16 +239,52 @@ const sumEditableBy = (rows: PnEditableSourceRow[], key: keyof PnEditableSourceR
 export function calculatePnPeriodNetPlInrCents(
   row: Pick<
     PnPeriodRow,
-    "netPlInrCents" | "companyReimbursementInrCents" | "expensesInrCents"
+    | "grossEarningsInrCents"
+    | "companyReimbursementInrCents"
+    | "expensesInrCents"
+    | "advancesInrCents"
   >,
-  options: { includeExpenses?: boolean; includeReimbursements?: boolean } = {},
+  options: {
+    includeExpenses?: boolean;
+    includeAdvances?: boolean;
+    includeReimbursements?: boolean;
+  } = {},
 ) {
   const includeExpenses = options.includeExpenses ?? true;
+  const includeAdvances = options.includeAdvances ?? true;
   const includeReimbursements = options.includeReimbursements ?? true;
   return (
-    row.netPlInrCents +
+    row.grossEarningsInrCents +
     (includeReimbursements ? row.companyReimbursementInrCents : 0) -
-    (includeExpenses ? row.expensesInrCents : 0)
+    (includeExpenses ? row.expensesInrCents : 0) -
+    (includeAdvances ? row.advancesInrCents : 0)
+  );
+}
+
+export function calculatePnEmployeeAdvanceInrCents(
+  row: Pick<PnEmployeeEditableRow, "onboardingAdvanceUsdCents" | "cashoutUsdInrRate">,
+) {
+  return Math.round(row.onboardingAdvanceUsdCents * row.cashoutUsdInrRate);
+}
+
+export function calculatePnEmployeeNetPlInrCents(
+  row: Pick<
+    PnEmployeeEditableRow,
+    | "onboardingAdvanceUsdCents"
+    | "cashoutUsdInrRate"
+    | "cashInInrCents"
+    | "salaryPaidInrCents"
+    | "pfInrCents"
+    | "tdsInrCents"
+  >,
+  options: { includeAdvances?: boolean } = {},
+) {
+  return (
+    row.cashInInrCents -
+    row.salaryPaidInrCents -
+    row.pfInrCents -
+    row.tdsInrCents -
+    ((options.includeAdvances ?? true) ? calculatePnEmployeeAdvanceInrCents(row) : 0)
   );
 }
 
@@ -93,10 +292,17 @@ export function sumPnPeriodNetPlInrCents(
   rows: Array<
     Pick<
       PnPeriodRow,
-      "netPlInrCents" | "companyReimbursementInrCents" | "expensesInrCents"
+      | "grossEarningsInrCents"
+      | "companyReimbursementInrCents"
+      | "expensesInrCents"
+      | "advancesInrCents"
     >
   >,
-  options: { includeExpenses?: boolean; includeReimbursements?: boolean } = {},
+  options: {
+    includeExpenses?: boolean;
+    includeAdvances?: boolean;
+    includeReimbursements?: boolean;
+  } = {},
 ) {
   return rows.reduce(
     (sum, row) => sum + calculatePnPeriodNetPlInrCents(row, options),
@@ -298,6 +504,7 @@ export function buildPnEmployeeEditableSections(
       grossEarningsInrCents: row.grossEarningsInrCents,
       netProfitInrCents: row.netProfitInrCents,
       isSecurityDepositMonth: row.isSecurityDepositMonth ?? false,
+      isSalaryOnly: row.isSalaryOnly ?? false,
     });
     existing.totalGrossEarningsInrCents += row.grossEarningsInrCents;
     existing.totalNetProfitInrCents += row.netProfitInrCents;
@@ -392,6 +599,10 @@ export function buildPnPeriodRows(input: {
         fiscalLabel,
         dollarInwardUsdCents: sumBy(bucket, "dollarInwardUsdCents"),
         onboardingAdvanceUsdCents: sumBy(bucket, "onboardingAdvanceUsdCents"),
+        advancesInrCents: bucket.reduce(
+          (sum, row) => sum + Math.round(row.onboardingAdvanceUsdCents * row.cashoutUsdInrRate),
+          0,
+        ),
         reimbursementUsdCents,
         reimbursementLabelsText: [...reimbursementLabels].join(", "),
         reimbursementInrCents,

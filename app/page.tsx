@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { LayoutDashboard } from "lucide-react";
 import { GlassPanel } from "./_components/glass-panel";
 import { inputClass } from "./_components/field";
 import { PendingSubmitButton } from "./_components/pending-submit-button";
@@ -7,12 +9,12 @@ import { requirePageAccess } from "@/lib/auth/server";
 import { filterCompaniesForAuthContext } from "@/src/features/billing/company-access";
 import { resolveSelectedCompanyIds } from "@/src/features/billing/filter-selection";
 import {
-  buildOverviewCompanySummaryRows,
-  buildOverviewGrandTotalRow,
+  buildOverviewMonthlyPnlRows,
+  buildOverviewDashboardHref,
   currentMonthKey,
-  formatOverviewPeriodLabel,
   resolveOverviewMonthRange,
 } from "@/src/features/billing/overview-pnl-summary";
+import { loadOverviewAdvancePreference } from "@/src/features/billing/overview-preference";
 import {
   listCachedAvailablePaymentMonthsForCompanies,
   listCachedCompanies,
@@ -45,7 +47,7 @@ export default async function HomePage({
     companies.length > 0 &&
     selectedCompanyIds.length >= companies.length &&
     companies.every((company) => selectedCompanyIdSet.has(company.id));
-  const [availableMonths, companyDashboardData] = await Promise.all([
+  const [availableMonths, companyDashboardData, preference] = await Promise.all([
     listCachedAvailablePaymentMonthsForCompanies(selectedCompanyIds),
     Promise.all(
       selectedCompanies.map(async (company) => ({
@@ -56,6 +58,7 @@ export default async function HomePage({
         }),
       })),
     ),
+    loadOverviewAdvancePreference(context),
   ]);
   const startMonthParam = Array.isArray(resolved.startMonth)
     ? resolved.startMonth[0]
@@ -69,20 +72,17 @@ export default async function HomePage({
     availableMonths,
     currentMonth: currentMonthKey(),
   });
-  const periodLabel = formatOverviewPeriodLabel(range.startMonth, range.endMonth);
   const dashboardDataByCompanyId = new Map(
     companyDashboardData.map((item) => [item.companyId, item.data] as const),
   );
-  const companyRows = buildOverviewCompanySummaryRows({
-    companies: selectedCompanies,
+  const rows = buildOverviewMonthlyPnlRows({
     dashboardDataByCompanyId,
     monthKeys: range.monthKeys,
-    periodLabel,
   });
-  const rows =
-    companyRows.length > 1
-      ? [...companyRows, buildOverviewGrandTotalRow(companyRows, periodLabel)]
-      : companyRows;
+  const dashboardHref = buildOverviewDashboardHref({
+    companyIds: selectedCompanyIds,
+    monthKeys: range.monthKeys,
+  });
 
   return (
     <Shell
@@ -123,16 +123,26 @@ export default async function HomePage({
             />
           </label>
 
-          <PendingSubmitButton
-            className="gradient-btn"
-            defaultText="Load"
-            pendingText="Loading..."
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <PendingSubmitButton
+              className="gradient-btn"
+              defaultText="Load"
+              pendingText="Loading..."
+            />
+            <Link className="btn-outline inline-flex items-center gap-2" href={dashboardHref}>
+              <LayoutDashboard size={16} aria-hidden="true" />
+              Open dashboard
+            </Link>
+          </div>
         </form>
       </GlassPanel>
 
-      <GlassPanel title="P&L Summary" gradient>
-        <OverviewPnlSummaryTable rows={rows} />
+      <GlassPanel title="Monthly P&L" gradient>
+        <OverviewPnlSummaryTable
+          rows={rows}
+          initialExcludeAdvanceDeduction={preference.excludeAdvanceDeduction}
+          preferenceLoadFailed={preference.loadFailed}
+        />
       </GlassPanel>
     </Shell>
   );

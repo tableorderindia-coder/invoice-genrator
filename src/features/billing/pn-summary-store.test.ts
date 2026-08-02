@@ -120,6 +120,7 @@ describe("P&L summary store", () => {
     });
     expect(data.periodRows[0]).toMatchObject({
       month: 7,
+      advancesInrCents: 850_00,
       expensesInrCents: 500_00,
       companyReimbursementUsdCents: 10_00,
       netPlInrCents: 71_252_00,
@@ -151,10 +152,33 @@ describe("P&L summary store", () => {
     expect(data.periodRows[0]).toMatchObject({
       fiscalLabel: "Apr 2026-Mar 2027",
       dollarInwardUsdCents: 300_00,
+      advancesInrCents: 1_700_00,
       monthlyPaidInrCents: 170_000_00,
       expensesInrCents: 1_200_00,
       netPlInrCents: 146_252_00,
     });
+  });
+
+  it("converts employee advances before company-month aggregation", () => {
+    const data = buildPnDashboardDataFromSummaryRows({
+      companyId: "company_a",
+      periodType: "monthly",
+      employeeRows: [
+        employeeSummary({
+          employeeId: "employee_a",
+          onboardingAdvanceUsdCents: 100_00,
+          cashoutUsdInrRate: 80,
+        }),
+        employeeSummary({
+          employeeId: "employee_b",
+          onboardingAdvanceUsdCents: 200_00,
+          cashoutUsdInrRate: 90,
+        }),
+      ],
+      companyRows: [companySummary({ onboardingAdvanceUsdCents: 300_00 })],
+    });
+
+    expect(data.periodRows[0]?.advancesInrCents).toBe(26_000_00);
   });
 
   it("uses persisted summaries from Overview and Dashboard pages", () => {

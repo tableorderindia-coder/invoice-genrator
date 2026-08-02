@@ -22,6 +22,7 @@ import {
   buildPnEmployeeEditableSections,
   buildPnEmployeeSections,
   buildPnPeriodRows,
+  buildPnSalaryOnlySourceRows,
   calculatePnPeriodNetPlInrCents,
   sumPnPeriodNetPlInrCents,
   type PnEditableSourceRow,
@@ -221,6 +222,22 @@ type DbDashboardCashFlowEntry = {
   invoice_id: string;
 };
 
+type DbDashboardSalaryPayment = {
+  id: string;
+  employee_id: string;
+  employee_name_snapshot: string;
+  company_id: string;
+  month: string;
+  paid_usd_inr_rate: number;
+  monthly_paid_inr_cents: number;
+  salary_paid_inr_cents: number;
+  pf_inr_cents: number;
+  tds_inr_cents: number;
+  actual_paid_inr_cents: number;
+  days_worked: number;
+  days_in_month: number;
+};
+
 type DbSecurityDepositLedger = {
   id: string;
   company_id: string;
@@ -284,13 +301,25 @@ async function getSupabaseOrThrow() {
 
 export async function listAvailablePaymentMonths(companyId: string): Promise<string[]> {
   const supabase = await getSupabaseOrThrow();
-  const { data, error } = await supabase
-    .from("invoice_payment_employee_entries")
-    .select("payment_month")
-    .eq("company_id", companyId);
+  const [cashFlowResult, salaryResult] = await Promise.all([
+    supabase
+      .from("invoice_payment_employee_entries")
+      .select("payment_month")
+      .eq("company_id", companyId),
+    supabase
+      .from("employee_salary_payments")
+      .select("month")
+      .eq("company_id", companyId),
+  ]);
 
-  if (error) throw error;
-  const months = [...new Set((data ?? []).map((row) => row.payment_month))].filter(Boolean) as string[];
+  if (cashFlowResult.error) throw cashFlowResult.error;
+  if (salaryResult.error) throw salaryResult.error;
+  const months = [
+    ...new Set([
+      ...(cashFlowResult.data ?? []).map((row) => row.payment_month),
+      ...(salaryResult.data ?? []).map((row) => row.month),
+    ]),
+  ].filter(Boolean) as string[];
   months.sort((a, b) => b.localeCompare(a)); // Descending order
   return months;
 }
@@ -304,13 +333,25 @@ export async function listAvailablePaymentMonthsForCompanies(
   }
 
   const supabase = await getSupabaseOrThrow();
-  const { data, error } = await supabase
-    .from("invoice_payment_employee_entries")
-    .select("payment_month")
-    .in("company_id", uniqueCompanyIds);
+  const [cashFlowResult, salaryResult] = await Promise.all([
+    supabase
+      .from("invoice_payment_employee_entries")
+      .select("payment_month")
+      .in("company_id", uniqueCompanyIds),
+    supabase
+      .from("employee_salary_payments")
+      .select("month")
+      .in("company_id", uniqueCompanyIds),
+  ]);
 
-  if (error) throw error;
-  const months = [...new Set((data ?? []).map((row) => row.payment_month))].filter(Boolean) as string[];
+  if (cashFlowResult.error) throw cashFlowResult.error;
+  if (salaryResult.error) throw salaryResult.error;
+  const months = [
+    ...new Set([
+      ...(cashFlowResult.data ?? []).map((row) => row.payment_month),
+      ...(salaryResult.data ?? []).map((row) => row.month),
+    ]),
+  ].filter(Boolean) as string[];
   months.sort((a, b) => b.localeCompare(a));
   return months;
 }
@@ -2314,11 +2355,45 @@ export async function getPnDashboardData(input: {
   if (cashFlowError) throw cashFlowError;
 
   const entries = (cashFlowRows ?? []) as DbDashboardCashFlowEntry[];
+  let salaryQuery = supabase
+    .from("employee_salary_payments")
+    .select(
+      "id, employee_id, employee_name_snapshot, company_id, month, paid_usd_inr_rate, monthly_paid_inr_cents, salary_paid_inr_cents, pf_inr_cents, tds_inr_cents, actual_paid_inr_cents, days_worked, days_in_month",
+    )
+    .eq("company_id", input.companyId);
+  if (input.employeeIds && input.employeeIds.length > 0) {
+    salaryQuery = salaryQuery.in("employee_id", input.employeeIds);
+  }
+  if (input.paymentMonths && input.paymentMonths.length > 0) {
+    salaryQuery = salaryQuery.in("month", input.paymentMonths);
+  }
+  const { data: salaryPaymentRows, error: salaryPaymentError } = await salaryQuery;
+  if (salaryPaymentError) throw salaryPaymentError;
+  const existingEmployeeMonthKeys = new Set(
+    entries.map((row) => `${row.employee_id}|${row.payment_month}`),
+  );
+  const salaryOnlyRows = buildPnSalaryOnlySourceRows({
+    existingEmployeeMonthKeys,
+    salaryRows: ((salaryPaymentRows ?? []) as DbDashboardSalaryPayment[]).map((row) => ({
+      id: row.id,
+      employeeId: row.employee_id,
+      employeeName: row.employee_name_snapshot,
+      paymentMonth: row.month,
+      daysWorked: Number(row.days_worked ?? 0),
+      daysInMonth: Number(row.days_in_month ?? 0),
+      paidUsdInrRate: Number(row.paid_usd_inr_rate ?? 0),
+      monthlyPaidInrCents: Number(row.monthly_paid_inr_cents ?? 0),
+      salaryPaidInrCents: Number(row.salary_paid_inr_cents ?? 0),
+      pfInrCents: Number(row.pf_inr_cents ?? 0),
+      tdsInrCents: Number(row.tds_inr_cents ?? 0),
+      actualPaidInrCents: Number(row.actual_paid_inr_cents ?? 0),
+    })),
+  });
   const invoiceIds = [...new Set(entries.map((row) => row.invoice_id))];
   const { data: invoiceRows, error: invoiceError } = await supabase
     .from("invoices")
     .select("id, month, year, invoice_number")
-    .in("id", invoiceIds);
+    .in("id", invoiceIds.length > 0 ? invoiceIds : ["__none__"]);
   if (invoiceError) throw invoiceError;
 
   const invoicePeriodMap = new Map<
@@ -2380,8 +2455,8 @@ export async function getPnDashboardData(input: {
     );
   }
 
-  const sourceRows: PnSourceRow[] = entries
-    .map((row) => {
+  const sourceRows: PnSourceRow[] = [
+    ...entries.map((row) => {
       const [yearPart, monthPart] = String(row.payment_month ?? "").split("-");
       const year = Number.parseInt(yearPart ?? "", 10);
       const month = Number.parseInt(monthPart ?? "", 10);
@@ -2447,8 +2522,9 @@ export async function getPnDashboardData(input: {
           salaryPaidInrCents,
         }),
       };
-    })
-    .filter(Boolean) as PnSourceRow[];
+    }).filter(Boolean) as PnSourceRow[],
+    ...salaryOnlyRows,
+  ];
 
   if (sourceRows.length === 0) {
     return {
@@ -2459,8 +2535,8 @@ export async function getPnDashboardData(input: {
     };
   }
 
-  const editableSourceRows: PnEditableSourceRow[] = entries
-    .map((row) => {
+  const editableSourceRows: PnEditableSourceRow[] = [
+    ...entries.map((row) => {
       const period = invoicePeriodMap.get(row.invoice_id);
       const [yearPart, monthPart] = String(row.payment_month ?? "").split("-");
       const year = Number.parseInt(yearPart ?? "", 10);
@@ -2537,8 +2613,9 @@ export async function getPnDashboardData(input: {
         }),
         isSecurityDepositMonth: false,
       };
-    })
-    .filter(Boolean) as PnEditableSourceRow[];
+    }).filter(Boolean) as PnEditableSourceRow[],
+    ...salaryOnlyRows,
+  ];
 
   return {
     companyId: input.companyId,

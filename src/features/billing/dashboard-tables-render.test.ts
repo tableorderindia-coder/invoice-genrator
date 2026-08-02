@@ -6,6 +6,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DashboardTables } from "../../../app/dashboard/dashboard-tables";
 import {
+  DEFAULT_EMPLOYEE_DASHBOARD_COLUMNS,
+  DEFAULT_PERIOD_DASHBOARD_COLUMNS,
   EMPLOYEE_DASHBOARD_COLUMN_OPTIONS,
   PERIOD_DASHBOARD_COLUMN_OPTIONS,
 } from "./dashboard-column-options";
@@ -34,7 +36,7 @@ const employeeRow: PnEmployeeEditableRow = {
   appraisalAdvanceInrCents: 80_00,
   offboardingDeductionUsdCents: 0,
   effectiveDollarInwardUsdCents: 98_00,
-  cashInInrCents: 8_000_00,
+  cashInInrCents: 18_200_00,
   cashoutUsdInrRate: 80,
   paidUsdInrRate: 75,
   salaryPaidInrCents: 14_500_00,
@@ -55,6 +57,7 @@ const periodRows: PnPeriodRow[] = [
     month: 4,
     dollarInwardUsdCents: 100_00,
     onboardingAdvanceUsdCents: 5_00,
+    advancesInrCents: 400_00,
     reimbursementUsdCents: 4_00,
     reimbursementLabelsText: "Taxi",
     reimbursementInrCents: 320_00,
@@ -83,6 +86,7 @@ const periodRows: PnPeriodRow[] = [
     month: 5,
     dollarInwardUsdCents: 200_00,
     onboardingAdvanceUsdCents: 0,
+    advancesInrCents: 0,
     reimbursementUsdCents: 3_00,
     reimbursementLabelsText: "Food",
     reimbursementInrCents: 240_00,
@@ -208,11 +212,141 @@ describe("dashboard tables rendering", () => {
     );
 
     expect(screen.getByText("Expenses: in P/L")).not.toBeNull();
-    expect(screen.getByText("+ ₹19,740.00")).not.toBeNull();
+    expect(screen.getByText("+ ₹3,740.00")).not.toBeNull();
 
     fireEvent.click(screen.getAllByRole("checkbox")[0] as HTMLInputElement);
 
-    expect(screen.getByText("+ ₹21,240.00")).not.toBeNull();
+    expect(screen.getByText("+ ₹5,240.00")).not.toBeNull();
+  });
+
+  it("renders salary-only dashboard rows as read-only costs", () => {
+    render(
+      createElement(DashboardTables, {
+        view: "employee",
+        periodType: "monthly",
+        data: {
+          ...baseData,
+          employeeEditableSections: [
+            {
+              employeeId: "employee_kiran",
+              employeeName: "B Kiran Suresh",
+              totalGrossEarningsInrCents: -50_000_00,
+              totalNetProfitInrCents: -50_000_00,
+              rows: [
+                {
+                  ...employeeRow,
+                  payoutId: "salary_only:salary_1",
+                  invoiceId: "",
+                  invoiceNumber: "Salary only",
+                  dollarInwardUsdCents: 0,
+                  baseDollarInwardUsdCents: 0,
+                  effectiveDollarInwardUsdCents: 0,
+                  cashInInrCents: 0,
+                  cashoutUsdInrRate: 0,
+                  salaryPaidInrCents: 50_000_00,
+                  actualPaidInrCents: 50_000_00,
+                  grossEarningsInrCents: -50_000_00,
+                  netProfitInrCents: -50_000_00,
+                  isSalaryOnly: true,
+                },
+              ],
+            },
+          ],
+        },
+        returnTo: "/dashboard",
+        employeeColumnKeys: DEFAULT_EMPLOYEE_DASHBOARD_COLUMNS,
+        periodColumnKeys: DEFAULT_PERIOD_DASHBOARD_COLUMNS,
+        updateDashboardEmployeeCashFlowEntryAction: vi.fn(async () => {}),
+      }),
+    );
+
+    expect(screen.getByText("B Kiran Suresh")).toBeTruthy();
+    expect(screen.getByText("Salary only")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Update" })).toBeNull();
+    expect(screen.queryAllByRole("spinbutton")).toHaveLength(0);
+  });
+
+  it("deducts advances from employee net p/l and persists the checkbox", () => {
+    render(
+      createElement(DashboardTables, {
+        view: "employee",
+        periodType: "monthly",
+        data: baseData,
+        returnTo: "/dashboard",
+        employeeColumnKeys: DEFAULT_EMPLOYEE_DASHBOARD_COLUMNS,
+        periodColumnKeys: DEFAULT_PERIOD_DASHBOARD_COLUMNS,
+        updateDashboardEmployeeCashFlowEntryAction: vi.fn(async () => {}),
+      }),
+    );
+
+    expect(screen.getAllByText("+ ₹2,600.00").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("checkbox", { name: "Include advances in Net P/L" }));
+    expect(screen.getAllByText("+ ₹3,000.00").length).toBeGreaterThan(0);
+    expect(window.localStorage.getItem("dashboardIncludeAdvances")).toBe("false");
+  });
+
+  it("keeps the default employee update form complete when optional columns are hidden", () => {
+    const { container } = render(
+      createElement(DashboardTables, {
+        view: "employee",
+        periodType: "monthly",
+        data: baseData,
+        returnTo: "/dashboard?view=employee",
+        employeeColumnKeys: DEFAULT_EMPLOYEE_DASHBOARD_COLUMNS,
+        periodColumnKeys: DEFAULT_PERIOD_DASHBOARD_COLUMNS,
+        updateDashboardEmployeeCashFlowEntryAction: vi.fn(async () => {}),
+      }),
+    );
+
+    const form = container.querySelector("#dashboard-payout-payout_1");
+    expect(form).toBeInstanceOf(HTMLFormElement);
+
+    const formData = new FormData(form as HTMLFormElement);
+    expect(formData.get("payoutId")).toBe("payout_1");
+    expect(formData.get("returnTo")).toBe("/dashboard?view=employee");
+    expect(formData.get("daysWorked")).toBe("10");
+    expect(formData.get("dollarInwardUsd")).toBe("100.00");
+    expect(formData.get("onboardingAdvanceUsd")).toBe("5.00");
+    expect(formData.get("reimbursementUsd")).toBe("2.00");
+    expect(formData.get("reimbursementLabelsText")).toBe("Taxi");
+    expect(formData.get("appraisalAdvanceUsd")).toBe("1.00");
+    expect(formData.get("offboardingDeductionUsd")).toBe("0.00");
+    expect(formData.get("cashoutUsdInrRate")).toBe("80");
+    expect(formData.get("paidUsdInrRate")).toBe("75");
+    expect(formData.get("pfInr")).toBe("500.00");
+    expect(formData.get("tdsInr")).toBe("200.00");
+    expect(formData.get("actualPaidInr")).toBe("15200.00");
+
+    const visiblePfInput = container.querySelector(
+      'input[type="number"][name="pfInr"]',
+    ) as HTMLInputElement;
+    fireEvent.change(visiblePfInput, { target: { value: "777.25" } });
+    expect(new FormData(form as HTMLFormElement).get("pfInr")).toBe("777.25");
+  });
+
+  it("restores stored accounting toggles after remounting", () => {
+    window.localStorage.setItem("dashboardIncludeAdvances", "false");
+    const props = {
+      view: "employee" as const,
+      periodType: "monthly" as const,
+      data: baseData,
+      returnTo: "/dashboard",
+      employeeColumnKeys: DEFAULT_EMPLOYEE_DASHBOARD_COLUMNS,
+      periodColumnKeys: DEFAULT_PERIOD_DASHBOARD_COLUMNS,
+      updateDashboardEmployeeCashFlowEntryAction: vi.fn(async () => {}),
+    };
+
+    const firstRender = render(createElement(DashboardTables, props));
+    expect(screen.getByText("Advances: excluded")).not.toBeNull();
+    firstRender.unmount();
+    render(createElement(DashboardTables, props));
+
+    expect(screen.getByText("Advances: excluded")).not.toBeNull();
+    expect(
+      (screen.getByRole("checkbox", {
+        name: "Include advances in Net P/L",
+      }) as HTMLInputElement).checked,
+    ).toBe(false);
   });
 
   it("renders monthly period columns in the requested order after effective dollar inward", () => {
@@ -235,19 +369,27 @@ describe("dashboard tables rendering", () => {
     expect(headerTexts).toEqual([
       "Period",
       "Dollar inward",
-      "Effective dollar inward",
-      "Received / exchanged rate",
+      "Onboarding advance",
+      "Employee reimbursements (USD)",
+      "Employee reimbursement labels",
+      "Employee reimbursements (INR)",
+      "Appraisal advance",
+      "Appraisal advance (INR)",
+      "Offboarding deduction",
+      "Total effective dollar inward (USD)",
+      "Cashout rate",
       "Total Cash Inward (INR)",
       "Peg rate",
       "Monthly paid (INR)",
       "Actual paid (INR)",
+      "Salary paid (INR)",
       "PF (INR)",
       "TDS (INR)",
-      "Salary paid (INR)",
       "Forex gain (INR)",
       "Operating margin (INR)",
-      "Total earning (INR)",
+      "Gross P&L (INR)",
       "In P/LExpenses (INR)",
+      "In P/LAdvances (INR)",
       "In P/LReimb. (USD)",
       "In P/LReimb. (INR)",
       "Net P/L (INR)",
@@ -308,7 +450,9 @@ describe("dashboard tables rendering", () => {
       }),
     );
 
-    const pegInput = screen.getByDisplayValue("95.2") as HTMLInputElement;
+    const pegInput = document.querySelector(
+      'input[type="number"][name="paidUsdInrRate"]',
+    ) as HTMLInputElement;
     expect(pegInput.name).toBe("paidUsdInrRate");
     expect(pegInput.step).toBe("0.0001");
     expect(screen.queryByDisplayValue("95")).toBeNull();
@@ -334,9 +478,78 @@ describe("dashboard tables rendering", () => {
     expect(headerTexts).toEqual([
       "Month",
       "Total Cash Inward (INR)",
-      "Net Profit (INR)",
+      "Net P/L (INR)",
       "Actions",
     ]);
+  });
+
+  it("renders the stakeholder defaults in exact order without a show-details control", () => {
+    render(
+      createElement(DashboardTables, {
+        view: "period",
+        periodType: "monthly",
+        data: baseData,
+        returnTo: "/dashboard",
+        employeeColumnKeys: DEFAULT_EMPLOYEE_DASHBOARD_COLUMNS,
+        periodColumnKeys: DEFAULT_PERIOD_DASHBOARD_COLUMNS,
+        updateDashboardEmployeeCashFlowEntryAction: vi.fn(async () => {}),
+      }),
+    );
+
+    expect(
+      screen.getAllByRole("columnheader").map((header) =>
+        header.textContent?.replace(/\s+/g, " ").trim(),
+      ),
+    ).toEqual([
+      "Period",
+      "Total effective dollar inward (USD)",
+      "Cashout rate",
+      "Salary paid (INR)",
+      "PF (INR)",
+      "TDS (INR)",
+      "Forex gain (INR)",
+      "Operating margin (INR)",
+      "Gross P&L (INR)",
+      "In P/LExpenses (INR)",
+      "In P/LAdvances (INR)",
+      "Net P/L (INR)",
+    ]);
+    expect(screen.queryByRole("button", { name: /show details/i })).toBeNull();
+  });
+
+  it("keeps export links aligned with the live accounting checkboxes", () => {
+    render(
+      createElement(DashboardTables, {
+        view: "period",
+        periodType: "monthly",
+        data: baseData,
+        returnTo: "/dashboard",
+        employeeColumnKeys: DEFAULT_EMPLOYEE_DASHBOARD_COLUMNS,
+        periodColumnKeys: DEFAULT_PERIOD_DASHBOARD_COLUMNS,
+        exportHrefs: {
+          tableCsv: "/api/dashboard/export?format=csv",
+          tablePdf: "/api/dashboard/export?format=pdf",
+          companyCsv: "/api/dashboard/export?format=csv&scope=company",
+          companyPdf: "/api/dashboard/export?format=pdf&scope=company",
+        },
+        updateDashboardEmployeeCashFlowEntryAction: vi.fn(async () => {}),
+      }),
+    );
+
+    expect(
+      screen.getAllByRole("link").map((link) => link.textContent?.trim()),
+    ).toEqual(["Export CSV", "Export PDF"]);
+    expect(screen.queryByRole("link", { name: "Export company CSV" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Export company PDF" })).toBeNull();
+
+    const csvLink = screen.getByRole("link", { name: "Export CSV" });
+    expect(csvLink.getAttribute("href")).toContain("includeAdvances=1");
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Include advances in Net P/L" }));
+
+    expect(csvLink.getAttribute("href")).toContain("includeExpenses=1");
+    expect(csvLink.getAttribute("href")).toContain("includeAdvances=0");
+    expect(csvLink.getAttribute("href")).toContain("includeReimbursements=1");
   });
 
   it("renders only selected monthly period columns plus the period column", () => {

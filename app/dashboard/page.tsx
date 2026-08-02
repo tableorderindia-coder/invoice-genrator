@@ -18,6 +18,8 @@ import {
   resolveSelectedCompanyIds,
 } from "../../src/features/billing/filter-selection";
 import {
+  DEFAULT_EMPLOYEE_DASHBOARD_COLUMNS,
+  DEFAULT_PERIOD_DASHBOARD_COLUMNS,
   EMPLOYEE_DASHBOARD_COLUMN_OPTIONS,
   PERIOD_DASHBOARD_COLUMN_OPTIONS,
 } from "../../src/features/billing/dashboard-column-options";
@@ -27,92 +29,18 @@ import {
   listCachedEmployeesForCompanies,
 } from "../../src/features/billing/cached-store";
 import { getPnDashboardSummaryData } from "../../src/features/billing/pn-summary-store";
-import type { PnDashboardData, PnPeriodRow } from "../../src/features/billing/types";
+import { mergePnPeriodRows } from "../../src/features/billing/pn-dashboard";
+import type { PnDashboardData } from "../../src/features/billing/types";
 import { DashboardTables } from "./dashboard-tables";
 
 export const dynamic = "force-dynamic";
-
-function weightedRate(rows: PnPeriodRow[], rateKey: "cashoutUsdInrRate" | "paidUsdInrRate") {
-  const eligibleRows = rateKey === "paidUsdInrRate"
-    ? rows.filter((row) => row.paidUsdInrRate > 0)
-    : rows;
-  const totalWeight = eligibleRows.reduce(
-    (sum, row) => sum + row.effectiveDollarInwardUsdCents,
-    0,
-  );
-  if (totalWeight <= 0) return 0;
-  return (
-    eligibleRows.reduce(
-      (sum, row) => sum + row[rateKey] * row.effectiveDollarInwardUsdCents,
-      0,
-    ) / totalWeight
-  );
-}
-
-function mergePeriodRows(rows: PnPeriodRow[]): PnPeriodRow[] {
-  const grouped = new Map<string, PnPeriodRow[]>();
-  for (const row of rows) {
-    const key = row.fiscalLabel ?? `${row.year}-${String(row.month ?? 0).padStart(2, "0")}`;
-    grouped.set(key, [...(grouped.get(key) ?? []), row]);
-  }
-
-  return [...grouped.values()]
-    .map((bucket) => {
-      const first = bucket[0];
-      const sum = (pick: (row: PnPeriodRow) => number) =>
-        bucket.reduce((total, row) => total + pick(row), 0);
-      const reimbursementLabelsText = [
-        ...new Set(
-          bucket
-            .flatMap((row) => row.reimbursementLabelsText.split(","))
-            .map((label) => label.trim())
-            .filter(Boolean),
-        ),
-      ].join(", ");
-
-      return {
-        year: first.year,
-        month: first.month,
-        fiscalLabel: first.fiscalLabel,
-        dollarInwardUsdCents: sum((row) => row.dollarInwardUsdCents),
-        onboardingAdvanceUsdCents: sum((row) => row.onboardingAdvanceUsdCents),
-        reimbursementUsdCents: sum((row) => row.reimbursementUsdCents),
-        reimbursementLabelsText,
-        reimbursementInrCents: sum((row) => row.reimbursementInrCents),
-        appraisalAdvanceUsdCents: sum((row) => row.appraisalAdvanceUsdCents),
-        appraisalAdvanceInrCents: sum((row) => row.appraisalAdvanceInrCents),
-        offboardingDeductionUsdCents: sum((row) => row.offboardingDeductionUsdCents),
-        effectiveDollarInwardUsdCents: sum((row) => row.effectiveDollarInwardUsdCents),
-        cashoutUsdInrRate: weightedRate(bucket, "cashoutUsdInrRate"),
-        cashInInrCents: sum((row) => row.cashInInrCents),
-        paidUsdInrRate: weightedRate(bucket, "paidUsdInrRate"),
-        monthlyPaidInrCents: sum((row) => row.monthlyPaidInrCents),
-        pfInrCents: sum((row) => row.pfInrCents),
-        tdsInrCents: sum((row) => row.tdsInrCents),
-        actualPaidInrCents: sum((row) => row.actualPaidInrCents),
-        salaryPaidInrCents: sum((row) => row.salaryPaidInrCents),
-        fxCommissionInrCents: sum((row) => row.fxCommissionInrCents),
-        totalCommissionUsdCents: sum((row) => row.totalCommissionUsdCents),
-        commissionEarnedInrCents: sum((row) => row.commissionEarnedInrCents),
-        grossEarningsInrCents: sum((row) => row.grossEarningsInrCents),
-        expensesInrCents: sum((row) => row.expensesInrCents),
-        companyReimbursementUsdCents: sum((row) => row.companyReimbursementUsdCents),
-        companyReimbursementInrCents: sum((row) => row.companyReimbursementInrCents),
-        netPlInrCents: sum((row) => row.netPlInrCents),
-      };
-    })
-    .sort(
-      (left, right) =>
-        left.year * 100 + (left.month ?? 0) - (right.year * 100 + (right.month ?? 0)),
-    );
-}
 
 function mergeDashboardData(companyIds: string[], data: PnDashboardData[]): PnDashboardData {
   return {
     companyId: companyIds.join(","),
     employeeEditableSections: data.flatMap((item) => item.employeeEditableSections),
     employeeSections: data.flatMap((item) => item.employeeSections),
-    periodRows: mergePeriodRows(data.flatMap((item) => item.periodRows)),
+    periodRows: mergePnPeriodRows(data.flatMap((item) => item.periodRows)),
   };
 }
 
@@ -187,10 +115,12 @@ export default async function DashboardPage({
   const employeeColumnKeys = resolveDashboardColumnSelection({
     selectedColumns: resolved.employeeColumns,
     allowedColumns: EMPLOYEE_DASHBOARD_COLUMN_OPTIONS.map((option) => option.value),
+    defaultColumns: DEFAULT_EMPLOYEE_DASHBOARD_COLUMNS,
   });
   const periodColumnKeys = resolveDashboardColumnSelection({
     selectedColumns: resolved.periodColumns,
     allowedColumns: PERIOD_DASHBOARD_COLUMN_OPTIONS.map((option) => option.value),
+    defaultColumns: DEFAULT_PERIOD_DASHBOARD_COLUMNS,
   });
 
   const dashboardFilterFields = buildDashboardFilterFieldEntries({
@@ -371,20 +301,6 @@ export default async function DashboardPage({
             pendingText="Loading view..."
           />
         </form>
-        <div className="flex flex-wrap items-center gap-2">
-          <a className="btn-outline" href={tableCsvExportHref}>
-            Export CSV
-          </a>
-          <a className="btn-outline" href={tablePdfExportHref}>
-            Export PDF
-          </a>
-          <a className="btn-outline" href={companyCsvExportHref}>
-            Export company CSV
-          </a>
-          <a className="btn-outline" href={companyPdfExportHref}>
-            Export company PDF
-          </a>
-        </div>
       </GlassPanel>
 
       {view === "employee" ? (
@@ -425,6 +341,7 @@ export default async function DashboardPage({
                 options={EMPLOYEE_DASHBOARD_COLUMN_OPTIONS}
                 defaultSelectedValues={employeeColumnKeys}
                 includeSelectAll
+                emptyValue="__none__"
               />
             </div>
             <PendingSubmitButton
@@ -440,6 +357,12 @@ export default async function DashboardPage({
             returnTo={returnTo}
             employeeColumnKeys={employeeColumnKeys}
             periodColumnKeys={periodColumnKeys}
+            exportHrefs={{
+              tableCsv: tableCsvExportHref,
+              tablePdf: tablePdfExportHref,
+              companyCsv: companyCsvExportHref,
+              companyPdf: companyPdfExportHref,
+            }}
             updateDashboardEmployeeCashFlowEntryAction={
               updateDashboardEmployeeCashFlowEntryAction
             }
@@ -483,6 +406,7 @@ export default async function DashboardPage({
                 options={PERIOD_DASHBOARD_COLUMN_OPTIONS}
                 defaultSelectedValues={periodColumnKeys}
                 includeSelectAll
+                emptyValue="__none__"
               />
             </div>
             <PendingSubmitButton
@@ -524,19 +448,18 @@ export default async function DashboardPage({
             returnTo={returnTo}
             employeeColumnKeys={employeeColumnKeys}
             periodColumnKeys={periodColumnKeys}
+            exportHrefs={{
+              tableCsv: tableCsvExportHref,
+              tablePdf: tablePdfExportHref,
+              companyCsv: companyCsvExportHref,
+              companyPdf: companyPdfExportHref,
+            }}
             updateDashboardEmployeeCashFlowEntryAction={
               updateDashboardEmployeeCashFlowEntryAction
             }
           />
         </GlassPanel>
       )}
-      <GlassPanel>
-        <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-          Total earning (INR) = Operating margin (INR) + Forex gain (INR). Net P/L in
-          Monthly / Yearly view includes Employee Cash Flow net profit, and optionally
-          company-level reimbursements and expenses (use headers toggles to include/exclude them).
-        </p>
-      </GlassPanel>
     </Shell>
   );
 }

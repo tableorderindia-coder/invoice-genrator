@@ -15,6 +15,7 @@ export type ChecklistFilterDropdownProps = {
   options: ChecklistFilterOption[];
   defaultSelectedValues?: string[];
   includeSelectAll?: boolean;
+  emptyValue?: string;
 };
 
 type TriggerLabelInput = {
@@ -51,6 +52,7 @@ export function ChecklistFilterDropdown({
   options,
   defaultSelectedValues = [],
   includeSelectAll = false,
+  emptyValue,
 }: ChecklistFilterDropdownProps) {
   const panelId = useId();
   const optionValues = options.map((option) => option.value);
@@ -87,6 +89,9 @@ export function ChecklistFilterDropdown({
 
   return (
     <div className={`relative inline-flex min-w-[14rem] flex-col ${open ? "z-50" : "z-10"}`}>
+      {visibleSelectedValues.length === 0 && emptyValue ? (
+        <input type="hidden" name={name} value={emptyValue} />
+      ) : null}
       {visibleSelectedValues.map((value) => (
         <input key={value} type="hidden" name={name} value={value} />
       ))}

@@ -97,13 +97,20 @@ export function resolveSavedCashFlowFilters(input: {
 export function resolveDashboardColumnSelection(input: {
   selectedColumns?: MultiSelectInput;
   allowedColumns: string[];
+  defaultColumns?: string[];
 }) {
   const allowedColumnSet = new Set(input.allowedColumns);
   const selectedColumns = normalizeMultiSelectValue(input.selectedColumns).filter((value) =>
     allowedColumnSet.has(value),
   );
 
-  return selectedColumns.length > 0 ? selectedColumns : input.allowedColumns;
+  if (input.selectedColumns !== undefined) {
+    return selectedColumns;
+  }
+
+  return (input.defaultColumns ?? input.allowedColumns).filter((value) =>
+    allowedColumnSet.has(value),
+  );
 }
 
 export function buildEmployeeCashFlowFilterFieldEntries(input: {
@@ -226,20 +233,26 @@ export function buildDashboardFilterFieldEntries(input: {
   }
 
   if (input.includeEmployeeColumns !== false) {
+    const employeeColumns = normalizeMultiSelectValue(input.employeeColumns);
     fields.push(
-      ...normalizeMultiSelectValue(input.employeeColumns).map((value) => ({
+      ...(input.employeeColumns !== undefined && employeeColumns.length === 0
+        ? [{ name: "employeeColumns", value: "__none__" }]
+        : employeeColumns.map((value) => ({
         name: "employeeColumns",
         value,
-      })),
+          }))),
     );
   }
 
   if (input.includePeriodColumns !== false) {
+    const periodColumns = normalizeMultiSelectValue(input.periodColumns);
     fields.push(
-      ...normalizeMultiSelectValue(input.periodColumns).map((value) => ({
+      ...(input.periodColumns !== undefined && periodColumns.length === 0
+        ? [{ name: "periodColumns", value: "__none__" }]
+        : periodColumns.map((value) => ({
         name: "periodColumns",
         value,
-      })),
+          }))),
     );
   }
 

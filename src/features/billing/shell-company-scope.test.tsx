@@ -75,4 +75,14 @@ describe("buildCompanyScopeHref", () => {
       "/employees?tab=edit&employeeId=employee_1&companyIds=company_2",
     );
   });
+
+  it("keeps the compact navigation in normal flow while scrolling", () => {
+    const { container } = render(
+      <Shell title="Employees" companyOptions={companies} activeCompanyIds={["company_1"]}>
+        <div>Employee content</div>
+      </Shell>,
+    );
+
+    expect(container.querySelector("header")).not.toHaveClass("sticky");
+  });
 });
