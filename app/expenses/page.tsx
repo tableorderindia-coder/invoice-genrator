@@ -2,6 +2,7 @@ import { Shell } from "../_components/shell";
 import { GlassPanel } from "../_components/glass-panel";
 import { Field, inputClass } from "../_components/field";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
+import { AutoApplyFilterForm } from "../_components/auto-apply-filter-form";
 import { NumericInput } from "../_components/numeric-input";
 import { requirePageAccess } from "@/lib/auth/server";
 import { filterCompaniesForAuthContext } from "@/src/features/billing/company-access";
@@ -114,7 +115,7 @@ export default async function ExpensesPage({
             <h2 className="text-xl font-semibold" style={{ color: "var(--text-primary)" }}>
               Select Period
             </h2>
-            <form className="mt-4 flex flex-wrap gap-3 items-end">
+            <AutoApplyFilterForm action="/expenses" className="mt-4 flex flex-wrap gap-3 items-end">
               {selectedCompanyIds.map((companyId) => (
                 <input key={companyId} type="hidden" name="companyIds" value={companyId} />
               ))}
@@ -136,14 +137,7 @@ export default async function ExpensesPage({
                   className={inputClass}
                 />
               </Field>
-              <button
-                type="submit"
-                className="gradient-btn"
-                style={{ height: "fit-content" }}
-              >
-                Load
-              </button>
-            </form>
+            </AutoApplyFilterForm>
           </GlassPanel>
 
           {/* Add expense form */}
@@ -155,7 +149,7 @@ export default async function ExpensesPage({
               {selectedCompany?.name ?? "-"}
             </p>
             {singleCompanySelected ? (
-            <form action={saveCompanyExpenseAction} className="mt-4 space-y-4">
+            <form action={saveCompanyExpenseAction} className="mt-4 space-y-4" data-unsaved-form>
               <input type="hidden" name="companyId" value={selectedCompanyId} />
               <input type="hidden" name="year" value={addTargetMonth.year} />
               <input type="hidden" name="month" value={addTargetMonth.month} />
@@ -255,7 +249,7 @@ export default async function ExpensesPage({
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   {/* Edit form — inline amount update */}
-                  <form action={saveCompanyExpenseAction} className="flex items-center gap-2">
+                  <form action={saveCompanyExpenseAction} className="flex items-center gap-2" data-unsaved-form>
                     <input type="hidden" name="expenseId" value={expense.id} />
                     <input type="hidden" name="companyId" value={expense.companyId} />
                     <input type="hidden" name="year" value={expense.year} />

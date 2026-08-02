@@ -138,7 +138,7 @@ export default function EmployeeStatementEditor(props: {
   )}&endMonth=${encodeURIComponent(props.endMonth)}`;
 
   return (
-    <form action={saveEmployeeStatementAction} className="space-y-6">
+    <form action={saveEmployeeStatementAction} className="space-y-6" data-unsaved-form>
       <input type="hidden" name="returnTo" value={props.returnTo} />
       <input type="hidden" name="statementJson" value={JSON.stringify(payload)} />
 

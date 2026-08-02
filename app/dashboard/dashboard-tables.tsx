@@ -591,6 +591,7 @@ function EmployeeTables({
           <form
             id={`dashboard-payout-${row.payoutId}`}
             action={updateDashboardEmployeeCashFlowEntryAction}
+            data-unsaved-form
           >
             <input type="hidden" name="payoutId" value={row.payoutId} />
             <input type="hidden" name="returnTo" value={returnTo} />

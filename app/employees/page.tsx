@@ -4,6 +4,7 @@ import { Shell } from "../_components/shell";
 import { GlassPanel } from "../_components/glass-panel";
 import { Field, inputClass } from "../_components/field";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
+import { AutoApplyFilterForm } from "../_components/auto-apply-filter-form";
 import { NumericInput } from "../_components/numeric-input";
 import { StaggerGrid } from "../_components/stagger-grid";
 import { requirePageAccess } from "@/lib/auth/server";
@@ -84,7 +85,7 @@ export default async function EmployeesPage({
           </div>
 
           {activeTab === "add" ? (
-            <form action={createEmployeeAction}>
+            <form action={createEmployeeAction} data-unsaved-form>
               <h2 className="mt-4 text-xl font-semibold" style={{ color: "var(--text-primary)" }}>
                 Add employee
               </h2>
@@ -161,7 +162,7 @@ export default async function EmployeesPage({
                 Edit employee
               </h2>
               <div className="mt-4">
-                <form action="/employees" className="flex items-end gap-2">
+                <AutoApplyFilterForm action="/employees" className="flex flex-wrap items-end gap-2">
                   <input type="hidden" name="tab" value="edit" />
                   {selectedCompanyIds.map((companyId) => (
                     <input key={companyId} type="hidden" name="companyIds" value={companyId} />
@@ -179,14 +180,9 @@ export default async function EmployeesPage({
                       ))}
                     </select>
                   </Field>
-                  <PendingSubmitButton
-                    className="btn-outline"
-                    defaultText="Load"
-                    pendingText="Loading..."
-                  />
-                </form>
+                </AutoApplyFilterForm>
               </div>
-              <form action={updateEmployeeAction}>
+              <form action={updateEmployeeAction} data-unsaved-form>
                 {selectedEmployee ? <input type="hidden" name="employeeId" value={selectedEmployee.id} /> : null}
                 {selectedEmployee ? <input type="hidden" name="companyId" value={selectedEmployee.companyId} /> : null}
                 <div className="mt-5 grid gap-4 md:grid-cols-2">

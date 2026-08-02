@@ -341,7 +341,7 @@ export default function EmployeeCashFlowSavedRows({
                               />
                             </td>
                             <td>
-                              <form action={updateSavedEmployeeCashFlowEntryAction} className="flex gap-2">
+                              <form action={updateSavedEmployeeCashFlowEntryAction} className="flex gap-2" data-unsaved-form>
                                 <input type="hidden" name="returnTo" value={returnTo} />
                                 <input type="hidden" name="entryId" value={row.id} />
                                 <input

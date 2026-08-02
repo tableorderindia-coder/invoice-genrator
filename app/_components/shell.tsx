@@ -41,6 +41,7 @@ import {
   type PortalUiMode,
 } from "@/src/features/ui/portal-ui-mode";
 import { useSidebarPreference } from "./sidebar-preference-provider";
+import { UnsavedChangesGuard } from "./unsaved-changes-guard";
 
 type CompanyOption = {
   id: string;
@@ -387,6 +388,7 @@ export function Shell({
       href={overviewHref}
       prefetch={false}
       aria-label="EassyOnboard Overview"
+      data-navigation-guarded
       className="sidebar-brand sidebar-icon-target"
       onClick={(event) => handleNavClick(event, overviewHref)}
       {...tooltipEvents("EassyOnboard Overview", compact)}
@@ -415,6 +417,7 @@ export function Shell({
             prefetch={false}
             aria-label={link.label}
             aria-current={active ? "page" : undefined}
+            data-navigation-guarded
             onClick={(event) => handleNavClick(event, href)}
             className={`sidebar-nav-link sidebar-icon-target ${active ? "is-active" : ""}`}
             {...tooltipEvents(link.label, compact)}
@@ -530,6 +533,7 @@ export function Shell({
 
   return (
     <div className="min-h-screen" style={{ color: "var(--text-primary)" }}>
+      <UnsavedChangesGuard />
       <div className="mx-auto flex w-full max-w-[1600px] gap-6 px-4 py-4 sm:px-6 lg:px-8">
         {uiMode === "saas" ? (
           <aside
@@ -556,7 +560,7 @@ export function Shell({
                 const href = scopedHref(link.href);
                 const Icon = link.Icon;
                 return (
-                  <Link key={link.href} href={href} prefetch={false} onClick={(event) => handleNavClick(event, href)} className="flex h-10 items-center gap-3 rounded-xl px-3 font-medium transition-all" style={{ color: active ? "var(--accent-1)" : "var(--text-secondary)", background: active ? "rgba(99, 102, 241, 0.12)" : "transparent" }}>
+                  <Link key={link.href} href={href} prefetch={false} data-navigation-guarded onClick={(event) => handleNavClick(event, href)} className="flex h-10 items-center gap-3 rounded-xl px-3 font-medium transition-all" style={{ color: active ? "var(--accent-1)" : "var(--text-secondary)", background: active ? "rgba(99, 102, 241, 0.12)" : "transparent" }}>
                     <Icon className="h-4 w-4 shrink-0" strokeWidth={2.2} />
                     <span className="min-w-0 flex-1 truncate">{link.label}</span>
                   </Link>
@@ -614,6 +618,7 @@ export function Shell({
                     key={link.href}
                     href={href}
                     prefetch={false}
+                    data-navigation-guarded
                     onClick={(event) => handleNavClick(event, href)}
                     className="flex h-10 shrink-0 items-center gap-2 rounded-xl px-3 font-medium transition-all"
                     style={{

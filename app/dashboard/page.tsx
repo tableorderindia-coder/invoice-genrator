@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { Shell } from "../_components/shell";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
 import { ChecklistFilterDropdown } from "../_components/checklist-filter-dropdown";
+import { AutoApplyFilterForm } from "../_components/auto-apply-filter-form";
 import {
   filterCompaniesForAuthContext,
 } from "@/src/features/billing/company-access";
@@ -313,7 +314,7 @@ export default async function DashboardPage({
 
       {view === "employee" ? (
         <GlassPanel title="Employee" gradient className="overflow-visible">
-          <form action="/dashboard" className="mb-4 space-y-4">
+          <AutoApplyFilterForm action="/dashboard" className="mb-4 space-y-4">
             {employeeFilterFields.map((field, index) => (
               <input
                 key={`${field.name}-${field.value}-${index}`}
@@ -332,6 +333,7 @@ export default async function DashboardPage({
                 }))}
                 defaultSelectedValues={effectiveEmployeeIds}
                 includeSelectAll
+                autoApplyOnClose
               />
               <ChecklistFilterDropdown
                 name="paymentMonths"
@@ -342,6 +344,7 @@ export default async function DashboardPage({
                 }))}
                 defaultSelectedValues={effectivePaymentMonths}
                 includeSelectAll
+                autoApplyOnClose
               />
               <ChecklistFilterDropdown
                 name="employeeColumns"
@@ -350,14 +353,10 @@ export default async function DashboardPage({
                 defaultSelectedValues={employeeColumnKeys}
                 includeSelectAll
                 emptyValue="__none__"
+                autoApplyOnClose
               />
             </div>
-            <PendingSubmitButton
-              className="btn-outline"
-              defaultText="Load"
-              pendingText="Loading..."
-            />
-          </form>
+          </AutoApplyFilterForm>
           <DashboardTables
             view="employee"
             periodType={periodType}
@@ -382,7 +381,7 @@ export default async function DashboardPage({
         </GlassPanel>
       ) : (
         <GlassPanel title="Monthly / Yearly" gradient className="overflow-visible">
-          <form action="/dashboard" className="mb-4 space-y-4">
+          <AutoApplyFilterForm action="/dashboard" className="mb-4 space-y-4">
             {periodFilterFields.map((field, index) => (
               <input
                 key={`${field.name}-${field.value}-${index}`}
@@ -401,6 +400,7 @@ export default async function DashboardPage({
                 }))}
                 defaultSelectedValues={effectiveEmployeeIds}
                 includeSelectAll
+                autoApplyOnClose
               />
               <ChecklistFilterDropdown
                 name="paymentMonths"
@@ -411,6 +411,7 @@ export default async function DashboardPage({
                 }))}
                 defaultSelectedValues={effectivePaymentMonths}
                 includeSelectAll
+                autoApplyOnClose
               />
               <ChecklistFilterDropdown
                 name="periodColumns"
@@ -419,14 +420,10 @@ export default async function DashboardPage({
                 defaultSelectedValues={periodColumnKeys}
                 includeSelectAll
                 emptyValue="__none__"
+                autoApplyOnClose
               />
             </div>
-            <PendingSubmitButton
-              className="btn-outline"
-              defaultText="Load"
-              pendingText="Loading..."
-            />
-          </form>
+          </AutoApplyFilterForm>
           <form action="/dashboard" className="mb-4 flex flex-wrap items-center gap-2">
             {periodTypeSwitchFields.map((field, index) => (
               <input
