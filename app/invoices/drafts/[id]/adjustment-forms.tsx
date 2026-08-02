@@ -311,7 +311,9 @@ export function AdjustmentForms({
           className="rounded-3xl p-6 space-y-5"
           data-unsaved-form
           onSubmit={(event) => {
+            delete event.currentTarget.dataset.unsavedSubmitBlocked;
           if (isAdding) {
+            event.currentTarget.dataset.unsavedSubmitBlocked = "true";
             event.preventDefault();
             return;
           }
@@ -325,6 +327,7 @@ export function AdjustmentForms({
             );
 
             if (exists) {
+              event.currentTarget.dataset.unsavedSubmitBlocked = "true";
               event.preventDefault();
               setError("Duplicate adjustment already added.");
               return;
@@ -333,6 +336,7 @@ export function AdjustmentForms({
             setIsAdding(true);
             setError("");
           } catch (submissionError) {
+            event.currentTarget.dataset.unsavedSubmitBlocked = "true";
             event.preventDefault();
             setError(
               submissionError instanceof Error

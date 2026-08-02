@@ -32,7 +32,16 @@ export function UnsavedChangesGuard() {
     const clearSubmittedForm = (event: SubmitEvent) => {
       const form = guardedFormFromEvent(event);
       if (!form) return;
-      if (!event.defaultPrevented) dirtyForms.delete(form);
+      const isServerAction = Array.from(form.elements).some(
+        (element) =>
+          element instanceof HTMLInputElement &&
+          element.type === "hidden" &&
+          element.name.startsWith("$ACTION_"),
+      );
+      const clientBlocked = form.dataset.unsavedSubmitBlocked === "true";
+      if (!event.defaultPrevented || (isServerAction && !clientBlocked)) {
+        dirtyForms.delete(form);
+      }
     };
     const confirmDiscard = (event: Event) => {
       if (!hasDirtyForms()) return;
