@@ -256,6 +256,10 @@ export function buildDashboardEmployeeTable(
   );
 }
 
+export function normalizeDashboardPdfText(value: string) {
+  return value.replaceAll("₹", "INR ");
+}
+
 export function buildDashboardEmployeeCsv(
   data: PnDashboardData,
   options: EmployeeExportOptions = { includeAdvances: true },
@@ -431,10 +435,13 @@ export async function buildDashboardExportPdf(input: {
   let y = 72;
   const pageWidth = doc.page.width - 48;
 
-  doc.font("Helvetica-Bold").fontSize(16).text(input.title, 24, 24);
-  doc.font("Helvetica").fontSize(9).text(input.subtitle, 24, 46);
+  doc.font("Helvetica-Bold").fontSize(16).text(normalizeDashboardPdfText(input.title), 24, 24);
+  doc.font("Helvetica").fontSize(9).text(normalizeDashboardPdfText(input.subtitle), 24, 46);
 
-  const tableChunks = splitWidePdfTable(input.rows, 8);
+  const tableChunks = splitWidePdfTable(
+    input.rows.map((row) => row.map(normalizeDashboardPdfText)),
+    8,
+  );
   for (const [chunkIndex, rows] of tableChunks.entries()) {
     if (chunkIndex > 0) {
       doc.addPage();
