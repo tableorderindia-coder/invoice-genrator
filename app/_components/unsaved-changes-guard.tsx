@@ -32,9 +32,7 @@ export function UnsavedChangesGuard() {
     const clearSubmittedForm = (event: SubmitEvent) => {
       const form = guardedFormFromEvent(event);
       if (!form) return;
-      window.setTimeout(() => {
-        if (!event.defaultPrevented) dirtyForms.delete(form);
-      }, 0);
+      if (!event.defaultPrevented) dirtyForms.delete(form);
     };
     const confirmDiscard = (event: Event) => {
       if (!hasDirtyForms()) return;
