@@ -47,4 +47,4 @@
 - [x] Run ESLint.
 - [x] Run the Next.js production build.
 - [x] Review the complete diff against `origin/main` for regressions and scope drift.
-- [ ] Mark this plan complete, commit the coherent fix, push `codex/edit-form-selection-sync`, and create a PR targeting `main`.
+- [x] Mark this plan complete, commit the coherent fix, push `codex/edit-form-selection-sync`, and create a PR targeting `main`.
