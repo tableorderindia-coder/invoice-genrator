@@ -263,7 +263,7 @@ export function SalaryMonthEditor({
   }
 
   return (
-    <form action={saveMonthlyPayrollRowsAction} className="space-y-5">
+    <form action={saveMonthlyPayrollRowsAction} className="space-y-5" data-unsaved-form>
       <input type="hidden" name="companyId" value={companyId} />
       <input type="hidden" name="month" value={month} />
       <input type="hidden" name="returnTo" value={returnTo} />

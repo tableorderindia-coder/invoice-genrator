@@ -195,7 +195,7 @@ function AdjustmentGroup({
               </p>
             </div>
             <div className="flex items-center gap-3">
-              <form action={updateAmountAction} className="flex items-center gap-2">
+              <form action={updateAmountAction} className="flex items-center gap-2" data-unsaved-form>
                 <input type="hidden" name="invoiceId" value={invoiceId} />
                 <input type="hidden" name="adjustmentId" value={adjustment.id} />
                 <input type="hidden" name="returnTo" value={returnTo} />
@@ -307,10 +307,13 @@ export function AdjustmentForms({
     <div className="overflow-x-auto pb-2" data-testid="adjustment-sidebar-scroll">
       <div className="space-y-4" style={{ minWidth: "42rem" }}>
         <form
-        action={addAction}
-        className="rounded-3xl p-6 space-y-5"
-        onSubmit={(event) => {
+          action={addAction}
+          className="rounded-3xl p-6 space-y-5"
+          data-unsaved-form
+          onSubmit={(event) => {
+            delete event.currentTarget.dataset.unsavedSubmitBlocked;
           if (isAdding) {
+            event.currentTarget.dataset.unsavedSubmitBlocked = "true";
             event.preventDefault();
             return;
           }
@@ -324,6 +327,7 @@ export function AdjustmentForms({
             );
 
             if (exists) {
+              event.currentTarget.dataset.unsavedSubmitBlocked = "true";
               event.preventDefault();
               setError("Duplicate adjustment already added.");
               return;
@@ -332,6 +336,7 @@ export function AdjustmentForms({
             setIsAdding(true);
             setError("");
           } catch (submissionError) {
+            event.currentTarget.dataset.unsavedSubmitBlocked = "true";
             event.preventDefault();
             setError(
               submissionError instanceof Error

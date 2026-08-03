@@ -1,6 +1,6 @@
 import { GlassPanel } from "@/app/_components/glass-panel";
 import { Field, inputClass } from "@/app/_components/field";
-import { PendingSubmitButton } from "@/app/_components/pending-submit-button";
+import { AutoApplyFilterForm } from "@/app/_components/auto-apply-filter-form";
 import { Shell } from "@/app/_components/shell";
 import { requirePageAccess } from "@/lib/auth/server";
 import { filterCompaniesForAuthContext } from "@/src/features/billing/company-access";
@@ -87,19 +87,14 @@ export default async function SalaryPage({
       ) : null}
 
       <GlassPanel>
-        <form action="/salary" className="grid gap-4 p-5 md:grid-cols-[1fr_auto] md:items-end">
+        <AutoApplyFilterForm action="/salary" className="grid gap-4 p-5 md:grid-cols-[1fr_auto] md:items-end">
           {selectedCompanyIds.map((companyId) => (
             <input key={companyId} type="hidden" name="companyIds" value={companyId} />
           ))}
           <Field label="Salary month">
             <input name="month" type="month" className={inputClass} defaultValue={selectedMonth} />
           </Field>
-          <PendingSubmitButton
-            className="btn-outline"
-            defaultText="Load month"
-            pendingText="Loading..."
-          />
-        </form>
+        </AutoApplyFilterForm>
       </GlassPanel>
 
       {singleCompanySelected && selectedCompany ? (

@@ -65,7 +65,7 @@ export default async function CreateInvoicePage({
             {flashMessage}
           </div>
         ) : null}
-        <form action={createInvoiceDraftAction}>
+        <form action={createInvoiceDraftAction} data-unsaved-form>
           <CreateInvoiceForm
             companies={companies.map((company) => ({
               id: company.id,

@@ -396,7 +396,7 @@ export default function EmployeeCashFlowEntryForm({
         </div>
       </div>
 
-      <form action={saveInvoicePaymentEmployeeEntriesAction} className="space-y-4">
+      <form action={saveInvoicePaymentEmployeeEntriesAction} className="space-y-4" data-unsaved-form>
         <input type="hidden" name="companyId" value={companyId} />
         <input type="hidden" name="paymentMonth" value={paymentMonth} />
         <input type="hidden" name="returnTo" value={returnTo} />

@@ -116,7 +116,7 @@ export function FoundersBalanceTable({
   };
 
   return (
-    <form action={saveFounderWithdrawalsAction} className="space-y-4">
+    <form action={saveFounderWithdrawalsAction} className="space-y-4" data-unsaved-form>
       <input type="hidden" name="companyId" value={companyId} />
       <input type="hidden" name="returnTo" value={returnTo} />
       <div className="flex items-center justify-between gap-3">

@@ -12,6 +12,10 @@ import {
   buildDashboardPeriodTable,
 } from "@/src/features/billing/dashboard-export";
 import { buildPeriodTotals } from "@/src/features/billing/dashboard-table-totals";
+import {
+  DEFAULT_EMPLOYEE_DASHBOARD_COLUMNS,
+  DEFAULT_PERIOD_DASHBOARD_COLUMNS,
+} from "@/src/features/billing/dashboard-column-options";
 import { resolveDashboardExportOptions } from "@/src/features/billing/dashboard-export-options";
 import {
   normalizeMultiSelectValue,
@@ -86,6 +90,14 @@ export async function GET(request: Request) {
   const format = searchParams.get("format") === "pdf" ? "pdf" : "csv";
   const scope = searchParams.get("scope") === "company" ? "company" : "table";
   const includeOptions = resolveDashboardExportOptions(searchParams);
+  const requestedEmployeeColumns = normalizeMultiSelectValue(resolved.employeeColumns);
+  const requestedPeriodColumns = normalizeMultiSelectValue(resolved.periodColumns);
+  const employeeColumns = requestedEmployeeColumns.length
+    ? requestedEmployeeColumns
+    : DEFAULT_EMPLOYEE_DASHBOARD_COLUMNS;
+  const periodColumns = requestedPeriodColumns.length
+    ? requestedPeriodColumns
+    : DEFAULT_PERIOD_DASHBOARD_COLUMNS;
   const selectedPeriodTypeRaw = Array.isArray(resolved.periodType)
     ? resolved.periodType[0]
     : resolved.periodType;
@@ -196,7 +208,8 @@ export async function GET(request: Request) {
   }
 
   if (view === "period") {
-    const table = buildDashboardPeriodTable(data, periodType, includeOptions);
+    const periodExportOptions = { ...includeOptions, columns: periodColumns };
+    const table = buildDashboardPeriodTable(data, periodType, periodExportOptions);
     const totals = buildPeriodTotals(data.periodRows, includeOptions);
     const filename = `dashboard-${periodType}-${periodLabel}.${format}`;
     if (format === "pdf") {
@@ -209,12 +222,15 @@ export async function GET(request: Request) {
         headers: responseHeaders(filename, "application/pdf"),
       });
     }
-    return new NextResponse(buildDashboardPeriodCsv(data, periodType, includeOptions), {
+    return new NextResponse(buildDashboardPeriodCsv(data, periodType, periodExportOptions), {
       headers: responseHeaders(filename, "text/csv; charset=utf-8"),
     });
   }
 
-  const employeeOptions = { includeAdvances: includeOptions.includeAdvances };
+  const employeeOptions = {
+    includeAdvances: includeOptions.includeAdvances,
+    columns: employeeColumns,
+  };
   const table = buildDashboardEmployeeTable(data, employeeOptions);
   const filename = `dashboard-employees-${periodLabel}.${format}`;
   if (format === "pdf") {

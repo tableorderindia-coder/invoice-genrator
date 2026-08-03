@@ -4,6 +4,7 @@ import { Shell } from "../_components/shell";
 import { GlassPanel } from "../_components/glass-panel";
 import { Field, inputClass } from "../_components/field";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
+import { AutoApplyFilterForm } from "../_components/auto-apply-filter-form";
 import { StaggerGrid } from "../_components/stagger-grid";
 import { requirePageAccess } from "@/lib/auth/server";
 import { createCompanyAction, updateCompanyAction } from "@/src/features/billing/actions";
@@ -54,7 +55,7 @@ export default async function CompaniesPage({
           </div>
 
           {activeTab === "add" ? (
-            <form action={createCompanyAction}>
+            <form action={createCompanyAction} data-unsaved-form>
               <h2 className="mt-4 text-xl font-semibold" style={{ color: "var(--text-primary)" }}>
                 Add company
               </h2>
@@ -80,7 +81,7 @@ export default async function CompaniesPage({
               <h2 className="mt-4 text-xl font-semibold" style={{ color: "var(--text-primary)" }}>
                 Edit company
               </h2>
-              <form action="/companies" className="mt-4 flex items-end gap-2">
+              <AutoApplyFilterForm action="/companies" className="mt-4 flex flex-wrap items-end gap-2">
                 <input type="hidden" name="tab" value="edit" />
                 <Field label="Select company">
                   <select
@@ -95,13 +96,8 @@ export default async function CompaniesPage({
                     ))}
                   </select>
                 </Field>
-                <PendingSubmitButton
-                  className="btn-outline"
-                  defaultText="Load"
-                  pendingText="Loading..."
-                />
-              </form>
-              <form action={updateCompanyAction}>
+              </AutoApplyFilterForm>
+              <form action={updateCompanyAction} data-unsaved-form>
                 {selectedCompany ? <input type="hidden" name="companyId" value={selectedCompany.id} /> : null}
                 <div className="mt-5 space-y-4">
                   <Field label="Company name">

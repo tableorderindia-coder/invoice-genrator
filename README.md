@@ -27,6 +27,11 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+## Browser support
+
+Use a current Chromium browser such as Chrome or Edge. The unsaved-edit guard relies on
+the Navigation API to stop Back/Forward traversal before Next.js changes the active route.
+
 ## Verification
 
 ```bash

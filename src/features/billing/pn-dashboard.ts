@@ -152,7 +152,12 @@ export function buildPnSalaryOnlySourceRows(input: {
 }
 
 function weightedPeriodRate(
-  rows: PnPeriodRow[],
+  rows: Array<
+    Pick<
+      PnSourceRow,
+      "effectiveDollarInwardUsdCents" | "cashoutUsdInrRate" | "paidUsdInrRate"
+    >
+  >,
   rateKey: "cashoutUsdInrRate" | "paidUsdInrRate",
 ) {
   const eligibleRows = rateKey === "paidUsdInrRate"
@@ -569,7 +574,9 @@ export function buildPnPeriodRows(input: {
       const companyLevelReimbursementUsdCents =
         input.companyLevelReimbursementUsdByKey.get(key) ?? 0;
       const companyLevelReimbursementInrCents = Math.round(
-        (companyLevelReimbursementUsdCents / 100) * averageRate(bucket, "cashoutUsdInrRate") * 100,
+        (companyLevelReimbursementUsdCents / 100) *
+          weightedPeriodRate(bucket, "cashoutUsdInrRate") *
+          100,
       );
       const appraisalAdvanceUsdCents = sumBy(bucket, "appraisalAdvanceUsdCents");
       const appraisalAdvanceInrCents = bucket.reduce(
@@ -589,8 +596,8 @@ export function buildPnPeriodRows(input: {
           .filter(Boolean)
           .forEach((label) => reimbursementLabels.add(label));
       }
-      const cashoutUsdInrRate = averageRate(bucket, "cashoutUsdInrRate");
-      const paidUsdInrRate = averageRate(bucket, "paidUsdInrRate");
+      const cashoutUsdInrRate = weightedPeriodRate(bucket, "cashoutUsdInrRate");
+      const paidUsdInrRate = weightedPeriodRate(bucket, "paidUsdInrRate");
       const salaryPaidInrCents = sumBy(bucket, "salaryPaidInrCents");
 
       return {

@@ -138,6 +138,7 @@ export default async function CashoutPage({
                       <form
                         action={cashOutInvoiceAction}
                         className="grid w-full min-w-[520px] gap-3 sm:grid-cols-[minmax(190px,1fr)_minmax(150px,0.75fr)_auto] sm:items-center"
+                        data-unsaved-form
                       >
                         <input type="hidden" name="invoiceId" value={invoice.id} />
                         <input type="hidden" name="returnTo" value={returnTo} />

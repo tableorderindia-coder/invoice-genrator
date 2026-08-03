@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 import { normalizeMultiSelectValue } from "../../src/features/billing/filter-selection";
 
@@ -16,6 +16,7 @@ export type ChecklistFilterDropdownProps = {
   defaultSelectedValues?: string[];
   includeSelectAll?: boolean;
   emptyValue?: string;
+  autoApplyOnClose?: boolean;
 };
 
 type TriggerLabelInput = {
@@ -53,6 +54,7 @@ export function ChecklistFilterDropdown({
   defaultSelectedValues = [],
   includeSelectAll = false,
   emptyValue,
+  autoApplyOnClose = false,
 }: ChecklistFilterDropdownProps) {
   const panelId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -62,6 +64,27 @@ export function ChecklistFilterDropdown({
   const [selectedValues, setSelectedValues] = useState<string[]>(() =>
     normalizeSelectedValues(defaultSelectedValues, optionValues),
   );
+  const selectionAtOpenRef = useRef("");
+  const selectedValuesRef = useRef(selectedValues);
+
+  useEffect(() => {
+    selectedValuesRef.current = selectedValues;
+  }, [selectedValues]);
+
+  const selectedSignature = useCallback(
+    (values: string[]) => normalizeSelectedValues(values, optionValues).join("\u0000"),
+    [optionValues],
+  );
+
+  const applySelectionIfChanged = useCallback(() => {
+    if (
+      !autoApplyOnClose ||
+      selectionAtOpenRef.current === selectedSignature(selectedValuesRef.current)
+    ) {
+      return;
+    }
+    window.setTimeout(() => rootRef.current?.closest("form")?.requestSubmit(), 0);
+  }, [autoApplyOnClose, selectedSignature]);
 
   const selectedValueSet = new Set(selectedValues);
   const visibleSelectedValues = options
@@ -79,30 +102,31 @@ export function ChecklistFilterDropdown({
   useEffect(() => {
     if (!open) return;
 
-    const closeAndRestoreFocus = () => {
+    const close = (restoreFocus = false, applySelection = true) => {
       setOpen(false);
-      triggerRef.current?.focus();
+      if (applySelection) applySelectionIfChanged();
+      if (restoreFocus) triggerRef.current?.focus();
     };
     const handlePointerDown = (event: PointerEvent) => {
       if (!rootRef.current?.contains(event.target as Node)) {
         event.preventDefault();
-        closeAndRestoreFocus();
+        close(true);
       }
     };
     const handleClick = (event: MouseEvent) => {
       if (!rootRef.current?.contains(event.target as Node)) {
-        closeAndRestoreFocus();
+        close(true);
       }
     };
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        closeAndRestoreFocus();
+        close(true);
       }
     };
     const handleOtherDropdown = (event: Event) => {
       if ((event as CustomEvent<string>).detail !== panelId) {
-        setOpen(false);
+        close();
       }
     };
     const form = rootRef.current?.closest("form");
@@ -111,15 +135,25 @@ export function ChecklistFilterDropdown({
     document.addEventListener("click", handleClick, true);
     document.addEventListener("keydown", handleKeyDown);
     document.addEventListener("checklist-dropdown-open", handleOtherDropdown);
-    form?.addEventListener("submit", closeAndRestoreFocus);
+    const handleSubmit = () => close(false, false);
+    form?.addEventListener("submit", handleSubmit);
     return () => {
       document.removeEventListener("pointerdown", handlePointerDown, true);
       document.removeEventListener("click", handleClick, true);
       document.removeEventListener("keydown", handleKeyDown);
       document.removeEventListener("checklist-dropdown-open", handleOtherDropdown);
-      form?.removeEventListener("submit", closeAndRestoreFocus);
+      form?.removeEventListener("submit", handleSubmit);
     };
-  }, [open, panelId]);
+  }, [applySelectionIfChanged, open, panelId]);
+
+  useEffect(() => {
+    const form = rootRef.current?.closest("form");
+    const resetSelection = () => {
+      setSelectedValues(normalizeSelectedValues(defaultSelectedValues, optionValues));
+    };
+    form?.addEventListener("reset", resetSelection);
+    return () => form?.removeEventListener("reset", resetSelection);
+  }, [defaultSelectedValues, optionValues]);
 
   function setOptionValue(value: string, checked: boolean) {
     setSelectedValues((currentValues) => {
@@ -148,17 +182,20 @@ export function ChecklistFilterDropdown({
         type="button"
         aria-controls={panelId}
         aria-expanded={open}
-        onClick={() =>
-          setOpen((current) => {
-            const next = !current;
-            if (next) {
+        onClick={() => {
+          if (open) {
+            setOpen(false);
+            applySelectionIfChanged();
+          } else {
+            selectionAtOpenRef.current = selectedSignature(selectedValuesRef.current);
+            setOpen(true);
+            if (!open) {
               document.dispatchEvent(
                 new CustomEvent("checklist-dropdown-open", { detail: panelId }),
               );
             }
-            return next;
-          })
-        }
+          }
+        }}
         className="inline-flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-sm font-medium transition-colors"
         style={{
           borderColor: "var(--glass-border)",
@@ -195,6 +232,7 @@ export function ChecklistFilterDropdown({
               <label className="flex items-center gap-2 rounded-lg px-2 py-1 text-sm">
                 <input
                   type="checkbox"
+                  data-auto-apply={autoApplyOnClose ? "false" : undefined}
                   checked={allSelected}
                   onChange={(event) => setAllValues(event.target.checked)}
                 />
@@ -210,6 +248,7 @@ export function ChecklistFilterDropdown({
                 >
                   <input
                     type="checkbox"
+                    data-auto-apply={autoApplyOnClose ? "false" : undefined}
                     checked={selectedValueSet.has(option.value)}
                     onChange={(event) => setOptionValue(option.value, event.target.checked)}
                   />

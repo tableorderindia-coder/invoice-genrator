@@ -2,6 +2,7 @@ import { ChecklistFilterDropdown } from "../_components/checklist-filter-dropdow
 import { GlassPanel } from "../_components/glass-panel";
 import { inputClass } from "../_components/field";
 import { PendingSubmitButton } from "../_components/pending-submit-button";
+import { AutoApplyFilterForm } from "../_components/auto-apply-filter-form";
 import { Shell } from "../_components/shell";
 import { requirePageAccess } from "@/lib/auth/server";
 import {
@@ -191,7 +192,7 @@ export default async function EmployeeCashFlowPage({
       activeCompanyIds={selectedCompanyIds}
     >
       <GlassPanel gradient className="overflow-visible">
-        <form
+        <AutoApplyFilterForm
           action="/employee-cash-flow"
           className={
             selectedTab === "saved"
@@ -225,6 +226,7 @@ export default async function EmployeeCashFlowPage({
                 })}
                 defaultSelectedValues={selectedInvoiceIds}
                 includeSelectAll
+                autoApplyOnClose
               />
             </>
           ) : (
@@ -235,6 +237,7 @@ export default async function EmployeeCashFlowPage({
                 options={savedEmployeeOptions}
                 defaultSelectedValues={savedFilters.employeeIds}
                 includeSelectAll
+                autoApplyOnClose
               />
               <ChecklistFilterDropdown
                 name="paymentMonths"
@@ -242,15 +245,11 @@ export default async function EmployeeCashFlowPage({
                 options={savedPaymentMonthOptions}
                 defaultSelectedValues={savedFilters.paymentMonths}
                 includeSelectAll
+                autoApplyOnClose
               />
             </>
           )}
-          <PendingSubmitButton
-            className="gradient-btn"
-            defaultText="Load"
-            pendingText="Loading..."
-          />
-        </form>
+        </AutoApplyFilterForm>
 
         {flashMessage ? (
           <div
