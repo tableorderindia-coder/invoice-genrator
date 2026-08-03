@@ -65,4 +65,31 @@ describe("automatic filter page wiring", () => {
       expect(source(path), path).toContain("data-unsaved-form");
     }
   });
+
+  it("remounts editors when their automatically applied data scope changes", () => {
+    expect(source("app/companies/page.tsx")).toContain(
+      'key={`company-editor:${selectedCompany?.id ?? "none"}`}',
+    );
+    expect(source("app/employees/page.tsx")).toContain(
+      'key={`employee-editor:${selectedEmployee?.id ?? "none"}`}',
+    );
+    expect(source("app/salary/page.tsx")).toContain(
+      'key={`salary-editor:${selectedCompanyId}:${selectedMonth}`}',
+    );
+    expect(source("app/employee-statements/page.tsx")).toContain(
+      'key={`${companyId}:${section.employeeId}:${startMonth}:${endMonth}`}',
+    );
+    expect(source("app/employee-cash-flow/page.tsx")).toContain(
+      "key={savedRowsEditorKey}",
+    );
+    expect(source("app/employee-cash-flow/page.tsx")).toContain(
+      "key={composeEditorKey}",
+    );
+    expect(source("app/expenses/page.tsx")).toContain(
+      'key={`expense-editor:${selectedCompanyId}:${period.endMonth}`}',
+    );
+    expect(source("app/dashboard/page.tsx")).toContain(
+      "key={dashboardEmployeeEditorKey}",
+    );
+  });
 });

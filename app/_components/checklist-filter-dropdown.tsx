@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { normalizeMultiSelectValue } from "../../src/features/billing/filter-selection";
 
@@ -24,6 +24,8 @@ type TriggerLabelInput = {
   selectedCount: number;
   optionCount: number;
 };
+
+const EMPTY_SELECTED_VALUES: string[] = [];
 
 function normalizeSelectedValues(
   selectedValues: string[],
@@ -51,7 +53,7 @@ export function ChecklistFilterDropdown({
   name,
   label,
   options,
-  defaultSelectedValues = [],
+  defaultSelectedValues = EMPTY_SELECTED_VALUES,
   includeSelectAll = false,
   emptyValue,
   autoApplyOnClose = false,
@@ -59,11 +61,24 @@ export function ChecklistFilterDropdown({
   const panelId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const optionValues = options.map((option) => option.value);
-  const [open, setOpen] = useState(false);
-  const [selectedValues, setSelectedValues] = useState<string[]>(() =>
-    normalizeSelectedValues(defaultSelectedValues, optionValues),
+  const optionValues = useMemo(
+    () => options.map((option) => option.value),
+    [options],
   );
+  const normalizedDefaultValues = useMemo(
+    () => normalizeSelectedValues(defaultSelectedValues, optionValues),
+    [defaultSelectedValues, optionValues],
+  );
+  const defaultSelectionSignature = normalizedDefaultValues.join("\u0000");
+  const [open, setOpen] = useState(false);
+  const [selection, setSelection] = useState(() => ({
+    sourceSignature: defaultSelectionSignature,
+    values: normalizedDefaultValues,
+  }));
+  const selectedValues =
+    open || selection.sourceSignature === defaultSelectionSignature
+      ? selection.values
+      : normalizedDefaultValues;
   const selectionAtOpenRef = useRef("");
   const selectedValuesRef = useRef(selectedValues);
 
@@ -103,6 +118,10 @@ export function ChecklistFilterDropdown({
     if (!open) return;
 
     const close = (restoreFocus = false, applySelection = true) => {
+      setSelection((current) => ({
+        ...current,
+        sourceSignature: defaultSelectionSignature,
+      }));
       setOpen(false);
       if (applySelection) applySelectionIfChanged();
       if (restoreFocus) triggerRef.current?.focus();
@@ -144,28 +163,38 @@ export function ChecklistFilterDropdown({
       document.removeEventListener("checklist-dropdown-open", handleOtherDropdown);
       form?.removeEventListener("submit", handleSubmit);
     };
-  }, [applySelectionIfChanged, open, panelId]);
+  }, [applySelectionIfChanged, defaultSelectionSignature, open, panelId]);
 
   useEffect(() => {
     const form = rootRef.current?.closest("form");
     const resetSelection = () => {
-      setSelectedValues(normalizeSelectedValues(defaultSelectedValues, optionValues));
+      setSelection({
+        sourceSignature: defaultSelectionSignature,
+        values: normalizedDefaultValues,
+      });
     };
     form?.addEventListener("reset", resetSelection);
     return () => form?.removeEventListener("reset", resetSelection);
-  }, [defaultSelectedValues, optionValues]);
+  }, [defaultSelectionSignature, normalizedDefaultValues]);
 
   function setOptionValue(value: string, checked: boolean) {
-    setSelectedValues((currentValues) => {
+    setSelection((current) => {
+      const currentValues = current.values;
       const nextValues = checked
         ? [...currentValues, value]
         : currentValues.filter((currentValue) => currentValue !== value);
-      return normalizeSelectedValues(nextValues, optionValues);
+      return {
+        sourceSignature: defaultSelectionSignature,
+        values: normalizeSelectedValues(nextValues, optionValues),
+      };
     });
   }
 
   function setAllValues(checked: boolean) {
-    setSelectedValues(checked ? optionValues : []);
+    setSelection({
+      sourceSignature: defaultSelectionSignature,
+      values: checked ? optionValues : [],
+    });
   }
 
   return (
@@ -184,10 +213,18 @@ export function ChecklistFilterDropdown({
         aria-expanded={open}
         onClick={() => {
           if (open) {
+            setSelection((current) => ({
+              ...current,
+              sourceSignature: defaultSelectionSignature,
+            }));
             setOpen(false);
             applySelectionIfChanged();
           } else {
             selectionAtOpenRef.current = selectedSignature(selectedValuesRef.current);
+            setSelection({
+              sourceSignature: defaultSelectionSignature,
+              values: selectedValuesRef.current,
+            });
             setOpen(true);
             if (!open) {
               document.dispatchEvent(

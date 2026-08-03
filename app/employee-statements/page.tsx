@@ -169,7 +169,7 @@ export default async function EmployeeStatementsPage({
           <div className="space-y-8">
             {sections.map(({ companyId, section }) => (
               <EmployeeStatementEditor
-                key={`${companyId}:${section.employeeId}`}
+                key={`${companyId}:${section.employeeId}:${startMonth}:${endMonth}`}
                 companyId={companyId}
                 companyName={companyNameMap.get(companyId) || "Unknown company"}
                 section={section}

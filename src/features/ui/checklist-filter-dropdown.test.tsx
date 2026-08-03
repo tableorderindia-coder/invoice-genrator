@@ -57,4 +57,53 @@ describe("ChecklistFilterDropdown", () => {
     expect(screen.queryByRole("group", { name: "Items filters" })).not.toBeInTheDocument();
     expect(trigger).toHaveFocus();
   });
+
+  it("reconciles a closed dropdown when server defaults change", () => {
+    const { rerender } = render(
+      <ChecklistFilterDropdown
+        name="items"
+        label="Items"
+        options={options}
+        defaultSelectedValues={["one"]}
+      />,
+    );
+
+    rerender(
+      <ChecklistFilterDropdown
+        name="items"
+        label="Items"
+        options={options}
+        defaultSelectedValues={["two"]}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /items/i }));
+
+    expect(screen.getByRole("checkbox", { name: "One" })).not.toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Two" })).toBeChecked();
+  });
+
+  it("does not replace an in-progress selection while the dropdown is open", () => {
+    const { rerender } = render(
+      <ChecklistFilterDropdown
+        name="items"
+        label="Items"
+        options={options}
+        defaultSelectedValues={["one"]}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /items/i }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Two" }));
+
+    rerender(
+      <ChecklistFilterDropdown
+        name="items"
+        label="Items"
+        options={options}
+        defaultSelectedValues={["two"]}
+      />,
+    );
+
+    expect(screen.getByRole("checkbox", { name: "One" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Two" })).toBeChecked();
+  });
 });

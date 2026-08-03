@@ -97,7 +97,11 @@ export default async function CompaniesPage({
                   </select>
                 </Field>
               </AutoApplyFilterForm>
-              <form action={updateCompanyAction} data-unsaved-form>
+              <form
+                key={`company-editor:${selectedCompany?.id ?? "none"}`}
+                action={updateCompanyAction}
+                data-unsaved-form
+              >
                 {selectedCompany ? <input type="hidden" name="companyId" value={selectedCompany.id} /> : null}
                 <div className="mt-5 space-y-4">
                   <Field label="Company name">

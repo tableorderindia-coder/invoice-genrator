@@ -229,6 +229,15 @@ export default async function DashboardPage({
         ),
       )
     : emptyDashboardData;
+  const dashboardEmployeeEditorKey = [
+    "dashboard-employee",
+    periodType,
+    ...[...selectedCompanyIds].sort(),
+    "employees",
+    ...[...effectiveEmployeeIds].sort(),
+    "months",
+    ...[...effectivePaymentMonths].sort(),
+  ].join(":");
 
   const flashStatus = Array.isArray(resolved.flashStatus)
     ? resolved.flashStatus[0]
@@ -358,6 +367,7 @@ export default async function DashboardPage({
             </div>
           </AutoApplyFilterForm>
           <DashboardTables
+            key={dashboardEmployeeEditorKey}
             view="employee"
             periodType={periodType}
             data={data}
