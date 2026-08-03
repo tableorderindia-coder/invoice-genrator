@@ -1,7 +1,7 @@
 import { ChecklistFilterDropdown } from "../_components/checklist-filter-dropdown";
 import { GlassPanel } from "../_components/glass-panel";
 import { inputClass } from "../_components/field";
-import { PendingSubmitButton } from "../_components/pending-submit-button";
+import { AutoApplyFilterForm } from "../_components/auto-apply-filter-form";
 import { Shell } from "../_components/shell";
 import {
   filterCompaniesForAuthContext,
@@ -108,7 +108,7 @@ export default async function EmployeeStatementsPage({
       activeCompanyIds={selectedCompanyIds}
     >
       <GlassPanel gradient className="overflow-visible">
-        <form
+        <AutoApplyFilterForm
           action="/employee-statements"
           className="grid gap-3 md:grid-cols-[1.4fr_180px_180px_auto] md:items-end"
         >
@@ -125,6 +125,7 @@ export default async function EmployeeStatementsPage({
             }))}
             defaultSelectedValues={selectedEmployeeIds}
             includeSelectAll
+            autoApplyOnClose
           />
 
           <label className="block">
@@ -141,12 +142,7 @@ export default async function EmployeeStatementsPage({
             <input name="endMonth" type="month" defaultValue={endMonth} className={inputClass} />
           </label>
 
-          <PendingSubmitButton
-            className="gradient-btn"
-            defaultText="Load"
-            pendingText="Loading..."
-          />
-        </form>
+        </AutoApplyFilterForm>
 
         {flashMessage ? (
           <div

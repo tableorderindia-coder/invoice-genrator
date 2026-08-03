@@ -119,7 +119,7 @@ export default async function AdminUsersPage({
             login.
           </p>
 
-          <form action={createManagedUserAction} className="mt-6 space-y-5">
+          <form action={createManagedUserAction} className="mt-6 space-y-5" data-unsaved-form>
             <label className="block space-y-2 text-sm">
               <span style={{ color: "var(--text-secondary)" }}>Email</span>
               <input name="email" type="email" required className={inputClass} />
@@ -187,7 +187,7 @@ export default async function AdminUsersPage({
                   </div>
                 </div>
 
-                <form action={updateManagedUserAccessAction} className="mt-5 space-y-4">
+                <form action={updateManagedUserAccessAction} className="mt-5 space-y-4" data-unsaved-form>
                   <input type="hidden" name="userId" value={profile.id} />
 
                   <label className="block space-y-2 text-sm">

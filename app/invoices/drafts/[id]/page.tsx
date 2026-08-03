@@ -110,7 +110,7 @@ export default async function DraftInvoicePage({
                 </div>
               </div>
 
-              <form action={updateInvoiceHeaderAction} className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <form action={updateInvoiceHeaderAction} className="grid gap-4 md:grid-cols-2 xl:grid-cols-4" data-unsaved-form>
                 <input type="hidden" name="invoiceId" value={detail.invoice.id} />
                 <input type="hidden" name="companyId" value={detail.company.id} />
                 <input type="hidden" name="returnTo" value={returnTo} />
@@ -251,7 +251,7 @@ export default async function DraftInvoicePage({
                     Sent
                   </span>
                 ) : null}
-                <form action={updateInvoiceGrandTotalAction} className="flex items-center gap-2">
+                <form action={updateInvoiceGrandTotalAction} className="flex items-center gap-2" data-unsaved-form>
                   <input type="hidden" name="invoiceId" value={detail.invoice.id} />
                   <input type="hidden" name="returnTo" value={returnTo} />
                   <NumericInput
@@ -293,7 +293,7 @@ export default async function DraftInvoicePage({
                   <h4 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
                     Add existing team
                   </h4>
-                  <form action={addInvoiceTeamAction} className="mt-3 flex flex-wrap items-center gap-2">
+                  <form action={addInvoiceTeamAction} className="mt-3 flex flex-wrap items-center gap-2" data-unsaved-form>
                     <input type="hidden" name="invoiceId" value={detail.invoice.id} />
                     <input type="hidden" name="companyId" value={detail.company.id} />
                     <input type="hidden" name="returnTo" value={returnTo} />
@@ -333,7 +333,7 @@ export default async function DraftInvoicePage({
                   <h4 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
                     Create new team
                   </h4>
-                  <form action={addInvoiceTeamAction} className="mt-3 flex flex-wrap items-center gap-2">
+                  <form action={addInvoiceTeamAction} className="mt-3 flex flex-wrap items-center gap-2" data-unsaved-form>
                     <input type="hidden" name="invoiceId" value={detail.invoice.id} />
                     <input type="hidden" name="companyId" value={detail.company.id} />
                     <input type="hidden" name="returnTo" value={returnTo} />
@@ -391,7 +391,7 @@ export default async function DraftInvoicePage({
                       <p className="text-sm" style={{ color: "var(--text-muted)" }}>
                         {team.lineItems.length} members in this invoice snapshot
                       </p>
-                      <form action={updateInvoiceTeamTotalAction} className="mt-2 flex items-center gap-2">
+                      <form action={updateInvoiceTeamTotalAction} className="mt-2 flex items-center gap-2" data-unsaved-form>
                         <input type="hidden" name="invoiceId" value={detail.invoice.id} />
                         <input type="hidden" name="invoiceTeamId" value={team.id} />
                         <input type="hidden" name="returnTo" value={returnTo} />
@@ -448,7 +448,7 @@ export default async function DraftInvoicePage({
                             <td className="font-semibold">{lineItem.employeeNameSnapshot}</td>
                             <td>{lineItem.designationSnapshot}</td>
                             <td>
-                              <form id={`line-item-${lineItem.id}`} action={updateInvoiceLineItemAction}></form>
+                              <form id={`line-item-${lineItem.id}`} action={updateInvoiceLineItemAction} data-unsaved-form></form>
                               <input type="hidden" form={`line-item-${lineItem.id}`} name="invoiceId" value={detail.invoice.id} />
                               <input type="hidden" form={`line-item-${lineItem.id}`} name="lineItemId" value={lineItem.id} />
                               <input type="hidden" form={`line-item-${lineItem.id}`} name="returnTo" value={returnTo} />
@@ -485,7 +485,7 @@ export default async function DraftInvoicePage({
                               />
                             </td>
                             <td style={{ fontFamily: "var(--font-jetbrains-mono), monospace" }}>
-                              <form action={updateInvoiceLineItemTotalAction} className="flex items-center gap-2">
+                              <form action={updateInvoiceLineItemTotalAction} className="flex items-center gap-2" data-unsaved-form>
                                 <input type="hidden" name="invoiceId" value={detail.invoice.id} />
                                 <input type="hidden" name="lineItemId" value={lineItem.id} />
                                 <input type="hidden" name="returnTo" value={returnTo} />
@@ -545,7 +545,7 @@ export default async function DraftInvoicePage({
                       });
 
                       return (
-                        <form action={assignInvoiceMemberAction} className="flex flex-wrap items-center gap-3">
+                        <form action={assignInvoiceMemberAction} className="flex flex-wrap items-center gap-3" data-unsaved-form>
                           <input type="hidden" name="invoiceId" value={detail.invoice.id} />
                           <input type="hidden" name="invoiceTeamId" value={team.id} />
                           <input type="hidden" name="returnTo" value={returnTo} />
@@ -622,7 +622,7 @@ export default async function DraftInvoicePage({
             <h3 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
               Invoice note
             </h3>
-            <form action={updateInvoiceNoteAction} className="mt-4 space-y-3">
+            <form action={updateInvoiceNoteAction} className="mt-4 space-y-3" data-unsaved-form>
               <input type="hidden" name="invoiceId" value={detail.invoice.id} />
               <input type="hidden" name="returnTo" value={returnTo} />
               <textarea name="noteText" defaultValue={detail.invoice.noteText} rows={5} className={inputClass} />

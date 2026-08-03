@@ -404,6 +404,31 @@ describe("pn dashboard aggregations", () => {
     expect(monthly[0].advancesInrCents).toBe(26_000_00);
   });
 
+  it("weights a period cashout rate by effective dollar inward", () => {
+    const monthly = buildPnPeriodRows({
+      rows: [
+        {
+          ...sampleRows[0],
+          effectiveDollarInwardUsdCents: 100_00,
+          cashoutUsdInrRate: 80,
+        },
+        {
+          ...sampleRows[2],
+          year: 2026,
+          month: 1,
+          effectiveDollarInwardUsdCents: 300_00,
+          cashoutUsdInrRate: 90,
+        },
+      ],
+      periodType: "monthly",
+      expenseByKey: new Map(),
+      companyLevelReimbursementUsdByKey: new Map([["2026-01", 100_00]]),
+    });
+
+    expect(monthly[0].cashoutUsdInrRate).toBe(87.5);
+    expect(monthly[0].companyReimbursementInrCents).toBe(8_750_00);
+  });
+
   it("builds yearly period rows from cash-flow net profit even without outflow", () => {
     const yearly = buildPnPeriodRows({
       rows: [

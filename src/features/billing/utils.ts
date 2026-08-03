@@ -50,7 +50,11 @@ export function formatRateInput(value: number | null | undefined) {
     return "";
   }
 
-  return formatRate(value);
+  return new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 4,
+    useGrouping: false,
+  }).format(value);
 }
 
 export function formatMonthYear(month: number, year: number) {

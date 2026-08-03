@@ -235,19 +235,14 @@ export function UnifiedEmployeeTable({
   useEffect(() => {
     if (dirtyIds.size === 0) return;
     const beforeUnload = (event: BeforeUnloadEvent) => event.preventDefault();
-    const beforeSubmit = (event: SubmitEvent) => {
-      if (!window.confirm("Discard unsaved dashboard changes?")) event.preventDefault();
-    };
     const beforeUiSwitch = (event: Event) => {
       if (!window.confirm("Discard unsaved dashboard changes?")) event.preventDefault();
     };
     window.addEventListener("beforeunload", beforeUnload);
-    document.addEventListener("submit", beforeSubmit, true);
     window.addEventListener("eassyonboard:before-ui-switch", beforeUiSwitch);
     window.addEventListener("eassyonboard:before-navigation", beforeUiSwitch);
     return () => {
       window.removeEventListener("beforeunload", beforeUnload);
-      document.removeEventListener("submit", beforeSubmit, true);
       window.removeEventListener("eassyonboard:before-ui-switch", beforeUiSwitch);
       window.removeEventListener("eassyonboard:before-navigation", beforeUiSwitch);
     };

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { LayoutDashboard } from "lucide-react";
 import { GlassPanel } from "./_components/glass-panel";
 import { inputClass } from "./_components/field";
-import { PendingSubmitButton } from "./_components/pending-submit-button";
+import { AutoApplyFilterForm } from "./_components/auto-apply-filter-form";
 import { Shell } from "./_components/shell";
 import { OverviewPnlSummaryTable } from "./overview-pnl-summary-table";
 import { requirePageAccess } from "@/lib/auth/server";
@@ -92,7 +92,7 @@ export default async function HomePage({
       activeCompanyIds={selectedCompanyIds}
     >
       <GlassPanel gradient>
-        <form action="/" className="grid gap-3 md:grid-cols-[180px_180px_auto] md:items-end">
+        <AutoApplyFilterForm action="/" className="grid gap-3 md:grid-cols-[180px_180px_auto] md:items-end">
           {!allSelected
             ? selectedCompanyIds.map((companyId) => (
                 <input key={companyId} type="hidden" name="companyIds" value={companyId} />
@@ -124,17 +124,12 @@ export default async function HomePage({
           </label>
 
           <div className="flex flex-wrap items-center gap-2">
-            <PendingSubmitButton
-              className="gradient-btn"
-              defaultText="Load"
-              pendingText="Loading..."
-            />
             <Link className="btn-outline inline-flex items-center gap-2" href={dashboardHref}>
               <LayoutDashboard size={16} aria-hidden="true" />
               Open dashboard
             </Link>
           </div>
-        </form>
+        </AutoApplyFilterForm>
       </GlassPanel>
 
       <GlassPanel title="Monthly P&L" gradient>

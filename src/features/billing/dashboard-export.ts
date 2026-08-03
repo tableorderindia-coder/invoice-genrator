@@ -23,6 +23,91 @@ type CsvTable = {
   rows: string[][];
 };
 
+type EmployeeExportOptions = {
+  includeAdvances: boolean;
+  columns?: string[];
+};
+
+type PeriodExportOptions = {
+  includeExpenses: boolean;
+  includeAdvances: boolean;
+  includeReimbursements: boolean;
+  columns?: string[];
+};
+
+function projectSelectedColumns(
+  table: CsvTable,
+  fixedIndexes: number[],
+  selectedColumns: string[] | undefined,
+  columnIndexes: Record<string, number>,
+) {
+  if (!selectedColumns) return table;
+  const indexes = [
+    ...fixedIndexes,
+    ...selectedColumns
+      .map((column) => columnIndexes[column])
+      .filter((index): index is number => index !== undefined),
+  ];
+  return {
+    headers: indexes.map((index) => table.headers[index] ?? ""),
+    rows: table.rows.map((row) => indexes.map((index) => row[index] ?? "")),
+  };
+}
+
+const employeeExportColumnIndexes: Record<string, number> = {
+  daysWorked: 3,
+  dollarInward: 4,
+  onboardingAdvance: 5,
+  reimbursements: 6,
+  reimbursementLabels: 7,
+  reimbursementsInr: 8,
+  appraisalAdvance: 9,
+  appraisalAdvanceInr: 10,
+  offboardingDeduction: 11,
+  effectiveDollarInward: 12,
+  cashoutRate: 13,
+  cashIn: 14,
+  paidRate: 15,
+  monthlyPaid: 16,
+  actualPaid: 17,
+  pf: 18,
+  tds: 19,
+  salaryPaid: 20,
+  fxCommission: 21,
+  commissionEarned: 23,
+  grossEarnings: 24,
+  advances: 25,
+  netProfit: 26,
+};
+
+const periodExportColumnIndexes: Record<string, number> = {
+  dollarInward: 1,
+  onboardingAdvance: 2,
+  reimbursements: 3,
+  reimbursementLabels: 4,
+  reimbursementsInr: 5,
+  appraisalAdvance: 6,
+  appraisalAdvanceInr: 7,
+  offboardingDeduction: 8,
+  effectiveDollarInward: 9,
+  cashoutRate: 10,
+  cashIn: 11,
+  paidRate: 12,
+  monthlyPaid: 13,
+  actualPaid: 14,
+  pf: 15,
+  tds: 16,
+  salaryPaid: 17,
+  fxCommission: 18,
+  commissionEarned: 20,
+  grossEarnings: 21,
+  expenses: 22,
+  advances: 23,
+  companyReimbursementUsd: 24,
+  companyReimbursementInr: 25,
+  netPl: 26,
+};
+
 function csvCell(value: string) {
   return `"${value.replace(/"/g, "\"\"")}"`;
 }
@@ -128,7 +213,7 @@ function employeeTotalRow(
 
 export function buildDashboardEmployeeTable(
   data: PnDashboardData,
-  options: { includeAdvances: boolean } = { includeAdvances: true },
+  options: EmployeeExportOptions = { includeAdvances: true },
 ): CsvTable {
   const headers = [
     "Employee",
@@ -163,12 +248,21 @@ export function buildDashboardEmployeeTable(
     ...section.rows.map((row) => employeeRow(section.employeeName, row, options)),
     employeeTotalRow("Totals", section.rows, options),
   ]);
-  return { headers, rows };
+  return projectSelectedColumns(
+    { headers, rows },
+    [0, 1],
+    options.columns,
+    employeeExportColumnIndexes,
+  );
+}
+
+export function normalizeDashboardPdfText(value: string) {
+  return value.replaceAll("₹", "INR ");
 }
 
 export function buildDashboardEmployeeCsv(
   data: PnDashboardData,
-  options: { includeAdvances: boolean } = { includeAdvances: true },
+  options: EmployeeExportOptions = { includeAdvances: true },
 ) {
   return csvFromTable(buildDashboardEmployeeTable(data, options));
 }
@@ -176,11 +270,7 @@ export function buildDashboardEmployeeCsv(
 export function buildDashboardPeriodTable(
   data: PnDashboardData,
   periodType: PnPeriodType,
-  options: {
-    includeExpenses: boolean;
-    includeAdvances: boolean;
-    includeReimbursements: boolean;
-  },
+  options: PeriodExportOptions,
 ): CsvTable {
   const headers = [
     "Period",
@@ -270,17 +360,18 @@ export function buildDashboardPeriodTable(
     formatInr(totals.companyReimbursementInrCents),
     formatSignedInr(totals.netPlInrCents),
   ];
-  return { headers, rows: [...data.periodRows.map(toRow), totalRow] };
+  return projectSelectedColumns(
+    { headers, rows: [...data.periodRows.map(toRow), totalRow] },
+    [0],
+    options.columns,
+    periodExportColumnIndexes,
+  );
 }
 
 export function buildDashboardPeriodCsv(
   data: PnDashboardData,
   periodType: PnPeriodType,
-  options: {
-    includeExpenses: boolean;
-    includeAdvances: boolean;
-    includeReimbursements: boolean;
-  },
+  options: PeriodExportOptions,
 ) {
   return csvFromTable(buildDashboardPeriodTable(data, periodType, options));
 }
@@ -344,10 +435,13 @@ export async function buildDashboardExportPdf(input: {
   let y = 72;
   const pageWidth = doc.page.width - 48;
 
-  doc.font("Helvetica-Bold").fontSize(16).text(input.title, 24, 24);
-  doc.font("Helvetica").fontSize(9).text(input.subtitle, 24, 46);
+  doc.font("Helvetica-Bold").fontSize(16).text(normalizeDashboardPdfText(input.title), 24, 24);
+  doc.font("Helvetica").fontSize(9).text(normalizeDashboardPdfText(input.subtitle), 24, 46);
 
-  const tableChunks = splitWidePdfTable(input.rows, 8);
+  const tableChunks = splitWidePdfTable(
+    input.rows.map((row) => row.map(normalizeDashboardPdfText)),
+    8,
+  );
   for (const [chunkIndex, rows] of tableChunks.entries()) {
     if (chunkIndex > 0) {
       doc.addPage();

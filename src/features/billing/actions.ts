@@ -258,6 +258,7 @@ export async function updateCompanyAction(formData: FormData) {
 
 export async function createEmployeeAction(formData: FormData) {
   await requirePageEditAccess('employees');
+  const returnTo = getString(formData, "returnTo") || "/employees";
   const companyId = getString(formData, "companyId");
   const defaultBasicInrCents = getNonNegativeCentsOrThrow(
     getString(formData, "defaultBasicInr"),
@@ -318,11 +319,12 @@ export async function createEmployeeAction(formData: FormData) {
   await invalidateBillingCaches({ type: "employee", companyId });
   revalidatePath("/");
   revalidatePath("/employees");
-  redirect("/employees");
+  redirect(returnTo);
 }
 
 export async function updateEmployeeAction(formData: FormData) {
   await requirePageEditAccess('employees');
+  let returnTo = getString(formData, "returnTo") || "/employees";
   const companyId = getString(formData, "companyId");
   const defaultBasicInrCents = getNonNegativeCentsOrThrow(
     getString(formData, "defaultBasicInr"),
@@ -388,7 +390,8 @@ export async function updateEmployeeAction(formData: FormData) {
   revalidatePath("/salary");
   revalidatePath("/dashboard");
   revalidatePath("/employee-statements");
-  redirect("/employees");
+  returnTo = buildFlashRedirect(returnTo, "success", "Employee updated.");
+  redirect(returnTo);
 }
 
 export async function createInvoiceDraftAction(formData: FormData) {
@@ -900,8 +903,12 @@ export async function updateInvoiceStatusAction(formData: FormData) {
 
   try {
     const status = getString(formData, "status") as InvoiceStatus;
+    const companyId = await getInvoiceCompanyId(invoiceId);
     await updateInvoiceStatus(invoiceId, status);
     await refreshPnSummariesForInvoice(invoiceId);
+    if (companyId) {
+      await invalidateBillingCaches({ type: "invoice", companyId });
+    }
 
     revalidatePath(`/invoices/${invoiceId}`);
     revalidatePath(`/invoices/drafts/${invoiceId}`);
@@ -970,8 +977,12 @@ export async function cashOutInvoiceAction(formData: FormData) {
     );
 
     const realizedAt = todayDateIso();
+    const companyId = await getInvoiceCompanyId(invoiceId);
     await cashOutInvoice(invoiceId, realizedAt, dollarInboundUsdCents, usdInrRate);
     await refreshPnSummariesForInvoice(invoiceId);
+    if (companyId) {
+      await invalidateBillingCaches({ type: "invoice", companyId });
+    }
 
     revalidatePath(`/invoices/${invoiceId}`);
     revalidatePath(`/invoices/drafts/${invoiceId}`);
