@@ -122,6 +122,7 @@ type DbCashFlowEntry = {
   company_id: string;
   base_dollar_inward_usd_cents: number;
   onboarding_advance_usd_cents: number;
+  advance_override_inr_cents: number | null;
   reimbursement_usd_cents: number;
   reimbursement_labels_text: string | null;
   appraisal_advance_usd_cents: number;
@@ -870,7 +871,7 @@ export async function getInvoicePaymentPrefillData(input: {
     const savedEntriesResult = await supabase
       .from("invoice_payment_employee_entries")
       .select(
-        "id, employee_id, payment_month, invoice_line_item_id, employee_name_snapshot, company_id, base_dollar_inward_usd_cents, onboarding_advance_usd_cents, reimbursement_usd_cents, reimbursement_labels_text, appraisal_advance_usd_cents, offboarding_deduction_usd_cents, effective_dollar_inward_usd_cents, cashout_usd_inr_rate, paid_usd_inr_rate, monthly_paid_inr_cents, cash_in_inr_cents, pf_inr_cents, tds_inr_cents, actual_paid_inr_cents, salary_paid_inr_cents, fx_commission_inr_cents, total_commission_usd_cents, commission_earned_inr_cents, gross_earnings_inr_cents, is_non_invoice_employee, is_paid, paid_at, notes, days_worked, days_in_month, invoice_id",
+        "id, employee_id, payment_month, invoice_line_item_id, employee_name_snapshot, company_id, base_dollar_inward_usd_cents, onboarding_advance_usd_cents, advance_override_inr_cents, reimbursement_usd_cents, reimbursement_labels_text, appraisal_advance_usd_cents, offboarding_deduction_usd_cents, effective_dollar_inward_usd_cents, cashout_usd_inr_rate, paid_usd_inr_rate, monthly_paid_inr_cents, cash_in_inr_cents, pf_inr_cents, tds_inr_cents, actual_paid_inr_cents, salary_paid_inr_cents, fx_commission_inr_cents, total_commission_usd_cents, commission_earned_inr_cents, gross_earnings_inr_cents, is_non_invoice_employee, is_paid, paid_at, notes, days_worked, days_in_month, invoice_id",
       )
       .eq("invoice_payment_id", invoicePayment.id)
       .order("employee_name_snapshot");
@@ -998,6 +999,7 @@ export async function getInvoicePaymentPrefillData(input: {
           daysInMonth: row.days_in_month ?? daysInMonth,
           baseDollarInwardUsdCents: row.base_dollar_inward_usd_cents,
           onboardingAdvanceUsdCents: row.onboarding_advance_usd_cents,
+          advanceOverrideInrCents: row.advance_override_inr_cents,
           reimbursementUsdCents: row.reimbursement_usd_cents,
           reimbursementLabelsText: row.reimbursement_labels_text ?? "",
           appraisalAdvanceUsdCents: row.appraisal_advance_usd_cents,
@@ -1272,6 +1274,7 @@ export async function replaceInvoicePaymentEmployeeEntries(input: {
       days_in_month: entry.daysInMonth,
       base_dollar_inward_usd_cents: entry.baseDollarInwardUsdCents,
       onboarding_advance_usd_cents: entry.onboardingAdvanceUsdCents,
+      advance_override_inr_cents: entry.advanceOverrideInrCents ?? null,
       reimbursement_usd_cents: entry.reimbursementUsdCents,
       reimbursement_labels_text: entry.reimbursementLabelsText || null,
       appraisal_advance_usd_cents: entry.appraisalAdvanceUsdCents,
@@ -1316,7 +1319,7 @@ export async function listSavedEmployeeCashFlowEntries(input: {
   let query = supabase
     .from("invoice_payment_employee_entries")
     .select(
-      "id, invoice_payment_id, invoice_id, employee_id, company_id, payment_month, invoice_line_item_id, employee_name_snapshot, days_worked, days_in_month, base_dollar_inward_usd_cents, onboarding_advance_usd_cents, reimbursement_usd_cents, reimbursement_labels_text, appraisal_advance_usd_cents, offboarding_deduction_usd_cents, cashout_usd_inr_rate, paid_usd_inr_rate, monthly_paid_inr_cents, pf_inr_cents, tds_inr_cents, actual_paid_inr_cents, salary_paid_inr_cents, fx_commission_inr_cents, total_commission_usd_cents, commission_earned_inr_cents, gross_earnings_inr_cents, is_non_invoice_employee, is_paid, paid_at, notes",
+      "id, invoice_payment_id, invoice_id, employee_id, company_id, payment_month, invoice_line_item_id, employee_name_snapshot, days_worked, days_in_month, base_dollar_inward_usd_cents, onboarding_advance_usd_cents, advance_override_inr_cents, reimbursement_usd_cents, reimbursement_labels_text, appraisal_advance_usd_cents, offboarding_deduction_usd_cents, cashout_usd_inr_rate, paid_usd_inr_rate, monthly_paid_inr_cents, pf_inr_cents, tds_inr_cents, actual_paid_inr_cents, salary_paid_inr_cents, fx_commission_inr_cents, total_commission_usd_cents, commission_earned_inr_cents, gross_earnings_inr_cents, is_non_invoice_employee, is_paid, paid_at, notes",
     )
     .eq("company_id", input.companyId)
     .order("employee_name_snapshot");
@@ -1357,6 +1360,7 @@ export async function listSavedEmployeeCashFlowEntries(input: {
     daysInMonth: row.days_in_month,
     baseDollarInwardUsdCents: row.base_dollar_inward_usd_cents,
     onboardingAdvanceUsdCents: row.onboarding_advance_usd_cents,
+    advanceOverrideInrCents: row.advance_override_inr_cents,
     reimbursementUsdCents: row.reimbursement_usd_cents,
     reimbursementLabelsText: row.reimbursement_labels_text ?? "",
     appraisalAdvanceUsdCents: row.appraisal_advance_usd_cents,
@@ -1404,6 +1408,7 @@ export async function updateSavedEmployeeCashFlowEntry(
       days_in_month: entry.daysInMonth,
       base_dollar_inward_usd_cents: entry.baseDollarInwardUsdCents,
       onboarding_advance_usd_cents: entry.onboardingAdvanceUsdCents,
+      advance_override_inr_cents: entry.advanceOverrideInrCents ?? null,
       reimbursement_usd_cents: entry.reimbursementUsdCents,
       reimbursement_labels_text: entry.reimbursementLabelsText || null,
       appraisal_advance_usd_cents: entry.appraisalAdvanceUsdCents,
@@ -1449,6 +1454,7 @@ export async function updateDashboardEmployeeCashFlowEntry(input: {
   daysWorked?: number;
   dollarInwardUsdCents?: number;
   onboardingAdvanceUsdCents?: number;
+  advanceOverrideInrCents?: number | null;
   reimbursementUsdCents?: number;
   reimbursementLabelsText?: string;
   appraisalAdvanceUsdCents?: number;
@@ -1463,7 +1469,7 @@ export async function updateDashboardEmployeeCashFlowEntry(input: {
   const { data: currentRow, error: currentError } = await supabase
     .from("invoice_payment_employee_entries")
     .select(
-      "id, days_worked, days_in_month, base_dollar_inward_usd_cents, onboarding_advance_usd_cents, reimbursement_usd_cents, reimbursement_labels_text, appraisal_advance_usd_cents, offboarding_deduction_usd_cents, cashout_usd_inr_rate, paid_usd_inr_rate, pf_inr_cents, tds_inr_cents, actual_paid_inr_cents",
+      "id, days_worked, days_in_month, base_dollar_inward_usd_cents, onboarding_advance_usd_cents, advance_override_inr_cents, reimbursement_usd_cents, reimbursement_labels_text, appraisal_advance_usd_cents, offboarding_deduction_usd_cents, cashout_usd_inr_rate, paid_usd_inr_rate, pf_inr_cents, tds_inr_cents, actual_paid_inr_cents",
     )
     .eq("id", input.entryId)
     .single();
@@ -1476,6 +1482,7 @@ export async function updateDashboardEmployeeCashFlowEntry(input: {
     | "days_in_month"
     | "base_dollar_inward_usd_cents"
     | "onboarding_advance_usd_cents"
+    | "advance_override_inr_cents"
     | "reimbursement_usd_cents"
     | "reimbursement_labels_text"
     | "appraisal_advance_usd_cents"
@@ -1491,6 +1498,10 @@ export async function updateDashboardEmployeeCashFlowEntry(input: {
     input.dollarInwardUsdCents ?? current.base_dollar_inward_usd_cents;
   const onboardingAdvanceUsdCents =
     input.onboardingAdvanceUsdCents ?? current.onboarding_advance_usd_cents;
+  const advanceOverrideInrCents =
+    input.advanceOverrideInrCents === undefined
+      ? current.advance_override_inr_cents
+      : input.advanceOverrideInrCents;
   const reimbursementUsdCents =
     input.reimbursementUsdCents ?? current.reimbursement_usd_cents;
   const reimbursementLabelsText =
@@ -1532,6 +1543,7 @@ export async function updateDashboardEmployeeCashFlowEntry(input: {
       days_worked: input.daysWorked ?? current.days_worked,
       base_dollar_inward_usd_cents: baseDollarInwardUsdCents,
       onboarding_advance_usd_cents: onboardingAdvanceUsdCents,
+      advance_override_inr_cents: advanceOverrideInrCents,
       reimbursement_usd_cents: reimbursementUsdCents,
       reimbursement_labels_text: reimbursementLabelsText || null,
       appraisal_advance_usd_cents: appraisalAdvanceUsdCents,

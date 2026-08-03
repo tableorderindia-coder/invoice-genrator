@@ -16,6 +16,7 @@ export type PnSourceRow = {
   daysInMonth: number;
   dollarInwardUsdCents: number;
   onboardingAdvanceUsdCents: number;
+  advanceOverrideInrCents?: number | null;
   reimbursementUsdCents: number;
   reimbursementLabelsText: string;
   appraisalAdvanceUsdCents: number;
@@ -267,8 +268,14 @@ export function calculatePnPeriodNetPlInrCents(
 }
 
 export function calculatePnEmployeeAdvanceInrCents(
-  row: Pick<PnEmployeeEditableRow, "onboardingAdvanceUsdCents" | "cashoutUsdInrRate">,
+  row: Pick<
+    PnEmployeeEditableRow,
+    "onboardingAdvanceUsdCents" | "cashoutUsdInrRate" | "advanceOverrideInrCents"
+  >,
 ) {
+  if (row.advanceOverrideInrCents != null) {
+    return row.advanceOverrideInrCents;
+  }
   return Math.round(row.onboardingAdvanceUsdCents * row.cashoutUsdInrRate);
 }
 
@@ -276,6 +283,7 @@ export function calculatePnEmployeeNetPlInrCents(
   row: Pick<
     PnEmployeeEditableRow,
     | "onboardingAdvanceUsdCents"
+    | "advanceOverrideInrCents"
     | "cashoutUsdInrRate"
     | "cashInInrCents"
     | "salaryPaidInrCents"
@@ -486,6 +494,7 @@ export function buildPnEmployeeEditableSections(
       dollarInwardUsdCents: row.baseDollarInwardUsdCents,
       baseDollarInwardUsdCents: row.baseDollarInwardUsdCents,
       onboardingAdvanceUsdCents: row.onboardingAdvanceUsdCents,
+      advanceOverrideInrCents: row.advanceOverrideInrCents ?? null,
       reimbursementUsdCents: row.reimbursementUsdCents,
       reimbursementLabelsText: row.reimbursementLabelsText,
       reimbursementInrCents: Math.round(row.reimbursementUsdCents * row.cashoutUsdInrRate),
@@ -607,7 +616,7 @@ export function buildPnPeriodRows(input: {
         dollarInwardUsdCents: sumBy(bucket, "dollarInwardUsdCents"),
         onboardingAdvanceUsdCents: sumBy(bucket, "onboardingAdvanceUsdCents"),
         advancesInrCents: bucket.reduce(
-          (sum, row) => sum + Math.round(row.onboardingAdvanceUsdCents * row.cashoutUsdInrRate),
+          (sum, row) => sum + calculatePnEmployeeAdvanceInrCents(row),
           0,
         ),
         reimbursementUsdCents,

@@ -1,5 +1,6 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getPnDashboardData } from "./store";
+import { calculatePnEmployeeAdvanceInrCents } from "./pn-dashboard";
 import type {
   PnDashboardData,
   PnEmployeeEditableRow,
@@ -45,6 +46,7 @@ type DbEmployeeSummary = {
   dollar_inward_usd_cents: number;
   base_dollar_inward_usd_cents: number;
   onboarding_advance_usd_cents: number;
+  advance_override_inr_cents: number | null;
   reimbursement_usd_cents: number;
   reimbursement_labels_text: string | null;
   reimbursement_inr_cents: number;
@@ -119,6 +121,7 @@ const employeeSummarySelect = `
   dollar_inward_usd_cents,
   base_dollar_inward_usd_cents,
   onboarding_advance_usd_cents,
+  advance_override_inr_cents,
   reimbursement_usd_cents,
   reimbursement_labels_text,
   reimbursement_inr_cents,
@@ -229,6 +232,10 @@ function toEmployeeSummaryRow(row: DbEmployeeSummary): PnEmployeeMonthSummaryRow
     dollarInwardUsdCents: numberValue(row.dollar_inward_usd_cents),
     baseDollarInwardUsdCents: numberValue(row.base_dollar_inward_usd_cents),
     onboardingAdvanceUsdCents: numberValue(row.onboarding_advance_usd_cents),
+    advanceOverrideInrCents:
+      row.advance_override_inr_cents == null
+        ? null
+        : numberValue(row.advance_override_inr_cents),
     reimbursementUsdCents: numberValue(row.reimbursement_usd_cents),
     reimbursementLabelsText: row.reimbursement_labels_text ?? "",
     reimbursementInrCents: numberValue(row.reimbursement_inr_cents),
@@ -371,7 +378,7 @@ function buildEmployeeSections(rows: PnEmployeeMonthSummaryRow[]): PnEmployeeSec
 function buildAdvancesInrByMonth(rows: PnEmployeeMonthSummaryRow[]) {
   const totals = new Map<string, number>();
   for (const row of rows) {
-    const converted = Math.round(row.onboardingAdvanceUsdCents * row.cashoutUsdInrRate);
+    const converted = calculatePnEmployeeAdvanceInrCents(row);
     totals.set(row.paymentMonth, (totals.get(row.paymentMonth) ?? 0) + converted);
   }
   return totals;
@@ -577,6 +584,7 @@ function employeeSummaryToDb(row: PnEmployeeMonthSummaryRow) {
     dollar_inward_usd_cents: row.dollarInwardUsdCents,
     base_dollar_inward_usd_cents: row.baseDollarInwardUsdCents,
     onboarding_advance_usd_cents: row.onboardingAdvanceUsdCents,
+    advance_override_inr_cents: row.advanceOverrideInrCents ?? null,
     reimbursement_usd_cents: row.reimbursementUsdCents,
     reimbursement_labels_text: row.reimbursementLabelsText,
     reimbursement_inr_cents: row.reimbursementInrCents,

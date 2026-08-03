@@ -171,6 +171,7 @@ export type PnEmployeeEditableRow = {
   dollarInwardUsdCents: number;
   baseDollarInwardUsdCents: number;
   onboardingAdvanceUsdCents: number;
+  advanceOverrideInrCents?: number | null;
   reimbursementUsdCents: number;
   reimbursementLabelsText: string;
   reimbursementInrCents: number;
@@ -249,6 +250,7 @@ export type DashboardBulkUpdateRowInput = {
   daysWorked: number;
   dollarInwardUsdCents: number;
   onboardingAdvanceUsdCents: number;
+  advanceOverrideInrCents?: number | null;
   reimbursementUsdCents: number;
   reimbursementLabelsText: string;
   appraisalAdvanceUsdCents: number;

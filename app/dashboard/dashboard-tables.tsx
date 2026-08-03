@@ -279,7 +279,7 @@ function EmployeeTables({
             style={{
               minWidth: "8rem",
               border: "1px solid var(--glass-border)",
-              background: "rgba(255,255,255,0.04)",
+              background: "var(--control-bg)",
               color: "var(--text-primary)",
             }}
           />
@@ -296,7 +296,7 @@ function EmployeeTables({
             style={{
               minWidth: "8rem",
               border: "1px solid var(--glass-border)",
-              background: "rgba(255,255,255,0.04)",
+              background: "var(--control-bg)",
               color: "var(--text-primary)",
             }}
           />
@@ -313,7 +313,7 @@ function EmployeeTables({
             style={{
               minWidth: "8rem",
               border: "1px solid var(--glass-border)",
-              background: "rgba(255,255,255,0.04)",
+              background: "var(--control-bg)",
               color: "var(--text-primary)",
             }}
           />
@@ -329,7 +329,7 @@ function EmployeeTables({
             style={{
               minWidth: "10rem",
               border: "1px solid var(--glass-border)",
-              background: "rgba(255,255,255,0.04)",
+              background: "var(--control-bg)",
               color: "var(--text-primary)",
             }}
           />
@@ -348,7 +348,7 @@ function EmployeeTables({
             style={{
               minWidth: "8rem",
               border: "1px solid var(--glass-border)",
-              background: "rgba(255,255,255,0.04)",
+              background: "var(--control-bg)",
               color: "var(--text-primary)",
             }}
           />
@@ -367,7 +367,7 @@ function EmployeeTables({
             style={{
               minWidth: "8rem",
               border: "1px solid var(--glass-border)",
-              background: "rgba(255,255,255,0.04)",
+              background: "var(--control-bg)",
               color: "var(--text-primary)",
             }}
           />
@@ -402,7 +402,7 @@ function EmployeeTables({
             style={{
               minWidth: "6rem",
               border: "1px solid var(--glass-border)",
-              background: "rgba(255,255,255,0.04)",
+              background: "var(--control-bg)",
               color: "var(--text-primary)",
             }}
           />
@@ -429,7 +429,7 @@ function EmployeeTables({
           style={{
             minWidth: "7rem",
             border: "1px solid var(--glass-border)",
-            background: "rgba(255,255,255,0.04)",
+            background: "var(--control-bg)",
             color: "var(--text-primary)",
           }}
         />
@@ -467,7 +467,7 @@ function EmployeeTables({
             style={{
               minWidth: "7rem",
               border: "1px solid var(--glass-border)",
-              background: "rgba(255,255,255,0.04)",
+              background: "var(--control-bg)",
               color: "var(--text-primary)",
             }}
           />
@@ -494,7 +494,7 @@ function EmployeeTables({
           style={{
             minWidth: "8rem",
             border: "1px solid var(--glass-border)",
-            background: "rgba(255,255,255,0.04)",
+            background: "var(--control-bg)",
             color: "var(--text-primary)",
           }}
         />
@@ -521,7 +521,7 @@ function EmployeeTables({
           style={{
             minWidth: "8rem",
             border: "1px solid var(--glass-border)",
-            background: "rgba(255,255,255,0.04)",
+            background: "var(--control-bg)",
             color: "var(--text-primary)",
           }}
         />
@@ -543,7 +543,7 @@ function EmployeeTables({
           style={{
             minWidth: "8rem",
             border: "1px solid var(--glass-border)",
-            background: "rgba(255,255,255,0.04)",
+            background: "var(--control-bg)",
             color: "var(--text-primary)",
           }}
         />
@@ -567,7 +567,30 @@ function EmployeeTables({
     {
       key: "advances",
       label: "__custom_advances__",
-      render: (row) => formatInr(calculatePnEmployeeAdvanceInrCents(row)),
+      render: (row) => row.isSalaryOnly ? (
+        formatInr(calculatePnEmployeeAdvanceInrCents(row))
+      ) : (
+        <NumericInput
+          form={`dashboard-payout-${row.payoutId}`}
+          name="advanceOverrideInr"
+          aria-label={`Advance INR override for ${formatMonthYear(row.month, row.year)}`}
+          min="0"
+          precision={2}
+          defaultValue={
+            row.advanceOverrideInrCents == null
+              ? ""
+              : row.advanceOverrideInrCents / 100
+          }
+          placeholder={`Auto: ${calculatePnEmployeeAdvanceInrCents(row) / 100}`}
+          className={inputClass}
+          style={{
+            minWidth: "8rem",
+            border: "1px solid var(--glass-border)",
+            background: "var(--control-bg)",
+            color: "var(--text-primary)",
+          }}
+        />
+      ),
     },
     {
       key: "netProfit",
@@ -776,7 +799,7 @@ function EmployeeTables({
           className="rounded-2xl p-4"
           style={{
             border: "1px solid var(--glass-border)",
-            background: "rgba(255,255,255,0.02)",
+            background: "var(--surface-subtle)",
           }}
         >
           <h3 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>

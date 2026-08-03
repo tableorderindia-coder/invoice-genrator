@@ -196,20 +196,11 @@ export function ChecklistFilterDropdown({
             }
           }
         }}
-        className="inline-flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-sm font-medium transition-colors"
-        style={{
-          borderColor: "var(--glass-border)",
-          background: "rgba(255, 255, 255, 0.04)",
-          color: "var(--text-primary)",
-        }}
+        className="checklist-filter-trigger inline-flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-sm font-medium transition-colors"
       >
         <span className="truncate">{label}</span>
         <span
-          className="rounded-full px-2 py-0.5 text-xs font-semibold"
-          style={{
-            background: "rgba(255, 255, 255, 0.08)",
-            color: "var(--text-secondary)",
-          }}
+          className="checklist-filter-count rounded-full px-2 py-0.5 text-xs font-semibold"
         >
           {triggerLabel}
         </span>
@@ -220,16 +211,11 @@ export function ChecklistFilterDropdown({
           id={panelId}
           role="group"
           aria-label={`${label} filters`}
-          className="absolute left-0 top-full z-[100] mt-2 max-h-[min(24rem,calc(100vh-6rem))] w-72 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-lg border p-3 shadow-xl"
-          style={{
-            borderColor: "var(--glass-border)",
-            background: "rgba(15, 17, 24, 0.98)",
-            color: "var(--text-primary)",
-          }}
+          className="checklist-filter-panel absolute left-0 top-full z-[100] mt-2 max-h-[min(24rem,calc(100vh-6rem))] w-72 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-lg border p-3 shadow-xl"
         >
           <div className="space-y-2">
             {includeSelectAll && options.length > 0 && (
-              <label className="flex items-center gap-2 rounded-lg px-2 py-1 text-sm">
+              <label className="checklist-filter-option flex items-center gap-2 rounded-lg px-2 py-1 text-sm">
                 <input
                   type="checkbox"
                   data-auto-apply={autoApplyOnClose ? "false" : undefined}
@@ -244,7 +230,7 @@ export function ChecklistFilterDropdown({
               options.map((option) => (
                 <label
                   key={option.value}
-                  className="flex items-center gap-2 rounded-lg px-2 py-1 text-sm"
+                  className="checklist-filter-option flex items-center gap-2 rounded-lg px-2 py-1 text-sm"
                 >
                   <input
                     type="checkbox"

@@ -347,7 +347,7 @@ export function Shell({
           className="h-10 w-full rounded-xl border px-3 text-sm font-medium outline-none transition"
           style={{
             borderColor: "var(--glass-border)",
-            background: "rgba(255,255,255,0.03)",
+            background: "var(--surface-subtle)",
             color: "var(--text-primary)",
           }}
         >

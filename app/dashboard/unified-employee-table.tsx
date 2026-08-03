@@ -99,6 +99,7 @@ const EDITABLE_COLUMN_KEYS = new Set([
   "actualPaid",
   "pf",
   "tds",
+  "advances",
 ]);
 
 function rowInput(
@@ -112,6 +113,7 @@ function rowInput(
     daysWorked: row.daysWorked,
     dollarInwardUsdCents: row.dollarInwardUsdCents,
     onboardingAdvanceUsdCents: row.onboardingAdvanceUsdCents,
+    advanceOverrideInrCents: row.advanceOverrideInrCents ?? null,
     reimbursementUsdCents: row.reimbursementUsdCents,
     reimbursementLabelsText: row.reimbursementLabelsText,
     appraisalAdvanceUsdCents: row.appraisalAdvanceUsdCents,
@@ -400,7 +402,17 @@ export function UnifiedEmployeeTable({
       case "fxCommission": return formatInr(row.fxCommissionInrCents);
       case "commissionEarned": return formatInr(row.commissionEarnedInrCents);
       case "grossEarnings": return formatInr(row.grossEarningsInrCents);
-      case "advances": return formatInr(calculatePnEmployeeAdvanceInrCents(row));
+      case "advances": {
+        const editor = renderNumericEditor(
+          source,
+          key,
+          calculatePnEmployeeAdvanceInrCents(row) / 100,
+          (raw) => ({
+            advanceOverrideInrCents: raw.trim() ? centsFromText(raw) : null,
+          }),
+        );
+        return editor ?? formatInr(calculatePnEmployeeAdvanceInrCents(row));
+      }
       case "netProfit": {
         const net = calculatePnEmployeeNetPlInrCents(row, { includeAdvances });
         return <span className={net < 0 ? "value-negative" : net > 0 ? "value-positive" : ""}>{formatSignedInr(net)}</span>;

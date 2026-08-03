@@ -107,7 +107,7 @@ export default function EmployeeCashFlowSavedRows({
         <div
           key={employeeGroup.employeeId}
           className="rounded-2xl p-4"
-          style={{ border: "1px solid var(--glass-border)", background: "rgba(255,255,255,0.02)" }}
+          style={{ border: "1px solid var(--glass-border)", background: "var(--surface-subtle)" }}
         >
           <h3 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
             {employeeGroup.employeeName}

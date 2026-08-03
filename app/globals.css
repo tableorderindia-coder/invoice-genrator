@@ -19,6 +19,10 @@
   --glass-border: rgba(255, 255, 255, 0.07);
   --glass-border-hover: rgba(255, 255, 255, 0.14);
   --glass-blur: 20px;
+  --control-bg: rgba(255, 255, 255, 0.04);
+  --control-bg-hover: rgba(255, 255, 255, 0.08);
+  --surface-subtle: rgba(255, 255, 255, 0.03);
+  --popover-bg: rgba(15, 17, 24, 0.98);
 
   /* Accent gradient (Indigo → Violet → Cyan) */
   --accent-1: #6366f1;
@@ -51,6 +55,34 @@
   --duration-fast: 0.2s;
   --duration-normal: 0.35s;
   --duration-slow: 0.6s;
+}
+
+.checklist-filter-trigger {
+  border-color: var(--glass-border);
+  color: var(--text-primary);
+  background: var(--control-bg);
+}
+
+.checklist-filter-trigger:hover,
+.checklist-filter-trigger:focus-visible {
+  border-color: var(--glass-border-hover);
+  background: var(--control-bg-hover);
+}
+
+.checklist-filter-count {
+  color: var(--text-secondary);
+  background: var(--control-bg-hover);
+}
+
+.checklist-filter-panel {
+  border-color: var(--glass-border);
+  color: var(--text-primary);
+  background: var(--popover-bg);
+}
+
+.checklist-filter-option:hover,
+.checklist-filter-option:focus-within {
+  background: var(--control-bg-hover);
 }
 
 @theme inline {
@@ -491,6 +523,10 @@ html[data-ui-mode="saas"] {
   --glass-border: #dde2e8;
   --glass-border-hover: #c7ced8;
   --glass-blur: 0px;
+  --control-bg: #ffffff;
+  --control-bg-hover: #f2f4f7;
+  --surface-subtle: #f8fafc;
+  --popover-bg: #ffffff;
   --accent-1: #2563eb;
   --accent-2: #0f766e;
   --accent-3: #b45309;
