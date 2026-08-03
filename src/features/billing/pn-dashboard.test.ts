@@ -280,6 +280,36 @@ describe("pn dashboard aggregations", () => {
     );
   });
 
+  it("uses an Advance INR override only for Advances and employee Net P/L", () => {
+    const automaticRow = {
+      ...editableSampleRows[0],
+      onboardingAdvanceUsdCents: 10_000,
+      cashoutUsdInrRate: 80,
+      cashInInrCents: 1_000_000,
+      salaryPaidInrCents: 100_000,
+      pfInrCents: 20_000,
+      tdsInrCents: 10_000,
+      grossEarningsInrCents: 870_000,
+      effectiveDollarInwardUsdCents: 12_500,
+      advanceOverrideInrCents: null,
+    };
+    const overriddenRow = {
+      ...automaticRow,
+      advanceOverrideInrCents: 250_000,
+    };
+
+    expect(calculatePnEmployeeAdvanceInrCents(automaticRow)).toBe(800_000);
+    expect(calculatePnEmployeeAdvanceInrCents(overriddenRow)).toBe(250_000);
+    expect(calculatePnEmployeeNetPlInrCents(automaticRow)).toBe(70_000);
+    expect(calculatePnEmployeeNetPlInrCents(overriddenRow)).toBe(620_000);
+    expect(overriddenRow.grossEarningsInrCents).toBe(
+      automaticRow.grossEarningsInrCents,
+    );
+    expect(overriddenRow.effectiveDollarInwardUsdCents).toBe(
+      automaticRow.effectiveDollarInwardUsdCents,
+    );
+  });
+
   it("derives employee net p/l from effective INR and the complete payout", () => {
     const row = {
       ...editableSampleRows[0],

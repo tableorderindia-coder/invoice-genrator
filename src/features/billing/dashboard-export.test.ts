@@ -145,6 +145,22 @@ describe("dashboard export", () => {
     expect(csv).toContain('"Totals","",""');
   });
 
+  it("exports salary paid before PF and TDS in employee and period views", () => {
+    const employee = buildDashboardEmployeeTable(dashboardData, {
+      includeAdvances: true,
+    });
+    const period = buildDashboardPeriodTable(dashboardData, "monthly", {
+      includeExpenses: true,
+      includeAdvances: true,
+      includeReimbursements: true,
+    });
+
+    for (const headers of [employee.headers, period.headers]) {
+      expect(headers.indexOf("Salary paid INR")).toBeLessThan(headers.indexOf("PF INR"));
+      expect(headers.indexOf("PF INR")).toBeLessThan(headers.indexOf("TDS INR"));
+    }
+  });
+
   it("matches employee export Net P/L to the advance inclusion state", () => {
     const included = buildDashboardEmployeeTable(dashboardData, {
       includeAdvances: true,
@@ -157,6 +173,30 @@ describe("dashboard export", () => {
     expect(included.rows[1]?.at(-1)).toBe("- ₹960.00");
     expect(excluded.rows[0]?.at(-1)).toBe("+ ₹7,440.00");
     expect(excluded.rows[1]?.at(-1)).toBe("+ ₹7,440.00");
+  });
+
+  it("exports a saved employee Advance INR override without changing Gross P&L", () => {
+    const data = {
+      ...dashboardData,
+      employeeEditableSections: dashboardData.employeeEditableSections.map(
+        (section) => ({
+          ...section,
+          rows: section.rows.map((row) => ({
+            ...row,
+            advanceOverrideInrCents: 250_000,
+          })),
+        }),
+      ),
+    };
+
+    const table = buildDashboardEmployeeTable(data, { includeAdvances: true });
+    const advancesIndex = table.headers.indexOf("Advances INR");
+    const grossIndex = table.headers.indexOf("Gross P&L INR");
+    const netIndex = table.headers.indexOf("Net P/L INR");
+
+    expect(table.rows[0]?.[advancesIndex]).toBe("₹2,500.00");
+    expect(table.rows[0]?.[grossIndex]).toBe("₹11,340.00");
+    expect(table.rows[0]?.[netIndex]).toBe("+ ₹4,940.00");
   });
 
   it("exports period view with all period columns and totals", () => {

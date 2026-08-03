@@ -458,6 +458,7 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
     formData.set("daysWorked", "24");
     formData.set("dollarInwardUsd", "1250");
     formData.set("onboardingAdvanceUsd", "150");
+    formData.set("advanceOverrideInr", "1234.56");
     formData.set("reimbursementUsd", "200");
     formData.set("reimbursementLabelsText", "Laptop");
     formData.set("appraisalAdvanceUsd", "75");
@@ -477,6 +478,7 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
       daysWorked: 24,
       dollarInwardUsdCents: 125000,
       onboardingAdvanceUsdCents: 15000,
+      advanceOverrideInrCents: 123456,
       reimbursementUsdCents: 20000,
       reimbursementLabelsText: "Laptop",
       appraisalAdvanceUsdCents: 7500,
@@ -507,6 +509,7 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
       daysWorked: 24,
       dollarInwardUsdCents: undefined,
       onboardingAdvanceUsdCents: undefined,
+      advanceOverrideInrCents: undefined,
       reimbursementUsdCents: undefined,
       reimbursementLabelsText: undefined,
       appraisalAdvanceUsdCents: undefined,
@@ -534,6 +537,7 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
         daysWorked: 22,
         dollarInwardUsdCents: 100_000,
         onboardingAdvanceUsdCents: 0,
+        advanceOverrideInrCents: null,
         reimbursementUsdCents: 0,
         reimbursementLabelsText: "",
         appraisalAdvanceUsdCents: 0,
@@ -551,6 +555,7 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
         daysWorked: 22,
         dollarInwardUsdCents: 90_000,
         onboardingAdvanceUsdCents: 0,
+        advanceOverrideInrCents: 50_000,
         reimbursementUsdCents: 0,
         reimbursementLabelsText: "",
         appraisalAdvanceUsdCents: 0,
@@ -573,6 +578,14 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
       }),
     ]);
     expect(updateDashboardEmployeeCashFlowEntryMock).toHaveBeenCalledTimes(2);
+    expect(updateDashboardEmployeeCashFlowEntryMock).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ advanceOverrideInrCents: null }),
+    );
+    expect(updateDashboardEmployeeCashFlowEntryMock).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ advanceOverrideInrCents: 50_000 }),
+    );
     expect(revalidatePathMock).toHaveBeenCalledWith("/dashboard");
   });
 

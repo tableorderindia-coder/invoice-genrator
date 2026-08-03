@@ -181,6 +181,46 @@ describe("P&L summary store", () => {
     expect(data.periodRows[0]?.advancesInrCents).toBe(26_000_00);
   });
 
+  it("uses persisted employee Advance INR overrides in period aggregation", () => {
+    const data = buildPnDashboardDataFromSummaryRows({
+      companyId: "company_a",
+      periodType: "monthly",
+      employeeRows: [
+        employeeSummary({
+          employeeId: "employee_a",
+          onboardingAdvanceUsdCents: 100_00,
+          cashoutUsdInrRate: 80,
+          advanceOverrideInrCents: 2_500_00,
+        }),
+        employeeSummary({
+          employeeId: "employee_b",
+          onboardingAdvanceUsdCents: 200_00,
+          cashoutUsdInrRate: 90,
+          advanceOverrideInrCents: null,
+        }),
+      ],
+      companyRows: [companySummary({ onboardingAdvanceUsdCents: 300_00 })],
+    });
+
+    expect(data.employeeEditableSections[0]?.rows[0]?.advanceOverrideInrCents).toBe(
+      2_500_00,
+    );
+    expect(data.periodRows[0]?.advancesInrCents).toBe(20_500_00);
+  });
+
+  it("persists the override in entry and employee summary storage", () => {
+    const cashFlowStore = readSource("src/features/billing/employee-cash-flow-store.ts");
+    const summaryStore = readSource("src/features/billing/pn-summary-store.ts");
+    const migration = readSource(
+      "supabase/migrations/20260803120000_employee_advance_inr_override.sql",
+    );
+
+    expect(cashFlowStore).toContain("advance_override_inr_cents");
+    expect(summaryStore).toContain("advance_override_inr_cents");
+    expect(migration).toContain("invoice_payment_employee_entries");
+    expect(migration).toContain("pn_employee_month_summaries");
+  });
+
   it("uses persisted summaries from Overview and Dashboard pages", () => {
     const overviewSource = readSource("app/page.tsx");
     const dashboardSource = readSource("app/dashboard/page.tsx");

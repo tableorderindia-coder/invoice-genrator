@@ -154,7 +154,7 @@ export default async function CashoutPage({
                             borderRadius: "14px",
                             padding: "0 14px",
                             border: "1px solid var(--glass-border)",
-                            background: "rgba(255,255,255,0.04)",
+                            background: "var(--control-bg)",
                             color: "var(--text-primary)",
                           }}
                         />
@@ -170,7 +170,7 @@ export default async function CashoutPage({
                             borderRadius: "14px",
                             padding: "0 14px",
                             border: "1px solid var(--glass-border)",
-                            background: "rgba(255,255,255,0.04)",
+                            background: "var(--control-bg)",
                             color: "var(--text-primary)",
                           }}
                         />

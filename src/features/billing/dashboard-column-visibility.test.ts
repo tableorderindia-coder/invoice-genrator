@@ -46,4 +46,15 @@ describe("dashboard column toggle", () => {
       ]),
     );
   });
+
+  it("orders salary paid before PF and TDS in employee and period views", () => {
+    for (const options of [
+      EMPLOYEE_DASHBOARD_COLUMN_OPTIONS,
+      PERIOD_DASHBOARD_COLUMN_OPTIONS,
+    ]) {
+      const keys = options.map((option) => option.value);
+      expect(keys.indexOf("salaryPaid")).toBeLessThan(keys.indexOf("pf"));
+      expect(keys.indexOf("pf")).toBeLessThan(keys.indexOf("tds"));
+    }
+  });
 });

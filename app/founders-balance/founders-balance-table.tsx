@@ -51,7 +51,7 @@ function FounderWithdrawalInput({
       style={{
         minWidth: "8rem",
         border: "1px solid var(--glass-border)",
-        background: "rgba(255,255,255,0.04)",
+        background: "var(--control-bg)",
         color: "var(--text-primary)",
         opacity: pending ? 0.6 : 1,
       }}

@@ -18,6 +18,7 @@ const employeeRows: PnEmployeeEditableRow[] = [
     dollarInwardUsdCents: 100_00,
     baseDollarInwardUsdCents: 100_00,
     onboardingAdvanceUsdCents: 5_00,
+    advanceOverrideInrCents: 125_00,
     reimbursementUsdCents: 2_00,
     reimbursementLabelsText: "Taxi",
     reimbursementInrCents: 160_00,
@@ -140,8 +141,8 @@ describe("dashboard table totals", () => {
 
     expect(totals.daysWorked).toBe(30);
     expect(totals.actualPaidInrCents).toBe(23_100_00);
-    expect(totals.advancesInrCents).toBe(400_00);
-    expect(totals.netPlInrCents).toBe(5_000_00);
+    expect(totals.advancesInrCents).toBe(125_00);
+    expect(totals.netPlInrCents).toBe(5_275_00);
     expect(totals.cashoutUsdInrRate).toBeCloseTo(81.3401, 3);
     expect(totals.paidUsdInrRate).toBeCloseTo(77.0101, 3);
   });

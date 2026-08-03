@@ -13,6 +13,7 @@ export type EmployeeCashFlowMonthRow = {
   daysInMonth: number;
   baseDollarInwardUsdCents: number;
   onboardingAdvanceUsdCents: number;
+  advanceOverrideInrCents?: number | null;
   reimbursementUsdCents: number;
   reimbursementLabelsText: string;
   appraisalAdvanceUsdCents: number;
@@ -54,6 +55,7 @@ export type EmployeeCashFlowEntryWriteInput = {
   daysInMonth: number;
   baseDollarInwardUsdCents: number;
   onboardingAdvanceUsdCents: number;
+  advanceOverrideInrCents?: number | null;
   reimbursementUsdCents: number;
   reimbursementLabelsText: string;
   appraisalAdvanceUsdCents: number;
