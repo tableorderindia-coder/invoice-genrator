@@ -23,6 +23,7 @@ import {
   buildPnEmployeeSections,
   buildPnPeriodRows,
   buildPnSalaryOnlySourceRows,
+  calculatePnEmployeeNetPlInrCents,
   calculatePnPeriodNetPlInrCents,
   sumPnPeriodNetPlInrCents,
   type PnEditableSourceRow,
@@ -31,7 +32,6 @@ import {
 import {
   calculateCashInInrCents,
   calculateEffectiveDollarInwardUsdCents,
-  calculateEmployeeMonthNetInrCents,
 } from "./employee-cash-flow";
 import {
   FOUNDER_BALANCE_FOUNDERS,
@@ -2519,9 +2519,14 @@ export async function getPnDashboardData(input: {
         commissionEarnedInrCents: payoutMetrics.commissionEarnedInrCents,
         cashInInrCents,
         salaryPaidInrCents,
-        netProfitInrCents: calculateEmployeeMonthNetInrCents({
+        netProfitInrCents: calculatePnEmployeeNetPlInrCents({
           cashInInrCents,
+          onboardingAdvanceUsdCents: row.onboarding_advance_usd_cents,
+          advanceOverrideInrCents: row.advance_override_inr_cents,
+          cashoutUsdInrRate: row.cashout_usd_inr_rate,
           salaryPaidInrCents,
+          pfInrCents: row.pf_inr_cents,
+          tdsInrCents: row.tds_inr_cents,
         }),
       };
     }).filter(Boolean) as PnSourceRow[],
@@ -2610,9 +2615,14 @@ export async function getPnDashboardData(input: {
         totalCommissionUsdCents: payoutMetrics.totalCommissionUsdCents,
         commissionEarnedInrCents: payoutMetrics.commissionEarnedInrCents,
         grossEarningsInrCents,
-        netProfitInrCents: calculateEmployeeMonthNetInrCents({
+        netProfitInrCents: calculatePnEmployeeNetPlInrCents({
           cashInInrCents,
+          onboardingAdvanceUsdCents: row.onboarding_advance_usd_cents,
+          advanceOverrideInrCents: row.advance_override_inr_cents,
+          cashoutUsdInrRate: row.cashout_usd_inr_rate,
           salaryPaidInrCents,
+          pfInrCents: row.pf_inr_cents,
+          tdsInrCents: row.tds_inr_cents,
         }),
         isSecurityDepositMonth: false,
       };

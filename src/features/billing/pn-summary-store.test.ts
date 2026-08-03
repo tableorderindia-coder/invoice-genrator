@@ -221,6 +221,23 @@ describe("P&L summary store", () => {
     expect(migration).toContain("pn_employee_month_summaries");
   });
 
+  it("keeps persisted P&L summaries canonical and repairs stale derived fields", () => {
+    const dashboardSource = readSource("src/features/billing/store.ts");
+    const migration = readSource(
+      "supabase/migrations/20260803170000_canonical_pn_summary_net_pl.sql",
+    );
+
+    expect(dashboardSource).toContain("calculatePnEmployeeNetPlInrCents");
+    expect(migration).toContain("fx_commission_inr_cents");
+    expect(migration).toContain("commission_earned_inr_cents");
+    expect(migration).toContain("gross_earnings_inr_cents");
+    expect(migration).toContain("advance_override_inr_cents");
+    expect(migration).toContain("company_reimbursement_inr_cents");
+    expect(migration).toContain("paid_usd_inr_rate");
+    expect(migration).toContain("effective_dollar_inward_usd_cents");
+    expect(migration).toContain("comment on column public.pn_company_month_summaries.net_pl_inr_cents");
+  });
+
   it("uses persisted summaries from Overview and Dashboard pages", () => {
     const overviewSource = readSource("app/page.tsx");
     const dashboardSource = readSource("app/dashboard/page.tsx");
