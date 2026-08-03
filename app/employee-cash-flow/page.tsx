@@ -183,6 +183,20 @@ export default async function EmployeeCashFlowPage({
     includeMonth: true,
     includeTab: false,
   });
+  const composeEditorKey = [
+    "cash-flow-compose",
+    selectedCompanyId,
+    monthKey,
+    ...[...selectedInvoiceIds].sort(),
+  ].join(":");
+  const savedRowsEditorKey = [
+    "cash-flow-saved",
+    ...[...selectedCompanyIds].sort(),
+    "employees",
+    ...[...savedFilters.employeeIds].sort(),
+    "months",
+    ...[...savedFilters.paymentMonths].sort(),
+  ].join(":");
 
   return (
     <Shell
@@ -301,9 +315,14 @@ export default async function EmployeeCashFlowPage({
         gradient
       >
         {selectedTab === "saved" ? (
-          <EmployeeCashFlowSavedRows initialRows={filteredSavedRows} returnTo={returnTo} />
+          <EmployeeCashFlowSavedRows
+            key={savedRowsEditorKey}
+            initialRows={filteredSavedRows}
+            returnTo={returnTo}
+          />
         ) : prefillData ? (
           <EmployeeCashFlowEntryForm
+            key={composeEditorKey}
             companyId={prefillData.companyId}
             paymentMonth={monthKey}
             returnTo={returnTo}

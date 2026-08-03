@@ -108,6 +108,7 @@ export default async function SalaryPage({
             </p>
           </div>
           <SalaryMonthEditor
+            key={`salary-editor:${selectedCompanyId}:${selectedMonth}`}
             companyId={selectedCompanyId}
             month={selectedMonth}
             rows={payrollRows}

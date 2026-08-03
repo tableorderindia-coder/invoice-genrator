@@ -149,7 +149,12 @@ export default async function ExpensesPage({
               {selectedCompany?.name ?? "-"}
             </p>
             {singleCompanySelected ? (
-            <form action={saveCompanyExpenseAction} className="mt-4 space-y-4" data-unsaved-form>
+            <form
+              key={`expense-editor:${selectedCompanyId}:${period.endMonth}`}
+              action={saveCompanyExpenseAction}
+              className="mt-4 space-y-4"
+              data-unsaved-form
+            >
               <input type="hidden" name="companyId" value={selectedCompanyId} />
               <input type="hidden" name="year" value={addTargetMonth.year} />
               <input type="hidden" name="month" value={addTargetMonth.month} />

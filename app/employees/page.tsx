@@ -186,7 +186,11 @@ export default async function EmployeesPage({
                   </Field>
                 </AutoApplyFilterForm>
               </div>
-              <form action={updateEmployeeAction} data-unsaved-form>
+              <form
+                key={`employee-editor:${selectedEmployee?.id ?? "none"}`}
+                action={updateEmployeeAction}
+                data-unsaved-form
+              >
                 <input type="hidden" name="returnTo" value={editReturnTo} />
                 {selectedEmployee ? <input type="hidden" name="employeeId" value={selectedEmployee.id} /> : null}
                 {selectedEmployee ? <input type="hidden" name="companyId" value={selectedEmployee.companyId} /> : null}
