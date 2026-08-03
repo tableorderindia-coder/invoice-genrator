@@ -1028,6 +1028,14 @@ export async function updateDashboardEmployeeCashFlowEntryAction(formData: FormD
     if (onboardingAdvanceUsdCents !== undefined && onboardingAdvanceUsdCents < 0) {
       throw new Error("Onboarding advance cannot be negative.");
     }
+    const advanceOverrideInrCents = formData.has("advanceOverrideInr")
+      ? String(formData.get("advanceOverrideInr") ?? "").trim()
+        ? centsFromUsd(String(formData.get("advanceOverrideInr")))
+        : null
+      : undefined;
+    if (advanceOverrideInrCents != null && advanceOverrideInrCents < 0) {
+      throw new Error("Advance INR cannot be negative.");
+    }
     const reimbursementUsdCents = optionalCents("reimbursementUsd");
     if (reimbursementUsdCents !== undefined && reimbursementUsdCents < 0) {
       throw new Error("Reimbursements / Expenses cannot be negative.");
@@ -1086,6 +1094,7 @@ export async function updateDashboardEmployeeCashFlowEntryAction(formData: FormD
       daysWorked,
       dollarInwardUsdCents,
       onboardingAdvanceUsdCents,
+      advanceOverrideInrCents,
       reimbursementUsdCents,
       reimbursementLabelsText,
       appraisalAdvanceUsdCents,
@@ -1133,6 +1142,13 @@ function validateDashboardBulkRow(row: DashboardBulkUpdateRowInput) {
     ["TDS", row.tdsInrCents],
     ["Actual paid", row.actualPaidInrCents],
   ];
+  if (
+    row.advanceOverrideInrCents != null &&
+    (!Number.isSafeInteger(row.advanceOverrideInrCents) ||
+      row.advanceOverrideInrCents < 0)
+  ) {
+    throw new Error("Advance INR cannot be negative.");
+  }
   for (const [label, value] of nonNegativeFields) {
     if (!Number.isFinite(value) || value < 0) {
       throw new Error(`${label} cannot be negative.`);
@@ -1159,6 +1175,7 @@ export async function bulkUpdateDashboardEmployeeCashFlowEntriesAction(
             daysWorked: row.daysWorked,
             dollarInwardUsdCents: row.dollarInwardUsdCents,
             onboardingAdvanceUsdCents: row.onboardingAdvanceUsdCents,
+            advanceOverrideInrCents: row.advanceOverrideInrCents,
             reimbursementUsdCents: row.reimbursementUsdCents,
             reimbursementLabelsText: row.reimbursementLabelsText,
             appraisalAdvanceUsdCents: row.appraisalAdvanceUsdCents,

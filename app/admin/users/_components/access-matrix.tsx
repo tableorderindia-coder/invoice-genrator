@@ -117,7 +117,7 @@ export function AccessMatrix({
               className="flex items-center justify-between rounded-2xl px-4 py-3"
               style={{
                 border: "1px solid var(--glass-border)",
-                background: "rgba(255,255,255,0.02)",
+                background: "var(--surface-subtle)",
               }}
             >
               <div>

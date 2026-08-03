@@ -16,6 +16,7 @@ export type PnSourceRow = {
   daysInMonth: number;
   dollarInwardUsdCents: number;
   onboardingAdvanceUsdCents: number;
+  advanceOverrideInrCents?: number | null;
   reimbursementUsdCents: number;
   reimbursementLabelsText: string;
   appraisalAdvanceUsdCents: number;
@@ -267,8 +268,14 @@ export function calculatePnPeriodNetPlInrCents(
 }
 
 export function calculatePnEmployeeAdvanceInrCents(
-  row: Pick<PnEmployeeEditableRow, "onboardingAdvanceUsdCents" | "cashoutUsdInrRate">,
+  row: Pick<
+    PnEmployeeEditableRow,
+    "onboardingAdvanceUsdCents" | "cashoutUsdInrRate" | "advanceOverrideInrCents"
+  >,
 ) {
+  if (row.advanceOverrideInrCents != null) {
+    return row.advanceOverrideInrCents;
+  }
   return Math.round(row.onboardingAdvanceUsdCents * row.cashoutUsdInrRate);
 }
 
@@ -276,6 +283,7 @@ export function calculatePnEmployeeNetPlInrCents(
   row: Pick<
     PnEmployeeEditableRow,
     | "onboardingAdvanceUsdCents"
+    | "advanceOverrideInrCents"
     | "cashoutUsdInrRate"
     | "cashInInrCents"
     | "salaryPaidInrCents"
@@ -486,6 +494,7 @@ export function buildPnEmployeeEditableSections(
       dollarInwardUsdCents: row.baseDollarInwardUsdCents,
       baseDollarInwardUsdCents: row.baseDollarInwardUsdCents,
       onboardingAdvanceUsdCents: row.onboardingAdvanceUsdCents,
+      advanceOverrideInrCents: row.advanceOverrideInrCents ?? null,
       reimbursementUsdCents: row.reimbursementUsdCents,
       reimbursementLabelsText: row.reimbursementLabelsText,
       reimbursementInrCents: Math.round(row.reimbursementUsdCents * row.cashoutUsdInrRate),
@@ -565,7 +574,10 @@ export function buildPnPeriodRows(input: {
       const commissionEarnedInrCents = sumBy(bucket, "commissionEarnedInrCents");
       const grossEarningsInrCents = fxCommissionInrCents + commissionEarnedInrCents;
       const expensesInrCents = input.expenseByKey.get(key) ?? 0;
-      const netProfitInrCents = sumBy(bucket, "netProfitInrCents");
+      const advancesInrCents = bucket.reduce(
+        (sum, row) => sum + calculatePnEmployeeAdvanceInrCents(row),
+        0,
+      );
       const employeeReimbursementUsdCents = sumBy(bucket, "reimbursementUsdCents");
       const employeeReimbursementInrCents = bucket.reduce(
         (sum, row) => sum + Math.round(row.reimbursementUsdCents * row.cashoutUsdInrRate),
@@ -606,10 +618,7 @@ export function buildPnPeriodRows(input: {
         fiscalLabel,
         dollarInwardUsdCents: sumBy(bucket, "dollarInwardUsdCents"),
         onboardingAdvanceUsdCents: sumBy(bucket, "onboardingAdvanceUsdCents"),
-        advancesInrCents: bucket.reduce(
-          (sum, row) => sum + Math.round(row.onboardingAdvanceUsdCents * row.cashoutUsdInrRate),
-          0,
-        ),
+        advancesInrCents,
         reimbursementUsdCents,
         reimbursementLabelsText: [...reimbursementLabels].join(", "),
         reimbursementInrCents,
@@ -632,7 +641,12 @@ export function buildPnPeriodRows(input: {
         expensesInrCents,
         companyReimbursementUsdCents: companyLevelReimbursementUsdCents,
         companyReimbursementInrCents: companyLevelReimbursementInrCents,
-        netPlInrCents: netProfitInrCents,
+        netPlInrCents: calculatePnPeriodNetPlInrCents({
+          grossEarningsInrCents,
+          companyReimbursementInrCents: companyLevelReimbursementInrCents,
+          expensesInrCents,
+          advancesInrCents,
+        }),
       };
     })
     .sort((a, b) => {

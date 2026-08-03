@@ -286,7 +286,7 @@ export default async function DraftInvoicePage({
                 <div
                   className="rounded-2xl p-4"
                   style={{
-                    background: "rgba(255,255,255,0.02)",
+                    background: "var(--surface-subtle)",
                     border: "1px solid var(--glass-border)",
                   }}
                 >
@@ -326,7 +326,7 @@ export default async function DraftInvoicePage({
                 <div
                   className="rounded-2xl p-4"
                   style={{
-                    background: "rgba(255,255,255,0.02)",
+                    background: "var(--surface-subtle)",
                     border: "1px solid var(--glass-border)",
                   }}
                 >
@@ -379,7 +379,7 @@ export default async function DraftInvoicePage({
                   key={team.id}
                   className="rounded-2xl p-4"
                   style={{
-                    background: "rgba(255,255,255,0.02)",
+                    background: "var(--surface-subtle)",
                     border: "1px solid var(--glass-border)",
                   }}
                 >
@@ -584,7 +584,7 @@ export default async function DraftInvoicePage({
                 <div
                   className="rounded-2xl p-6 text-sm"
                   style={{
-                    background: "rgba(255,255,255,0.02)",
+                    background: "var(--surface-subtle)",
                     border: "1px solid var(--glass-border)",
                     color: "var(--text-muted)",
                   }}

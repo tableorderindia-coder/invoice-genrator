@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { createElement } from "react";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DashboardTables } from "../../../app/dashboard/dashboard-tables";
@@ -210,6 +210,72 @@ describe("dashboard tables rendering", () => {
     const employeeCell = screen.getByRole("rowheader", { name: "Alice" });
     expect(screen.getAllByText("Alice")).toHaveLength(1);
     expect(employeeCell.getAttribute("rowspan")).toBe("3");
+  });
+
+  it("edits only Advances and Net P/L in the SaaS employee spreadsheet", async () => {
+    const bulkUpdate = vi.fn(async () => ({
+      savedPayoutIds: ["payout_1"],
+      failedRows: [],
+    }));
+    render(
+      createElement(DashboardTables, {
+        view: "employee",
+        periodType: "monthly",
+        data: baseData,
+        returnTo: "/dashboard",
+        employeeColumnKeys: DEFAULT_EMPLOYEE_DASHBOARD_COLUMNS,
+        periodColumnKeys: DEFAULT_PERIOD_DASHBOARD_COLUMNS,
+        uiMode: "saas",
+        updateDashboardEmployeeCashFlowEntryAction: vi.fn(async () => {}),
+        bulkUpdateDashboardEmployeeCashFlowEntriesAction: bulkUpdate,
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    const advanceInput = screen.getByRole("textbox", {
+      name: "advances for April 2026",
+    }) as HTMLInputElement;
+    expect(advanceInput.value).toBe("400");
+
+    fireEvent.change(advanceInput, { target: { value: "125" } });
+
+    expect(screen.getAllByText("-₹6,560.00").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("$108").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("- ₹6,685.00").length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "Save (1)" }));
+    await waitFor(() => expect(bulkUpdate).toHaveBeenCalledTimes(1));
+    expect(bulkUpdate).toHaveBeenCalledWith([
+      expect.objectContaining({
+        payoutId: "payout_1",
+        advanceOverrideInrCents: 12_500,
+      }),
+    ]);
+  });
+
+  it("allows a blank Legacy Advance INR override to keep automatic calculation", () => {
+    const { container } = render(
+      createElement(DashboardTables, {
+        view: "employee",
+        periodType: "monthly",
+        data: baseData,
+        returnTo: "/dashboard",
+        employeeColumnKeys: DEFAULT_EMPLOYEE_DASHBOARD_COLUMNS,
+        periodColumnKeys: DEFAULT_PERIOD_DASHBOARD_COLUMNS,
+        updateDashboardEmployeeCashFlowEntryAction: vi.fn(async () => {}),
+      }),
+    );
+
+    const input = container.querySelector(
+      'input[name="advanceOverrideInr"]',
+    ) as HTMLInputElement;
+    expect(input).toBeInstanceOf(HTMLInputElement);
+    expect(input.value).toBe("");
+    expect(input.placeholder).toContain("400");
+
+    fireEvent.change(input, { target: { value: "125" } });
+    const form = container.querySelector("#dashboard-payout-payout_1") as HTMLFormElement;
+    expect(new FormData(form).get("advanceOverrideInr")).toBe("125");
   });
 
   it("renders a totals row aligned to the visible employee columns", () => {

@@ -157,7 +157,7 @@ function AdjustmentGroup({
     <div
       className="rounded-2xl p-4"
       style={{
-        background: "rgba(255,255,255,0.02)",
+        background: "var(--surface-subtle)",
         border: "1px solid var(--glass-border)",
       }}
     >
@@ -182,7 +182,7 @@ function AdjustmentGroup({
             key={adjustment.id}
             className="flex min-w-max items-center justify-between gap-4 rounded-2xl p-3"
             style={{
-              background: "rgba(255,255,255,0.02)",
+              background: "var(--surface-subtle)",
               border: "1px solid var(--glass-border)",
             }}
           >
@@ -346,7 +346,7 @@ export function AdjustmentForms({
           }
         }}
         style={{
-          background: "rgba(255,255,255,0.02)",
+          background: "var(--surface-subtle)",
           border: "1px solid var(--glass-border)",
         }}
       >

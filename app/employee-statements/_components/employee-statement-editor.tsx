@@ -146,7 +146,7 @@ export default function EmployeeStatementEditor(props: {
         className="grid gap-4 rounded-3xl border p-5 lg:grid-cols-[1.4fr_1fr]"
         style={{
           borderColor: "var(--glass-border)",
-          background: "rgba(255, 255, 255, 0.03)",
+          background: "var(--surface-subtle)",
         }}
       >
         <div>
@@ -201,7 +201,7 @@ export default function EmployeeStatementEditor(props: {
           <thead>
             <tr
               style={{
-                background: "rgba(255, 255, 255, 0.05)",
+                background: "var(--control-bg-hover)",
                 color: "var(--text-secondary)",
               }}
             >
@@ -353,7 +353,7 @@ export default function EmployeeStatementEditor(props: {
             <tr
               style={{
                 borderTop: "1px solid rgba(255, 255, 255, 0.1)",
-                background: "rgba(255, 255, 255, 0.04)",
+                background: "var(--control-bg)",
               }}
             >
               <td className="px-4 py-3 font-semibold" style={{ color: "var(--text-primary)" }}>

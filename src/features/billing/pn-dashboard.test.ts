@@ -280,6 +280,36 @@ describe("pn dashboard aggregations", () => {
     );
   });
 
+  it("uses an Advance INR override only for Advances and employee Net P/L", () => {
+    const automaticRow = {
+      ...editableSampleRows[0],
+      onboardingAdvanceUsdCents: 10_000,
+      cashoutUsdInrRate: 80,
+      cashInInrCents: 1_000_000,
+      salaryPaidInrCents: 100_000,
+      pfInrCents: 20_000,
+      tdsInrCents: 10_000,
+      grossEarningsInrCents: 870_000,
+      effectiveDollarInwardUsdCents: 12_500,
+      advanceOverrideInrCents: null,
+    };
+    const overriddenRow = {
+      ...automaticRow,
+      advanceOverrideInrCents: 250_000,
+    };
+
+    expect(calculatePnEmployeeAdvanceInrCents(automaticRow)).toBe(800_000);
+    expect(calculatePnEmployeeAdvanceInrCents(overriddenRow)).toBe(250_000);
+    expect(calculatePnEmployeeNetPlInrCents(automaticRow)).toBe(70_000);
+    expect(calculatePnEmployeeNetPlInrCents(overriddenRow)).toBe(620_000);
+    expect(overriddenRow.grossEarningsInrCents).toBe(
+      automaticRow.grossEarningsInrCents,
+    );
+    expect(overriddenRow.effectiveDollarInwardUsdCents).toBe(
+      automaticRow.effectiveDollarInwardUsdCents,
+    );
+  });
+
   it("derives employee net p/l from effective INR and the complete payout", () => {
     const row = {
       ...editableSampleRows[0],
@@ -376,7 +406,7 @@ describe("pn dashboard aggregations", () => {
     expect(monthly[0].appraisalAdvanceInrCents).toBe(416000);
     expect(monthly[0].expensesInrCents).toBe(50000);
     expect(monthly[0].companyReimbursementInrCents).toBe(832000);
-    expect(monthly[0].netPlInrCents).toBe(3821000);
+    expect(monthly[0].netPlInrCents).toBe(982000);
 
     expect(monthly[1].month).toBe(2);
     expect(monthly[1].grossEarningsInrCents).toBe(362000);
@@ -386,7 +416,7 @@ describe("pn dashboard aggregations", () => {
     expect(monthly[1].appraisalAdvanceInrCents).toBe(208750);
     expect(monthly[1].expensesInrCents).toBe(90000);
     expect(monthly[1].companyReimbursementInrCents).toBe(417500);
-    expect(monthly[1].netPlInrCents).toBe(6183250);
+    expect(monthly[1].netPlInrCents).toBe(689500);
   });
 
   it("converts each employee advance before aggregating mixed cashout rates", () => {
@@ -429,7 +459,37 @@ describe("pn dashboard aggregations", () => {
     expect(monthly[0].companyReimbursementInrCents).toBe(8_750_00);
   });
 
-  it("builds yearly period rows from cash-flow net profit even without outflow", () => {
+  it("stores the fully included canonical company net p/l", () => {
+    const monthly = buildPnPeriodRows({
+      rows: [
+        {
+          ...sampleRows[0],
+          year: 2026,
+          month: 7,
+          effectiveDollarInwardUsdCents: 100_00,
+          cashoutUsdInrRate: 80,
+          onboardingAdvanceUsdCents: 10_00,
+          advanceOverrideInrCents: 250_00,
+          fxCommissionInrCents: 2_000_00,
+          commissionEarnedInrCents: 3_000_00,
+          netProfitInrCents: 99_999_00,
+        },
+      ],
+      periodType: "monthly",
+      expenseByKey: new Map([["2026-07", 1_000_00]]),
+      companyLevelReimbursementUsdByKey: new Map([["2026-07", 10_00]]),
+    });
+
+    expect(monthly[0]).toMatchObject({
+      grossEarningsInrCents: 5_000_00,
+      companyReimbursementInrCents: 800_00,
+      expensesInrCents: 1_000_00,
+      advancesInrCents: 250_00,
+      netPlInrCents: 4_550_00,
+    });
+  });
+
+  it("builds yearly period rows from canonical period accounting", () => {
     const yearly = buildPnPeriodRows({
       rows: [
         {
@@ -460,7 +520,7 @@ describe("pn dashboard aggregations", () => {
       grossEarningsInrCents: 0,
       expensesInrCents: 0,
       companyReimbursementInrCents: 832000,
-      netPlInrCents: 900000,
+      netPlInrCents: 832000,
     });
   });
 

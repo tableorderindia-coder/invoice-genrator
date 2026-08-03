@@ -255,7 +255,7 @@ export default function EmployeeCashFlowEntryForm({
       <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
         <div
           className="rounded-2xl p-5"
-          style={{ border: "1px solid var(--glass-border)", background: "rgba(255,255,255,0.03)" }}
+          style={{ border: "1px solid var(--glass-border)", background: "var(--surface-subtle)" }}
         >
           <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
             Employee Monthly View
@@ -283,7 +283,7 @@ export default function EmployeeCashFlowEntryForm({
             style={{
               minHeight: "220px",
               border: "1px solid var(--glass-border)",
-              background: "rgba(255,255,255,0.04)",
+              background: "var(--control-bg)",
               color: "var(--text-primary)",
             }}
           >
@@ -312,7 +312,7 @@ export default function EmployeeCashFlowEntryForm({
 
         <div
           className="rounded-2xl p-5"
-          style={{ border: "1px solid var(--glass-border)", background: "rgba(255,255,255,0.03)" }}
+          style={{ border: "1px solid var(--glass-border)", background: "var(--surface-subtle)" }}
         >
           <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
             Add employee
@@ -337,7 +337,7 @@ export default function EmployeeCashFlowEntryForm({
               className={cardInputClass()}
               style={{
                 border: "1px solid var(--glass-border)",
-                background: "rgba(255,255,255,0.04)",
+                background: "var(--control-bg)",
                 color: "var(--text-primary)",
               }}
             >
@@ -368,7 +368,7 @@ export default function EmployeeCashFlowEntryForm({
               className={cardInputClass()}
               style={{
                 border: "1px solid var(--glass-border)",
-                background: "rgba(255,255,255,0.04)",
+                background: "var(--control-bg)",
                 color: "var(--text-primary)",
               }}
               disabled={addableEmployees.length === 0}
@@ -424,7 +424,7 @@ export default function EmployeeCashFlowEntryForm({
             <div
               key={entry.id}
               className="rounded-2xl p-5"
-              style={{ border: "1px solid var(--glass-border)", background: "rgba(255,255,255,0.03)" }}
+              style={{ border: "1px solid var(--glass-border)", background: "var(--surface-subtle)" }}
             >
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
@@ -766,7 +766,7 @@ export default function EmployeeCashFlowEntryForm({
                   <div
                     key={label}
                     className="rounded-xl px-4 py-3"
-                    style={{ border: "1px solid var(--glass-border)", background: "rgba(255,255,255,0.04)" }}
+                    style={{ border: "1px solid var(--glass-border)", background: "var(--control-bg)" }}
                   >
                     <p className="text-xs font-medium uppercase tracking-[0.16em]" style={{ color: "var(--text-muted)" }}>
                       {label}

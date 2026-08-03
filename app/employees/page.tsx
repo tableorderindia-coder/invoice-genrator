@@ -343,7 +343,7 @@ export default async function EmployeesPage({
                   <span
                     className="rounded-full px-3 py-1 text-xs font-medium"
                     style={{
-                      background: "rgba(255,255,255,0.04)",
+                      background: "var(--control-bg)",
                       color: "var(--text-muted)",
                       border: "1px solid var(--glass-border)",
                     }}
@@ -353,7 +353,7 @@ export default async function EmployeesPage({
                   <span
                     className="rounded-full px-3 py-1 text-xs font-medium"
                     style={{
-                      background: "rgba(255,255,255,0.04)",
+                      background: "var(--control-bg)",
                       color: "var(--text-muted)",
                       border: "1px solid var(--glass-border)",
                     }}
@@ -363,7 +363,7 @@ export default async function EmployeesPage({
                   <span
                     className="rounded-full px-3 py-1 text-xs font-medium"
                     style={{
-                      background: "rgba(255,255,255,0.04)",
+                      background: "var(--control-bg)",
                       color: "var(--text-muted)",
                       border: "1px solid var(--glass-border)",
                     }}
@@ -373,7 +373,7 @@ export default async function EmployeesPage({
                   <span
                     className="rounded-full px-3 py-1 text-xs font-medium"
                     style={{
-                      background: "rgba(255,255,255,0.04)",
+                      background: "var(--control-bg)",
                       color: "var(--text-muted)",
                       border: "1px solid var(--glass-border)",
                     }}
@@ -383,7 +383,7 @@ export default async function EmployeesPage({
                   <span
                     className="rounded-full px-3 py-1 text-xs font-medium"
                     style={{
-                      background: "rgba(255,255,255,0.04)",
+                      background: "var(--control-bg)",
                       color: "var(--text-muted)",
                       border: "1px solid var(--glass-border)",
                     }}
