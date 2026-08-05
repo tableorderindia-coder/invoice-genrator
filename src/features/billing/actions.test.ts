@@ -194,6 +194,38 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
     });
   });
 
+  it("bulk updates dashboard expense rows without redirecting", async () => {
+    const { bulkUpdateDashboardCompanyExpensesAction } = await import("./actions");
+
+    const result = await bulkUpdateDashboardCompanyExpensesAction([
+      {
+        expenseId: "expense_1",
+        companyId: "company_1",
+        periodLabel: "April 2026",
+        label: "Software",
+        year: 2026,
+        month: 4,
+        amountInrCents: 98765,
+      },
+    ]);
+
+    expect(result).toEqual({
+      savedExpenseIds: ["expense_1"],
+      failedRows: [],
+    });
+    expect(upsertCompanyExpenseMock).toHaveBeenCalledWith({
+      id: "expense_1",
+      companyId: "company_1",
+      year: 2026,
+      month: 4,
+      label: "Software",
+      amountInrCents: 98765,
+    });
+    expect(revalidatePathMock).toHaveBeenCalledWith("/expenses");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/dashboard");
+    expect(redirectMock).not.toHaveBeenCalled();
+  });
+
   it("saves monthly payroll rows through the company-scoped Salary permission gate", async () => {
     const { saveMonthlyPayrollRowsAction } = await import("./actions");
     const formData = new FormData();

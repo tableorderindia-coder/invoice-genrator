@@ -200,6 +200,30 @@ describe("dashboard tables rendering", () => {
     expect(screen.getByRole("button", { name: "Detailed" })).toBeTruthy();
   });
 
+  it("renders column presets for monthly period dashboards", () => {
+    render(
+      createElement(DashboardTables, {
+        view: "period",
+        periodType: "monthly",
+        data: baseData,
+        returnTo: "/dashboard",
+        employeeColumnKeys: DEFAULT_EMPLOYEE_DASHBOARD_COLUMNS,
+        periodColumnKeys: DEFAULT_PERIOD_DASHBOARD_COLUMNS,
+        uiMode: "saas",
+        updateDashboardEmployeeCashFlowEntryAction: vi.fn(async () => {}),
+        bulkUpdateDashboardEmployeeCashFlowEntriesAction: vi.fn(async () => ({
+          savedPayoutIds: [],
+          failedRows: [],
+        })),
+      }),
+    );
+
+    expect(screen.getByRole("button", { name: "P&L" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Payroll" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Cash Flow" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Detailed" })).toBeTruthy();
+  });
+
   it("shows an employee name once across that employee's rows and subtotal", () => {
     render(
       createElement(DashboardTables, {
@@ -920,5 +944,247 @@ describe("dashboard tables rendering", () => {
     expect(
       within(advancesBreakdownCell as HTMLElement).getAllByText("₹400.00").length,
     ).toBeGreaterThan(0);
+  });
+
+  it("edits expanded monthly drilldown source values with keyboard shortcuts", async () => {
+    const bulkUpdate = vi.fn(async () => ({
+      savedPayoutIds: ["payout_1"],
+      failedRows: [],
+    }));
+    render(
+      createElement(DashboardTables, {
+        view: "period",
+        periodType: "monthly",
+        data: baseData,
+        companyBreakdowns: [
+          {
+            companyId: "comp_1",
+            companyName: "Acme India",
+            data: baseData,
+          },
+        ],
+        returnTo: "/dashboard",
+        employeeColumnKeys: allEmployeeColumnKeys,
+        periodColumnKeys: ["dollarInward"],
+        updateDashboardEmployeeCashFlowEntryAction: vi.fn(async () => {}),
+        bulkUpdateDashboardEmployeeCashFlowEntriesAction: bulkUpdate,
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand period April 2026" }));
+    fireEvent.click(screen.getByRole("button", { name: "Expand company Acme India" }));
+
+    const dollarBreakdownButton = screen.getByRole("button", {
+      name: "Expand Dollar inward breakdown for Acme India",
+    });
+    const dollarBreakdownCell = dollarBreakdownButton.closest("td");
+    fireEvent.click(dollarBreakdownButton);
+    fireEvent.keyDown(window, { key: "e", ctrlKey: true });
+
+    expect(dollarBreakdownCell).not.toBeNull();
+    const dollarInput = within(dollarBreakdownCell as HTMLElement).getByRole("textbox", {
+      name: "Dollar inward for Alice - INV-1 - April 2026",
+    }) as HTMLInputElement;
+    expect(dollarInput.value).toBe("100");
+
+    fireEvent.change(dollarInput, { target: { value: "125" } });
+    fireEvent.keyDown(window, { key: "s", ctrlKey: true });
+
+    await waitFor(() => expect(bulkUpdate).toHaveBeenCalledTimes(1));
+    expect(bulkUpdate).toHaveBeenCalledWith([
+      expect.objectContaining({
+        payoutId: "payout_1",
+        dollarInwardUsdCents: 12_500,
+      }),
+    ]);
+  });
+
+  it("edits computed monthly drilldown contributors inside source rows", async () => {
+    const bulkUpdate = vi.fn(async () => ({
+      savedPayoutIds: ["payout_1"],
+      failedRows: [],
+    }));
+    render(
+      createElement(DashboardTables, {
+        view: "period",
+        periodType: "monthly",
+        data: baseData,
+        companyBreakdowns: [
+          {
+            companyId: "comp_1",
+            companyName: "Acme India",
+            data: baseData,
+          },
+        ],
+        returnTo: "/dashboard",
+        employeeColumnKeys: allEmployeeColumnKeys,
+        periodColumnKeys: ["effectiveDollarInward"],
+        updateDashboardEmployeeCashFlowEntryAction: vi.fn(async () => {}),
+        bulkUpdateDashboardEmployeeCashFlowEntriesAction: bulkUpdate,
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand period April 2026" }));
+    fireEvent.click(screen.getByRole("button", { name: "Expand company Acme India" }));
+
+    const cashInBreakdownButton = screen.getByRole("button", {
+      name: "Expand Total effective dollar inward (USD) breakdown for Acme India",
+    });
+    const cashInBreakdownCell = cashInBreakdownButton.closest("td");
+    fireEvent.click(cashInBreakdownButton);
+    expect(cashInBreakdownCell).not.toBeNull();
+
+    const employeeBreakdownButton = within(cashInBreakdownCell as HTMLElement).getByRole(
+      "button",
+      {
+        name: "Expand Alice - INV-1 - April 2026",
+      },
+    );
+    fireEvent.click(
+      within(cashInBreakdownCell as HTMLElement).getByRole("button", {
+        name: "Expand Alice - INV-1 - April 2026",
+      }),
+    );
+    expect(
+      within(cashInBreakdownCell as HTMLElement).queryByText("Offboarding deduction"),
+    ).toBeNull();
+    fireEvent.click(
+      within(cashInBreakdownCell as HTMLElement).getByRole("button", {
+        name: "Collapse Alice - INV-1 - April 2026",
+      }),
+    );
+
+    fireEvent.keyDown(window, { key: "e", ctrlKey: true });
+
+    expect(
+      within(cashInBreakdownCell as HTMLElement).queryByRole("textbox", {
+        name: "Dollar inward for Alice - INV-1 - April 2026",
+      }),
+    ).toBeNull();
+
+    fireEvent.click(employeeBreakdownButton);
+
+    const dollarInput = within(cashInBreakdownCell as HTMLElement).getByRole("textbox", {
+      name: "Dollar inward for Alice - INV-1 - April 2026",
+    }) as HTMLInputElement;
+    const offboardingInput = within(cashInBreakdownCell as HTMLElement).getByRole(
+      "textbox",
+      {
+        name: "Offboarding deduction for Alice - INV-1 - April 2026",
+      },
+    ) as HTMLInputElement;
+    expect(dollarInput.value).toBe("100");
+    expect(offboardingInput.value).toBe("0");
+
+    fireEvent.click(
+      within(cashInBreakdownCell as HTMLElement).getByRole("button", {
+        name: "Collapse Alice - INV-1 - April 2026",
+      }),
+    );
+    expect(
+      within(cashInBreakdownCell as HTMLElement).queryByRole("textbox", {
+        name: "Dollar inward for Alice - INV-1 - April 2026",
+      }),
+    ).toBeNull();
+
+    fireEvent.click(
+      within(cashInBreakdownCell as HTMLElement).getByRole("button", {
+        name: "Expand Alice - INV-1 - April 2026",
+      }),
+    );
+    const reopenedDollarInput = within(cashInBreakdownCell as HTMLElement).getByRole(
+      "textbox",
+      {
+        name: "Dollar inward for Alice - INV-1 - April 2026",
+      },
+    );
+    fireEvent.change(reopenedDollarInput, { target: { value: "125" } });
+    fireEvent.keyDown(window, { key: "s", ctrlKey: true });
+
+    await waitFor(() => expect(bulkUpdate).toHaveBeenCalledTimes(1));
+    expect(bulkUpdate).toHaveBeenCalledWith([
+      expect.objectContaining({
+        payoutId: "payout_1",
+        dollarInwardUsdCents: 12_500,
+      }),
+    ]);
+  });
+
+  it("edits expense drilldown entries from monthly period rows", async () => {
+    const bulkUpdateExpenses = vi.fn(async () => ({
+      savedExpenseIds: ["expense_1"],
+      failedRows: [],
+    }));
+    render(
+      createElement(DashboardTables, {
+        view: "period",
+        periodType: "monthly",
+        data: {
+          ...baseData,
+          periodRows: [
+            {
+              ...periodRows[0],
+              expensesInrCents: 157_231_00,
+            },
+          ],
+        },
+        companyBreakdowns: [
+          {
+            companyId: "comp_1",
+            companyName: "Acme India",
+            data: {
+              ...baseData,
+              periodRows: [
+                {
+                  ...periodRows[0],
+                  expensesInrCents: 157_231_00,
+                },
+              ],
+            },
+            expenses: expenseRows,
+          },
+        ],
+        returnTo: "/dashboard",
+        employeeColumnKeys: allEmployeeColumnKeys,
+        periodColumnKeys: ["expenses"],
+        updateDashboardEmployeeCashFlowEntryAction: vi.fn(async () => {}),
+        bulkUpdateDashboardCompanyExpensesAction: bulkUpdateExpenses,
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand period April 2026" }));
+    fireEvent.click(screen.getByRole("button", { name: "Expand company Acme India" }));
+    const expensesBreakdownButton = screen.getByRole("button", {
+      name: "Expand Expenses (INR) breakdown for Acme India",
+    });
+    const expensesBreakdownCell = expensesBreakdownButton.closest("td");
+    fireEvent.click(expensesBreakdownButton);
+    expect(expensesBreakdownCell).not.toBeNull();
+
+    fireEvent.click(
+      within(expensesBreakdownCell as HTMLElement).getByRole("button", {
+        name: "Expand Beesetti Kiran Suresh's salary",
+      }),
+    );
+    fireEvent.keyDown(window, { key: "e", ctrlKey: true });
+
+    const [expenseInput] = within(expensesBreakdownCell as HTMLElement).getAllByRole(
+      "textbox",
+      {
+        name: "Expense amount for April 2026",
+      },
+    ) as HTMLInputElement[];
+    expect(expenseInput.value).toBe("63334");
+
+    fireEvent.change(expenseInput, { target: { value: "70000" } });
+    fireEvent.keyDown(window, { key: "s", ctrlKey: true });
+
+    await waitFor(() => expect(bulkUpdateExpenses).toHaveBeenCalledTimes(1));
+    expect(bulkUpdateExpenses).toHaveBeenCalledWith([
+      expect.objectContaining({
+        expenseId: "expense_1",
+        amountInrCents: 7_000_000,
+      }),
+    ]);
   });
 });

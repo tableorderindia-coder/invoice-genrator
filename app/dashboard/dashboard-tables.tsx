@@ -3,12 +3,14 @@
 import {
   Fragment,
   useCallback,
+  useEffect,
   useMemo,
   useState,
   useSyncExternalStore,
   type Dispatch,
   type SetStateAction,
 } from "react";
+import { useRouter } from "next/navigation";
 import { PendingActionButton } from "../_components/pending-action-button";
 import { inputClass } from "../_components/field";
 import { NumericInput } from "../_components/numeric-input";
@@ -37,9 +39,12 @@ import {
   formatUsd,
 } from "../../src/features/billing/utils";
 import { getVisibleToggleColumns } from "../../src/features/billing/dashboard-column-visibility";
+import { PERIOD_DASHBOARD_COLUMN_OPTIONS } from "../../src/features/billing/dashboard-column-options";
 import { buildDashboardExportHref } from "../../src/features/billing/dashboard-export-options";
 import type { PortalUiMode } from "../../src/features/ui/portal-ui-mode";
 import type {
+  DashboardExpenseBulkUpdateResult,
+  DashboardExpenseBulkUpdateRowInput,
   DashboardBulkUpdateResult,
   DashboardBulkUpdateRowInput,
 } from "../../src/features/billing/types";
@@ -73,6 +78,9 @@ type DashboardTablesProps = {
   bulkUpdateDashboardEmployeeCashFlowEntriesAction?: (
     rows: DashboardBulkUpdateRowInput[],
   ) => Promise<DashboardBulkUpdateResult>;
+  bulkUpdateDashboardCompanyExpensesAction?: (
+    rows: DashboardExpenseBulkUpdateRowInput[],
+  ) => Promise<DashboardExpenseBulkUpdateResult>;
 };
 
 const PERIOD_BREAKDOWN_COLUMN_KEY = "breakdown";
@@ -81,6 +89,45 @@ const PERIOD_ALWAYS_VISIBLE_COLUMN_KEYS = new Set([
   PERIOD_BREAKDOWN_COLUMN_KEY,
   "period",
 ]);
+const PERIOD_COLUMN_PRESETS = {
+  "P&L": [
+    "effectiveDollarInward",
+    "cashoutRate",
+    "cashIn",
+    "salaryPaid",
+    "pf",
+    "tds",
+    "fxCommission",
+    "commissionEarned",
+    "grossEarnings",
+    "expenses",
+    "advances",
+    "companyReimbursementInr",
+    "netPl",
+  ],
+  Payroll: [
+    "monthlyPaid",
+    "actualPaid",
+    "salaryPaid",
+    "pf",
+    "tds",
+    "advances",
+    "netPl",
+  ],
+  "Cash Flow": [
+    "dollarInward",
+    "onboardingAdvance",
+    "reimbursements",
+    "appraisalAdvance",
+    "offboardingDeduction",
+    "effectiveDollarInward",
+    "cashoutRate",
+    "cashIn",
+    "companyReimbursementUsd",
+    "companyReimbursementInr",
+  ],
+  Detailed: PERIOD_DASHBOARD_COLUMN_OPTIONS.map((option) => option.value),
+} as const;
 
 function filterColumns<TColumn extends { key: string }>(
   columns: TColumn[],
@@ -106,6 +153,7 @@ export function DashboardTables({
   uiMode = "legacy",
   updateDashboardEmployeeCashFlowEntryAction,
   bulkUpdateDashboardEmployeeCashFlowEntriesAction,
+  bulkUpdateDashboardCompanyExpensesAction,
 }: DashboardTablesProps) {
   const [includeExpenses, setIncludeExpenses] = useStoredBoolean(
     "dashboardIncludeExpenses",
@@ -152,6 +200,8 @@ export function DashboardTables({
         includeReimbursements={includeReimbursements}
         setIncludeReimbursements={setIncludeReimbursements}
         uiMode={uiMode}
+        bulkUpdateAction={bulkUpdateDashboardEmployeeCashFlowEntriesAction}
+        bulkUpdateExpensesAction={bulkUpdateDashboardCompanyExpensesAction}
       />
     );
 
@@ -226,8 +276,292 @@ type PeriodDetailSource = {
   id: string;
   label: string;
   value: number | string | null | undefined;
+  valueKind?: PeriodValueKind;
+  editLabel?: string;
+  editContext?: string;
   children?: PeriodDetailSource[];
+  editable?: PeriodEditableSource;
+  editableExpense?: PeriodEditableExpenseSource;
 };
+
+type PeriodEditableSource = {
+  row: PnEmployeeEditableRow;
+  employeeName: string;
+  field: keyof DashboardBulkUpdateRowInput;
+  inputKind: "cents" | "rate" | "text";
+  nullable?: boolean;
+};
+
+type PeriodEditableExpenseSource = {
+  expense: CompanyExpense;
+};
+
+function dashboardBulkInput(
+  employeeName: string,
+  row: PnEmployeeEditableRow,
+): DashboardBulkUpdateRowInput {
+  return {
+    payoutId: row.payoutId,
+    employeeName,
+    periodLabel: formatMonthYear(row.month, row.year),
+    daysWorked: row.daysWorked,
+    dollarInwardUsdCents: row.dollarInwardUsdCents,
+    onboardingAdvanceUsdCents: row.onboardingAdvanceUsdCents,
+    advanceOverrideInrCents: row.advanceOverrideInrCents ?? null,
+    reimbursementUsdCents: row.reimbursementUsdCents,
+    reimbursementLabelsText: row.reimbursementLabelsText,
+    appraisalAdvanceUsdCents: row.appraisalAdvanceUsdCents,
+    offboardingDeductionUsdCents: row.offboardingDeductionUsdCents,
+    cashoutUsdInrRate: row.cashoutUsdInrRate,
+    paidUsdInrRate: row.paidUsdInrRate,
+    pfInrCents: row.pfInrCents,
+    tdsInrCents: row.tdsInrCents,
+    actualPaidInrCents: row.actualPaidInrCents,
+  };
+}
+
+function buildInitialPeriodDrafts(
+  data: PnDashboardData,
+  companyBreakdowns: DashboardCompanyBreakdown[],
+) {
+  const drafts: Record<string, DashboardBulkUpdateRowInput> = {};
+  const addRows = (sourceData: PnDashboardData) => {
+    for (const section of sourceData.employeeEditableSections) {
+      for (const row of section.rows) {
+        drafts[row.payoutId] = dashboardBulkInput(section.employeeName, row);
+      }
+    }
+  };
+  addRows(data);
+  for (const company of companyBreakdowns) addRows(company.data);
+  return drafts;
+}
+
+function buildInitialExpenseDrafts(companyBreakdowns: DashboardCompanyBreakdown[]) {
+  const drafts: Record<string, DashboardExpenseBulkUpdateRowInput> = {};
+  for (const company of companyBreakdowns) {
+    for (const expense of company.expenses ?? []) {
+      drafts[expense.id] = {
+        expenseId: expense.id,
+        companyId: expense.companyId,
+        periodLabel: formatMonthYear(expense.month, expense.year),
+        label: expense.label,
+        year: expense.year,
+        month: expense.month,
+        amountInrCents: expense.amountInrCents,
+      };
+    }
+  }
+  return drafts;
+}
+
+function centsFromText(value: string) {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? Math.round(parsed * 100) : 0;
+}
+
+function numberFromText(value: string) {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function periodEditableForColumn(
+  columnKey: string,
+  row: PnEmployeeEditableRow,
+  employeeName: string,
+): PeriodEditableSource | undefined {
+  if (row.isSalaryOnly) return undefined;
+  switch (columnKey) {
+    case "dollarInward":
+      return { row, employeeName, field: "dollarInwardUsdCents", inputKind: "cents" };
+    case "onboardingAdvance":
+      return { row, employeeName, field: "onboardingAdvanceUsdCents", inputKind: "cents" };
+    case "reimbursements":
+      return { row, employeeName, field: "reimbursementUsdCents", inputKind: "cents" };
+    case "reimbursementLabels":
+      return { row, employeeName, field: "reimbursementLabelsText", inputKind: "text" };
+    case "appraisalAdvance":
+      return { row, employeeName, field: "appraisalAdvanceUsdCents", inputKind: "cents" };
+    case "offboardingDeduction":
+      return { row, employeeName, field: "offboardingDeductionUsdCents", inputKind: "cents" };
+    case "cashoutRate":
+      return { row, employeeName, field: "cashoutUsdInrRate", inputKind: "rate" };
+    case "paidRate":
+      return { row, employeeName, field: "paidUsdInrRate", inputKind: "rate" };
+    case "actualPaid":
+      return { row, employeeName, field: "actualPaidInrCents", inputKind: "cents" };
+    case "pf":
+      return { row, employeeName, field: "pfInrCents", inputKind: "cents" };
+    case "tds":
+      return { row, employeeName, field: "tdsInrCents", inputKind: "cents" };
+    case "advances":
+      return {
+        row,
+        employeeName,
+        field: "advanceOverrideInrCents",
+        inputKind: "cents",
+        nullable: true,
+      };
+    default:
+      return undefined;
+  }
+}
+
+function periodEditableContributionSource(
+  columnKey: string,
+  row: PnEmployeeEditableRow,
+  employeeName: string,
+  editContext: string,
+): PeriodDetailSource | null {
+  const editable = periodEditableForColumn(columnKey, row, employeeName);
+  if (!editable) return null;
+  const value = (() => {
+    switch (columnKey) {
+      case "dollarInward":
+        return row.dollarInwardUsdCents;
+      case "onboardingAdvance":
+        return row.onboardingAdvanceUsdCents;
+      case "reimbursements":
+        return row.reimbursementUsdCents;
+      case "reimbursementLabels":
+        return row.reimbursementLabelsText;
+      case "appraisalAdvance":
+        return row.appraisalAdvanceUsdCents;
+      case "offboardingDeduction":
+        return row.offboardingDeductionUsdCents;
+      case "cashoutRate":
+        return row.cashoutUsdInrRate;
+      case "paidRate":
+        return row.paidUsdInrRate;
+      case "actualPaid":
+        return row.actualPaidInrCents;
+      case "pf":
+        return row.pfInrCents;
+      case "tds":
+        return row.tdsInrCents;
+      case "advances":
+        return calculatePnEmployeeAdvanceInrCents(row);
+      default:
+        return null;
+    }
+  })();
+  if (value === null || value === undefined) return null;
+  const label = periodSourceInputLabel(columnKey);
+  return {
+    id: `${row.payoutId}:${columnKey}:input`,
+    label,
+    editLabel: label,
+    editContext,
+    value,
+    valueKind:
+      columnKey === "cashoutRate" || columnKey === "paidRate"
+        ? "rate"
+        : columnKey === "reimbursementLabels"
+          ? "text"
+          : columnKey === "dollarInward" ||
+              columnKey === "onboardingAdvance" ||
+              columnKey === "reimbursements" ||
+              columnKey === "appraisalAdvance" ||
+              columnKey === "offboardingDeduction"
+            ? "usd"
+            : "inr",
+    editable,
+  } satisfies PeriodDetailSource;
+}
+
+function periodSourceInputLabel(columnKey: string) {
+  switch (columnKey) {
+    case "cashoutRate":
+      return "Cashout rate";
+    case "paidRate":
+      return "Peg rate";
+    case "actualPaid":
+      return "Actual paid (INR)";
+    case "pf":
+      return "PF (INR)";
+    case "tds":
+      return "TDS (INR)";
+    case "advances":
+      return "Advances (INR)";
+    default:
+      return periodColumnDisplayLabel({
+        key: columnKey,
+        label:
+          getVisibleToggleColumns(true).find((column) => column.key === columnKey)
+            ?.label ?? columnKey,
+      });
+  }
+}
+
+function periodComputedContributionKeys(columnKey: string) {
+  switch (columnKey) {
+    case "reimbursementsInr":
+      return ["reimbursements", "cashoutRate"];
+    case "appraisalAdvanceInr":
+      return ["appraisalAdvance", "cashoutRate"];
+    case "effectiveDollarInward":
+      return [
+        "dollarInward",
+        "onboardingAdvance",
+        "reimbursements",
+        "appraisalAdvance",
+        "offboardingDeduction",
+      ];
+    case "cashIn":
+      return [
+        "dollarInward",
+        "onboardingAdvance",
+        "reimbursements",
+        "appraisalAdvance",
+        "offboardingDeduction",
+        "cashoutRate",
+      ];
+    case "monthlyPaid":
+    case "actualPaid":
+      return ["actualPaid"];
+    case "salaryPaid":
+      return ["actualPaid", "pf", "tds"];
+    case "fxCommission":
+    case "commissionEarned":
+    case "grossEarnings":
+      return [
+        "dollarInward",
+        "onboardingAdvance",
+        "reimbursements",
+        "appraisalAdvance",
+        "offboardingDeduction",
+        "cashoutRate",
+        "paidRate",
+        "actualPaid",
+      ];
+    case "netPl":
+      return [
+        "dollarInward",
+        "onboardingAdvance",
+        "reimbursements",
+        "appraisalAdvance",
+        "offboardingDeduction",
+        "cashoutRate",
+        "actualPaid",
+        "pf",
+        "tds",
+        "advances",
+      ];
+    default:
+      return [];
+  }
+}
+
+function periodComputedContributionSources(
+  columnKey: string,
+  row: PnEmployeeEditableRow,
+  employeeName: string,
+  editContext: string,
+) {
+  return periodComputedContributionKeys(columnKey)
+    .map((key) => periodEditableContributionSource(key, row, employeeName, editContext))
+    .filter((source): source is PeriodDetailSource => Boolean(source));
+}
 
 function periodRowKey(row: Pick<PnPeriodRow, "year" | "month" | "fiscalLabel">) {
   return row.fiscalLabel ?? `${row.year}-${String(row.month ?? 0).padStart(2, "0")}`;
@@ -977,6 +1311,12 @@ type PeriodTablesProps = {
   includeReimbursements: boolean;
   setIncludeReimbursements: (value: boolean) => void;
   uiMode: PortalUiMode;
+  bulkUpdateAction?: (
+    rows: DashboardBulkUpdateRowInput[],
+  ) => Promise<DashboardBulkUpdateResult>;
+  bulkUpdateExpensesAction?: (
+    rows: DashboardExpenseBulkUpdateRowInput[],
+  ) => Promise<DashboardExpenseBulkUpdateResult>;
 };
 
 function PeriodTables({
@@ -992,10 +1332,119 @@ function PeriodTables({
   includeReimbursements,
   setIncludeReimbursements,
   uiMode,
+  bulkUpdateAction,
+  bulkUpdateExpensesAction,
 }: PeriodTablesProps) {
+  const router = useRouter();
   const [expandedPeriods, setExpandedPeriods] = useState<Set<string>>(() => new Set());
   const [expandedCompanies, setExpandedCompanies] = useState<Set<string>>(() => new Set());
   const [expandedColumns, setExpandedColumns] = useState<Set<string>>(() => new Set());
+  const [editingBreakdowns, setEditingBreakdowns] = useState(false);
+  const [savingBreakdowns, setSavingBreakdowns] = useState(false);
+  const [breakdownDrafts, setBreakdownDrafts] = useState<
+    Record<string, DashboardBulkUpdateRowInput>
+  >(() => buildInitialPeriodDrafts(data, companyBreakdowns));
+  const [expenseDrafts, setExpenseDrafts] = useState<
+    Record<string, DashboardExpenseBulkUpdateRowInput>
+  >(() => buildInitialExpenseDrafts(companyBreakdowns));
+  const [dirtyBreakdownIds, setDirtyBreakdownIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [dirtyExpenseIds, setDirtyExpenseIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const dirtyBreakdownCount = dirtyBreakdownIds.size + dirtyExpenseIds.size;
+
+  useEffect(() => {
+    if (dirtyBreakdownIds.size > 0 || dirtyExpenseIds.size > 0) return;
+    setBreakdownDrafts(buildInitialPeriodDrafts(data, companyBreakdowns));
+    setExpenseDrafts(buildInitialExpenseDrafts(companyBreakdowns));
+  }, [companyBreakdowns, data, dirtyBreakdownIds.size, dirtyExpenseIds.size]);
+
+  const saveBreakdowns = useCallback(async () => {
+    if (!bulkUpdateAction && !bulkUpdateExpensesAction) return;
+    if (dirtyBreakdownIds.size === 0 && dirtyExpenseIds.size === 0) {
+      setEditingBreakdowns(false);
+      return;
+    }
+    setSavingBreakdowns(true);
+    try {
+      const [employeeResult, expenseResult] = await Promise.all([
+        bulkUpdateAction && dirtyBreakdownIds.size > 0
+          ? bulkUpdateAction(
+              [...dirtyBreakdownIds]
+                .map((payoutId) => breakdownDrafts[payoutId])
+                .filter(Boolean),
+            )
+          : Promise.resolve({ savedPayoutIds: [], failedRows: [] }),
+        bulkUpdateExpensesAction && dirtyExpenseIds.size > 0
+          ? bulkUpdateExpensesAction(
+              [...dirtyExpenseIds]
+                .map((expenseId) => expenseDrafts[expenseId])
+                .filter(Boolean),
+            )
+          : Promise.resolve({ savedExpenseIds: [], failedRows: [] }),
+      ]);
+      setDirtyBreakdownIds((current) => {
+        const next = new Set(current);
+        for (const payoutId of employeeResult.savedPayoutIds) next.delete(payoutId);
+        return next;
+      });
+      setDirtyExpenseIds((current) => {
+        const next = new Set(current);
+        for (const expenseId of expenseResult.savedExpenseIds) next.delete(expenseId);
+        return next;
+      });
+      if (
+        employeeResult.failedRows.length === 0 &&
+        expenseResult.failedRows.length === 0
+      ) {
+        setEditingBreakdowns(false);
+      }
+      router.refresh();
+    } finally {
+      setSavingBreakdowns(false);
+    }
+  }, [
+    breakdownDrafts,
+    bulkUpdateAction,
+    bulkUpdateExpensesAction,
+    dirtyBreakdownIds,
+    dirtyExpenseIds,
+    expenseDrafts,
+    router,
+  ]);
+
+  useEffect(() => {
+    if (!bulkUpdateAction && !bulkUpdateExpensesAction) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLocaleLowerCase() === "e") {
+        event.preventDefault();
+        setEditingBreakdowns(true);
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLocaleLowerCase() === "s") {
+        event.preventDefault();
+        void saveBreakdowns();
+      }
+      if (event.key === "Escape" && editingBreakdowns && !savingBreakdowns) {
+        setBreakdownDrafts(buildInitialPeriodDrafts(data, companyBreakdowns));
+        setExpenseDrafts(buildInitialExpenseDrafts(companyBreakdowns));
+        setDirtyBreakdownIds(new Set());
+        setDirtyExpenseIds(new Set());
+        setEditingBreakdowns(false);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [
+    bulkUpdateAction,
+    bulkUpdateExpensesAction,
+    companyBreakdowns,
+    data,
+    editingBreakdowns,
+    saveBreakdowns,
+    savingBreakdowns,
+  ]);
 
   const toggleSetValue = (
     setValue: Dispatch<SetStateAction<Set<string>>>,
@@ -1018,6 +1467,15 @@ function PeriodTables({
       includeAdvances,
       includeReimbursements,
     });
+  };
+
+  const applyPeriodPreset = (keys: readonly string[]) => {
+    const params = new URLSearchParams(window.location.search);
+    params.set("view", "period");
+    params.set("periodType", periodType);
+    params.delete("periodColumns");
+    for (const key of keys) params.append("periodColumns", key);
+    window.location.assign(`/dashboard?${params.toString()}`);
   };
 
   const companyBreakdownsByPeriod = useMemo(() => {
@@ -1359,11 +1817,22 @@ function PeriodTables({
         })),
     );
     const employeeSources = employeeRows
-      .map(({ sectionName, row }) => ({
-        id: `${row.payoutId}:${column.key}`,
-        label: `${sectionName} - ${row.invoiceNumber || "Salary only"} - ${formatMonthYear(row.month, row.year)}`,
-        value: getEmployeeSourceValue(row, column.key),
-      }))
+      .map(({ sectionName, row }) => {
+        const label = `${sectionName} - ${row.invoiceNumber || "Salary only"} - ${formatMonthYear(row.month, row.year)}`;
+        const children = periodComputedContributionSources(
+          column.key,
+          row,
+          sectionName,
+          label,
+        );
+        return {
+          id: `${row.payoutId}:${column.key}`,
+          label,
+          value: getEmployeeSourceValue(row, column.key),
+          editable: periodEditableForColumn(column.key, row, sectionName),
+          children: children.length ? children : undefined,
+        };
+      })
       .filter((source) => isContributingValue(source.value));
 
     if (column.key === "expenses") {
@@ -1382,11 +1851,15 @@ function PeriodTables({
           value: expenses.reduce((sum, expense) => sum + expense.amountInrCents, 0),
           children: expenses
             .slice()
-            .sort((left, right) => left.year * 100 + left.month - (right.year * 100 + right.month))
+            .sort(
+              (left, right) =>
+                left.year * 100 + left.month - (right.year * 100 + right.month),
+            )
             .map((expense) => ({
               id: expense.id,
               label: formatMonthYear(expense.month, expense.year),
               value: expense.amountInrCents,
+              editableExpense: { expense },
             })),
         }))
         .filter((source) => isContributingValue(source.value))
@@ -1411,10 +1884,11 @@ function PeriodTables({
           id: `${company.companyId}:advances:${employeeName}`,
           label: employeeName,
           value: rows.reduce((sum, item) => sum + item.value, 0),
-          children: rows.map(({ row, value }) => ({
+          children: rows.map(({ sectionName, row, value }) => ({
             id: `${row.payoutId}:advance`,
             label: `${row.invoiceNumber || "Salary only"} - ${formatMonthYear(row.month, row.year)}`,
             value,
+            editable: periodEditableForColumn("advances", row, sectionName),
           })),
         }))
         .sort((left, right) => Number(right.value) - Number(left.value));
@@ -1504,6 +1978,127 @@ function PeriodTables({
     return column.render(company.periodRow);
   };
 
+  const updateBreakdownDraft = (
+    editable: PeriodEditableSource,
+    rawValue: string,
+  ) => {
+    const draft =
+      breakdownDrafts[editable.row.payoutId] ??
+      dashboardBulkInput(editable.employeeName, editable.row);
+    const nextValue =
+      editable.inputKind === "cents"
+        ? editable.nullable && rawValue.trim() === ""
+          ? null
+          : centsFromText(rawValue)
+        : editable.inputKind === "rate"
+          ? numberFromText(rawValue)
+          : rawValue;
+    setBreakdownDrafts((current) => ({
+      ...current,
+      [editable.row.payoutId]: {
+        ...draft,
+        [editable.field]: nextValue,
+      },
+    }));
+    setDirtyBreakdownIds((current) => new Set(current).add(editable.row.payoutId));
+  };
+
+  const updateExpenseDraft = (
+    editable: PeriodEditableExpenseSource,
+    rawValue: string,
+  ) => {
+    const { expense } = editable;
+    const draft =
+      expenseDrafts[expense.id] ?? {
+        expenseId: expense.id,
+        companyId: expense.companyId,
+        periodLabel: formatMonthYear(expense.month, expense.year),
+        label: expense.label,
+        year: expense.year,
+        month: expense.month,
+        amountInrCents: expense.amountInrCents,
+      };
+    setExpenseDrafts((current) => ({
+      ...current,
+      [expense.id]: {
+        ...draft,
+        amountInrCents: centsFromText(rawValue),
+      },
+    }));
+    setDirtyExpenseIds((current) => new Set(current).add(expense.id));
+  };
+
+  const renderBreakdownSourceValue = (
+    source: PeriodDetailSource,
+    column: PeriodColumn<PnPeriodRow>,
+    displayLabel: string,
+  ) => {
+    const editable = source.editable;
+    const editableExpense = source.editableExpense;
+    if (editingBreakdowns && bulkUpdateExpensesAction && editableExpense) {
+      const expense = editableExpense.expense;
+      const draft =
+        expenseDrafts[expense.id] ?? {
+          expenseId: expense.id,
+          companyId: expense.companyId,
+          periodLabel: formatMonthYear(expense.month, expense.year),
+          label: expense.label,
+          year: expense.year,
+          month: expense.month,
+          amountInrCents: expense.amountInrCents,
+        };
+      return (
+        <NumericInput
+          aria-label={`Expense amount for ${source.label}`}
+          value={draft.amountInrCents / 100}
+          min={0}
+          precision={2}
+          className={`${inputClass} min-w-24 text-xs`}
+          onValueChange={(raw) => updateExpenseDraft(editableExpense, raw)}
+        />
+      );
+    }
+    if (!editingBreakdowns || !bulkUpdateAction || !editable) {
+      return (
+        <div className="font-medium">
+          {formatPeriodBreakdownValue(source.value, source.valueKind ?? column.valueKind)}
+        </div>
+      );
+    }
+    const draft =
+      breakdownDrafts[editable.row.payoutId] ??
+      dashboardBulkInput(editable.employeeName, editable.row);
+    const draftValue = draft[editable.field];
+    if (editable.inputKind === "text") {
+      return (
+        <input
+          aria-label={`${displayLabel} for ${source.editContext ?? source.label}`}
+          className={`${inputClass} min-w-36 text-xs`}
+          value={String(draftValue ?? "")}
+          onChange={(event) => updateBreakdownDraft(editable, event.target.value)}
+        />
+      );
+    }
+    const value =
+      editable.field === "advanceOverrideInrCents" && draftValue === null
+        ? calculatePnEmployeeAdvanceInrCents(editable.row) / 100
+        : typeof draftValue === "number" && editable.inputKind === "cents"
+          ? draftValue / 100
+          : typeof draftValue === "number"
+            ? draftValue
+            : 0;
+    return (
+      <NumericInput
+        aria-label={`${displayLabel} for ${source.editContext ?? source.label}`}
+        value={value}
+        min={0}
+        precision={editable.inputKind === "rate" ? 4 : 2}
+        className={`${inputClass} min-w-24 text-xs`}
+        onValueChange={(raw) => updateBreakdownDraft(editable, raw)}
+      />
+    );
+  };
+
   const renderColumnBreakdownCell = (
     company: DashboardCompanyBreakdown & { periodRow: PnPeriodRow },
     periodRow: PnPeriodRow,
@@ -1546,64 +2141,71 @@ function PeriodTables({
               color: "var(--text-primary)",
             }}
           >
-            {sources.map((source) => (
-              <div key={source.id} className="space-y-1">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex min-w-0 items-start gap-1.5">
-                    {source.children?.length ? (
-                      <button
-                        type="button"
-                        className="btn-outline"
-                        aria-label={`${expandedColumns.has(`${columnKey}:source:${source.id}`) ? "Collapse" : "Expand"} ${source.label}`}
-                        aria-expanded={expandedColumns.has(`${columnKey}:source:${source.id}`)}
-                        onClick={() =>
-                          toggleSetValue(
-                            setExpandedColumns,
-                            `${columnKey}:source:${source.id}`,
-                          )
-                        }
-                        style={{
-                          minWidth: "1.3rem",
-                          padding: "0.05rem 0.25rem",
-                          fontSize: "0.7rem",
-                        }}
-                      >
-                        {expandedColumns.has(`${columnKey}:source:${source.id}`)
-                          ? "-"
-                          : "+"}
-                      </button>
-                    ) : null}
-                    <div className="min-w-0" style={{ color: "var(--text-muted)" }}>
-                      {source.label}
-                    </div>
-                  </div>
-                  <div className="font-medium">
-                    {formatPeriodBreakdownValue(source.value, column.valueKind)}
-                  </div>
-                </div>
-                {source.children?.length &&
-                expandedColumns.has(`${columnKey}:source:${source.id}`) ? (
-                  <div
-                    className="ml-6 space-y-1 border-l pl-2"
-                    style={{ borderColor: "var(--glass-border)" }}
-                  >
-                    {source.children.map((child) => (
-                      <div
-                        key={child.id}
-                        className="flex items-start justify-between gap-2"
-                      >
-                        <span style={{ color: "var(--text-muted)" }}>
-                          {child.label}
-                        </span>
-                        <span className="font-medium">
-                          {formatPeriodBreakdownValue(child.value, column.valueKind)}
-                        </span>
+            {sources.map((source) => {
+              const visibleChildren = (source.children ?? []).filter((child) =>
+                editingBreakdowns
+                  ? Boolean(child.editable || child.editableExpense)
+                  : isContributingValue(child.value),
+              );
+              return (
+                <div key={source.id} className="space-y-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex min-w-0 items-start gap-1.5">
+                      {visibleChildren.length ? (
+                        <button
+                          type="button"
+                          className="btn-outline"
+                          aria-label={`${expandedColumns.has(`${columnKey}:source:${source.id}`) ? "Collapse" : "Expand"} ${source.label}`}
+                          aria-expanded={expandedColumns.has(`${columnKey}:source:${source.id}`)}
+                          onClick={() =>
+                            toggleSetValue(
+                              setExpandedColumns,
+                              `${columnKey}:source:${source.id}`,
+                            )
+                          }
+                          style={{
+                            minWidth: "1.3rem",
+                            padding: "0.05rem 0.25rem",
+                            fontSize: "0.7rem",
+                          }}
+                        >
+                          {expandedColumns.has(`${columnKey}:source:${source.id}`)
+                            ? "-"
+                            : "+"}
+                        </button>
+                      ) : null}
+                      <div className="min-w-0" style={{ color: "var(--text-muted)" }}>
+                        {source.label}
                       </div>
-                    ))}
+                    </div>
+                    {renderBreakdownSourceValue(source, column, displayLabel)}
                   </div>
-                ) : null}
-              </div>
-            ))}
+                  {visibleChildren.length &&
+                  expandedColumns.has(`${columnKey}:source:${source.id}`) ? (
+                    <div
+                      className="ml-6 space-y-1 border-l pl-2"
+                      style={{ borderColor: "var(--glass-border)" }}
+                    >
+                      {visibleChildren.map((child) => (
+                        <div
+                          key={child.id}
+                          className="flex items-start justify-between gap-2"
+                        >
+                          <span style={{ color: "var(--text-muted)" }}>
+                            {child.label}
+                          </span>
+                          {renderBreakdownSourceValue(
+                            child,
+                            column,
+                            child.editLabel ?? displayLabel,
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
           </div>
         ) : null}
       </div>
@@ -1730,6 +2332,61 @@ function PeriodTables({
             Reimbursements: {includeReimbursements ? "in P/L" : "excluded"}
           </span>
         </div>
+        <div className="flex flex-wrap items-center gap-1.5" aria-label="Period column presets">
+          <span className="mr-1 text-xs font-medium" style={{ color: "var(--text-muted)" }}>
+            Columns
+          </span>
+          {Object.entries(PERIOD_COLUMN_PRESETS).map(([label, keys]) => (
+            <button
+              key={label}
+              type="button"
+              className="preset-button"
+              onClick={() => applyPeriodPreset(keys)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {bulkUpdateAction || bulkUpdateExpensesAction ? (
+          <div className="flex items-center gap-2">
+            {editingBreakdowns ? (
+              <>
+                <button
+                  type="button"
+                  className="btn-outline"
+                  disabled={savingBreakdowns}
+                  onClick={() => {
+                    setBreakdownDrafts(buildInitialPeriodDrafts(data, companyBreakdowns));
+                    setExpenseDrafts(buildInitialExpenseDrafts(companyBreakdowns));
+                    setDirtyBreakdownIds(new Set());
+                    setDirtyExpenseIds(new Set());
+                    setEditingBreakdowns(false);
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="gradient-btn"
+                  disabled={savingBreakdowns || dirtyBreakdownCount === 0}
+                  onClick={() => void saveBreakdowns()}
+                >
+                  {savingBreakdowns
+                    ? "Saving..."
+                    : `Save${dirtyBreakdownCount ? ` (${dirtyBreakdownCount})` : ""}`}
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="gradient-btn"
+                onClick={() => setEditingBreakdowns(true)}
+              >
+                Edit
+              </button>
+            )}
+          </div>
+        ) : null}
       </div>
       <div
         className={uiMode === "saas" ? "unified-dashboard-scroll" : "overflow-x-auto rounded-2xl"}
