@@ -74,8 +74,17 @@ export function expandOverviewMonthRange(startMonth: string, endMonth: string) {
 
 export function resolveOverviewMonthRange(input: MonthRangeInput) {
   const fallbackMonth = latestMonth(input.availableMonths, input.currentMonth);
-  let startMonth = isValidMonthKey(input.startMonth) ? input.startMonth : fallbackMonth;
-  let endMonth = isValidMonthKey(input.endMonth) ? input.endMonth : startMonth;
+  const validAvailableMonths = input.availableMonths.filter(isValidMonthKey);
+  const defaultStartMonth =
+    validAvailableMonths.length > 0
+      ? [...validAvailableMonths].sort((left, right) => left.localeCompare(right))[0]
+      : fallbackMonth;
+  const defaultEndMonth =
+    validAvailableMonths.length > 0
+      ? [...validAvailableMonths].sort((left, right) => right.localeCompare(left))[0]
+      : fallbackMonth;
+  let startMonth = isValidMonthKey(input.startMonth) ? input.startMonth : defaultStartMonth;
+  let endMonth = isValidMonthKey(input.endMonth) ? input.endMonth : defaultEndMonth;
 
   if (monthIndex(startMonth) > monthIndex(endMonth)) {
     [startMonth, endMonth] = [endMonth, startMonth];

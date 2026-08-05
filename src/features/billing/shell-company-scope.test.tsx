@@ -61,7 +61,7 @@ describe("buildCompanyScopeHref", () => {
     ).toBe("/employees");
   });
 
-  it("commits company checkbox changes to the generated URL", () => {
+  it("checks company dropdown values locally before applying the generated URL", () => {
     const assign = vi.fn();
     vi.stubGlobal("location", {
       ...window.location,
@@ -84,6 +84,9 @@ describe("buildCompanyScopeHref", () => {
     expect(screen.queryByLabelText("Company Two")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Company One" }));
     fireEvent.click(screen.getAllByLabelText("Company Two")[0]);
+    expect(assign).not.toHaveBeenCalled();
+    expect(screen.getAllByLabelText("Company Two")[0]).toBeChecked();
+    fireEvent.click(screen.getByRole("button", { name: "Apply companies" }));
 
     expect(assign).toHaveBeenCalledWith(
       "/employees?tab=edit&employeeId=employee_1&companyIds=company_1&companyIds=company_2",

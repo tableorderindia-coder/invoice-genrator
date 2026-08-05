@@ -301,11 +301,17 @@ export function Shell({
     : activeCompanyId
       ? [activeCompanyId]
       : companyOptions.map((company) => company.id);
+  const [pendingCompanyIds, setPendingCompanyIds] = useState<string[]>(selectedCompanyIds);
   const selectedCompanyIdSet = new Set(selectedCompanyIds);
+  const pendingCompanyIdSet = new Set(pendingCompanyIds);
   const allCompaniesSelected =
     companyOptions.length > 0 &&
     selectedCompanyIds.length >= companyOptions.length &&
     companyOptions.every((company) => selectedCompanyIdSet.has(company.id));
+  const pendingAllCompaniesSelected =
+    companyOptions.length > 0 &&
+    pendingCompanyIds.length >= companyOptions.length &&
+    companyOptions.every((company) => pendingCompanyIdSet.has(company.id));
 
   const navigateWithCompanyScope = (companyIds: string[]) => {
     if (!canLeaveCurrentView()) return;
@@ -333,7 +339,7 @@ export function Shell({
   };
 
   const handleCompanyScopeToggle = (companyId: string) => {
-    const current = new Set(selectedCompanyIds);
+    const current = new Set(pendingCompanyIds);
     if (current.has(companyId)) {
       current.delete(companyId);
     } else {
@@ -342,7 +348,21 @@ export function Shell({
     const next = companyOptions
       .map((company) => company.id)
       .filter((id) => current.has(id));
-    navigateWithCompanyScope(next.length > 0 ? next : companyOptions.map((company) => company.id));
+    setPendingCompanyIds(next);
+  };
+
+  const handleAllCompanyScopeToggle = () => {
+    setPendingCompanyIds(
+      pendingAllCompaniesSelected ? [] : companyOptions.map((company) => company.id),
+    );
+  };
+
+  const applyCompanyScope = () => {
+    navigateWithCompanyScope(
+      pendingCompanyIds.length > 0
+        ? pendingCompanyIds
+        : companyOptions.map((company) => company.id),
+    );
   };
 
   const selectedCompanyLabel = allCompaniesSelected
@@ -425,8 +445,8 @@ export function Shell({
               <label className="flex items-center gap-2 rounded-lg px-2 py-1.5">
                 <input
                   type="checkbox"
-                  checked={allCompaniesSelected}
-                  onChange={() => navigateWithCompanyScope(companyOptions.map((company) => company.id))}
+                  checked={pendingAllCompaniesSelected}
+                  onChange={handleAllCompanyScopeToggle}
                 />
                 <span>All companies</span>
               </label>
@@ -434,12 +454,19 @@ export function Shell({
                 <label key={company.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5">
                   <input
                     type="checkbox"
-                    checked={selectedCompanyIdSet.has(company.id)}
+                    checked={pendingCompanyIdSet.has(company.id)}
                     onChange={() => handleCompanyScopeToggle(company.id)}
                   />
                   <span className="min-w-0 truncate">{company.name}</span>
                 </label>
               ))}
+              <button
+                type="button"
+                className="btn-primary justify-center px-3 py-2 text-xs"
+                onClick={applyCompanyScope}
+              >
+                Apply companies
+              </button>
             </div>
           ) : null}
         </div>
