@@ -11,7 +11,12 @@ import {
   EMPLOYEE_DASHBOARD_COLUMN_OPTIONS,
   PERIOD_DASHBOARD_COLUMN_OPTIONS,
 } from "./dashboard-column-options";
-import type { PnDashboardData, PnEmployeeEditableRow, PnPeriodRow } from "./types";
+import type {
+  CompanyExpense,
+  PnDashboardData,
+  PnEmployeeEditableRow,
+  PnPeriodRow,
+} from "./types";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: vi.fn() }),
@@ -130,6 +135,29 @@ const baseData: PnDashboardData = {
   ],
   periodRows,
 };
+
+const expenseRows: CompanyExpense[] = [
+  {
+    id: "expense_1",
+    companyId: "comp_1",
+    year: 2026,
+    month: 4,
+    label: "Beesetti Kiran Suresh's salary",
+    amountInrCents: 63_334_00,
+    createdAt: "2026-04-01T00:00:00.000Z",
+    updatedAt: "2026-04-01T00:00:00.000Z",
+  },
+  {
+    id: "expense_2",
+    companyId: "comp_1",
+    year: 2026,
+    month: 4,
+    label: "Beesetti Kiran Suresh's salary",
+    amountInrCents: 93_897_00,
+    createdAt: "2026-04-02T00:00:00.000Z",
+    updatedAt: "2026-04-02T00:00:00.000Z",
+  },
+];
 
 describe("dashboard tables rendering", () => {
   beforeEach(() => {
@@ -512,6 +540,7 @@ describe("dashboard tables rendering", () => {
       .map((header) => header.textContent?.replace(/\s+/g, " ").trim() ?? "");
 
     expect(headerTexts).toEqual([
+      "",
       "Period",
       "Dollar inward",
       "Onboarding advance",
@@ -628,7 +657,7 @@ describe("dashboard tables rendering", () => {
     ]);
   });
 
-  it("renders the stakeholder defaults in exact order without a show-details control", () => {
+  it("renders the stakeholder defaults in exact order with a period expand control", () => {
     render(
       createElement(DashboardTables, {
         view: "period",
@@ -646,6 +675,7 @@ describe("dashboard tables rendering", () => {
         header.textContent?.replace(/\s+/g, " ").trim(),
       ),
     ).toEqual([
+      "",
       "Period",
       "Total effective dollar inward (USD)",
       "Cashout rate",
@@ -660,7 +690,7 @@ describe("dashboard tables rendering", () => {
       "In P/LAdvances (INR)",
       "Net P/L (INR)",
     ]);
-    expect(screen.queryByRole("button", { name: /show details/i })).toBeNull();
+    expect(screen.getByRole("button", { name: "Expand period April 2026" })).toBeTruthy();
   });
 
   it("keeps export links aligned with the live accounting checkboxes", () => {
@@ -715,6 +745,180 @@ describe("dashboard tables rendering", () => {
       .getAllByRole("columnheader")
       .map((header) => header.textContent?.replace(/\s+/g, " ").trim() ?? "");
 
-    expect(headerTexts).toEqual(["Period", "Total Cash Inward (INR)", "Net P/L (INR)"]);
+    expect(headerTexts).toEqual(["", "Period", "Total Cash Inward (INR)", "Net P/L (INR)"]);
+  });
+
+  it("expands monthly period rows into company and visible column source breakdowns", () => {
+    render(
+      createElement(DashboardTables, {
+        view: "period",
+        periodType: "monthly",
+        data: baseData,
+        companyBreakdowns: [
+          {
+            companyId: "comp_1",
+            companyName: "Acme India",
+            data: baseData,
+          },
+        ],
+        returnTo: "/dashboard",
+        employeeColumnKeys: allEmployeeColumnKeys,
+        periodColumnKeys: ["cashIn", "netPl"],
+        updateDashboardEmployeeCashFlowEntryAction: vi.fn(async () => {}),
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand period April 2026" }));
+    expect(screen.getByText("Acme India")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand company Acme India" }));
+    expect(screen.getByText("Column breakdown")).toBeTruthy();
+
+    const cashInBreakdownButton = screen.getByRole("button", {
+      name: "Expand Total Cash Inward (INR) breakdown for Acme India",
+    });
+    const cashInBreakdownCell = cashInBreakdownButton.closest("td");
+    fireEvent.click(cashInBreakdownButton);
+
+    expect(cashInBreakdownCell).not.toBeNull();
+    expect(
+      within(cashInBreakdownCell as HTMLElement).getByText("Alice - INV-1 - April 2026"),
+    ).toBeTruthy();
+    expect(within(cashInBreakdownCell as HTMLElement).getByText("₹18,200.00")).toBeTruthy();
+  });
+
+  it("opens expenses as grouped rows before showing individual expense entries", () => {
+    render(
+      createElement(DashboardTables, {
+        view: "period",
+        periodType: "monthly",
+        data: {
+          ...baseData,
+          periodRows: [
+            {
+              ...periodRows[0],
+              expensesInrCents: 157_231_00,
+            },
+          ],
+        },
+        companyBreakdowns: [
+          {
+            companyId: "comp_1",
+            companyName: "Acme India",
+            data: {
+              ...baseData,
+              periodRows: [
+                {
+                  ...periodRows[0],
+                  expensesInrCents: 157_231_00,
+                },
+              ],
+            },
+            expenses: expenseRows,
+          },
+        ],
+        returnTo: "/dashboard",
+        employeeColumnKeys: allEmployeeColumnKeys,
+        periodColumnKeys: ["expenses"],
+        updateDashboardEmployeeCashFlowEntryAction: vi.fn(async () => {}),
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand period April 2026" }));
+    fireEvent.click(screen.getByRole("button", { name: "Expand company Acme India" }));
+
+    const expensesBreakdownButton = screen.getByRole("button", {
+      name: "Expand Expenses (INR) breakdown for Acme India",
+    });
+    const expensesBreakdownCell = expensesBreakdownButton.closest("td");
+    fireEvent.click(expensesBreakdownButton);
+
+    expect(expensesBreakdownCell).not.toBeNull();
+    expect(
+      within(expensesBreakdownCell as HTMLElement).getByText(
+        "Beesetti Kiran Suresh's salary",
+      ),
+    ).toBeTruthy();
+    expect(
+      within(expensesBreakdownCell as HTMLElement).queryByText("₹63,334.00"),
+    ).toBeNull();
+
+    fireEvent.click(
+      within(expensesBreakdownCell as HTMLElement).getByRole("button", {
+        name: "Expand Beesetti Kiran Suresh's salary",
+      }),
+    );
+
+    expect(
+      within(expensesBreakdownCell as HTMLElement).getByText("₹63,334.00"),
+    ).toBeTruthy();
+    expect(
+      within(expensesBreakdownCell as HTMLElement).getByText("₹93,897.00"),
+    ).toBeTruthy();
+  });
+
+  it("opens advances as grouped rows before showing individual advance entries", () => {
+    render(
+      createElement(DashboardTables, {
+        view: "period",
+        periodType: "monthly",
+        data: {
+          ...baseData,
+          periodRows: [
+            {
+              ...periodRows[0],
+              advancesInrCents: 400_00,
+            },
+          ],
+        },
+        companyBreakdowns: [
+          {
+            companyId: "comp_1",
+            companyName: "Acme India",
+            data: {
+              ...baseData,
+              periodRows: [
+                {
+                  ...periodRows[0],
+                  advancesInrCents: 400_00,
+                },
+              ],
+            },
+          },
+        ],
+        returnTo: "/dashboard",
+        employeeColumnKeys: allEmployeeColumnKeys,
+        periodColumnKeys: ["advances"],
+        updateDashboardEmployeeCashFlowEntryAction: vi.fn(async () => {}),
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand period April 2026" }));
+    fireEvent.click(screen.getByRole("button", { name: "Expand company Acme India" }));
+
+    const advancesBreakdownButton = screen.getByRole("button", {
+      name: "Expand Advances (INR) breakdown for Acme India",
+    });
+    const advancesBreakdownCell = advancesBreakdownButton.closest("td");
+    fireEvent.click(advancesBreakdownButton);
+
+    expect(advancesBreakdownCell).not.toBeNull();
+    expect(within(advancesBreakdownCell as HTMLElement).getByText("Alice")).toBeTruthy();
+    expect(
+      within(advancesBreakdownCell as HTMLElement).queryByText("INV-1 - April 2026"),
+    ).toBeNull();
+
+    fireEvent.click(
+      within(advancesBreakdownCell as HTMLElement).getByRole("button", {
+        name: "Expand Alice",
+      }),
+    );
+
+    expect(
+      within(advancesBreakdownCell as HTMLElement).getByText("INV-1 - April 2026"),
+    ).toBeTruthy();
+    expect(
+      within(advancesBreakdownCell as HTMLElement).getAllByText("₹400.00").length,
+    ).toBeGreaterThan(0);
   });
 });

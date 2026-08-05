@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useSyncExternalStore } from "react";
+import {
+  Fragment,
+  useCallback,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import { PendingActionButton } from "../_components/pending-action-button";
 import { inputClass } from "../_components/field";
 import { NumericInput } from "../_components/numeric-input";
@@ -14,6 +22,7 @@ import {
   calculatePnPeriodNetPlInrCents,
 } from "../../src/features/billing/pn-dashboard";
 import type {
+  CompanyExpense,
   PnDashboardData,
   PnEmployeeEditableRow,
   PnPeriodRow,
@@ -43,10 +52,18 @@ type DashboardExportHrefs = {
   companyPdf: string;
 };
 
+type DashboardCompanyBreakdown = {
+  companyId: string;
+  companyName: string;
+  data: PnDashboardData;
+  expenses?: CompanyExpense[];
+};
+
 type DashboardTablesProps = {
   view: "employee" | "period";
   periodType: PnPeriodType;
   data: PnDashboardData;
+  companyBreakdowns?: DashboardCompanyBreakdown[];
   returnTo: string;
   employeeColumnKeys: string[];
   periodColumnKeys: string[];
@@ -58,11 +75,15 @@ type DashboardTablesProps = {
   ) => Promise<DashboardBulkUpdateResult>;
 };
 
+const PERIOD_BREAKDOWN_COLUMN_KEY = "breakdown";
 const EMPLOYEE_ALWAYS_VISIBLE_COLUMN_KEYS = new Set(["month", "actions"]);
-const PERIOD_ALWAYS_VISIBLE_COLUMN_KEYS = new Set(["period"]);
+const PERIOD_ALWAYS_VISIBLE_COLUMN_KEYS = new Set([
+  PERIOD_BREAKDOWN_COLUMN_KEY,
+  "period",
+]);
 
-function filterColumns<Row>(
-  columns: Column<Row>[],
+function filterColumns<TColumn extends { key: string }>(
+  columns: TColumn[],
   selectedColumnKeys: string[],
   alwaysVisibleColumnKeys: Set<string>,
 ) {
@@ -77,6 +98,7 @@ export function DashboardTables({
   view,
   periodType,
   data,
+  companyBreakdowns = [],
   returnTo,
   employeeColumnKeys,
   periodColumnKeys,
@@ -119,6 +141,7 @@ export function DashboardTables({
     ) : (
       <PeriodTables
         data={data}
+        companyBreakdowns={companyBreakdowns}
         periodType={periodType}
         selectedColumnKeys={periodColumnKeys}
         toggleColumns={toggleColumns}
@@ -191,6 +214,94 @@ type Column<Row> = {
   label: string;
   render: (row: Row) => React.ReactNode;
 };
+
+type PeriodValueKind = "usd" | "inr" | "signedInr" | "rate" | "text";
+
+type PeriodColumn<Row> = Column<Row> & {
+  valueKind?: PeriodValueKind;
+  getValue?: (row: Row) => number | string | null | undefined;
+};
+
+type PeriodDetailSource = {
+  id: string;
+  label: string;
+  value: number | string | null | undefined;
+  children?: PeriodDetailSource[];
+};
+
+function periodRowKey(row: Pick<PnPeriodRow, "year" | "month" | "fiscalLabel">) {
+  return row.fiscalLabel ?? `${row.year}-${String(row.month ?? 0).padStart(2, "0")}`;
+}
+
+function rowMatchesPeriod(
+  source: Pick<PnEmployeeEditableRow, "year" | "month">,
+  period: PnPeriodRow,
+  periodType: PnPeriodType,
+) {
+  if (periodType === "monthly") {
+    return source.year === period.year && source.month === period.month;
+  }
+  const fiscalStartYear = source.month >= 4 ? source.year : source.year - 1;
+  return fiscalStartYear === period.year;
+}
+
+function expenseMatchesPeriod(
+  expense: Pick<CompanyExpense, "year" | "month">,
+  period: PnPeriodRow,
+  periodType: PnPeriodType,
+) {
+  if (periodType === "monthly") {
+    return expense.year === period.year && expense.month === period.month;
+  }
+  const fiscalStartYear = expense.month >= 4 ? expense.year : expense.year - 1;
+  return fiscalStartYear === period.year;
+}
+
+function periodLabel(row: PnPeriodRow, periodType: PnPeriodType) {
+  return periodType === "monthly"
+    ? formatMonthYear(row.month ?? 1, row.year)
+    : row.fiscalLabel ?? String(row.year);
+}
+
+function formatPeriodBreakdownValue(
+  value: number | string | null | undefined,
+  valueKind: PeriodValueKind | undefined,
+) {
+  if (value === null || value === undefined || value === "") return "-";
+  if (typeof value === "string") return value;
+  switch (valueKind) {
+    case "usd":
+      return formatUsd(value);
+    case "inr":
+      return formatInr(value);
+    case "signedInr":
+      return formatSignedInr(value);
+    case "rate":
+      return formatRate(value);
+    default:
+      return String(value);
+  }
+}
+
+function isContributingValue(value: number | string | null | undefined) {
+  if (typeof value === "number") return value > 0;
+  return Boolean(value);
+}
+
+function periodColumnDisplayLabel(column: Pick<PeriodColumn<PnPeriodRow>, "key" | "label">) {
+  switch (column.key) {
+    case "expenses":
+      return "Expenses (INR)";
+    case "advances":
+      return "Advances (INR)";
+    case "companyReimbursementUsd":
+      return "Reimb. (USD)";
+    case "companyReimbursementInr":
+      return "Reimb. (INR)";
+    default:
+      return column.label;
+  }
+}
 
 function netProfitColor(cents: number) {
   if (cents < 0) return "#fca5a5";
@@ -855,6 +966,7 @@ function EmployeeTables({
 
 type PeriodTablesProps = {
   data: PnDashboardData;
+  companyBreakdowns: DashboardCompanyBreakdown[];
   periodType: PnPeriodType;
   selectedColumnKeys: string[];
   toggleColumns: ToggleColumn[];
@@ -869,6 +981,7 @@ type PeriodTablesProps = {
 
 function PeriodTables({
   data,
+  companyBreakdowns,
   periodType,
   selectedColumnKeys,
   toggleColumns,
@@ -880,6 +993,25 @@ function PeriodTables({
   setIncludeReimbursements,
   uiMode,
 }: PeriodTablesProps) {
+  const [expandedPeriods, setExpandedPeriods] = useState<Set<string>>(() => new Set());
+  const [expandedCompanies, setExpandedCompanies] = useState<Set<string>>(() => new Set());
+  const [expandedColumns, setExpandedColumns] = useState<Set<string>>(() => new Set());
+
+  const toggleSetValue = (
+    setValue: Dispatch<SetStateAction<Set<string>>>,
+    key: string,
+  ) => {
+    setValue((current) => {
+      const next = new Set(current);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
   const computeNetPl = (row: PnPeriodRow) => {
     return calculatePnPeriodNetPlInrCents(row, {
       includeExpenses,
@@ -887,6 +1019,22 @@ function PeriodTables({
       includeReimbursements,
     });
   };
+
+  const companyBreakdownsByPeriod = useMemo(() => {
+    const grouped = new Map<
+      string,
+      Array<DashboardCompanyBreakdown & { periodRow: PnPeriodRow }>
+    >();
+    for (const company of companyBreakdowns) {
+      for (const periodRow of company.data.periodRows) {
+        const key = periodRowKey(periodRow);
+        const existing = grouped.get(key) ?? [];
+        existing.push({ ...company, periodRow });
+        grouped.set(key, existing);
+      }
+    }
+    return grouped;
+  }, [companyBreakdowns]);
 
   const renderToggleCell = (key: ToggleColumn["key"], row: PnPeriodRow) => {
     const details = row;
@@ -914,77 +1062,127 @@ function PeriodTables({
     }
   };
 
-  const periodPrefixColumns: Column<PnPeriodRow>[] = [
+  const periodPrefixColumns: PeriodColumn<PnPeriodRow>[] = [
+    {
+      key: PERIOD_BREAKDOWN_COLUMN_KEY,
+      label: "",
+      render: (row) => {
+        const key = periodRowKey(row);
+        const isExpanded = expandedPeriods.has(key);
+        const companyCount = companyBreakdownsByPeriod.get(key)?.length ?? 0;
+        return (
+          <button
+            type="button"
+            className="btn-outline"
+            aria-label={`${isExpanded ? "Collapse" : "Expand"} period ${periodLabel(row, periodType)}`}
+            aria-expanded={isExpanded}
+            disabled={companyCount === 0}
+            onClick={() => toggleSetValue(setExpandedPeriods, key)}
+            style={{
+              minWidth: "2rem",
+              padding: "0.2rem 0.45rem",
+              opacity: companyCount === 0 ? 0.45 : 1,
+            }}
+          >
+            {isExpanded ? "-" : "+"}
+          </button>
+        );
+      },
+    },
     {
       key: "period",
       label: "Period",
       render: (row) =>
         periodType === "monthly"
           ? formatMonthYear(row.month ?? 1, row.year)
-          : String(row.year),
+          : row.fiscalLabel ?? String(row.year),
+      valueKind: "text",
+      getValue: (row) => periodLabel(row, periodType),
     },
   ];
 
-  const periodSuffixColumns: Column<PnPeriodRow>[] = [
+  const periodSuffixColumns: PeriodColumn<PnPeriodRow>[] = [
     {
       key: "cashoutRate",
       label: "Cashout rate",
       render: (row) => formatRate(row.cashoutUsdInrRate),
+      valueKind: "rate",
+      getValue: (row) => row.cashoutUsdInrRate,
     },
     {
       key: "cashIn",
       label: "Total Cash Inward (INR)",
       render: (row) => formatInr(row.cashInInrCents),
+      valueKind: "inr",
+      getValue: (row) => row.cashInInrCents,
     },
     {
       key: "paidRate",
       label: "Peg rate",
       render: (row) => formatRate(row.paidUsdInrRate),
+      valueKind: "rate",
+      getValue: (row) => row.paidUsdInrRate,
     },
     {
       key: "monthlyPaid",
       label: "Monthly paid (INR)",
       render: (row) => formatInr(row.monthlyPaidInrCents),
+      valueKind: "inr",
+      getValue: (row) => row.monthlyPaidInrCents,
     },
     {
       key: "actualPaid",
       label: "Actual paid (INR)",
       render: (row) => formatInr(row.actualPaidInrCents),
+      valueKind: "inr",
+      getValue: (row) => row.actualPaidInrCents,
     },
     {
       key: "salaryPaid",
       label: "Salary paid (INR)",
       render: (row) => formatInr(row.salaryPaidInrCents),
+      valueKind: "inr",
+      getValue: (row) => row.salaryPaidInrCents,
     },
     {
       key: "pf",
       label: "PF (INR)",
       render: (row) => formatInr(row.pfInrCents),
+      valueKind: "inr",
+      getValue: (row) => row.pfInrCents,
     },
     {
       key: "tds",
       label: "TDS (INR)",
       render: (row) => formatInr(row.tdsInrCents),
+      valueKind: "inr",
+      getValue: (row) => row.tdsInrCents,
     },
     {
       key: "fxCommission",
       label: "Forex gain (INR)",
       render: (row) => formatInr(row.fxCommissionInrCents),
+      valueKind: "inr",
+      getValue: (row) => row.fxCommissionInrCents,
     },
     {
       key: "commissionEarned",
       label: "Operating margin (INR)",
       render: (row) => formatInr(row.commissionEarnedInrCents),
+      valueKind: "inr",
+      getValue: (row) => row.commissionEarnedInrCents,
     },
     {
       key: "grossEarnings",
       label: "Gross P&L (INR)",
       render: (row) => formatInr(row.grossEarningsInrCents),
+      valueKind: "inr",
+      getValue: (row) => row.grossEarningsInrCents,
     },
   ];
 
   // Expense, reimbursement, and net P/L columns keep their header controls when selected.
-  const financialColumns: Column<PnPeriodRow>[] = [
+  const financialColumns: PeriodColumn<PnPeriodRow>[] = [
     {
       key: "expenses",
       label: "__custom_expenses__",
@@ -993,6 +1191,8 @@ function PeriodTables({
           {formatInr(row.expensesInrCents)}
         </span>
       ),
+      valueKind: "inr",
+      getValue: (row) => row.expensesInrCents,
     },
     {
       key: "advances",
@@ -1002,11 +1202,15 @@ function PeriodTables({
           {formatInr(row.advancesInrCents)}
         </span>
       ),
+      valueKind: "inr",
+      getValue: (row) => row.advancesInrCents,
     },
     {
       key: "companyReimbursementUsd",
       label: "__custom_reimbursement_usd__",
       render: (row) => formatUsd(row.companyReimbursementUsdCents),
+      valueKind: "usd",
+      getValue: (row) => row.companyReimbursementUsdCents,
     },
     {
       key: "companyReimbursementInr",
@@ -1016,6 +1220,8 @@ function PeriodTables({
           {formatInr(row.companyReimbursementInrCents)}
         </span>
       ),
+      valueKind: "inr",
+      getValue: (row) => row.companyReimbursementInrCents,
     },
     {
       key: "netPl",
@@ -1028,15 +1234,47 @@ function PeriodTables({
           </span>
         );
       },
+      valueKind: "signedInr",
+      getValue: (row) => computeNetPl(row),
     },
   ];
 
-  const allColumns: Column<PnPeriodRow>[] = [
+  const allColumns: PeriodColumn<PnPeriodRow>[] = [
     ...periodPrefixColumns,
-    ...toggleColumns.map((col) => ({
+    ...toggleColumns.map((col): PeriodColumn<PnPeriodRow> => ({
       key: col.key,
       label: col.label,
       render: (row: PnPeriodRow) => renderToggleCell(col.key, row),
+      valueKind:
+        col.key === "reimbursementLabels"
+          ? "text"
+          : col.key === "reimbursementsInr" || col.key === "appraisalAdvanceInr"
+            ? "inr"
+            : "usd",
+      getValue: (row: PnPeriodRow) => {
+        switch (col.key) {
+          case "dollarInward":
+            return row.dollarInwardUsdCents;
+          case "onboardingAdvance":
+            return row.onboardingAdvanceUsdCents;
+          case "reimbursements":
+            return row.reimbursementUsdCents;
+          case "reimbursementLabels":
+            return row.reimbursementLabelsText;
+          case "reimbursementsInr":
+            return row.reimbursementInrCents;
+          case "appraisalAdvance":
+            return row.appraisalAdvanceUsdCents;
+          case "appraisalAdvanceInr":
+            return row.appraisalAdvanceInrCents;
+          case "offboardingDeduction":
+            return row.offboardingDeductionUsdCents;
+          case "effectiveDollarInward":
+            return row.effectiveDollarInwardUsdCents;
+          default:
+            return null;
+        }
+      },
     })),
     ...periodSuffixColumns,
     ...financialColumns,
@@ -1052,6 +1290,325 @@ function PeriodTables({
     includeAdvances,
     includeReimbursements,
   });
+
+  const getEmployeeSourceValue = (
+    row: PnEmployeeEditableRow,
+    columnKey: string,
+  ): number | string | null => {
+    switch (columnKey) {
+      case "dollarInward":
+        return row.dollarInwardUsdCents;
+      case "onboardingAdvance":
+        return row.onboardingAdvanceUsdCents;
+      case "reimbursements":
+        return row.reimbursementUsdCents;
+      case "reimbursementLabels":
+        return row.reimbursementLabelsText;
+      case "reimbursementsInr":
+        return row.reimbursementInrCents;
+      case "appraisalAdvance":
+        return row.appraisalAdvanceUsdCents;
+      case "appraisalAdvanceInr":
+        return row.appraisalAdvanceInrCents;
+      case "offboardingDeduction":
+        return row.offboardingDeductionUsdCents;
+      case "effectiveDollarInward":
+        return row.effectiveDollarInwardUsdCents;
+      case "cashoutRate":
+        return row.cashoutUsdInrRate;
+      case "cashIn":
+        return row.cashInInrCents;
+      case "paidRate":
+        return row.paidUsdInrRate;
+      case "monthlyPaid":
+        return row.monthlyPaidInrCents;
+      case "actualPaid":
+        return row.actualPaidInrCents;
+      case "salaryPaid":
+        return row.salaryPaidInrCents;
+      case "pf":
+        return row.pfInrCents;
+      case "tds":
+        return row.tdsInrCents;
+      case "fxCommission":
+        return row.fxCommissionInrCents;
+      case "commissionEarned":
+        return row.commissionEarnedInrCents;
+      case "grossEarnings":
+        return row.grossEarningsInrCents;
+      case "advances":
+        return calculatePnEmployeeAdvanceInrCents(row);
+      case "netPl":
+        return calculatePnEmployeeNetPlInrCents(row, { includeAdvances });
+      default:
+        return null;
+    }
+  };
+
+  const getColumnSources = (
+    company: DashboardCompanyBreakdown,
+    periodRow: PnPeriodRow,
+    column: PeriodColumn<PnPeriodRow>,
+  ): PeriodDetailSource[] => {
+    const employeeRows = company.data.employeeEditableSections.flatMap((section) =>
+      section.rows
+        .filter((row) => rowMatchesPeriod(row, periodRow, periodType))
+        .map((row) => ({
+          sectionName: section.employeeName,
+          row,
+        })),
+    );
+    const employeeSources = employeeRows
+      .map(({ sectionName, row }) => ({
+        id: `${row.payoutId}:${column.key}`,
+        label: `${sectionName} - ${row.invoiceNumber || "Salary only"} - ${formatMonthYear(row.month, row.year)}`,
+        value: getEmployeeSourceValue(row, column.key),
+      }))
+      .filter((source) => isContributingValue(source.value));
+
+    if (column.key === "expenses") {
+      const matchingExpenses = (company.expenses ?? []).filter((expense) =>
+        expenseMatchesPeriod(expense, periodRow, periodType),
+      );
+      const byLabel = new Map<string, CompanyExpense[]>();
+      for (const expense of matchingExpenses) {
+        const label = expense.label || "(No label)";
+        byLabel.set(label, [...(byLabel.get(label) ?? []), expense]);
+      }
+      return [...byLabel.entries()]
+        .map(([label, expenses]) => ({
+          id: `${company.companyId}:expenses:${label}`,
+          label,
+          value: expenses.reduce((sum, expense) => sum + expense.amountInrCents, 0),
+          children: expenses
+            .slice()
+            .sort((left, right) => left.year * 100 + left.month - (right.year * 100 + right.month))
+            .map((expense) => ({
+              id: expense.id,
+              label: formatMonthYear(expense.month, expense.year),
+              value: expense.amountInrCents,
+            })),
+        }))
+        .filter((source) => isContributingValue(source.value))
+        .sort((left, right) => Number(right.value) - Number(left.value));
+    }
+
+    if (column.key === "advances") {
+      const byEmployee = new Map<
+        string,
+        Array<{ sectionName: string; row: PnEmployeeEditableRow; value: number }>
+      >();
+      for (const source of employeeRows) {
+        const value = calculatePnEmployeeAdvanceInrCents(source.row);
+        if (!isContributingValue(value)) continue;
+        byEmployee.set(source.sectionName, [
+          ...(byEmployee.get(source.sectionName) ?? []),
+          { ...source, value },
+        ]);
+      }
+      return [...byEmployee.entries()]
+        .map(([employeeName, rows]) => ({
+          id: `${company.companyId}:advances:${employeeName}`,
+          label: employeeName,
+          value: rows.reduce((sum, item) => sum + item.value, 0),
+          children: rows.map(({ row, value }) => ({
+            id: `${row.payoutId}:advance`,
+            label: `${row.invoiceNumber || "Salary only"} - ${formatMonthYear(row.month, row.year)}`,
+            value,
+          })),
+        }))
+        .sort((left, right) => Number(right.value) - Number(left.value));
+    }
+
+    if (column.key === "companyReimbursementUsd") {
+      return isContributingValue(periodRow.companyReimbursementUsdCents)
+        ? [
+            {
+              id: `${company.companyId}:companyReimbursementUsd`,
+              label: `${company.companyName} company reimbursement`,
+              value: periodRow.companyReimbursementUsdCents,
+            },
+          ]
+        : [];
+    }
+
+    if (column.key === "companyReimbursementInr") {
+      return isContributingValue(periodRow.companyReimbursementInrCents)
+        ? [
+            {
+              id: `${company.companyId}:companyReimbursementInr`,
+              label: `${company.companyName} company reimbursement`,
+              value: periodRow.companyReimbursementInrCents,
+            },
+          ]
+        : [];
+    }
+
+    if (column.key === "reimbursements") {
+      const companySource = isContributingValue(periodRow.companyReimbursementUsdCents)
+        ? [
+            {
+              id: `${company.companyId}:companyReimbursementUsd`,
+              label: `${company.companyName} company reimbursement`,
+              value: periodRow.companyReimbursementUsdCents,
+            },
+          ]
+        : [];
+      return [...employeeSources, ...companySource];
+    }
+
+    if (column.key === "reimbursementsInr") {
+      const companySource = isContributingValue(periodRow.companyReimbursementInrCents)
+        ? [
+            {
+              id: `${company.companyId}:companyReimbursementInr`,
+              label: `${company.companyName} company reimbursement`,
+              value: periodRow.companyReimbursementInrCents,
+            },
+          ]
+        : [];
+      return [...employeeSources, ...companySource];
+    }
+
+    return employeeSources;
+  };
+
+  const renderCompanyCell = (
+    company: DashboardCompanyBreakdown & { periodRow: PnPeriodRow },
+    periodRow: PnPeriodRow,
+    column: PeriodColumn<PnPeriodRow>,
+  ) => {
+    const companyKey = `${periodRowKey(periodRow)}:${company.companyId}`;
+    const isExpanded = expandedCompanies.has(companyKey);
+    if (column.key === PERIOD_BREAKDOWN_COLUMN_KEY) {
+      return (
+        <button
+          type="button"
+          className="btn-outline"
+          aria-label={`${isExpanded ? "Collapse" : "Expand"} company ${company.companyName}`}
+          aria-expanded={isExpanded}
+          onClick={() => toggleSetValue(setExpandedCompanies, companyKey)}
+          style={{ minWidth: "2rem", padding: "0.2rem 0.45rem" }}
+        >
+          {isExpanded ? "-" : "+"}
+        </button>
+      );
+    }
+    if (column.key === "period") {
+      return (
+        <span className="font-medium" style={{ color: "var(--text-primary)" }}>
+          {company.companyName}
+        </span>
+      );
+    }
+    return column.render(company.periodRow);
+  };
+
+  const renderColumnBreakdownCell = (
+    company: DashboardCompanyBreakdown & { periodRow: PnPeriodRow },
+    periodRow: PnPeriodRow,
+    column: PeriodColumn<PnPeriodRow>,
+  ) => {
+    if (column.key === PERIOD_BREAKDOWN_COLUMN_KEY) return "";
+    if (column.key === "period") {
+      return (
+        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+          Column breakdown
+        </span>
+      );
+    }
+    const value = column.getValue?.(company.periodRow);
+    const sources = getColumnSources(company, periodRow, column);
+    const columnKey = `${periodRowKey(periodRow)}:${company.companyId}:${column.key}`;
+    const isExpanded = expandedColumns.has(columnKey);
+    const displayLabel = periodColumnDisplayLabel(column);
+    if (!isContributingValue(value) || sources.length === 0) {
+      return <span style={{ color: "var(--text-muted)" }}>-</span>;
+    }
+    return (
+      <div className="space-y-2">
+        <button
+          type="button"
+          className="btn-outline"
+          aria-label={`${isExpanded ? "Collapse" : "Expand"} ${displayLabel} breakdown for ${company.companyName}`}
+          aria-expanded={isExpanded}
+          onClick={() => toggleSetValue(setExpandedColumns, columnKey)}
+          style={{ minWidth: "2rem", padding: "0.2rem 0.45rem" }}
+        >
+          {isExpanded ? "-" : "+"}
+        </button>
+        {isExpanded ? (
+          <div
+            className="min-w-56 space-y-1 rounded-lg p-2 text-xs"
+            style={{
+              border: "1px solid var(--glass-border)",
+              background: "var(--surface-subtle)",
+              color: "var(--text-primary)",
+            }}
+          >
+            {sources.map((source) => (
+              <div key={source.id} className="space-y-1">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex min-w-0 items-start gap-1.5">
+                    {source.children?.length ? (
+                      <button
+                        type="button"
+                        className="btn-outline"
+                        aria-label={`${expandedColumns.has(`${columnKey}:source:${source.id}`) ? "Collapse" : "Expand"} ${source.label}`}
+                        aria-expanded={expandedColumns.has(`${columnKey}:source:${source.id}`)}
+                        onClick={() =>
+                          toggleSetValue(
+                            setExpandedColumns,
+                            `${columnKey}:source:${source.id}`,
+                          )
+                        }
+                        style={{
+                          minWidth: "1.3rem",
+                          padding: "0.05rem 0.25rem",
+                          fontSize: "0.7rem",
+                        }}
+                      >
+                        {expandedColumns.has(`${columnKey}:source:${source.id}`)
+                          ? "-"
+                          : "+"}
+                      </button>
+                    ) : null}
+                    <div className="min-w-0" style={{ color: "var(--text-muted)" }}>
+                      {source.label}
+                    </div>
+                  </div>
+                  <div className="font-medium">
+                    {formatPeriodBreakdownValue(source.value, column.valueKind)}
+                  </div>
+                </div>
+                {source.children?.length &&
+                expandedColumns.has(`${columnKey}:source:${source.id}`) ? (
+                  <div
+                    className="ml-6 space-y-1 border-l pl-2"
+                    style={{ borderColor: "var(--glass-border)" }}
+                  >
+                    {source.children.map((child) => (
+                      <div
+                        key={child.id}
+                        className="flex items-start justify-between gap-2"
+                      >
+                        <span style={{ color: "var(--text-muted)" }}>
+                          {child.label}
+                        </span>
+                        <span className="font-medium">
+                          {formatPeriodBreakdownValue(child.value, column.valueKind)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    );
+  };
 
   const renderPeriodTotalCell = (
     column: Column<PnPeriodRow>,
@@ -1187,13 +1744,45 @@ function PeriodTables({
             </tr>
           </thead>
           <tbody>
-            {data.periodRows.map((row) => (
-              <tr key={`${row.year}-${row.month ?? 0}`}>
-                {columns.map((column) => (
-                  <td key={column.key}>{column.render(row)}</td>
-                ))}
-              </tr>
-            ))}
+            {data.periodRows.map((row) => {
+              const key = periodRowKey(row);
+              const companies = companyBreakdownsByPeriod.get(key) ?? [];
+              return (
+                <Fragment key={key}>
+                  <tr>
+                    {columns.map((column) => (
+                      <td key={column.key}>{column.render(row)}</td>
+                    ))}
+                  </tr>
+                  {expandedPeriods.has(key)
+                    ? companies.map((company) => {
+                        const companyKey = `${key}:${company.companyId}`;
+                        const companyExpanded = expandedCompanies.has(companyKey);
+                        return (
+                          <Fragment key={companyKey}>
+                            <tr style={{ background: "rgba(15, 23, 42, 0.28)" }}>
+                              {columns.map((column) => (
+                                <td key={`${companyKey}:${column.key}`}>
+                                  {renderCompanyCell(company, row, column)}
+                                </td>
+                              ))}
+                            </tr>
+                            {companyExpanded ? (
+                              <tr style={{ background: "rgba(15, 23, 42, 0.34)" }}>
+                                {columns.map((column) => (
+                                  <td key={`${companyKey}:drill:${column.key}`}>
+                                    {renderColumnBreakdownCell(company, row, column)}
+                                  </td>
+                                ))}
+                              </tr>
+                            ) : null}
+                          </Fragment>
+                        );
+                      })
+                    : null}
+                </Fragment>
+              );
+            })}
             {data.periodRows.length > 0 ? (
               <tr>
                 {columns.map((column) => (
