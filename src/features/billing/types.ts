@@ -272,6 +272,26 @@ export type DashboardBulkUpdateResult = {
   }>;
 };
 
+export type DashboardExpenseBulkUpdateRowInput = {
+  expenseId: string;
+  companyId: string;
+  periodLabel: string;
+  label: string;
+  year: number;
+  month: number;
+  amountInrCents: number;
+};
+
+export type DashboardExpenseBulkUpdateResult = {
+  savedExpenseIds: string[];
+  failedRows: Array<{
+    expenseId: string;
+    label: string;
+    periodLabel: string;
+    message: string;
+  }>;
+};
+
 export type CompanyExpense = {
   id: string;
   companyId: string;

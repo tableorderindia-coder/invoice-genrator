@@ -9,6 +9,7 @@ import {
 } from "@/src/features/billing/company-access";
 import { requirePageAccess } from "@/lib/auth/server";
 import {
+  bulkUpdateDashboardCompanyExpensesAction,
   bulkUpdateDashboardEmployeeCashFlowEntriesAction,
   updateDashboardEmployeeCashFlowEntryAction,
 } from "../../src/features/billing/actions";
@@ -559,6 +560,9 @@ export default async function DashboardPage({
             }
             bulkUpdateDashboardEmployeeCashFlowEntriesAction={
               bulkUpdateDashboardEmployeeCashFlowEntriesAction
+            }
+            bulkUpdateDashboardCompanyExpensesAction={
+              bulkUpdateDashboardCompanyExpensesAction
             }
           />
         </GlassPanel>

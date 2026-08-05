@@ -50,6 +50,8 @@ import {
 } from "./employee-cash-flow-store";
 import { parseExpenseMonthKeyParts } from "./expense-period";
 import type {
+  DashboardExpenseBulkUpdateResult,
+  DashboardExpenseBulkUpdateRowInput,
   DashboardBulkUpdateResult,
   DashboardBulkUpdateRowInput,
   InvoiceStatus,
@@ -1216,6 +1218,78 @@ export async function bulkUpdateDashboardEmployeeCashFlowEntriesAction(
   );
   revalidatePath("/dashboard");
   revalidatePath("/employee-cash-flow");
+  return result;
+}
+
+function validateDashboardExpenseBulkRow(row: DashboardExpenseBulkUpdateRowInput) {
+  if (!row.expenseId) throw new Error("Expense row is missing an id.");
+  if (!row.companyId) throw new Error("Expense row is missing a company.");
+  if (!row.label.trim()) throw new Error("Expense label is required.");
+  if (!Number.isFinite(row.year) || row.year <= 0) {
+    throw new Error("Invalid year.");
+  }
+  if (!Number.isFinite(row.month) || row.month < 1 || row.month > 12) {
+    throw new Error("Invalid month.");
+  }
+  if (!Number.isSafeInteger(row.amountInrCents) || row.amountInrCents < 0) {
+    throw new Error("Expense amount cannot be negative.");
+  }
+}
+
+export async function bulkUpdateDashboardCompanyExpensesAction(
+  rows: DashboardExpenseBulkUpdateRowInput[],
+): Promise<DashboardExpenseBulkUpdateResult> {
+  await requirePageEditAccess("expenses");
+  const result: DashboardExpenseBulkUpdateResult = {
+    savedExpenseIds: [],
+    failedRows: [],
+  };
+  const companyIds = new Set<string>();
+
+  for (let offset = 0; offset < rows.length; offset += 10) {
+    const batch = rows.slice(offset, offset + 10);
+    const batchResults = await Promise.all(
+      batch.map(async (row) => {
+        try {
+          validateDashboardExpenseBulkRow(row);
+          await upsertCompanyExpense({
+            id: row.expenseId,
+            companyId: row.companyId,
+            year: row.year,
+            month: row.month,
+            label: row.label,
+            amountInrCents: row.amountInrCents,
+          });
+          return { row, error: null };
+        } catch (error) {
+          return { row, error };
+        }
+      }),
+    );
+
+    for (const item of batchResults) {
+      if (item.error) {
+        result.failedRows.push({
+          expenseId: item.row.expenseId,
+          label: item.row.label,
+          periodLabel: item.row.periodLabel,
+          message: getErrorMessage(item.error, "Unable to update expense row."),
+        });
+      } else {
+        result.savedExpenseIds.push(item.row.expenseId);
+        companyIds.add(item.row.companyId);
+      }
+    }
+  }
+
+  await Promise.all(
+    [...companyIds].map(async (companyId) => {
+      await invalidateBillingCaches({ type: "expense", companyId });
+      await refreshPnSummariesForCompany(companyId);
+    }),
+  );
+  revalidatePath("/expenses");
+  revalidatePath("/dashboard");
   return result;
 }
 
