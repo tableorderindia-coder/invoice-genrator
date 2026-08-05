@@ -4,7 +4,12 @@ import { PendingSubmitButton } from "../_components/pending-submit-button";
 import { NumericInput } from "../_components/numeric-input";
 import { requirePageAccess } from "@/lib/auth/server";
 import { filterCompaniesForAuthContext } from "@/src/features/billing/company-access";
-import { resolveSelectedCompanyIds } from "@/src/features/billing/filter-selection";
+import {
+  filterRowsByFinancialYear,
+  getFinancialYearOptions,
+  parseFinancialYear,
+  resolveSelectedCompanyIds,
+} from "@/src/features/billing/filter-selection";
 import { cashOutInvoiceAction } from "@/src/features/billing/actions";
 import { filterCashoutEligibleInvoices } from "@/src/features/billing/invoice-workflow";
 import {
@@ -21,6 +26,7 @@ export default async function CashoutPage({
   searchParams: Promise<{
     companyId?: string | string[];
     companyIds?: string | string[];
+    financialYear?: string | string[];
     flashStatus?: string | string[];
     flashMessage?: string | string[];
   }>;
@@ -33,8 +39,16 @@ export default async function CashoutPage({
     companyId: resolvedSearchParams.companyId,
     companies,
   });
+  const allInvoices = await listCachedInvoicesForCompanies(selectedCompanyIds);
+  const financialYearOptions = getFinancialYearOptions(allInvoices);
+  const selectedFinancialYear = parseFinancialYear(
+    Array.isArray(resolvedSearchParams.financialYear)
+      ? resolvedSearchParams.financialYear[0]
+      : resolvedSearchParams.financialYear,
+    financialYearOptions,
+  );
   const invoices = filterCashoutEligibleInvoices(
-    await listCachedInvoicesForCompanies(selectedCompanyIds),
+    filterRowsByFinancialYear(allInvoices, selectedFinancialYear.value),
   );
   const companyMap = new Map(companies.map((company) => [company.id, company.name]));
   const flashStatus = Array.isArray(resolvedSearchParams.flashStatus)
@@ -47,6 +61,7 @@ export default async function CashoutPage({
   for (const companyId of selectedCompanyIds) {
     returnToParams.append("companyIds", companyId);
   }
+  returnToParams.set("financialYear", selectedFinancialYear.value);
   const returnTo = returnToParams.toString()
     ? `/cashout?${returnToParams.toString()}`
     : "/cashout";
@@ -57,6 +72,7 @@ export default async function CashoutPage({
       eyebrow="Settlement queue"
       companyOptions={companies.map((company) => ({ id: company.id, name: company.name }))}
       activeCompanyIds={selectedCompanyIds}
+      financialYearOptions={financialYearOptions}
     >
       <GlassPanel gradient>
         <div>

@@ -7,7 +7,12 @@ import { Shell } from "./_components/shell";
 import { OverviewPnlSummaryTable } from "./overview-pnl-summary-table";
 import { requirePageAccess } from "@/lib/auth/server";
 import { filterCompaniesForAuthContext } from "@/src/features/billing/company-access";
-import { resolveSelectedCompanyIds } from "@/src/features/billing/filter-selection";
+import {
+  filterRowsByFinancialYear,
+  getFinancialYearOptions,
+  parseFinancialYear,
+  resolveSelectedCompanyIds,
+} from "@/src/features/billing/filter-selection";
 import {
   buildOverviewMonthlyPnlRows,
   buildOverviewDashboardHref,
@@ -31,6 +36,7 @@ export default async function HomePage({
     companyIds?: string | string[];
     startMonth?: string | string[];
     endMonth?: string | string[];
+    financialYear?: string | string[];
   }>;
 }) {
   const context = await requirePageAccess("overview");
@@ -60,16 +66,37 @@ export default async function HomePage({
     ),
     loadOverviewAdvancePreference(context),
   ]);
+  const availableMonthRows = availableMonths
+    .map((monthKey) => {
+      const [yearPart, monthPart] = monthKey.split("-");
+      return {
+        value: monthKey,
+        year: Number.parseInt(yearPart ?? "", 10),
+        month: Number.parseInt(monthPart ?? "", 10),
+      };
+    })
+    .filter((row) => Number.isFinite(row.year) && Number.isFinite(row.month));
+  const financialYearOptions = getFinancialYearOptions(availableMonthRows);
+  const selectedFinancialYear = parseFinancialYear(
+    Array.isArray(resolved.financialYear)
+      ? resolved.financialYear[0]
+      : resolved.financialYear,
+    financialYearOptions,
+  );
   const startMonthParam = Array.isArray(resolved.startMonth)
     ? resolved.startMonth[0]
     : resolved.startMonth;
   const endMonthParam = Array.isArray(resolved.endMonth)
     ? resolved.endMonth[0]
     : resolved.endMonth;
+  const financialYearMonths = filterRowsByFinancialYear(
+    availableMonthRows,
+    selectedFinancialYear.value,
+  ).map((row) => row.value);
   const range = resolveOverviewMonthRange({
     startMonth: startMonthParam,
     endMonth: endMonthParam,
-    availableMonths,
+    availableMonths: financialYearMonths,
     currentMonth: currentMonthKey(),
   });
   const dashboardDataByCompanyId = new Map(
@@ -79,10 +106,11 @@ export default async function HomePage({
     dashboardDataByCompanyId,
     monthKeys: range.monthKeys,
   });
-  const dashboardHref = buildOverviewDashboardHref({
+  const dashboardHrefBase = buildOverviewDashboardHref({
     companyIds: selectedCompanyIds,
     monthKeys: range.monthKeys,
   });
+  const dashboardHref = `${dashboardHrefBase}&financialYear=${encodeURIComponent(selectedFinancialYear.value)}`;
 
   return (
     <Shell
@@ -90,6 +118,7 @@ export default async function HomePage({
       eyebrow="Company profitability summary"
       companyOptions={companies.map((company) => ({ id: company.id, name: company.name }))}
       activeCompanyIds={selectedCompanyIds}
+      financialYearOptions={financialYearOptions}
     >
       <GlassPanel gradient>
         <AutoApplyFilterForm action="/" className="grid gap-3 md:grid-cols-[180px_180px_auto] md:items-end">
@@ -98,6 +127,7 @@ export default async function HomePage({
                 <input key={companyId} type="hidden" name="companyIds" value={companyId} />
               ))
             : null}
+          <input type="hidden" name="financialYear" value={selectedFinancialYear.value} />
 
           <label className="block">
             <span className="mb-2 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>

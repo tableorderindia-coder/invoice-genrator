@@ -176,19 +176,30 @@ describe("overview P&L summary helpers", () => {
     });
   });
 
-  it("falls back to the latest available month when no month is selected", () => {
+  it("defaults to every available financial-year month when no period is selected", () => {
     expect(
       resolveOverviewMonthRange({
         startMonth: undefined,
         endMonth: undefined,
-        availableMonths: ["2026-04", "2026-06", "2026-05"],
+        availableMonths: ["2026-04", "2026-06", "2026-05", "2026-08"],
         currentMonth: "2026-08",
       }),
     ).toMatchObject({
-      startMonth: "2026-06",
-      endMonth: "2026-06",
-      monthKeys: ["2026-06"],
+      startMonth: "2026-04",
+      endMonth: "2026-08",
+      monthKeys: ["2026-04", "2026-05", "2026-06", "2026-07", "2026-08"],
     });
+  });
+
+  it("uses selected period inputs to narrow the financial-year months", () => {
+    expect(
+      resolveOverviewMonthRange({
+        startMonth: "2026-05",
+        endMonth: "2026-06",
+        availableMonths: ["2026-04", "2026-05", "2026-06", "2026-08"],
+        currentMonth: "2026-08",
+      }).monthKeys,
+    ).toEqual(["2026-05", "2026-06"]);
   });
 
   it("aggregates company rows for the selected period only", () => {

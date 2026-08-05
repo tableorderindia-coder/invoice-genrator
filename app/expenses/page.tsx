@@ -14,10 +14,13 @@ import {
   listCachedCompanies,
   listCachedCompanyExpensesForCompanies,
 } from "@/src/features/billing/cached-store";
-import { resolveSelectedCompanyIds } from "@/src/features/billing/filter-selection";
+import {
+  getFinancialYearOptions,
+  parseFinancialYear,
+  resolveSelectedCompanyIds,
+} from "@/src/features/billing/filter-selection";
 import { formatInr, formatMonthYear } from "@/src/features/billing/utils";
 import {
-  currentExpenseMonthKey,
   formatExpensePeriodLabel,
   normalizeExpensePeriodRange,
   parseExpenseMonthKeyParts,
@@ -39,15 +42,25 @@ export default async function ExpensesPage({
     companyId: params.companyId,
     companies,
   });
+  const allExpensesForOptions = await listCachedCompanyExpensesForCompanies({
+    companyIds: selectedCompanyIds,
+  });
+  const financialYearOptions = getFinancialYearOptions(allExpensesForOptions);
+  const selectedFinancialYear = parseFinancialYear(
+    typeof params.financialYear === "string" ? params.financialYear : undefined,
+    financialYearOptions,
+  );
   const selectedCompanyId = selectedCompanyIds[0] ?? "";
   const singleCompanySelected = selectedCompanyIds.length === 1;
+  const financialYearStartMonth = `${selectedFinancialYear.startYear}-04`;
+  const financialYearEndMonth = `${selectedFinancialYear.endYear}-03`;
   const fallbackMonth =
     typeof params.year === "string" && typeof params.month === "string"
       ? `${params.year}-${params.month.padStart(2, "0")}`
-      : currentExpenseMonthKey();
+      : financialYearStartMonth;
   const period = normalizeExpensePeriodRange({
-    startMonth: params.startMonth,
-    endMonth: params.endMonth,
+    startMonth: params.startMonth ?? financialYearStartMonth,
+    endMonth: params.endMonth ?? financialYearEndMonth,
     fallbackMonth,
   });
   const addTargetMonth = parseExpenseMonthKeyParts(period.endMonth);
@@ -74,7 +87,7 @@ export default async function ExpensesPage({
     .join("&");
   const returnUrl = `/expenses?${companyScopeParams}&startMonth=${encodeURIComponent(
     period.startMonth,
-  )}&endMonth=${encodeURIComponent(period.endMonth)}`;
+  )}&endMonth=${encodeURIComponent(period.endMonth)}&financialYear=${encodeURIComponent(selectedFinancialYear.value)}`;
   const periodLabel = formatExpensePeriodLabel(period.startMonth, period.endMonth);
   const buildExportHref = (input: { format: "csv" | "pdf" }) => {
     const exportParams = new URLSearchParams();
@@ -83,6 +96,7 @@ export default async function ExpensesPage({
     }
     exportParams.set("startMonth", period.startMonth);
     exportParams.set("endMonth", period.endMonth);
+    exportParams.set("financialYear", selectedFinancialYear.value);
     exportParams.set("format", input.format);
     return `/api/expenses/export?${exportParams.toString()}`;
   };
@@ -93,6 +107,7 @@ export default async function ExpensesPage({
       eyebrow="Financial management"
       companyOptions={companies.map((company) => ({ id: company.id, name: company.name }))}
       activeCompanyIds={selectedCompanyIds}
+      financialYearOptions={financialYearOptions}
     >
       {/* Flash message */}
       {flashStatus && flashMessage && (
@@ -121,6 +136,7 @@ export default async function ExpensesPage({
               ))}
               {flashStatus && <input type="hidden" name="flashStatus" value={flashStatus} />}
               {flashMessage && <input type="hidden" name="flashMessage" value={flashMessage} />}
+              <input type="hidden" name="financialYear" value={selectedFinancialYear.value} />
               <Field label="Start month">
                 <input
                   type="month"

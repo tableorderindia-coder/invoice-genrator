@@ -55,6 +55,7 @@ export const PERIOD_DASHBOARD_COLUMN_OPTIONS = [
 export const DEFAULT_EMPLOYEE_DASHBOARD_COLUMNS = [
   "effectiveDollarInward",
   "cashoutRate",
+  "cashIn",
   "salaryPaid",
   "pf",
   "tds",
@@ -68,6 +69,7 @@ export const DEFAULT_EMPLOYEE_DASHBOARD_COLUMNS = [
 export const DEFAULT_PERIOD_DASHBOARD_COLUMNS = [
   "effectiveDollarInward",
   "cashoutRate",
+  "cashIn",
   "salaryPaid",
   "pf",
   "tds",

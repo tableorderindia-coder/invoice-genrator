@@ -6,6 +6,15 @@ type CompanySelectionOption = {
   id: string;
 };
 
+export type FinancialYearSelection = {
+  value: string;
+  startYear: number;
+  endYear: number;
+  startMonth: 4;
+  endMonth: 3;
+  label: string;
+};
+
 export function normalizeMultiSelectValue(input?: MultiSelectInput) {
   const values = Array.isArray(input) ? input : input ? [input] : [];
   const normalized = values.flatMap((value) =>
@@ -47,6 +56,94 @@ export function resolveSelectedCompanyIds(input: {
   return selectedCompanyIds.length > 0
     ? selectedCompanyIds
     : input.companies.map((company) => company.id);
+}
+
+export function resolveFinancialYearFromDate(date = new Date()): FinancialYearSelection {
+  const month = date.getMonth() + 1;
+  const calendarYear = date.getFullYear();
+  const startYear = month >= 4 ? calendarYear : calendarYear - 1;
+  const endYear = startYear + 1;
+
+  return {
+    value: `${startYear}-${endYear}`,
+    startYear,
+    endYear,
+    startMonth: 4,
+    endMonth: 3,
+    label: `Apr ${startYear} - Mar ${endYear}`,
+  };
+}
+
+export function parseFinancialYear(
+  value?: string,
+  availableOptions?: Array<Pick<FinancialYearSelection, "value">>,
+): FinancialYearSelection {
+  const match = /^(\d{4})-(\d{4})$/.exec(String(value ?? ""));
+  if (!match) {
+    if (availableOptions && availableOptions.length > 0) {
+      const current = resolveFinancialYearFromDate();
+      const option = availableOptions.find((item) => item.value === current.value) ?? availableOptions[0];
+      return parseFinancialYear(option?.value);
+    }
+    return resolveFinancialYearFromDate();
+  }
+
+  const startYear = Number.parseInt(match[1] ?? "", 10);
+  const endYear = Number.parseInt(match[2] ?? "", 10);
+  if (!Number.isFinite(startYear) || endYear !== startYear + 1) {
+    return parseFinancialYear(undefined, availableOptions);
+  }
+
+  const parsedValue = `${startYear}-${endYear}`;
+  if (
+    availableOptions &&
+    availableOptions.length > 0 &&
+    !availableOptions.some((item) => item.value === parsedValue)
+  ) {
+    return parseFinancialYear(undefined, availableOptions);
+  }
+
+  return {
+    value: parsedValue,
+    startYear,
+    endYear,
+    startMonth: 4,
+    endMonth: 3,
+    label: `Apr ${startYear} - Mar ${endYear}`,
+  };
+}
+
+export function isMonthInFinancialYear(
+  input: { year: number; month: number },
+  financialYearValue: string,
+) {
+  const financialYear = parseFinancialYear(financialYearValue);
+  const monthKey = input.year * 100 + input.month;
+
+  return (
+    monthKey >= financialYear.startYear * 100 + financialYear.startMonth &&
+    monthKey <= financialYear.endYear * 100 + financialYear.endMonth
+  );
+}
+
+export function filterRowsByFinancialYear<TRow extends { year: number; month: number }>(
+  rows: TRow[],
+  financialYearValue: string,
+) {
+  return rows.filter((row) => isMonthInFinancialYear(row, financialYearValue));
+}
+
+export function getFinancialYearOptions(rows: Array<{ year: number; month: number }>) {
+  const startYears = new Set<number>();
+  for (const row of rows) {
+    if (!Number.isFinite(row.year) || !Number.isFinite(row.month)) continue;
+    if (row.month < 1 || row.month > 12) continue;
+    startYears.add(row.month >= 4 ? row.year : row.year - 1);
+  }
+
+  return [...startYears]
+    .sort((left, right) => right - left)
+    .map((startYear) => parseFinancialYear(`${startYear}-${startYear + 1}`));
 }
 
 export function formatPaymentMonthLabel(paymentMonth: string) {
@@ -164,6 +261,7 @@ export function buildEmployeeCashFlowFilterFieldEntries(input: {
 export function buildDashboardFilterFieldEntries(input: {
   companyId?: string;
   companyIds?: MultiSelectInput;
+  financialYear?: string;
   periodType: "monthly" | "yearly";
   view: "employee" | "period";
   employeeIds?: MultiSelectInput;
@@ -196,6 +294,10 @@ export function buildDashboardFilterFieldEntries(input: {
     } else if (input.companyId) {
       fields.push({ name: "companyId", value: input.companyId });
     }
+  }
+
+  if (input.financialYear) {
+    fields.push({ name: "financialYear", value: input.financialYear });
   }
 
   if (input.includePeriodType !== false && input.periodType) {

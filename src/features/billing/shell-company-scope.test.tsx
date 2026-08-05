@@ -61,29 +61,35 @@ describe("buildCompanyScopeHref", () => {
     ).toBe("/employees");
   });
 
-  it("commits company selector changes to the generated URL", () => {
+  it("checks company dropdown values locally before applying the generated URL", () => {
     const assign = vi.fn();
     vi.stubGlobal("location", {
       ...window.location,
       assign,
     });
+    const companyOptions = [...companies, { id: "company_3", name: "Company Three" }];
 
     render(
       <Shell
         title="Employees"
-        companyOptions={companies}
+        companyOptions={companyOptions}
         activeCompanyIds={["company_1"]}
+        financialYearOptions={[{ value: "2024-2025", label: "Apr 2024 - Mar 2025" }]}
       >
         <div>Employee content</div>
       </Shell>,
     );
 
-    fireEvent.change(screen.getAllByLabelText("Active company")[0], {
-      target: { value: "company_2" },
-    });
+    expect(screen.getByRole("button", { name: "Company One" })).toBeTruthy();
+    expect(screen.queryByLabelText("Company Two")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Company One" }));
+    fireEvent.click(screen.getAllByLabelText("Company Two")[0]);
+    expect(assign).not.toHaveBeenCalled();
+    expect(screen.getAllByLabelText("Company Two")[0]).toBeChecked();
+    fireEvent.click(screen.getByRole("button", { name: "Apply companies" }));
 
     expect(assign).toHaveBeenCalledWith(
-      "/employees?tab=edit&employeeId=employee_1&companyIds=company_2",
+      "/employees?tab=edit&employeeId=employee_1&companyIds=company_1&companyIds=company_2",
     );
   });
 
@@ -136,7 +142,12 @@ describe("buildCompanyScopeHref", () => {
   it("uses an anchored company popover when the desktop sidebar is collapsed", () => {
     render(
       <SidebarPreferenceProvider initialCollapsed>
-        <Shell title="Employees" companyOptions={companies} activeCompanyIds={["company_1"]}>
+        <Shell
+          title="Employees"
+          companyOptions={companies}
+          activeCompanyIds={["company_1"]}
+          financialYearOptions={[{ value: "2024-2025", label: "Apr 2024 - Mar 2025" }]}
+        >
           <div>Employee content</div>
         </Shell>
       </SidebarPreferenceProvider>,
@@ -144,7 +155,10 @@ describe("buildCompanyScopeHref", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Change active company" }));
     const popover = screen.getByRole("dialog", { name: "Choose active company" });
-    expect(within(popover).getByLabelText("Active company")).toBeTruthy();
+    expect(within(popover).getByLabelText("Financial year")).toBeTruthy();
+    fireEvent.click(within(popover).getByRole("button", { name: "Company One" }));
+    expect(within(popover).getByLabelText("All companies")).toBeTruthy();
+    expect(within(popover).getAllByLabelText("Company One").length).toBeGreaterThan(1);
 
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByRole("dialog", { name: "Choose active company" })).toBeNull();
