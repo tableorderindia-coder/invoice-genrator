@@ -17,6 +17,7 @@ import {
   buildDashboardFilterFieldEntries,
   filterRowsByFinancialYear,
   formatPaymentMonthLabel,
+  getFinancialYearOptions,
   normalizeMultiSelectValue,
   parseFinancialYear,
   resolveDashboardColumnSelection,
@@ -91,11 +92,6 @@ export default async function DashboardPage({
     companyId: resolved.companyId,
     companies,
   });
-  const selectedFinancialYear = parseFinancialYear(
-    Array.isArray(resolved.financialYear)
-      ? resolved.financialYear[0]
-      : resolved.financialYear,
-  );
   const selectedPeriodTypeRaw = Array.isArray(resolved.periodType)
     ? resolved.periodType[0]
     : resolved.periodType;
@@ -110,16 +106,27 @@ export default async function DashboardPage({
   const allEmployeesSelected = allEmployeesValue === "1";
   const selectedEmployeeIds = normalizeMultiSelectValue(resolved.employeeIds);
 
-  const employees = await listCachedEmployeesForCompanies(selectedCompanyIds);
+  const [employees, availablePaymentMonthKeys] = await Promise.all([
+    listCachedEmployeesForCompanies(selectedCompanyIds),
+    listCachedAvailablePaymentMonthsForCompanies(selectedCompanyIds),
+  ]);
+  const availablePaymentMonthRows = availablePaymentMonthKeys
+    .map(monthKeyToRow)
+    .filter((row) => Number.isFinite(row.year) && Number.isFinite(row.month));
+  const financialYearOptions = getFinancialYearOptions(availablePaymentMonthRows);
+  const selectedFinancialYear = parseFinancialYear(
+    Array.isArray(resolved.financialYear)
+      ? resolved.financialYear[0]
+      : resolved.financialYear,
+    financialYearOptions,
+  );
   const employeeCompanyMap = new Map(
     employees.map((employee) => [employee.id, employee.companyId] as const),
   );
   const availableMonths = filterRowsByFinancialYear(
-    (await listCachedAvailablePaymentMonthsForCompanies(selectedCompanyIds)).map(monthKeyToRow),
+    availablePaymentMonthRows,
     selectedFinancialYear.value,
-  )
-    .filter((row) => Number.isFinite(row.year) && Number.isFinite(row.month))
-    .map((row) => row.value);
+  ).map((row) => row.value);
 
   const effectiveEmployeeIds =
     allEmployeesSelected || selectedEmployeeIds.length === 0
@@ -299,6 +306,7 @@ export default async function DashboardPage({
       eyebrow="Company profitability"
       companyOptions={companies.map((company) => ({ id: company.id, name: company.name }))}
       activeCompanyIds={selectedCompanyIds}
+      financialYearOptions={financialYearOptions}
     >
       {flashMessage ? (
         <GlassPanel gradient className="overflow-visible">

@@ -12,6 +12,7 @@ import {
 } from "@/src/features/billing/actions";
 import {
   filterRowsByFinancialYear,
+  getFinancialYearOptions,
   parseFinancialYear,
   resolveSelectedCompanyIds,
 } from "@/src/features/billing/filter-selection";
@@ -54,15 +55,15 @@ export default async function InvoicesPage({
     companyId: resolvedSearchParams.companyId,
     companies,
   });
+  const allInvoices = await listCachedInvoicesForCompanies(selectedCompanyIds);
+  const financialYearOptions = getFinancialYearOptions(allInvoices);
   const selectedFinancialYear = parseFinancialYear(
     Array.isArray(resolvedSearchParams.financialYear)
       ? resolvedSearchParams.financialYear[0]
       : resolvedSearchParams.financialYear,
+    financialYearOptions,
   );
-  const invoices = filterRowsByFinancialYear(
-    await listCachedInvoicesForCompanies(selectedCompanyIds),
-    selectedFinancialYear.value,
-  );
+  const invoices = filterRowsByFinancialYear(allInvoices, selectedFinancialYear.value);
   const cashoutRateByInvoiceId = await listInvoiceCashoutRates(
     invoices.filter((invoice) => invoice.status === "cashed_out").map((invoice) => invoice.id),
   );
@@ -88,6 +89,7 @@ export default async function InvoicesPage({
       eyebrow="Issued invoices"
       companyOptions={companies.map((company) => ({ id: company.id, name: company.name }))}
       activeCompanyIds={selectedCompanyIds}
+      financialYearOptions={financialYearOptions}
     >
       <GlassPanel gradient>
         <div className="flex items-center justify-between gap-4">

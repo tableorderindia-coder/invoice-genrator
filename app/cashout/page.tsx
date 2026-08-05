@@ -6,6 +6,7 @@ import { requirePageAccess } from "@/lib/auth/server";
 import { filterCompaniesForAuthContext } from "@/src/features/billing/company-access";
 import {
   filterRowsByFinancialYear,
+  getFinancialYearOptions,
   parseFinancialYear,
   resolveSelectedCompanyIds,
 } from "@/src/features/billing/filter-selection";
@@ -38,16 +39,16 @@ export default async function CashoutPage({
     companyId: resolvedSearchParams.companyId,
     companies,
   });
+  const allInvoices = await listCachedInvoicesForCompanies(selectedCompanyIds);
+  const financialYearOptions = getFinancialYearOptions(allInvoices);
   const selectedFinancialYear = parseFinancialYear(
     Array.isArray(resolvedSearchParams.financialYear)
       ? resolvedSearchParams.financialYear[0]
       : resolvedSearchParams.financialYear,
+    financialYearOptions,
   );
   const invoices = filterCashoutEligibleInvoices(
-    filterRowsByFinancialYear(
-      await listCachedInvoicesForCompanies(selectedCompanyIds),
-      selectedFinancialYear.value,
-    ),
+    filterRowsByFinancialYear(allInvoices, selectedFinancialYear.value),
   );
   const companyMap = new Map(companies.map((company) => [company.id, company.name]));
   const flashStatus = Array.isArray(resolvedSearchParams.flashStatus)
@@ -71,6 +72,7 @@ export default async function CashoutPage({
       eyebrow="Settlement queue"
       companyOptions={companies.map((company) => ({ id: company.id, name: company.name }))}
       activeCompanyIds={selectedCompanyIds}
+      financialYearOptions={financialYearOptions}
     >
       <GlassPanel gradient>
         <div>

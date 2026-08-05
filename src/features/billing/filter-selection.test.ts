@@ -86,12 +86,15 @@ describe("filter selection helpers", () => {
     ).toEqual(["start", "end"]);
   });
 
-  it("builds nearby financial year options around the selected date", () => {
+  it("builds financial year options only from available row months", () => {
     expect(
-      getFinancialYearOptions(new Date("2026-08-05T00:00:00+05:30")).map(
-        (row) => row.value,
-      ),
-    ).toEqual(["2027-2028", "2026-2027", "2025-2026"]);
+      getFinancialYearOptions([
+        { year: 2024, month: 12 },
+        { year: 2025, month: 4 },
+        { year: 2025, month: 5 },
+        { year: 2026, month: 3 },
+      ]).map((row) => row.value),
+    ).toEqual(["2025-2026", "2024-2025"]);
   });
 
   it("falls back to the raw payment month when the month key is invalid", () => {

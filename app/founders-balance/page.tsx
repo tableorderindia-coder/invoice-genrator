@@ -8,6 +8,7 @@ import { saveFounderWithdrawalsAction } from "../../src/features/billing/actions
 import { listCachedCompanies } from "../../src/features/billing/cached-store";
 import { getFounderBalanceData } from "../../src/features/billing/store";
 import {
+  getFinancialYearOptions,
   parseFinancialYear,
   resolveSelectedCompanyIds,
 } from "../../src/features/billing/filter-selection";
@@ -110,15 +111,24 @@ export default async function FoundersBalancePage({
     companyId: resolved.companyId,
     companies,
   });
+  const allAccessibleCompaniesSelected = selectedCompanyIds.length === companies.length;
+  const useGlobalAllCompanies =
+    context.profile.role === "admin" && allAccessibleCompaniesSelected;
+  const dataForOptions = useGlobalAllCompanies
+    ? await getFounderBalanceData({ companyId: null })
+    : mergeFounderBalanceData(
+        await Promise.all(
+          selectedCompanyIds.map((companyId) => getFounderBalanceData({ companyId })),
+        ),
+      );
+  const financialYearOptions = getFinancialYearOptions(dataForOptions.rows);
   const selectedFinancialYear = parseFinancialYear(
     Array.isArray(resolved.financialYear)
       ? resolved.financialYear[0]
       : resolved.financialYear,
+    financialYearOptions,
   );
   const period = { type: "financialYear" as const, value: selectedFinancialYear.value };
-  const allAccessibleCompaniesSelected = selectedCompanyIds.length === companies.length;
-  const useGlobalAllCompanies =
-    context.profile.role === "admin" && allAccessibleCompaniesSelected;
   const data = useGlobalAllCompanies
     ? await getFounderBalanceData({ companyId: null, period })
     : mergeFounderBalanceData(
@@ -152,6 +162,7 @@ export default async function FoundersBalancePage({
       eyebrow="Founder withdrawals"
       companyOptions={companies.map((company) => ({ id: company.id, name: company.name }))}
       activeCompanyIds={selectedCompanyIds}
+      financialYearOptions={financialYearOptions}
     >
       {flashMessage ? (
         <GlassPanel gradient className="overflow-visible">

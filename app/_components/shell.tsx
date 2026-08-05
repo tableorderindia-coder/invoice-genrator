@@ -35,8 +35,8 @@ import {
   useTransition,
 } from "react";
 import {
-  getFinancialYearOptions,
   parseFinancialYear,
+  type FinancialYearSelection,
 } from "@/src/features/billing/filter-selection";
 import {
   buildPortalUiModeCookie,
@@ -127,6 +127,7 @@ export function Shell({
   activeCompanyIds,
   companySelectorLabel = "Active company",
   showCompanySelector = true,
+  financialYearOptions = [],
 }: {
   title: string;
   eyebrow?: string;
@@ -136,6 +137,7 @@ export function Shell({
   activeCompanyIds?: string[];
   companySelectorLabel?: string;
   showCompanySelector?: boolean;
+  financialYearOptions?: Array<Pick<FinancialYearSelection, "value" | "label">>;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -146,6 +148,7 @@ export function Shell({
   const mobileSidebarRef = useRef<HTMLElement>(null);
   const mobileSidebarTriggerRef = useRef<HTMLButtonElement>(null);
   const [companyPopoverOpen, setCompanyPopoverOpen] = useState(false);
+  const [companyDropdownOpen, setCompanyDropdownOpen] = useState(false);
   const companyPopoverRef = useRef<HTMLDivElement>(null);
   const companyPopoverTriggerRef = useRef<HTMLButtonElement>(null);
   const [sidebarTooltip, setSidebarTooltip] = useState<{
@@ -161,8 +164,8 @@ export function Shell({
   );
   const selectedFinancialYear = parseFinancialYear(
     searchParams.get("financialYear") ?? undefined,
+    financialYearOptions,
   );
-  const financialYearOptions = getFinancialYearOptions();
 
   const toggleUiMode = () => {
     const beforeSwitch = new CustomEvent("eassyonboard:before-ui-switch", {
@@ -172,6 +175,7 @@ export function Shell({
     const nextMode = oppositePortalUiMode(uiMode);
     setMobileSidebarOpen(false);
     setCompanyPopoverOpen(false);
+    setCompanyDropdownOpen(false);
     document.cookie = buildPortalUiModeCookie(nextMode);
     document.documentElement.dataset.uiMode = nextMode;
     setUiMode(nextMode);
@@ -313,6 +317,7 @@ export function Shell({
     });
     setMobileSidebarOpen(false);
     setCompanyPopoverOpen(false);
+    setCompanyDropdownOpen(false);
     setPendingHref(href);
     window.location.assign(href);
   };
@@ -323,18 +328,8 @@ export function Shell({
     params.set("financialYear", financialYear);
     setMobileSidebarOpen(false);
     setCompanyPopoverOpen(false);
+    setCompanyDropdownOpen(false);
     window.location.assign(`${pathname}?${params.toString()}`);
-  };
-
-  const selectedCompanyScopeValue = allCompaniesSelected ? "__all__" : selectedCompanyIds[0] ?? "__all__";
-
-  const handleCompanyScopeSelect = (companyId: string) => {
-    if (companyId === "__all__") {
-      navigateWithCompanyScope(companyOptions.map((company) => company.id));
-      return;
-    }
-
-    navigateWithCompanyScope([companyId]);
   };
 
   const handleCompanyScopeToggle = (companyId: string) => {
@@ -349,6 +344,12 @@ export function Shell({
       .filter((id) => current.has(id));
     navigateWithCompanyScope(next.length > 0 ? next : companyOptions.map((company) => company.id));
   };
+
+  const selectedCompanyLabel = allCompaniesSelected
+    ? "All companies"
+    : selectedCompanyIds.length === 1
+      ? companyOptions.find((company) => company.id === selectedCompanyIds[0])?.name ?? "1 company"
+      : `${selectedCompanyIds.length} companies`;
 
   const scopedHref = (href: string) => {
     if (!showCompanySelector || href === "/logout") {
@@ -374,66 +375,74 @@ export function Shell({
   const renderCompanySelector = () =>
     showCompanySelector && companyOptions.length > 0 ? (
       <div className="flex flex-col gap-3 text-xs font-medium" style={{ color: "var(--text-muted)" }}>
-        <label className="flex flex-col gap-2">
-          Financial year
-          <select
-            value={selectedFinancialYear.value}
-            onChange={(event) => navigateWithFinancialYear(event.currentTarget.value)}
-            className="h-10 w-full rounded-xl border px-3 text-sm font-medium outline-none transition"
+        {financialYearOptions.length > 0 ? (
+          <label className="flex flex-col gap-2">
+            Financial year
+            <select
+              value={selectedFinancialYear.value}
+              onChange={(event) => navigateWithFinancialYear(event.currentTarget.value)}
+              className="h-10 w-full rounded-xl border px-3 text-sm font-medium outline-none transition"
+              style={{
+                borderColor: "var(--glass-border)",
+                background: "var(--surface-subtle)",
+                color: "var(--text-primary)",
+              }}
+            >
+              {financialYearOptions.map((financialYear) => (
+                <option key={financialYear.value} value={financialYear.value}>
+                  {financialYear.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+        <div className="flex flex-col gap-2">
+          <span>{companySelectorLabel}</span>
+          <button
+            type="button"
+            aria-label={selectedCompanyLabel}
+            aria-expanded={companyDropdownOpen}
+            onClick={() => setCompanyDropdownOpen((current) => !current)}
+            className="h-10 w-full rounded-xl border px-3 text-left text-sm font-medium outline-none transition"
             style={{
               borderColor: "var(--glass-border)",
               background: "var(--surface-subtle)",
               color: "var(--text-primary)",
             }}
           >
-            {financialYearOptions.map((financialYear) => (
-              <option key={financialYear.value} value={financialYear.value}>
-                {financialYear.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="flex flex-col gap-2">
-          <span>{companySelectorLabel}</span>
-          <label className="flex items-center gap-2 rounded-lg px-2 py-1.5" style={{ background: "var(--surface-subtle)" }}>
-            <input
-              type="checkbox"
-              checked={allCompaniesSelected}
-              onChange={() => navigateWithCompanyScope(companyOptions.map((company) => company.id))}
-            />
-            <span>All companies</span>
-          </label>
-          {companyOptions.map((company) => (
-            <label key={company.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5" style={{ background: "var(--surface-subtle)" }}>
-              <input
-                type="checkbox"
-                checked={selectedCompanyIdSet.has(company.id)}
-                onChange={() => handleCompanyScopeToggle(company.id)}
-              />
-              <span className="min-w-0 truncate">{company.name}</span>
-            </label>
-          ))}
+            <span>{selectedCompanyLabel}</span>
+          </button>
+          {companyDropdownOpen ? (
+            <div
+              role="group"
+              aria-label={companySelectorLabel}
+              className="flex flex-col gap-2 rounded-xl border p-2"
+              style={{
+                borderColor: "var(--glass-border)",
+                background: "var(--surface-subtle)",
+              }}
+            >
+              <label className="flex items-center gap-2 rounded-lg px-2 py-1.5">
+                <input
+                  type="checkbox"
+                  checked={allCompaniesSelected}
+                  onChange={() => navigateWithCompanyScope(companyOptions.map((company) => company.id))}
+                />
+                <span>All companies</span>
+              </label>
+              {companyOptions.map((company) => (
+                <label key={company.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5">
+                  <input
+                    type="checkbox"
+                    checked={selectedCompanyIdSet.has(company.id)}
+                    onChange={() => handleCompanyScopeToggle(company.id)}
+                  />
+                  <span className="min-w-0 truncate">{company.name}</span>
+                </label>
+              ))}
+            </div>
+          ) : null}
         </div>
-        <label className="hidden">
-          Legacy company selector
-        <select
-          value={selectedCompanyScopeValue}
-          onChange={(event) => handleCompanyScopeSelect(event.currentTarget.value)}
-          className="h-10 w-full rounded-xl border px-3 text-sm font-medium outline-none transition"
-          style={{
-            borderColor: "var(--glass-border)",
-            background: "var(--surface-subtle)",
-            color: "var(--text-primary)",
-          }}
-        >
-          <option value="__all__">All companies</option>
-          {companyOptions.map((company) => (
-            <option key={company.id} value={company.id}>
-              {company.name}
-            </option>
-          ))}
-        </select>
-        </label>
       </div>
     ) : null;
 

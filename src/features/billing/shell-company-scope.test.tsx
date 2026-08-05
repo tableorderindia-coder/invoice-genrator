@@ -74,11 +74,15 @@ describe("buildCompanyScopeHref", () => {
         title="Employees"
         companyOptions={companyOptions}
         activeCompanyIds={["company_1"]}
+        financialYearOptions={[{ value: "2024-2025", label: "Apr 2024 - Mar 2025" }]}
       >
         <div>Employee content</div>
       </Shell>,
     );
 
+    expect(screen.getByRole("button", { name: "Company One" })).toBeTruthy();
+    expect(screen.queryByLabelText("Company Two")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Company One" }));
     fireEvent.click(screen.getAllByLabelText("Company Two")[0]);
 
     expect(assign).toHaveBeenCalledWith(
@@ -135,7 +139,12 @@ describe("buildCompanyScopeHref", () => {
   it("uses an anchored company popover when the desktop sidebar is collapsed", () => {
     render(
       <SidebarPreferenceProvider initialCollapsed>
-        <Shell title="Employees" companyOptions={companies} activeCompanyIds={["company_1"]}>
+        <Shell
+          title="Employees"
+          companyOptions={companies}
+          activeCompanyIds={["company_1"]}
+          financialYearOptions={[{ value: "2024-2025", label: "Apr 2024 - Mar 2025" }]}
+        >
           <div>Employee content</div>
         </Shell>
       </SidebarPreferenceProvider>,
@@ -144,8 +153,9 @@ describe("buildCompanyScopeHref", () => {
     fireEvent.click(screen.getByRole("button", { name: "Change active company" }));
     const popover = screen.getByRole("dialog", { name: "Choose active company" });
     expect(within(popover).getByLabelText("Financial year")).toBeTruthy();
+    fireEvent.click(within(popover).getByRole("button", { name: "Company One" }));
     expect(within(popover).getByLabelText("All companies")).toBeTruthy();
-    expect(within(popover).getByLabelText("Company One")).toBeTruthy();
+    expect(within(popover).getAllByLabelText("Company One").length).toBeGreaterThan(1);
 
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByRole("dialog", { name: "Choose active company" })).toBeNull();

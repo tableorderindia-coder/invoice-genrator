@@ -15,6 +15,7 @@ import {
   listCachedCompanyExpensesForCompanies,
 } from "@/src/features/billing/cached-store";
 import {
+  getFinancialYearOptions,
   parseFinancialYear,
   resolveSelectedCompanyIds,
 } from "@/src/features/billing/filter-selection";
@@ -41,8 +42,13 @@ export default async function ExpensesPage({
     companyId: params.companyId,
     companies,
   });
+  const allExpensesForOptions = await listCachedCompanyExpensesForCompanies({
+    companyIds: selectedCompanyIds,
+  });
+  const financialYearOptions = getFinancialYearOptions(allExpensesForOptions);
   const selectedFinancialYear = parseFinancialYear(
     typeof params.financialYear === "string" ? params.financialYear : undefined,
+    financialYearOptions,
   );
   const selectedCompanyId = selectedCompanyIds[0] ?? "";
   const singleCompanySelected = selectedCompanyIds.length === 1;
@@ -101,6 +107,7 @@ export default async function ExpensesPage({
       eyebrow="Financial management"
       companyOptions={companies.map((company) => ({ id: company.id, name: company.name }))}
       activeCompanyIds={selectedCompanyIds}
+      financialYearOptions={financialYearOptions}
     >
       {/* Flash message */}
       {flashStatus && flashMessage && (

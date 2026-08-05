@@ -9,6 +9,7 @@ import { requirePageAccess } from "@/lib/auth/server";
 import { filterCompaniesForAuthContext } from "@/src/features/billing/company-access";
 import {
   filterRowsByFinancialYear,
+  getFinancialYearOptions,
   parseFinancialYear,
   resolveSelectedCompanyIds,
 } from "@/src/features/billing/filter-selection";
@@ -46,11 +47,6 @@ export default async function HomePage({
     companyId: resolved.companyId,
     companies,
   });
-  const selectedFinancialYear = parseFinancialYear(
-    Array.isArray(resolved.financialYear)
-      ? resolved.financialYear[0]
-      : resolved.financialYear,
-  );
   const selectedCompanyIdSet = new Set(selectedCompanyIds);
   const selectedCompanies = companies.filter((company) => selectedCompanyIdSet.has(company.id));
   const allSelected =
@@ -70,6 +66,23 @@ export default async function HomePage({
     ),
     loadOverviewAdvancePreference(context),
   ]);
+  const availableMonthRows = availableMonths
+    .map((monthKey) => {
+      const [yearPart, monthPart] = monthKey.split("-");
+      return {
+        value: monthKey,
+        year: Number.parseInt(yearPart ?? "", 10),
+        month: Number.parseInt(monthPart ?? "", 10),
+      };
+    })
+    .filter((row) => Number.isFinite(row.year) && Number.isFinite(row.month));
+  const financialYearOptions = getFinancialYearOptions(availableMonthRows);
+  const selectedFinancialYear = parseFinancialYear(
+    Array.isArray(resolved.financialYear)
+      ? resolved.financialYear[0]
+      : resolved.financialYear,
+    financialYearOptions,
+  );
   const startMonthParam = Array.isArray(resolved.startMonth)
     ? resolved.startMonth[0]
     : resolved.startMonth;
@@ -77,14 +90,7 @@ export default async function HomePage({
     ? resolved.endMonth[0]
     : resolved.endMonth;
   const financialYearMonths = filterRowsByFinancialYear(
-    availableMonths.map((monthKey) => {
-      const [yearPart, monthPart] = monthKey.split("-");
-      return {
-        value: monthKey,
-        year: Number.parseInt(yearPart ?? "", 10),
-        month: Number.parseInt(monthPart ?? "", 10),
-      };
-    }),
+    availableMonthRows,
     selectedFinancialYear.value,
   ).map((row) => row.value);
   const range = resolveOverviewMonthRange({
@@ -112,6 +118,7 @@ export default async function HomePage({
       eyebrow="Company profitability summary"
       companyOptions={companies.map((company) => ({ id: company.id, name: company.name }))}
       activeCompanyIds={selectedCompanyIds}
+      financialYearOptions={financialYearOptions}
     >
       <GlassPanel gradient>
         <AutoApplyFilterForm action="/" className="grid gap-3 md:grid-cols-[180px_180px_auto] md:items-end">

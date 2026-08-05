@@ -74,18 +74,37 @@ export function resolveFinancialYearFromDate(date = new Date()): FinancialYearSe
   };
 }
 
-export function parseFinancialYear(value?: string): FinancialYearSelection {
+export function parseFinancialYear(
+  value?: string,
+  availableOptions?: Array<Pick<FinancialYearSelection, "value">>,
+): FinancialYearSelection {
   const match = /^(\d{4})-(\d{4})$/.exec(String(value ?? ""));
-  if (!match) return resolveFinancialYearFromDate();
+  if (!match) {
+    if (availableOptions && availableOptions.length > 0) {
+      const current = resolveFinancialYearFromDate();
+      const option = availableOptions.find((item) => item.value === current.value) ?? availableOptions[0];
+      return parseFinancialYear(option?.value);
+    }
+    return resolveFinancialYearFromDate();
+  }
 
   const startYear = Number.parseInt(match[1] ?? "", 10);
   const endYear = Number.parseInt(match[2] ?? "", 10);
   if (!Number.isFinite(startYear) || endYear !== startYear + 1) {
-    return resolveFinancialYearFromDate();
+    return parseFinancialYear(undefined, availableOptions);
+  }
+
+  const parsedValue = `${startYear}-${endYear}`;
+  if (
+    availableOptions &&
+    availableOptions.length > 0 &&
+    !availableOptions.some((item) => item.value === parsedValue)
+  ) {
+    return parseFinancialYear(undefined, availableOptions);
   }
 
   return {
-    value: `${startYear}-${endYear}`,
+    value: parsedValue,
     startYear,
     endYear,
     startMonth: 4,
@@ -114,12 +133,17 @@ export function filterRowsByFinancialYear<TRow extends { year: number; month: nu
   return rows.filter((row) => isMonthInFinancialYear(row, financialYearValue));
 }
 
-export function getFinancialYearOptions(date = new Date(), radius = 1) {
-  const current = resolveFinancialYearFromDate(date);
-  return Array.from({ length: radius * 2 + 1 }, (_, index) => {
-    const startYear = current.startYear + radius - index;
-    return parseFinancialYear(`${startYear}-${startYear + 1}`);
-  });
+export function getFinancialYearOptions(rows: Array<{ year: number; month: number }>) {
+  const startYears = new Set<number>();
+  for (const row of rows) {
+    if (!Number.isFinite(row.year) || !Number.isFinite(row.month)) continue;
+    if (row.month < 1 || row.month > 12) continue;
+    startYears.add(row.month >= 4 ? row.year : row.year - 1);
+  }
+
+  return [...startYears]
+    .sort((left, right) => right - left)
+    .map((startYear) => parseFinancialYear(`${startYear}-${startYear + 1}`));
 }
 
 export function formatPaymentMonthLabel(paymentMonth: string) {
