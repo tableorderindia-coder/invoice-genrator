@@ -31,6 +31,7 @@ import {
 } from "../../src/features/billing/dashboard-column-options";
 import {
   listCachedAvailablePaymentMonthsForCompanies,
+  listCachedCompanyExpensesForCompanies,
   listCachedCompanies,
   listCachedEmployeesForCompanies,
 } from "../../src/features/billing/cached-store";
@@ -241,28 +242,71 @@ export default async function DashboardPage({
     periodRows: [],
   };
 
-  const data = selectedCompanyIds.length > 0
-    ? mergeDashboardData(
-        selectedCompanyIds,
-        await Promise.all(
-          selectedCompanyIds.map((companyId) => {
-            const companyEmployeeIds = effectiveEmployeeIds.filter(
-              (employeeId) => employeeCompanyMap.get(employeeId) === companyId,
-            );
-            return getPnDashboardSummaryData({
-              companyId,
-              periodType,
-              employeeIds: employeeFilterActive
-                ? companyEmployeeIds.length > 0
-                  ? companyEmployeeIds
-                  : ["__none__"]
-                : undefined,
-              paymentMonths: effectivePaymentMonths,
-            });
+  const selectedPaymentMonthSet = new Set(effectivePaymentMonths);
+  const sortedEffectivePaymentMonths = [...effectivePaymentMonths].sort();
+  const expenseStartMonth = sortedEffectivePaymentMonths[0];
+  const expenseEndMonth =
+    sortedEffectivePaymentMonths[sortedEffectivePaymentMonths.length - 1];
+  const allCompanyExpenses =
+    selectedCompanyIds.length > 0 && expenseStartMonth && expenseEndMonth
+      ? (
+          await listCachedCompanyExpensesForCompanies({
+            companyIds: selectedCompanyIds,
+            startMonth: expenseStartMonth,
+            endMonth: expenseEndMonth,
+          })
+        ).filter((expense) =>
+          selectedPaymentMonthSet.has(
+            `${expense.year}-${String(expense.month).padStart(2, "0")}`,
+          ),
+        )
+      : [];
+
+  const dataByCompanyId = new Map(
+    await Promise.all(
+      selectedCompanyIds.map(async (companyId) => {
+        const companyEmployeeIds = effectiveEmployeeIds.filter(
+          (employeeId) => employeeCompanyMap.get(employeeId) === companyId,
+        );
+        return [
+          companyId,
+          await getPnDashboardSummaryData({
+            companyId,
+            periodType,
+            employeeIds: employeeFilterActive
+              ? companyEmployeeIds.length > 0
+                ? companyEmployeeIds
+                : ["__none__"]
+              : undefined,
+            paymentMonths: effectivePaymentMonths,
           }),
-        ),
+        ] as const;
+      }),
+    ),
+  );
+
+  const dashboardDataByCompany = selectedCompanyIds.length > 0
+    ? await Promise.all(
+        selectedCompanyIds.map((companyId) => {
+          const company = companies.find((item) => item.id === companyId);
+          return {
+            companyId,
+            companyName: company?.name ?? companyId,
+            data: dataByCompanyId.get(companyId) ?? emptyDashboardData,
+            expenses: allCompanyExpenses.filter(
+              (expense) => expense.companyId === companyId,
+            ),
+          };
+        }),
       )
-    : emptyDashboardData;
+    : [];
+  const data =
+    dashboardDataByCompany.length > 0
+      ? mergeDashboardData(
+          selectedCompanyIds,
+          dashboardDataByCompany.map((item) => item.data),
+        )
+      : emptyDashboardData;
   const dashboardEmployeeEditorKey = [
     "dashboard-employee",
     periodType,
@@ -499,6 +543,7 @@ export default async function DashboardPage({
             view="period"
             periodType={periodType}
             data={data}
+            companyBreakdowns={dashboardDataByCompany}
             returnTo={returnTo}
             employeeColumnKeys={employeeColumnKeys}
             periodColumnKeys={periodColumnKeys}
