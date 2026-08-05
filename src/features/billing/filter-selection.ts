@@ -6,6 +6,15 @@ type CompanySelectionOption = {
   id: string;
 };
 
+export type FinancialYearSelection = {
+  value: string;
+  startYear: number;
+  endYear: number;
+  startMonth: 4;
+  endMonth: 3;
+  label: string;
+};
+
 export function normalizeMultiSelectValue(input?: MultiSelectInput) {
   const values = Array.isArray(input) ? input : input ? [input] : [];
   const normalized = values.flatMap((value) =>
@@ -47,6 +56,70 @@ export function resolveSelectedCompanyIds(input: {
   return selectedCompanyIds.length > 0
     ? selectedCompanyIds
     : input.companies.map((company) => company.id);
+}
+
+export function resolveFinancialYearFromDate(date = new Date()): FinancialYearSelection {
+  const month = date.getMonth() + 1;
+  const calendarYear = date.getFullYear();
+  const startYear = month >= 4 ? calendarYear : calendarYear - 1;
+  const endYear = startYear + 1;
+
+  return {
+    value: `${startYear}-${endYear}`,
+    startYear,
+    endYear,
+    startMonth: 4,
+    endMonth: 3,
+    label: `Apr ${startYear} - Mar ${endYear}`,
+  };
+}
+
+export function parseFinancialYear(value?: string): FinancialYearSelection {
+  const match = /^(\d{4})-(\d{4})$/.exec(String(value ?? ""));
+  if (!match) return resolveFinancialYearFromDate();
+
+  const startYear = Number.parseInt(match[1] ?? "", 10);
+  const endYear = Number.parseInt(match[2] ?? "", 10);
+  if (!Number.isFinite(startYear) || endYear !== startYear + 1) {
+    return resolveFinancialYearFromDate();
+  }
+
+  return {
+    value: `${startYear}-${endYear}`,
+    startYear,
+    endYear,
+    startMonth: 4,
+    endMonth: 3,
+    label: `Apr ${startYear} - Mar ${endYear}`,
+  };
+}
+
+export function isMonthInFinancialYear(
+  input: { year: number; month: number },
+  financialYearValue: string,
+) {
+  const financialYear = parseFinancialYear(financialYearValue);
+  const monthKey = input.year * 100 + input.month;
+
+  return (
+    monthKey >= financialYear.startYear * 100 + financialYear.startMonth &&
+    monthKey <= financialYear.endYear * 100 + financialYear.endMonth
+  );
+}
+
+export function filterRowsByFinancialYear<TRow extends { year: number; month: number }>(
+  rows: TRow[],
+  financialYearValue: string,
+) {
+  return rows.filter((row) => isMonthInFinancialYear(row, financialYearValue));
+}
+
+export function getFinancialYearOptions(date = new Date(), radius = 1) {
+  const current = resolveFinancialYearFromDate(date);
+  return Array.from({ length: radius * 2 + 1 }, (_, index) => {
+    const startYear = current.startYear + radius - index;
+    return parseFinancialYear(`${startYear}-${startYear + 1}`);
+  });
 }
 
 export function formatPaymentMonthLabel(paymentMonth: string) {
@@ -164,6 +237,7 @@ export function buildEmployeeCashFlowFilterFieldEntries(input: {
 export function buildDashboardFilterFieldEntries(input: {
   companyId?: string;
   companyIds?: MultiSelectInput;
+  financialYear?: string;
   periodType: "monthly" | "yearly";
   view: "employee" | "period";
   employeeIds?: MultiSelectInput;
@@ -196,6 +270,10 @@ export function buildDashboardFilterFieldEntries(input: {
     } else if (input.companyId) {
       fields.push({ name: "companyId", value: input.companyId });
     }
+  }
+
+  if (input.financialYear) {
+    fields.push({ name: "financialYear", value: input.financialYear });
   }
 
   if (input.includePeriodType !== false && input.periodType) {

@@ -649,6 +649,7 @@ describe("dashboard tables rendering", () => {
       "Period",
       "Total effective dollar inward (USD)",
       "Cashout rate",
+      "Total Cash Inward (INR)",
       "Salary paid (INR)",
       "PF (INR)",
       "TDS (INR)",

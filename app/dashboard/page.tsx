@@ -15,8 +15,10 @@ import {
 import { employeeStatusLabel } from "../../src/features/billing/employee-status";
 import {
   buildDashboardFilterFieldEntries,
+  filterRowsByFinancialYear,
   formatPaymentMonthLabel,
   normalizeMultiSelectValue,
+  parseFinancialYear,
   resolveDashboardColumnSelection,
   resolveSelectedCompanyIds,
 } from "../../src/features/billing/filter-selection";
@@ -51,6 +53,15 @@ function mergeDashboardData(companyIds: string[], data: PnDashboardData[]): PnDa
   };
 }
 
+function monthKeyToRow(value: string) {
+  const [yearPart, monthPart] = value.split("-");
+  return {
+    value,
+    year: Number.parseInt(yearPart ?? "", 10),
+    month: Number.parseInt(monthPart ?? "", 10),
+  };
+}
+
 export default async function DashboardPage({
   searchParams,
 }: {
@@ -67,6 +78,7 @@ export default async function DashboardPage({
     paymentMonths?: string | string[];
     employeeColumns?: string | string[];
     periodColumns?: string | string[];
+    financialYear?: string | string[];
   }>;
 }) {
   const context = await requirePageAccess("dashboard");
@@ -79,6 +91,11 @@ export default async function DashboardPage({
     companyId: resolved.companyId,
     companies,
   });
+  const selectedFinancialYear = parseFinancialYear(
+    Array.isArray(resolved.financialYear)
+      ? resolved.financialYear[0]
+      : resolved.financialYear,
+  );
   const selectedPeriodTypeRaw = Array.isArray(resolved.periodType)
     ? resolved.periodType[0]
     : resolved.periodType;
@@ -97,7 +114,12 @@ export default async function DashboardPage({
   const employeeCompanyMap = new Map(
     employees.map((employee) => [employee.id, employee.companyId] as const),
   );
-  const availableMonths = await listCachedAvailablePaymentMonthsForCompanies(selectedCompanyIds);
+  const availableMonths = filterRowsByFinancialYear(
+    (await listCachedAvailablePaymentMonthsForCompanies(selectedCompanyIds)).map(monthKeyToRow),
+    selectedFinancialYear.value,
+  )
+    .filter((row) => Number.isFinite(row.year) && Number.isFinite(row.month))
+    .map((row) => row.value);
 
   const effectiveEmployeeIds =
     allEmployeesSelected || selectedEmployeeIds.length === 0
@@ -134,6 +156,7 @@ export default async function DashboardPage({
 
   const dashboardFilterFields = buildDashboardFilterFieldEntries({
     companyIds: selectedCompanyIds,
+    financialYear: selectedFinancialYear.value,
     periodType,
     view,
     employeeIds: effectiveEmployeeIds,
@@ -146,6 +169,7 @@ export default async function DashboardPage({
 
   const dashboardSwitchFields = buildDashboardFilterFieldEntries({
     companyIds: selectedCompanyIds,
+    financialYear: selectedFinancialYear.value,
     periodType,
     view,
     employeeIds: effectiveEmployeeIds,
@@ -159,6 +183,7 @@ export default async function DashboardPage({
 
   const employeeFilterFields = buildDashboardFilterFieldEntries({
     companyIds: selectedCompanyIds,
+    financialYear: selectedFinancialYear.value,
     periodType,
     view,
     allEmployees: allEffectiveEmployeeIdsSelected,
@@ -174,6 +199,7 @@ export default async function DashboardPage({
 
   const periodFilterFields = buildDashboardFilterFieldEntries({
     companyIds: selectedCompanyIds,
+    financialYear: selectedFinancialYear.value,
     periodType,
     view,
     allEmployees: allEffectiveEmployeeIdsSelected,
@@ -189,6 +215,7 @@ export default async function DashboardPage({
 
   const periodTypeSwitchFields = buildDashboardFilterFieldEntries({
     companyIds: selectedCompanyIds,
+    financialYear: selectedFinancialYear.value,
     periodType,
     view,
     employeeIds: effectiveEmployeeIds,

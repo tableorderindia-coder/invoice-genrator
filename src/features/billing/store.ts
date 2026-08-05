@@ -37,6 +37,7 @@ import {
   FOUNDER_BALANCE_FOUNDERS,
   buildFounderBalanceModel,
   type FounderBalanceModel,
+  type FounderBalancePeriodFilter,
   type FounderBalanceSourceRow,
   type FounderWithdrawal,
   type ParsedFounderWithdrawalRow,
@@ -1185,6 +1186,27 @@ export async function listInvoicesForCompanies(companyIds: string[]) {
   return (data ?? [])
     .map((row) => mapInvoice(row as DbInvoice))
     .sort(sortInvoicesDesc);
+}
+
+export async function listInvoiceCashoutRates(invoiceIds: string[]) {
+  const uniqueInvoiceIds = uniqueNonEmptyValues(invoiceIds);
+  if (uniqueInvoiceIds.length === 0) {
+    return new Map<string, number>();
+  }
+
+  const supabase = await getSupabaseOrThrow();
+  const { data, error } = await supabase
+    .from("invoice_realizations")
+    .select("invoice_id, usd_inr_rate")
+    .in("invoice_id", uniqueInvoiceIds);
+  if (error) throw error;
+
+  return new Map(
+    (data ?? []).map((row) => [
+      String(row.invoice_id),
+      Number(row.usd_inr_rate ?? 0),
+    ]),
+  );
 }
 
 export async function createInvoiceDraft(input: {
@@ -2719,6 +2741,7 @@ async function listFounderWithdrawals(companyId: string | null) {
 
 export async function getFounderBalanceData(input: {
   companyId: string | null;
+  period?: FounderBalancePeriodFilter;
 }): Promise<FounderBalanceModel> {
   const companies = await listCompanies();
   const selectedCompanies = input.companyId
@@ -2740,6 +2763,7 @@ export async function getFounderBalanceData(input: {
 
   return buildFounderBalanceModel({
     companyId: input.companyId,
+    period: input.period,
     sourceRows,
     withdrawals,
   });

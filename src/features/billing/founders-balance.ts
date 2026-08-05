@@ -1,3 +1,5 @@
+import { isMonthInFinancialYear } from "./filter-selection";
+
 export const FOUNDER_BALANCE_FOUNDERS = [
   {
     key: "nirbhay_kumar_giri",
@@ -33,6 +35,10 @@ export type FounderWithdrawal = {
   withdrawalInrCents: number;
   updatedAt: string;
 };
+
+export type FounderBalancePeriodFilter =
+  | { type: "all" }
+  | { type: "financialYear"; value: string };
 
 type FounderBalanceRow = {
   key: string;
@@ -97,11 +103,22 @@ function inrCentsFromFormValue(value: FormDataEntryValue | null) {
 
 export function buildFounderBalanceModel(input: {
   companyId: string | null;
+  period?: FounderBalancePeriodFilter;
   sourceRows: FounderBalanceSourceRow[];
   withdrawals: FounderWithdrawal[];
 }): FounderBalanceModel {
+  const financialYearValue =
+    input.period?.type === "financialYear" ? input.period.value : undefined;
+  const sourceRows =
+    financialYearValue !== undefined
+      ? input.sourceRows.filter((row) => isMonthInFinancialYear(row, financialYearValue))
+      : input.sourceRows;
+  const withdrawals =
+    financialYearValue !== undefined
+      ? input.withdrawals.filter((row) => isMonthInFinancialYear(row, financialYearValue))
+      : input.withdrawals;
   const grouped = new Map<string, FounderBalanceSourceRow[]>();
-  for (const row of input.sourceRows) {
+  for (const row of sourceRows) {
     const key = monthKey(row.year, row.month);
     const rows = grouped.get(key) ?? [];
     rows.push(row);
@@ -109,7 +126,7 @@ export function buildFounderBalanceModel(input: {
   }
 
   const withdrawalsByMonth = new Map<string, FounderWithdrawal[]>();
-  for (const withdrawal of input.withdrawals) {
+  for (const withdrawal of withdrawals) {
     const key = monthKey(withdrawal.year, withdrawal.month);
     const rows = withdrawalsByMonth.get(key) ?? [];
     rows.push(withdrawal);

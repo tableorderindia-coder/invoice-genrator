@@ -45,8 +45,8 @@ describe("UnsavedChangesGuard hydrated server action submission", () => {
     expect(confirm).not.toHaveBeenCalled();
   });
 
-  it("keeps dirty state when client validation blocks a server action", () => {
-    vi.spyOn(window, "confirm").mockReturnValue(false);
+  it("does not keep dirty state when client validation blocks a server action", () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
     render(
       <>
         <UnsavedChangesGuard />
@@ -74,6 +74,7 @@ describe("UnsavedChangesGuard hydrated server action submission", () => {
       window.dispatchEvent(
         new CustomEvent("eassyonboard:before-navigation", { cancelable: true }),
       ),
-    ).toBe(false);
+    ).toBe(true);
+    expect(confirm).not.toHaveBeenCalled();
   });
 });

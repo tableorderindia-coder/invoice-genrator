@@ -7,7 +7,10 @@ import {
 import { saveFounderWithdrawalsAction } from "../../src/features/billing/actions";
 import { listCachedCompanies } from "../../src/features/billing/cached-store";
 import { getFounderBalanceData } from "../../src/features/billing/store";
-import { resolveSelectedCompanyIds } from "../../src/features/billing/filter-selection";
+import {
+  parseFinancialYear,
+  resolveSelectedCompanyIds,
+} from "../../src/features/billing/filter-selection";
 import { FoundersBalanceTable } from "./founders-balance-table";
 import type { FounderBalanceModel } from "../../src/features/billing/founders-balance";
 
@@ -94,6 +97,7 @@ export default async function FoundersBalancePage({
   searchParams: Promise<{
     companyId?: string | string[];
     companyIds?: string | string[];
+    financialYear?: string | string[];
     flashStatus?: string | string[];
     flashMessage?: string | string[];
   }>;
@@ -106,14 +110,20 @@ export default async function FoundersBalancePage({
     companyId: resolved.companyId,
     companies,
   });
+  const selectedFinancialYear = parseFinancialYear(
+    Array.isArray(resolved.financialYear)
+      ? resolved.financialYear[0]
+      : resolved.financialYear,
+  );
+  const period = { type: "financialYear" as const, value: selectedFinancialYear.value };
   const allAccessibleCompaniesSelected = selectedCompanyIds.length === companies.length;
   const useGlobalAllCompanies =
     context.profile.role === "admin" && allAccessibleCompaniesSelected;
   const data = useGlobalAllCompanies
-    ? await getFounderBalanceData({ companyId: null })
+    ? await getFounderBalanceData({ companyId: null, period })
     : mergeFounderBalanceData(
         await Promise.all(
-          selectedCompanyIds.map((companyId) => getFounderBalanceData({ companyId })),
+          selectedCompanyIds.map((companyId) => getFounderBalanceData({ companyId, period })),
         ),
       );
   const tableCompanyId = useGlobalAllCompanies
@@ -133,6 +143,7 @@ export default async function FoundersBalancePage({
   for (const companyId of selectedCompanyIds) {
     returnParams.append("companyIds", companyId);
   }
+  returnParams.set("financialYear", selectedFinancialYear.value);
   const returnTo = `/founders-balance?${returnParams.toString()}`;
 
   return (

@@ -61,29 +61,28 @@ describe("buildCompanyScopeHref", () => {
     ).toBe("/employees");
   });
 
-  it("commits company selector changes to the generated URL", () => {
+  it("commits company checkbox changes to the generated URL", () => {
     const assign = vi.fn();
     vi.stubGlobal("location", {
       ...window.location,
       assign,
     });
+    const companyOptions = [...companies, { id: "company_3", name: "Company Three" }];
 
     render(
       <Shell
         title="Employees"
-        companyOptions={companies}
+        companyOptions={companyOptions}
         activeCompanyIds={["company_1"]}
       >
         <div>Employee content</div>
       </Shell>,
     );
 
-    fireEvent.change(screen.getAllByLabelText("Active company")[0], {
-      target: { value: "company_2" },
-    });
+    fireEvent.click(screen.getAllByLabelText("Company Two")[0]);
 
     expect(assign).toHaveBeenCalledWith(
-      "/employees?tab=edit&employeeId=employee_1&companyIds=company_2",
+      "/employees?tab=edit&employeeId=employee_1&companyIds=company_1&companyIds=company_2",
     );
   });
 
@@ -144,7 +143,9 @@ describe("buildCompanyScopeHref", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Change active company" }));
     const popover = screen.getByRole("dialog", { name: "Choose active company" });
-    expect(within(popover).getByLabelText("Active company")).toBeTruthy();
+    expect(within(popover).getByLabelText("Financial year")).toBeTruthy();
+    expect(within(popover).getByLabelText("All companies")).toBeTruthy();
+    expect(within(popover).getByLabelText("Company One")).toBeTruthy();
 
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByRole("dialog", { name: "Choose active company" })).toBeNull();

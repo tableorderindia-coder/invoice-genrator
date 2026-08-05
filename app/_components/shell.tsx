@@ -35,6 +35,10 @@ import {
   useTransition,
 } from "react";
 import {
+  getFinancialYearOptions,
+  parseFinancialYear,
+} from "@/src/features/billing/filter-selection";
+import {
   buildPortalUiModeCookie,
   normalizePortalUiMode,
   oppositePortalUiMode,
@@ -155,6 +159,10 @@ export function Shell({
       ? "saas"
       : normalizePortalUiMode(document.documentElement.dataset.uiMode),
   );
+  const selectedFinancialYear = parseFinancialYear(
+    searchParams.get("financialYear") ?? undefined,
+  );
+  const financialYearOptions = getFinancialYearOptions();
 
   const toggleUiMode = () => {
     const beforeSwitch = new CustomEvent("eassyonboard:before-ui-switch", {
@@ -309,6 +317,15 @@ export function Shell({
     window.location.assign(href);
   };
 
+  const navigateWithFinancialYear = (financialYear: string) => {
+    if (!canLeaveCurrentView()) return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("financialYear", financialYear);
+    setMobileSidebarOpen(false);
+    setCompanyPopoverOpen(false);
+    window.location.assign(`${pathname}?${params.toString()}`);
+  };
+
   const selectedCompanyScopeValue = allCompaniesSelected ? "__all__" : selectedCompanyIds[0] ?? "__all__";
 
   const handleCompanyScopeSelect = (companyId: string) => {
@@ -320,11 +337,28 @@ export function Shell({
     navigateWithCompanyScope([companyId]);
   };
 
+  const handleCompanyScopeToggle = (companyId: string) => {
+    const current = new Set(selectedCompanyIds);
+    if (current.has(companyId)) {
+      current.delete(companyId);
+    } else {
+      current.add(companyId);
+    }
+    const next = companyOptions
+      .map((company) => company.id)
+      .filter((id) => current.has(id));
+    navigateWithCompanyScope(next.length > 0 ? next : companyOptions.map((company) => company.id));
+  };
+
   const scopedHref = (href: string) => {
     if (!showCompanySelector || href === "/logout") {
       return href;
     }
     const nextParams = new URLSearchParams();
+    const financialYearParam = searchParams.get("financialYear");
+    if (financialYearParam) {
+      nextParams.set("financialYear", financialYearParam);
+    }
     if (!allCompaniesSelected) {
       for (const companyId of selectedCompanyIds) {
         nextParams.append("companyIds", companyId);
@@ -339,8 +373,49 @@ export function Shell({
 
   const renderCompanySelector = () =>
     showCompanySelector && companyOptions.length > 0 ? (
-      <label className="flex flex-col gap-2 text-xs font-medium" style={{ color: "var(--text-muted)" }}>
-        {companySelectorLabel}
+      <div className="flex flex-col gap-3 text-xs font-medium" style={{ color: "var(--text-muted)" }}>
+        <label className="flex flex-col gap-2">
+          Financial year
+          <select
+            value={selectedFinancialYear.value}
+            onChange={(event) => navigateWithFinancialYear(event.currentTarget.value)}
+            className="h-10 w-full rounded-xl border px-3 text-sm font-medium outline-none transition"
+            style={{
+              borderColor: "var(--glass-border)",
+              background: "var(--surface-subtle)",
+              color: "var(--text-primary)",
+            }}
+          >
+            {financialYearOptions.map((financialYear) => (
+              <option key={financialYear.value} value={financialYear.value}>
+                {financialYear.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="flex flex-col gap-2">
+          <span>{companySelectorLabel}</span>
+          <label className="flex items-center gap-2 rounded-lg px-2 py-1.5" style={{ background: "var(--surface-subtle)" }}>
+            <input
+              type="checkbox"
+              checked={allCompaniesSelected}
+              onChange={() => navigateWithCompanyScope(companyOptions.map((company) => company.id))}
+            />
+            <span>All companies</span>
+          </label>
+          {companyOptions.map((company) => (
+            <label key={company.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5" style={{ background: "var(--surface-subtle)" }}>
+              <input
+                type="checkbox"
+                checked={selectedCompanyIdSet.has(company.id)}
+                onChange={() => handleCompanyScopeToggle(company.id)}
+              />
+              <span className="min-w-0 truncate">{company.name}</span>
+            </label>
+          ))}
+        </div>
+        <label className="hidden">
+          Legacy company selector
         <select
           value={selectedCompanyScopeValue}
           onChange={(event) => handleCompanyScopeSelect(event.currentTarget.value)}
@@ -358,7 +433,8 @@ export function Shell({
             </option>
           ))}
         </select>
-      </label>
+        </label>
+      </div>
     ) : null;
 
   const showSidebarTooltip = (element: HTMLElement, label: string) => {

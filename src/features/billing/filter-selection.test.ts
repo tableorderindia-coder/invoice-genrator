@@ -7,10 +7,14 @@ import { describe, expect, it } from "vitest";
 import {
   buildEmployeeCashFlowFilterFieldEntries,
   buildDashboardFilterFieldEntries,
+  filterRowsByFinancialYear,
   filterSavedCashFlowRows,
   formatPaymentMonthLabel,
+  getFinancialYearOptions,
   normalizeMultiSelectValue,
+  parseFinancialYear,
   resolveDashboardColumnSelection,
+  resolveFinancialYearFromDate,
   resolveSelectedCompanyId,
   resolveSavedCashFlowFilters,
 } from "./filter-selection";
@@ -60,6 +64,34 @@ describe("filter selection helpers", () => {
 
   it("formats payment months as readable labels", () => {
     expect(formatPaymentMonthLabel("2026-04")).toBe("April 2026");
+  });
+
+  it("defaults the financial year from April to March", () => {
+    expect(resolveFinancialYearFromDate(new Date("2026-08-05T00:00:00+05:30")).value).toBe("2026-2027");
+    expect(resolveFinancialYearFromDate(new Date("2027-02-01T00:00:00+05:30")).value).toBe("2026-2027");
+  });
+
+  it("parses and filters rows by financial year", () => {
+    expect(parseFinancialYear("2026-2027").label).toBe("Apr 2026 - Mar 2027");
+    expect(
+      filterRowsByFinancialYear(
+        [
+          { id: "before", year: 2026, month: 3 },
+          { id: "start", year: 2026, month: 4 },
+          { id: "end", year: 2027, month: 3 },
+          { id: "after", year: 2027, month: 4 },
+        ],
+        "2026-2027",
+      ).map((row) => row.id),
+    ).toEqual(["start", "end"]);
+  });
+
+  it("builds nearby financial year options around the selected date", () => {
+    expect(
+      getFinancialYearOptions(new Date("2026-08-05T00:00:00+05:30")).map(
+        (row) => row.value,
+      ),
+    ).toEqual(["2027-2028", "2026-2027", "2025-2026"]);
   });
 
   it("falls back to the raw payment month when the month key is invalid", () => {
@@ -179,6 +211,7 @@ describe("filter selection helpers", () => {
     expect(
       buildDashboardFilterFieldEntries({
         companyId: "comp_1",
+        financialYear: "2026-2027",
         periodType: "monthly",
         view: "employee",
         employeeIds: ["emp_1", "emp_2"],
@@ -189,6 +222,7 @@ describe("filter selection helpers", () => {
       }),
     ).toEqual([
       { name: "companyId", value: "comp_1" },
+      { name: "financialYear", value: "2026-2027" },
       { name: "periodType", value: "monthly" },
       { name: "employeeIds", value: "emp_1" },
       { name: "employeeIds", value: "emp_2" },
@@ -260,6 +294,7 @@ describe("filter selection helpers", () => {
     expect(DEFAULT_EMPLOYEE_DASHBOARD_COLUMNS).toEqual([
       "effectiveDollarInward",
       "cashoutRate",
+      "cashIn",
       "salaryPaid",
       "pf",
       "tds",
@@ -272,6 +307,7 @@ describe("filter selection helpers", () => {
     expect(DEFAULT_PERIOD_DASHBOARD_COLUMNS).toEqual([
       "effectiveDollarInward",
       "cashoutRate",
+      "cashIn",
       "salaryPaid",
       "pf",
       "tds",
