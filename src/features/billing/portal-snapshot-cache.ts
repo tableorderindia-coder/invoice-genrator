@@ -1,4 +1,4 @@
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { query } from "@/lib/db/pool";
 import type { BillingInvalidationInput } from "./cache-tags";
 
 export type PortalSnapshotType =
@@ -35,83 +35,75 @@ export function buildPortalSnapshotKey(input: {
 
 function isMissingSnapshotTableError(error: unknown) {
   if (!error || typeof error !== "object") return false;
-  const code = "code" in error ? String(error.code) : "";
-  const message = "message" in error ? String(error.message) : "";
+  const code = "code" in error ? String((error as { code?: unknown }).code) : "";
+  const message = "message" in error ? String((error as { message?: unknown }).message) : "";
   return (
     code === "42P01" ||
-    code === "PGRST205" ||
     message.includes('relation "public.portal_company_snapshots" does not exist') ||
-    message.includes("Could not find the table 'public.portal_company_snapshots'")
+    message.includes('relation "portal_company_snapshots" does not exist')
   );
 }
 
 function isSnapshotWriteDeniedError(error: unknown) {
   if (!error || typeof error !== "object") return false;
-  const code = "code" in error ? String(error.code) : "";
-  const message = "message" in error ? String(error.message) : "";
-  return (
-    code === "42501" ||
-    message.includes("row-level security policy") ||
-    message.includes("permission denied")
-  );
-}
-
-async function getSupabaseOrThrow() {
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) {
-    throw new Error("Supabase is not configured.");
-  }
-  return supabase;
+  const code = "code" in error ? String((error as { code?: unknown }).code) : "";
+  const message = "message" in error ? String((error as { message?: unknown }).message) : "";
+  return code === "42501" || message.includes("permission denied");
 }
 
 export async function getOrBuildPortalSnapshot<T>(input: {
   key: PortalSnapshotKey;
   build: () => Promise<T>;
 }): Promise<T> {
-  const supabase = await getSupabaseOrThrow();
   const { key } = input;
+  let missingTable = false;
 
-  const { data, error } = await supabase
-    .from("portal_company_snapshots")
-    .select("payload_json")
-    .eq("company_id", key.companyId)
-    .eq("snapshot_type", key.snapshotType)
-    .eq("month_key", key.monthKey)
-    .maybeSingle();
+  try {
+    const { rows } = await query<{ payload_json: T }>(
+      `select payload_json
+       from public.portal_company_snapshots
+       where company_id = $1 and snapshot_type = $2 and month_key = $3
+       limit 1`,
+      [key.companyId, key.snapshotType, key.monthKey],
+    );
 
-  if (error && !isMissingSnapshotTableError(error)) {
-    throw error;
-  }
-
-  if (data && !error) {
-    return data.payload_json as T;
+    if (rows[0]) {
+      return rows[0].payload_json;
+    }
+  } catch (error) {
+    if (!isMissingSnapshotTableError(error)) {
+      throw error;
+    }
+    missingTable = true;
   }
 
   const payload = await input.build();
-  if (error && isMissingSnapshotTableError(error)) {
+  if (missingTable) {
     return payload;
   }
 
-  const { error: upsertError } = await supabase
-    .from("portal_company_snapshots")
-    .upsert(
-      {
-        company_id: key.companyId,
-        snapshot_type: key.snapshotType,
-        month_key: key.monthKey,
-        payload_json: payload,
-        source_version: new Date().toISOString(),
-        rebuilt_at: new Date().toISOString(),
-      },
-      { onConflict: "company_id,snapshot_type,month_key" },
+  try {
+    await query(
+      `insert into public.portal_company_snapshots
+         (company_id, snapshot_type, month_key, payload_json, source_version, rebuilt_at)
+       values ($1, $2, $3, $4, $5, $5)
+       on conflict (company_id, snapshot_type, month_key)
+       do update set
+         payload_json = excluded.payload_json,
+         source_version = excluded.source_version,
+         rebuilt_at = excluded.rebuilt_at`,
+      [
+        key.companyId,
+        key.snapshotType,
+        key.monthKey,
+        JSON.stringify(payload),
+        new Date().toISOString(),
+      ],
     );
-
-  if (
-    upsertError &&
-    !isMissingSnapshotTableError(upsertError) &&
-    !isSnapshotWriteDeniedError(upsertError)
-  ) {
-    throw upsertError;
+  } catch (error) {
+    if (!isMissingSnapshotTableError(error) && !isSnapshotWriteDeniedError(error)) {
+      throw error;
+    }
   }
 
   return payload;
@@ -149,22 +141,26 @@ function snapshotTypesForInvalidation(input: BillingInvalidationInput): PortalSn
 }
 
 export async function invalidatePortalSnapshotsForBilling(input: BillingInvalidationInput) {
-  const supabase = await getSupabaseOrThrow();
   const snapshotTypes = snapshotTypesForInvalidation(input);
   const companyId = "companyId" in input ? input.companyId : undefined;
   const companyIds = [companyId, GLOBAL_COMPANY_ID].filter(Boolean) as string[];
 
-  let query = supabase
-    .from("portal_company_snapshots")
-    .delete()
-    .in("snapshot_type", snapshotTypes);
+  const conditions = ["snapshot_type = any($1::text[])"];
+  const params: unknown[] = [snapshotTypes];
 
   if (companyIds.length > 0) {
-    query = query.in("company_id", companyIds);
+    conditions.push(`company_id = any($${params.length + 1}::text[])`);
+    params.push(companyIds);
   }
 
-  const { error } = await query;
-  if (error && !isMissingSnapshotTableError(error) && !isSnapshotWriteDeniedError(error)) {
-    throw error;
+  try {
+    await query(
+      `delete from public.portal_company_snapshots where ${conditions.join(" and ")}`,
+      params,
+    );
+  } catch (error) {
+    if (!isMissingSnapshotTableError(error) && !isSnapshotWriteDeniedError(error)) {
+      throw error;
+    }
   }
 }

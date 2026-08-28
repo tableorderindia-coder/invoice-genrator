@@ -4,6 +4,15 @@ import { createElement } from "react";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+// employee-statements.ts (imported transitively by the editor component)
+// imports normalizeEmployeeNameForMatch from employee-cash-flow-store.ts,
+// which imports lib/db/pool.ts (a "server-only" module). Stub the pg client
+// so that import chain doesn't throw in this (jsdom) test environment.
+vi.mock("@/lib/db/pool", () => ({
+  query: vi.fn(),
+  withTransaction: vi.fn(),
+}));
+
 vi.mock("../../../src/features/billing/actions", () => ({
   saveEmployeeStatementAction: vi.fn(),
 }));

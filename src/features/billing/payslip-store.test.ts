@@ -1,4 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("@/lib/db/pool", () => ({
+  query: vi.fn(async () => ({ rows: [], rowCount: 0 })),
+  withTransaction: vi.fn(async (fn: (client: unknown) => unknown) =>
+    fn({ query: vi.fn(async () => ({ rows: [], rowCount: 0 })) }),
+  ),
+}));
 
 import { preparePayslipRecords } from "./payslip-store";
 import type { Employee } from "./types";

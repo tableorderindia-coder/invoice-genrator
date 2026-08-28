@@ -1,5 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+// employee-statements.ts (imported transitively by employee-statements-load.ts)
+// imports normalizeEmployeeNameForMatch from employee-cash-flow-store.ts, which
+// imports lib/db/pool.ts (a "server-only" module). Stub the pg client so that
+// import chain doesn't throw in this (non-server) test environment.
+vi.mock("@/lib/db/pool", () => ({
+  query: vi.fn(),
+  withTransaction: vi.fn(),
+}));
+
 const listEmployeesMock = vi.fn();
 const listInvoicesForCompanyMock = vi.fn();
 const getInvoiceDetailMock = vi.fn();

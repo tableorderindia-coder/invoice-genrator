@@ -1,5 +1,5 @@
 import { resolveEffectiveLineItemTotalUsdCents } from "./domain";
-import { normalizeEmployeeNameForMatch } from "./employee-cash-flow-store";
+import { normalizeEmployeeNameForMatch } from "./employee-name-match";
 import {
   formatPaymentMonthLabel,
   normalizeMultiSelectValue,

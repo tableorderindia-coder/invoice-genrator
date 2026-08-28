@@ -1,15 +1,9 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createBrowserClient } from "@supabase/ssr";
 
-import {
-  getDefaultRedirectPath,
-  normalizePermissionPage,
-  type AppPermission,
-} from "@/lib/auth/authorization";
-import { ForgotPassword } from "@/components/ForgotPassword";
+import { loginAction } from "@/lib/auth/actions";
 import PasswordInput from "@/components/PasswordInput";
 import {
   RiveCharacter,
@@ -20,19 +14,6 @@ type LoginFormProps = {
   initialError?: string;
   initialSuccess?: string;
   next?: string;
-  supabaseUrl: string | null;
-  supabaseKey: string | null;
-};
-
-type PermissionRow = {
-  page: string;
-  can_view: boolean;
-  can_edit: boolean;
-};
-
-type ProfileRow = {
-  role: "admin" | "user";
-  must_change_password: boolean;
 };
 
 const inputClassName =
@@ -44,22 +25,9 @@ const inputStyle = {
   color: "#E5E7EB",
 } as const;
 
-export function LoginForm({
-  initialError,
-  initialSuccess,
-  next,
-  supabaseUrl,
-  supabaseKey,
-}: LoginFormProps) {
+export function LoginForm({ initialError, initialSuccess, next }: LoginFormProps) {
   const router = useRouter();
   const riveRef = useRef<RiveCharacterHandle>(null);
-  const supabase = useMemo(() => {
-    if (!supabaseUrl || !supabaseKey) {
-      return null;
-    }
-
-    return createBrowserClient(supabaseUrl, supabaseKey);
-  }, [supabaseKey, supabaseUrl]);
 
   const [mode, setMode] = useState<"login" | "forgot">("login");
   const [email, setEmail] = useState("");
@@ -73,65 +41,23 @@ export function LoginForm({
     setError("");
     setSuccess("");
 
-    if (!supabase) {
-      setError("Supabase is not configured.");
-      riveRef.current?.fireFail();
-      return;
-    }
-
     try {
       setIsSubmitting(true);
 
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const formData = new FormData();
+      formData.set("email", email);
+      formData.set("password", password);
 
-      if (signInError || !data.user) {
+      const result = await loginAction(formData);
+
+      if (!result.ok) {
         riveRef.current?.fireFail();
-        setError("Invalid email or password");
+        setError(result.error);
         return;
       }
 
       riveRef.current?.fireSuccess();
-
-      const [{ data: profile }, { data: permissionRows }] = await Promise.all([
-        supabase
-          .from("profiles")
-          .select("role, must_change_password")
-          .eq("id", data.user.id)
-          .single<ProfileRow>(),
-        supabase
-          .from("permissions")
-          .select("page, can_view, can_edit")
-          .eq("user_id", data.user.id),
-      ]);
-
-      const permissions: AppPermission[] =
-        ((permissionRows ?? []) as PermissionRow[])
-          .map((permission) => {
-            const page = normalizePermissionPage(permission.page);
-            if (!page) {
-              return null;
-            }
-
-            return {
-              page,
-              canView: permission.can_view,
-              canEdit: permission.can_edit,
-            } satisfies AppPermission;
-          })
-          .filter((permission): permission is AppPermission => permission !== null);
-
-      const destination =
-        next ||
-        getDefaultRedirectPath({
-          role: profile?.role ?? "user",
-          permissions,
-          mustChangePassword: profile?.must_change_password ?? false,
-        });
-
-      router.push(destination);
+      router.push(next || result.redirectTo);
       router.refresh();
     } catch {
       riveRef.current?.fireFail();
@@ -254,15 +180,25 @@ export function LoginForm({
               </button>
             </>
           ) : (
-            <ForgotPassword
-              supabaseUrl={supabaseUrl}
-              supabaseKey={supabaseKey}
-              onBack={() => {
-                setError("");
-                setSuccess("");
-                setMode("login");
-              }}
-            />
+            <div className="w-full space-y-4">
+              <p className="text-sm" style={{ color: "#E5E7EB" }}>
+                Password resets are handled by your admin. Ask them to set a new
+                temporary password for your account from Admin &rarr; Users - you&apos;ll
+                be prompted to choose a new password the next time you log in.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setError("");
+                  setSuccess("");
+                  setMode("login");
+                }}
+                className="w-full text-sm transition-colors duration-200"
+                style={{ color: "#E5E7EB" }}
+              >
+                Back to Login
+              </button>
+            </div>
           )}
         </div>
       </section>

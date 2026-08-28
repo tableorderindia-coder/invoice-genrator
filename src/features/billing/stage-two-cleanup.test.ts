@@ -20,24 +20,32 @@ function tableDefinition(schema: string, tableName: string) {
 }
 
 describe("stage two cleanup", () => {
-  it("removes obsolete auth actions and Supabase compatibility shims", () => {
+  it("has moved auth actions off Supabase and onto the self-hosted session/pg layer", () => {
     const authActions = readProjectFile("lib/auth/actions.ts");
     const authServer = readProjectFile("lib/auth/server.ts");
     const packageJson = readProjectFile("package.json");
 
     expect(authActions).not.toMatch(
-      /loginAction|forgotPasswordAction|resetPasswordAction|getRequestOrigin/,
+      /createSupabaseAdminClient|createSupabaseServerClient|auth\.admin\.createUser/,
     );
     expect(authServer).not.toMatch(
-      /getPostAuthRedirectPath|shouldRedirectToPasswordReset/,
+      /createSupabaseServerClient|supabase\.auth\.getUser/,
     );
     expect(packageJson).toContain('"server-only"');
+    expect(packageJson).toContain('"pg"');
+    expect(packageJson).toContain('"bcryptjs"');
 
     for (const path of [
       "lib/supabase/client.ts",
       "src/lib/supabase/client.ts",
       "src/lib/supabase/server.ts",
       "src/lib/supabase/config.ts",
+      // The Supabase magic-link forgot-password flow has no self-hosted-auth
+      // equivalent (see lib/auth/actions.ts changePasswordAction docblock) -
+      // password resets are admin-issued temp passwords instead.
+      "components/ForgotPassword.tsx",
+      "app/auth/callback/route.ts",
+      "app/api/auth/users/exists/route.ts",
     ]) {
       expect(existsSync(resolve(projectRoot, path)), path).toBe(false);
     }
@@ -46,9 +54,9 @@ describe("stage two cleanup", () => {
   it("keeps the active browser auth and PDF endpoints in place", () => {
     for (const path of [
       "components/LoginForm.tsx",
-      "components/ForgotPassword.tsx",
       "components/ResetPasswordForm.tsx",
-      "app/auth/callback/route.ts",
+      "lib/auth/session.ts",
+      "lib/auth/password.ts",
       "app/api/invoices/[id]/pdf/route.ts",
       "app/api/employee-statements/[employeeId]/pdf/route.ts",
     ]) {

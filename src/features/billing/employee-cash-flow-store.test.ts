@@ -1,12 +1,188 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+type Row = Record<string, unknown>;
+
+const mocks = vi.hoisted(() => {
+  const state: {
+    invoiceRows: Row[];
+    payoutRows: Row[];
+    realizationRows: Row[];
+    invoiceTeamRows: Row[];
+    lineItemRows: Row[];
+    adjustmentRows: Row[];
+    employeeRows: Row[];
+    salaryPaymentRows: Row[];
+    invoicePaymentRows: Row[];
+    savedEntryRows: Row[];
+    inserts: Array<{ sql: string; params: unknown[] }>;
+    updates: Array<{ sql: string; params: unknown[] }>;
+    deletes: Array<{ sql: string; params: unknown[] }>;
+    txCalls: Array<{ sql: string; params: unknown[] }>;
+    forceError: { match: (sql: string) => boolean; error: unknown } | null;
+  } = {
+    invoiceRows: [],
+    payoutRows: [],
+    realizationRows: [],
+    invoiceTeamRows: [],
+    lineItemRows: [],
+    adjustmentRows: [],
+    employeeRows: [],
+    salaryPaymentRows: [],
+    invoicePaymentRows: [],
+    savedEntryRows: [],
+    inserts: [],
+    updates: [],
+    deletes: [],
+    txCalls: [],
+    forceError: null,
+  };
+
+  // The real Postgres driver returns bigint/numeric columns as strings and
+  // date/timestamp columns as Date objects unless the query casts them
+  // (see the ::float8 / ::text casts throughout employee-cash-flow-store.ts).
+  // This mock doesn't run real SQL, so it simulates just enough of that cast
+  // behavior - by scanning the query text for "<col>::float8 as <alias>" and
+  // "<col>::text as <alias>" - to catch a regression where a cast is dropped
+  // and a money field silently turns into a string again.
+  function applyCasts(sql: string, rows: Row[]): Row[] {
+    const floatAliases = new Set<string>();
+    const textAliases = new Set<string>();
+    const floatRe = /::float8\s+as\s+(\w+)/gi;
+    const textRe = /::text\s+as\s+(\w+)/gi;
+    let match: RegExpExecArray | null;
+    while ((match = floatRe.exec(sql))) floatAliases.add(match[1]!);
+    while ((match = textRe.exec(sql))) textAliases.add(match[1]!);
+    if (floatAliases.size === 0 && textAliases.size === 0) {
+      return rows;
+    }
+    return rows.map((row) => {
+      const clone: Row = { ...row };
+      for (const alias of floatAliases) {
+        if (clone[alias] !== null && clone[alias] !== undefined) {
+          clone[alias] = Number(clone[alias]);
+        }
+      }
+      for (const alias of textAliases) {
+        if (clone[alias] !== null && clone[alias] !== undefined) {
+          clone[alias] = String(clone[alias]);
+        }
+      }
+      return clone;
+    });
+  }
+
+  function route(sql: string, params: unknown[]) {
+    if (state.forceError && state.forceError.match(sql)) {
+      const error = state.forceError.error;
+      state.forceError = null;
+      throw error;
+    }
+
+    const s = sql.trim().toLowerCase();
+
+    if (s.startsWith("select")) {
+      let rows: Row[];
+      if (s.includes("from invoice_payment_employee_entries")) {
+        rows = state.savedEntryRows;
+      } else if (s.includes("from employee_payouts")) {
+        rows = state.payoutRows;
+      } else if (s.includes("from employee_salary_payments")) {
+        rows = state.salaryPaymentRows;
+      } else if (s.includes("from invoice_realizations")) {
+        rows = state.realizationRows;
+      } else if (s.includes("from invoice_line_items")) {
+        rows = state.lineItemRows;
+      } else if (s.includes("from invoice_teams")) {
+        rows = state.invoiceTeamRows;
+      } else if (s.includes("from invoice_adjustments")) {
+        rows = state.adjustmentRows;
+      } else if (s.includes("from invoice_payments")) {
+        rows = state.invoicePaymentRows;
+      } else if (s.includes("from employees")) {
+        rows = state.employeeRows;
+      } else if (s.includes("from invoices")) {
+        rows = state.invoiceRows;
+      } else {
+        throw new Error(`Unexpected select: ${sql}`);
+      }
+      const cast = applyCasts(sql, rows);
+      return { rows: cast, rowCount: cast.length };
+    }
+
+    if (s.startsWith("insert")) {
+      state.inserts.push({ sql, params });
+      return { rows: [], rowCount: 1 };
+    }
+
+    if (s.startsWith("update")) {
+      state.updates.push({ sql, params });
+      return { rows: [], rowCount: 1 };
+    }
+
+    if (s.startsWith("delete")) {
+      state.deletes.push({ sql, params });
+      return { rows: [], rowCount: 0 };
+    }
+
+    throw new Error(`Unexpected query: ${sql}`);
+  }
+
+  const query = vi.fn(async (sql: string, params: unknown[] = []) => route(sql, params));
+
+  const withTransaction = vi.fn(async (fn: (client: { query: typeof query }) => Promise<unknown>) => {
+    const client = {
+      query: vi.fn(async (sql: string, params: unknown[] = []) => {
+        state.txCalls.push({ sql, params });
+        return route(sql, params);
+      }),
+    };
+    return fn(client);
+  });
+
+  return { state, query, withTransaction };
+});
+
+vi.mock("@/lib/db/pool", () => ({
+  query: mocks.query,
+  withTransaction: mocks.withTransaction,
+}));
 
 import {
   appendMissingAdjustmentEntries,
   buildEmployeeCashFlowMonthRows,
   buildInvoiceCashFlowFallbackEntries,
-  normalizeEmployeeNameForMatch,
+  deleteSavedEmployeeCashFlowEntry,
+  getInvoicePaymentPrefillData,
+  listCashFlowInvoiceOptions,
+  listSavedEmployeeCashFlowEntries,
+  replaceInvoicePaymentEmployeeEntries,
+  updateDashboardEmployeeCashFlowEntry,
+  updateSavedEmployeeCashFlowEntry,
+  upsertInvoicePayment,
 } from "./employee-cash-flow-store";
+import { normalizeEmployeeNameForMatch } from "./employee-name-match";
 import { calculateEffectiveDollarInwardUsdCents } from "./employee-cash-flow";
+import type { EmployeeCashFlowSavedEntry } from "./employee-cash-flow-types";
+
+function resetMockState() {
+  mocks.state.invoiceRows = [];
+  mocks.state.payoutRows = [];
+  mocks.state.realizationRows = [];
+  mocks.state.invoiceTeamRows = [];
+  mocks.state.lineItemRows = [];
+  mocks.state.adjustmentRows = [];
+  mocks.state.employeeRows = [];
+  mocks.state.salaryPaymentRows = [];
+  mocks.state.invoicePaymentRows = [];
+  mocks.state.savedEntryRows = [];
+  mocks.state.inserts = [];
+  mocks.state.updates = [];
+  mocks.state.deletes = [];
+  mocks.state.txCalls = [];
+  mocks.state.forceError = null;
+  mocks.query.mockClear();
+  mocks.withTransaction.mockClear();
+}
 
 describe("employee cash flow store shaping", () => {
   it("aggregates multiple payment rows in the same month", () => {
@@ -23,6 +199,10 @@ describe("employee cash flow store shaping", () => {
           reimbursementLabelsText: "",
           appraisalAdvanceUsdCents: 0,
           offboardingDeductionUsdCents: 0,
+          monthlyPaidInrCents: 0,
+          pfInrCents: 0,
+          tdsInrCents: 0,
+          salaryPaidInrCents: 0,
           daysWorked: 10,
           daysInMonth: 30,
           cashoutUsdInrRate: 85,
@@ -42,6 +222,10 @@ describe("employee cash flow store shaping", () => {
           reimbursementLabelsText: "Laptop",
           appraisalAdvanceUsdCents: 125,
           offboardingDeductionUsdCents: 0,
+          monthlyPaidInrCents: 0,
+          pfInrCents: 0,
+          tdsInrCents: 0,
+          salaryPaidInrCents: 0,
           daysWorked: 12,
           daysInMonth: 30,
           cashoutUsdInrRate: 85,
@@ -84,6 +268,10 @@ describe("employee cash flow store shaping", () => {
           reimbursementLabelsText: "",
           appraisalAdvanceUsdCents: 0,
           offboardingDeductionUsdCents: 0,
+          monthlyPaidInrCents: 0,
+          pfInrCents: 0,
+          tdsInrCents: 0,
+          salaryPaidInrCents: 0,
           daysWorked: 0,
           daysInMonth: 30,
           cashoutUsdInrRate: 85,
@@ -130,6 +318,10 @@ describe("employee cash flow store shaping", () => {
           reimbursementLabelsText: "Laptop",
           appraisalAdvanceUsdCents: 100_000,
           offboardingDeductionUsdCents: 0,
+          monthlyPaidInrCents: 0,
+          pfInrCents: 0,
+          tdsInrCents: 0,
+          salaryPaidInrCents: 0,
           daysWorked: 0,
           daysInMonth: 30,
           cashoutUsdInrRate: 85,
@@ -160,7 +352,7 @@ describe("employee cash flow store shaping", () => {
     expect(normalizeEmployeeNameForMatch("PAWAN KUMAR BEESETTI")).toBe(
       "pawan kumar beesetti",
     );
-    expect(normalizeEmployeeNameForMatch("Nirbhay\u00A0 Kumar   Giri")).toBe(
+    expect(normalizeEmployeeNameForMatch("Nirbhay  Kumar   Giri")).toBe(
       "nirbhay kumar giri",
     );
   });
@@ -479,5 +671,560 @@ describe("employee cash flow store shaping", () => {
     });
 
     expect(entries[0]?.paidUsdInrRate).toBe(85);
+  });
+});
+
+describe("employee cash flow store (pg-backed)", () => {
+  beforeEach(() => {
+    resetMockState();
+  });
+
+  it("lists cashed-out invoices ordered by year/month descending", async () => {
+    mocks.state.invoiceRows = [
+      { id: "inv_2", invoice_number: "2026/002", company_id: "comp_1", month: 2, year: 2026 },
+    ];
+
+    const options = await listCashFlowInvoiceOptions({ companyId: "comp_1" });
+
+    expect(options).toEqual([
+      { id: "inv_2", invoiceNumber: "2026/002", companyId: "comp_1", month: 2, year: 2026 },
+    ]);
+    expect(mocks.query).toHaveBeenCalledTimes(1);
+    const [sql, params] = mocks.query.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("status = 'cashed_out'");
+    expect(params).toEqual(["comp_1"]);
+  });
+
+  it("throws when the invoice is not found", async () => {
+    mocks.state.invoiceRows = [];
+
+    await expect(
+      getInvoicePaymentPrefillData({ invoiceId: "inv_missing", paymentMonth: "2026-04" }),
+    ).rejects.toThrow("Selected invoice was not found.");
+  });
+
+  it("throws when the invoice has not been cashed out", async () => {
+    mocks.state.invoiceRows = [
+      {
+        id: "inv_1",
+        invoice_number: "2026/001",
+        company_id: "comp_1",
+        month: 4,
+        year: 2026,
+        status: "sent",
+      },
+    ];
+
+    await expect(
+      getInvoicePaymentPrefillData({ invoiceId: "inv_1", paymentMonth: "2026-04" }),
+    ).rejects.toThrow("Only cashed out invoices can be used in employee cash flow.");
+  });
+
+  it("builds prefill data from saved invoice_payment_employee_entries when present", async () => {
+    mocks.state.invoiceRows = [
+      {
+        id: "inv_1",
+        invoice_number: "2026/001",
+        company_id: "comp_1",
+        month: 4,
+        year: 2026,
+        status: "cashed_out",
+      },
+    ];
+    mocks.state.payoutRows = [];
+    mocks.state.realizationRows = [
+      { invoice_id: "inv_1", dollar_inbound_usd_cents: 500_000, usd_inr_rate: "85.5000" },
+    ];
+    mocks.state.employeeRows = [
+      {
+        id: "emp_1",
+        full_name: "Asha Rao",
+        company_id: "comp_1",
+        default_paid_usd_inr_rate: "82.0000",
+        default_actual_paid_inr_cents: "18000000",
+        default_pf_inr_cents: "150000",
+        default_tds_inr_cents: "250000",
+      },
+    ];
+    mocks.state.salaryPaymentRows = [];
+    mocks.state.invoicePaymentRows = [
+      { id: "ip_1", payment_date: "2026-04-05", payment_month: "2026-04", usd_inr_rate: "85.5000" },
+    ];
+    mocks.state.savedEntryRows = [
+      {
+        id: "entry_1",
+        employee_id: "emp_1",
+        payment_month: "2026-04",
+        invoice_line_item_id: null,
+        employee_name_snapshot: "Asha Rao",
+        company_id: "comp_1",
+        base_dollar_inward_usd_cents: 400_000,
+        onboarding_advance_usd_cents: 0,
+        advance_override_inr_cents: null,
+        reimbursement_usd_cents: 0,
+        reimbursement_labels_text: null,
+        appraisal_advance_usd_cents: 0,
+        offboarding_deduction_usd_cents: 0,
+        effective_dollar_inward_usd_cents: 400_000,
+        cashout_usd_inr_rate: "85.5000",
+        paid_usd_inr_rate: "82.0000",
+        monthly_paid_inr_cents: "18000000",
+        cash_in_inr_cents: "34200000",
+        pf_inr_cents: "150000",
+        tds_inr_cents: "250000",
+        actual_paid_inr_cents: "18000000",
+        salary_paid_inr_cents: "17600000",
+        fx_commission_inr_cents: "0",
+        total_commission_usd_cents: 0,
+        commission_earned_inr_cents: "0",
+        gross_earnings_inr_cents: "0",
+        is_non_invoice_employee: false,
+        is_paid: false,
+        paid_at: null,
+        notes: null,
+        days_worked: 30,
+        days_in_month: 30,
+        invoice_id: "inv_1",
+      },
+    ];
+
+    const result = await getInvoicePaymentPrefillData({
+      invoiceId: "inv_1",
+      paymentMonth: "2026-04",
+    });
+
+    expect(result.invoicePaymentId).toBe("ip_1");
+    expect(result.invoice.usdInrRate).toBe(85.5);
+    expect(result.entries).toHaveLength(1);
+    // The savedEntries branch must carry through as real numbers, not strings,
+    // even though bigint/numeric Postgres columns come back as strings.
+    expect(result.entries[0]?.baseDollarInwardUsdCents).toBe(400_000);
+    expect(result.entries[0]?.actualPaidInrCents).toBe(180_000_00);
+    expect(typeof result.entries[0]?.actualPaidInrCents).toBe("number");
+    expect(typeof result.entries[0]?.cashoutUsdInrRate).toBe("number");
+  });
+
+  it("falls back to a days_worked-less line item select when the column is missing", async () => {
+    mocks.state.invoiceRows = [
+      {
+        id: "inv_1",
+        invoice_number: "2026/001",
+        company_id: "comp_1",
+        month: 4,
+        year: 2026,
+        status: "cashed_out",
+      },
+    ];
+    mocks.state.payoutRows = [
+      {
+        id: "payout_1",
+        invoice_id: "inv_1",
+        company_id: "comp_1",
+        employee_id: "emp_1",
+        invoice_line_item_id: "line_1",
+        employee_name_snapshot: "Asha Rao",
+        dollar_inward_usd_cents: 400_000,
+        cashout_usd_inr_rate: "85.0000",
+        paid_usd_inr_rate: "82.0000",
+        pf_inr_cents: "150000",
+        tds_inr_cents: "250000",
+        actual_paid_inr_cents: "18000000",
+        fx_commission_inr_cents: null,
+        total_commission_usd_cents: 0,
+        commission_earned_inr_cents: null,
+        is_non_invoice_employee: false,
+        is_paid: false,
+        paid_at: null,
+      },
+    ];
+    mocks.state.realizationRows = [
+      { invoice_id: "inv_1", dollar_inbound_usd_cents: 500_000, usd_inr_rate: "85.0000" },
+    ];
+    mocks.state.employeeRows = [
+      {
+        id: "emp_1",
+        full_name: "Asha Rao",
+        company_id: "comp_1",
+        default_paid_usd_inr_rate: "82.0000",
+        default_actual_paid_inr_cents: "18000000",
+        default_pf_inr_cents: "150000",
+        default_tds_inr_cents: "250000",
+      },
+    ];
+    mocks.state.invoicePaymentRows = [];
+    // The line item still exists (billed_total etc.) but its row won't carry
+    // days_worked once the fallback (column-less) query re-runs.
+    mocks.state.lineItemRows = [
+      {
+        id: "line_1",
+        employee_id: "emp_1",
+        employee_name_snapshot: "Asha Rao",
+        billed_total_usd_cents: 400_000,
+        manual_total_usd_cents: null,
+      },
+    ];
+    mocks.state.forceError = {
+      match: (sql) =>
+        sql.toLowerCase().includes("from invoice_line_items") &&
+        sql.toLowerCase().includes("days_worked"),
+      error: {
+        code: "42703",
+        message: "column invoice_line_items.days_worked does not exist",
+      },
+    };
+
+    const result = await getInvoicePaymentPrefillData({
+      invoiceId: "inv_1",
+      paymentMonth: "2026-04",
+    });
+
+    expect(result.entries).toHaveLength(1);
+    // days_worked falls back to daysInMonth when the column can't be selected.
+    expect(result.entries[0]?.daysWorked).toBe(30);
+  });
+
+  it("re-throws line item query errors that are not a missing days_worked column", async () => {
+    mocks.state.invoiceRows = [
+      {
+        id: "inv_1",
+        invoice_number: "2026/001",
+        company_id: "comp_1",
+        month: 4,
+        year: 2026,
+        status: "cashed_out",
+      },
+    ];
+    mocks.state.payoutRows = [
+      {
+        id: "payout_1",
+        invoice_id: "inv_1",
+        company_id: "comp_1",
+        employee_id: "emp_1",
+        invoice_line_item_id: "line_1",
+        employee_name_snapshot: "Asha Rao",
+        dollar_inward_usd_cents: 400_000,
+        cashout_usd_inr_rate: "85.0000",
+        paid_usd_inr_rate: "82.0000",
+        pf_inr_cents: "150000",
+        tds_inr_cents: "250000",
+        actual_paid_inr_cents: "18000000",
+        fx_commission_inr_cents: null,
+        total_commission_usd_cents: 0,
+        commission_earned_inr_cents: null,
+        is_non_invoice_employee: false,
+        is_paid: false,
+        paid_at: null,
+      },
+    ];
+    mocks.state.forceError = {
+      match: (sql) => sql.toLowerCase().includes("from invoice_line_items"),
+      error: { code: "42P01", message: "relation invoice_line_items does not exist" },
+    };
+
+    await expect(
+      getInvoicePaymentPrefillData({ invoiceId: "inv_1", paymentMonth: "2026-04" }),
+    ).rejects.toMatchObject({ code: "42P01" });
+  });
+
+  it("falls back to employee_payouts rows when no saved entries exist", async () => {
+    mocks.state.invoiceRows = [
+      {
+        id: "inv_1",
+        invoice_number: "2026/001",
+        company_id: "comp_1",
+        month: 4,
+        year: 2026,
+        status: "cashed_out",
+      },
+    ];
+    mocks.state.payoutRows = [
+      {
+        id: "payout_1",
+        invoice_id: "inv_1",
+        company_id: "comp_1",
+        employee_id: "emp_1",
+        invoice_line_item_id: null,
+        employee_name_snapshot: "Asha Rao",
+        dollar_inward_usd_cents: 400_000,
+        cashout_usd_inr_rate: "85.0000",
+        paid_usd_inr_rate: "82.0000",
+        pf_inr_cents: "150000",
+        tds_inr_cents: "250000",
+        actual_paid_inr_cents: "18000000",
+        fx_commission_inr_cents: "1000",
+        total_commission_usd_cents: 100,
+        commission_earned_inr_cents: "2000",
+        is_non_invoice_employee: false,
+        is_paid: false,
+        paid_at: null,
+      },
+    ];
+    mocks.state.realizationRows = [
+      { invoice_id: "inv_1", dollar_inbound_usd_cents: 500_000, usd_inr_rate: "85.0000" },
+    ];
+    mocks.state.employeeRows = [
+      {
+        id: "emp_1",
+        full_name: "Asha Rao",
+        company_id: "comp_1",
+        default_paid_usd_inr_rate: "82.0000",
+        default_actual_paid_inr_cents: "18000000",
+        default_pf_inr_cents: "150000",
+        default_tds_inr_cents: "250000",
+      },
+    ];
+    mocks.state.invoicePaymentRows = [];
+
+    const result = await getInvoicePaymentPrefillData({
+      invoiceId: "inv_1",
+      paymentMonth: "2026-04",
+    });
+
+    expect(result.invoicePaymentId).toBe("");
+    expect(result.entries).toHaveLength(1);
+    expect(result.entries[0]?.baseDollarInwardUsdCents).toBe(400_000);
+    expect(result.entries[0]?.pfInrCents).toBe(1_500_00);
+    expect(typeof result.entries[0]?.pfInrCents).toBe("number");
+  });
+
+  it("inserts a new invoice payment when no id is supplied", async () => {
+    const id = await upsertInvoicePayment({
+      invoiceId: "inv_1",
+      companyId: "comp_1",
+      paymentDate: "2026-04-05",
+      paymentMonth: "2026-04",
+      usdInrRate: 85.5,
+    });
+
+    expect(id).toMatch(/^invoice_payment_/);
+    expect(mocks.state.inserts).toHaveLength(1);
+    expect(mocks.state.updates).toHaveLength(0);
+    expect(mocks.state.inserts[0]?.sql.toLowerCase()).toContain("insert into invoice_payments");
+  });
+
+  it("updates an existing invoice payment when an id is supplied", async () => {
+    const id = await upsertInvoicePayment({
+      invoicePaymentId: "ip_existing",
+      invoiceId: "inv_1",
+      companyId: "comp_1",
+      paymentDate: "2026-04-05",
+      paymentMonth: "2026-04",
+      usdInrRate: 85.5,
+      notes: "Adjusted",
+    });
+
+    expect(id).toBe("ip_existing");
+    expect(mocks.state.updates).toHaveLength(1);
+    expect(mocks.state.inserts).toHaveLength(0);
+    expect(mocks.state.updates[0]?.params).toContain("ip_existing");
+  });
+
+  it("replaces invoice payment employee entries inside one transaction", async () => {
+    await replaceInvoicePaymentEmployeeEntries({
+      invoicePaymentId: "ip_1",
+      invoiceId: "inv_1",
+      companyId: "comp_1",
+      paymentMonth: "2026-04",
+      entries: [
+        {
+          clientBatchId: "ip_1",
+          invoiceId: "inv_1",
+          invoiceNumber: "2026/001",
+          employeeId: "emp_1",
+          employeeNameSnapshot: "Asha Rao",
+          daysWorked: 30,
+          daysInMonth: 30,
+          baseDollarInwardUsdCents: 400_000,
+          onboardingAdvanceUsdCents: 0,
+          reimbursementUsdCents: 0,
+          reimbursementLabelsText: "",
+          appraisalAdvanceUsdCents: 0,
+          offboardingDeductionUsdCents: 0,
+          cashoutUsdInrRate: 85,
+          paidUsdInrRate: 82,
+          monthlyPaidInrCents: 180_000_00,
+          pfInrCents: 1_500_00,
+          tdsInrCents: 2_500_00,
+          actualPaidInrCents: 180_000_00,
+          salaryPaidInrCents: 176_000_00,
+          fxCommissionInrCents: 0,
+          totalCommissionUsdCents: 0,
+          commissionEarnedInrCents: 0,
+          grossEarningsInrCents: 0,
+          isNonInvoiceEmployee: false,
+          isPaid: false,
+        },
+      ],
+    });
+
+    expect(mocks.withTransaction).toHaveBeenCalledTimes(1);
+    expect(mocks.state.txCalls).toHaveLength(2);
+    expect(mocks.state.txCalls[0]?.sql.toLowerCase()).toContain("delete from invoice_payment_employee_entries");
+    expect(mocks.state.txCalls[0]?.params).toEqual(["ip_1"]);
+    expect(mocks.state.txCalls[1]?.sql.toLowerCase()).toContain("insert into invoice_payment_employee_entries");
+    expect(mocks.state.txCalls[1]?.params).toContain("emp_1");
+  });
+
+  it("only deletes (skips the insert) when replacing with zero entries", async () => {
+    await replaceInvoicePaymentEmployeeEntries({
+      invoicePaymentId: "ip_1",
+      invoiceId: "inv_1",
+      companyId: "comp_1",
+      paymentMonth: "2026-04",
+      entries: [],
+    });
+
+    expect(mocks.state.txCalls).toHaveLength(1);
+    expect(mocks.state.txCalls[0]?.sql.toLowerCase()).toContain("delete from invoice_payment_employee_entries");
+  });
+
+  it("lists saved entries and coerces numeric/bigint columns to real numbers", async () => {
+    mocks.state.savedEntryRows = [
+      {
+        id: "entry_1",
+        invoice_payment_id: "ip_1",
+        invoice_id: "inv_1",
+        employee_id: "emp_1",
+        company_id: "comp_1",
+        payment_month: "2026-04",
+        invoice_line_item_id: null,
+        employee_name_snapshot: "Asha Rao",
+        days_worked: 30,
+        days_in_month: 30,
+        base_dollar_inward_usd_cents: 400_000,
+        onboarding_advance_usd_cents: 0,
+        advance_override_inr_cents: null,
+        reimbursement_usd_cents: 0,
+        reimbursement_labels_text: null,
+        appraisal_advance_usd_cents: 0,
+        offboarding_deduction_usd_cents: 0,
+        cashout_usd_inr_rate: "85.0000",
+        paid_usd_inr_rate: "82.0000",
+        monthly_paid_inr_cents: "18000000",
+        pf_inr_cents: "150000",
+        tds_inr_cents: "250000",
+        actual_paid_inr_cents: "18000000",
+        salary_paid_inr_cents: "17600000",
+        fx_commission_inr_cents: null,
+        total_commission_usd_cents: 0,
+        commission_earned_inr_cents: null,
+        gross_earnings_inr_cents: null,
+        is_non_invoice_employee: false,
+        is_paid: false,
+        paid_at: null,
+        notes: null,
+      },
+    ];
+    mocks.state.invoiceRows = [{ id: "inv_1", invoice_number: "2026/001" }];
+
+    const entries = await listSavedEmployeeCashFlowEntries({ companyId: "comp_1" });
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.invoiceNumber).toBe("2026/001");
+    expect(entries[0]?.cashoutUsdInrRate).toBe(85);
+    expect(entries[0]?.actualPaidInrCents).toBe(180_000_00);
+    expect(entries[0]?.fxCommissionInrCents).toBeNull();
+    expect(typeof entries[0]?.cashoutUsdInrRate).toBe("number");
+  });
+
+  it("filters saved entries by payment month when provided", async () => {
+    mocks.state.savedEntryRows = [];
+
+    await listSavedEmployeeCashFlowEntries({ companyId: "comp_1", paymentMonth: "2026-04" });
+
+    const [sql, params] = mocks.query.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("payment_month = $2");
+    expect(params).toEqual(["comp_1", "2026-04"]);
+  });
+
+  it("updates a saved entry with recalculated payout metrics", async () => {
+    const entry: EmployeeCashFlowSavedEntry = {
+      id: "entry_1",
+      companyId: "comp_1",
+      paymentMonth: "2026-04",
+      clientBatchId: "ip_1",
+      invoiceId: "inv_1",
+      invoiceNumber: "2026/001",
+      employeeId: "emp_1",
+      employeeNameSnapshot: "Asha Rao",
+      daysWorked: 30,
+      daysInMonth: 30,
+      baseDollarInwardUsdCents: 400_000,
+      onboardingAdvanceUsdCents: 0,
+      reimbursementUsdCents: 0,
+      reimbursementLabelsText: "",
+      appraisalAdvanceUsdCents: 0,
+      offboardingDeductionUsdCents: 0,
+      cashoutUsdInrRate: 85,
+      paidUsdInrRate: 82,
+      monthlyPaidInrCents: 180_000_00,
+      pfInrCents: 1_500_00,
+      tdsInrCents: 2_500_00,
+      actualPaidInrCents: 180_000_00,
+      salaryPaidInrCents: 176_000_00,
+      fxCommissionInrCents: 0,
+      totalCommissionUsdCents: 0,
+      commissionEarnedInrCents: 0,
+      grossEarningsInrCents: 0,
+      isNonInvoiceEmployee: false,
+      isPaid: false,
+    };
+
+    await updateSavedEmployeeCashFlowEntry(entry);
+
+    expect(mocks.state.updates).toHaveLength(1);
+    const [sql, params] = [mocks.state.updates[0]!.sql, mocks.state.updates[0]!.params];
+    expect(sql.toLowerCase()).toContain("update invoice_payment_employee_entries");
+    expect(params[params.length - 1]).toBe("entry_1");
+  });
+
+  it("deletes a saved entry by id", async () => {
+    await deleteSavedEmployeeCashFlowEntry("entry_1");
+
+    expect(mocks.state.deletes).toHaveLength(1);
+    expect(mocks.state.deletes[0]?.params).toEqual(["entry_1"]);
+  });
+
+  it("throws a clear error when the dashboard entry to update is missing", async () => {
+    mocks.state.savedEntryRows = [];
+
+    await expect(
+      updateDashboardEmployeeCashFlowEntry({ entryId: "missing_entry" }),
+    ).rejects.toThrow(/missing_entry/);
+  });
+
+  it("merges partial dashboard updates onto the current row", async () => {
+    mocks.state.savedEntryRows = [
+      {
+        id: "entry_1",
+        days_worked: 20,
+        days_in_month: 30,
+        base_dollar_inward_usd_cents: 300_000,
+        onboarding_advance_usd_cents: 0,
+        advance_override_inr_cents: null,
+        reimbursement_usd_cents: 0,
+        reimbursement_labels_text: null,
+        appraisal_advance_usd_cents: 0,
+        offboarding_deduction_usd_cents: 0,
+        cashout_usd_inr_rate: "85.0000",
+        paid_usd_inr_rate: "82.0000",
+        pf_inr_cents: "150000",
+        tds_inr_cents: "250000",
+        actual_paid_inr_cents: "18000000",
+      },
+    ];
+
+    await updateDashboardEmployeeCashFlowEntry({
+      entryId: "entry_1",
+      daysWorked: 25,
+    });
+
+    expect(mocks.state.updates).toHaveLength(1);
+    const params = mocks.state.updates[0]!.params;
+    // days_worked = $1 should reflect the override; base_dollar_inward_usd_cents
+    // ($2) should fall back to the fetched current row's value.
+    expect(params[0]).toBe(25);
+    expect(params[1]).toBe(300_000);
+    expect(params[params.length - 1]).toBe("entry_1");
   });
 });

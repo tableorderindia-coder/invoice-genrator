@@ -4,6 +4,7 @@ import {
   createManagedUserAction,
   updateManagedUserAccessAction,
 } from "@/lib/auth/actions";
+import { query } from "@/lib/db/pool";
 import { GlassPanel } from "@/app/_components/glass-panel";
 import { inputClass } from "@/app/_components/field";
 import { PendingSubmitButton } from "@/app/_components/pending-submit-button";
@@ -47,33 +48,30 @@ export default async function AdminUsersPage({
     success?: string | string[];
   }>;
 }) {
-  const context = await requireAdminAccess();
+  await requireAdminAccess();
   const params = await searchParams;
   const error = Array.isArray(params.error) ? params.error[0] : params.error;
   const success = Array.isArray(params.success) ? params.success[0] : params.success;
 
   const [
-    { data: profiles },
-    { data: permissionRows },
-    { data: companies },
-    { data: companyAccessRows },
+    { rows: profiles },
+    { rows: permissionRows },
+    { rows: companies },
+    { rows: companyAccessRows },
   ] = await Promise.all([
-    context.supabase
-      .from("profiles")
-      .select("id, email, role, must_change_password, created_at")
-      .order("created_at", { ascending: true }),
-    context.supabase
-      .from("permissions")
-      .select("user_id, page, can_view, can_edit")
-      .order("page", { ascending: true }),
-    context.supabase
-      .from("companies")
-      .select("id, name")
-      .order("name", { ascending: true }),
-    context.supabase
-      .from("user_company_access")
-      .select("user_id, company_id")
-      .order("company_id", { ascending: true }),
+    query<ProfileRow>(
+      `select id, email, role, must_change_password, created_at
+       from public.profiles order by created_at asc`,
+    ),
+    query<PermissionRow>(
+      `select user_id, page, can_view, can_edit
+       from public.permissions order by page asc`,
+    ),
+    query<CompanyRow>(`select id, name from public.companies order by name asc`),
+    query<CompanyAccessRow>(
+      `select user_id, company_id
+       from public.user_company_access order by company_id asc`,
+    ),
   ]);
 
   const permissionsByUserId = new Map<string, PermissionRow[]>();
@@ -196,6 +194,23 @@ export default async function AdminUsersPage({
                       <option value="user">User</option>
                       <option value="admin">Admin</option>
                     </select>
+                  </label>
+
+                  <label className="block space-y-2 text-sm">
+                    <span style={{ color: "var(--text-secondary)" }}>
+                      Set new temporary password (optional)
+                    </span>
+                    <PasswordInput
+                      name="newPassword"
+                      minLength={12}
+                      autoComplete="new-password"
+                      placeholder="Leave blank to keep current password"
+                      className={inputClass}
+                    />
+                    <span className="block text-xs" style={{ color: "var(--text-muted)" }}>
+                      Sets this as their password and forces a reset on next login. Use
+                      this in place of self-service &quot;forgot password&quot;.
+                    </span>
                   </label>
 
                   <div className="space-y-3">

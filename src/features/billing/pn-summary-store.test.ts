@@ -1,8 +1,62 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { buildPnDashboardDataFromSummaryRows } from "./pn-summary-store";
+const mocks = vi.hoisted(() => {
+  const state: {
+    selectResults: Array<{ rows: unknown[]; rowCount: number | null }>;
+    queries: Array<{ sql: string; params: unknown[] }>;
+    queryError: unknown;
+    txQueries: Array<{ sql: string; params: unknown[] }>;
+  } = {
+    selectResults: [],
+    queries: [],
+    queryError: null,
+    txQueries: [],
+  };
+
+  const query = vi.fn(async (sql: string, params: unknown[] = []) => {
+    state.queries.push({ sql, params });
+    if (state.queryError) {
+      throw state.queryError;
+    }
+    const normalized = sql.trim().toLowerCase();
+    if (normalized.startsWith("select")) {
+      const next = state.selectResults.shift();
+      return next ?? { rows: [], rowCount: 0 };
+    }
+    return { rows: [], rowCount: 0 };
+  });
+
+  const client = {
+    query: vi.fn(async (sql: string, params: unknown[] = []) => {
+      state.txQueries.push({ sql, params });
+      if (state.queryError) {
+        throw state.queryError;
+      }
+      return { rows: [], rowCount: 0 };
+    }),
+  };
+
+  const withTransaction = vi.fn(async (fn: (txClient: typeof client) => Promise<unknown>) => {
+    return fn(client);
+  });
+
+  return { state, query, withTransaction, client };
+});
+
+vi.mock("@/lib/db/pool", () => ({
+  query: mocks.query,
+  withTransaction: mocks.withTransaction,
+}));
+
+import {
+  buildPnDashboardDataFromSummaryRows,
+  getCompanyExpenseCompanyId,
+  getEmployeeCashFlowEntryCompanyId,
+  getInvoiceCompanyId,
+  getPnDashboardSummaryData,
+} from "./pn-summary-store";
 import type { PnCompanyMonthSummaryRow, PnEmployeeMonthSummaryRow } from "./pn-summary-store";
 
 const projectRoot = process.cwd();
@@ -95,7 +149,98 @@ function companySummary(
   };
 }
 
+function dbEmployeeRow(overrides: Record<string, unknown> = {}) {
+  return {
+    company_id: "company_a",
+    employee_id: "employee_a",
+    employee_name_snapshot: "Ankit Singh",
+    payment_month: "2026-07",
+    year: 2026,
+    month: 7,
+    payout_id: "entry_a",
+    invoice_id: "invoice_a",
+    invoice_number: "INV-001",
+    days_worked: 31,
+    days_in_month: 31,
+    dollar_inward_usd_cents: 100_00,
+    base_dollar_inward_usd_cents: 100_00,
+    onboarding_advance_usd_cents: 10_00,
+    advance_override_inr_cents: null,
+    reimbursement_usd_cents: 20_00,
+    reimbursement_labels_text: "Travel",
+    reimbursement_inr_cents: 1_700_00,
+    appraisal_advance_usd_cents: 5_00,
+    appraisal_advance_inr_cents: 425_00,
+    offboarding_deduction_usd_cents: 2_00,
+    effective_dollar_inward_usd_cents: 133_00,
+    cash_in_inr_cents: 8_500_00,
+    cashout_usd_inr_rate: 85,
+    paid_usd_inr_rate: 84,
+    monthly_paid_inr_cents: 80_000_00,
+    salary_paid_inr_cents: 70_000_00,
+    pf_inr_cents: 5_000_00,
+    tds_inr_cents: 5_000_00,
+    actual_paid_inr_cents: 80_000_00,
+    fx_commission_inr_cents: 1_000_00,
+    total_commission_usd_cents: 3_00,
+    commission_earned_inr_cents: 252_00,
+    gross_earnings_inr_cents: 1_252_00,
+    net_profit_inr_cents: 71_252_00,
+    is_security_deposit_month: false,
+    source_updated_at: "2026-07-22T09:59:00.000Z",
+    rebuilt_at: "2026-07-22T10:00:00.000Z",
+    ...overrides,
+  };
+}
+
+function dbCompanyRow(overrides: Record<string, unknown> = {}) {
+  return {
+    company_id: "company_a",
+    payment_month: "2026-07",
+    year: 2026,
+    month: 7,
+    dollar_inward_usd_cents: 100_00,
+    onboarding_advance_usd_cents: 10_00,
+    reimbursement_usd_cents: 30_00,
+    reimbursement_labels_text: "Travel",
+    reimbursement_inr_cents: 2_550_00,
+    appraisal_advance_usd_cents: 5_00,
+    appraisal_advance_inr_cents: 425_00,
+    offboarding_deduction_usd_cents: 2_00,
+    effective_dollar_inward_usd_cents: 133_00,
+    cashout_usd_inr_rate: 85,
+    cash_in_inr_cents: 8_500_00,
+    paid_usd_inr_rate: 84,
+    monthly_paid_inr_cents: 80_000_00,
+    pf_inr_cents: 5_000_00,
+    tds_inr_cents: 5_000_00,
+    actual_paid_inr_cents: 80_000_00,
+    salary_paid_inr_cents: 70_000_00,
+    fx_commission_inr_cents: 1_000_00,
+    total_commission_usd_cents: 3_00,
+    commission_earned_inr_cents: 252_00,
+    gross_earnings_inr_cents: 1_252_00,
+    expenses_inr_cents: 500_00,
+    company_reimbursement_usd_cents: 10_00,
+    company_reimbursement_inr_cents: 850_00,
+    net_pl_inr_cents: 71_252_00,
+    source_updated_at: "2026-07-22T09:59:00.000Z",
+    rebuilt_at: "2026-07-22T10:00:00.000Z",
+    ...overrides,
+  };
+}
+
 describe("P&L summary store", () => {
+  beforeEach(() => {
+    mocks.state.selectResults = [];
+    mocks.state.queries = [];
+    mocks.state.queryError = null;
+    mocks.state.txQueries = [];
+    mocks.query.mockClear();
+    mocks.withTransaction.mockClear();
+    mocks.client.query.mockClear();
+  });
+
   it("rebuilds dashboard data from persisted monthly summary rows", () => {
     const data = buildPnDashboardDataFromSummaryRows({
       companyId: "company_a",
@@ -267,5 +412,83 @@ describe("P&L summary store", () => {
     expect(routeSource).toContain('page: "dashboard"');
     expect(routeSource).toContain("edit: true");
     expect(routeSource).toContain("rebuildPnSummariesForCompany");
+  });
+
+  it("reads persisted employee and company summary rows scoped to the company", async () => {
+    mocks.state.selectResults = [
+      { rows: [dbEmployeeRow()], rowCount: 1 },
+      { rows: [dbCompanyRow()], rowCount: 1 },
+    ];
+
+    const data = await getPnDashboardSummaryData({
+      companyId: "company_a",
+      periodType: "monthly",
+    });
+
+    expect(data.employeeEditableSections[0]?.rows[0]).toMatchObject({
+      payoutId: "entry_a",
+      monthlyPaidInrCents: 80_000_00,
+    });
+    expect(data.periodRows[0]).toMatchObject({ month: 7, netPlInrCents: 71_252_00 });
+
+    const employeeQuery = mocks.state.queries.find((entry) =>
+      entry.sql.includes("pn_employee_month_summaries"),
+    );
+    expect(employeeQuery?.params).toEqual(["company_a"]);
+    expect(employeeQuery?.sql).toContain("company_id = $1");
+    expect(employeeQuery?.sql).not.toContain("employee_id = any");
+
+    const companyQuery = mocks.state.queries.find((entry) =>
+      entry.sql.includes("pn_company_month_summaries"),
+    );
+    expect(companyQuery?.params).toEqual(["company_a"]);
+  });
+
+  it("filters persisted rows by employee id and payment month when provided", async () => {
+    mocks.state.selectResults = [
+      { rows: [dbEmployeeRow()], rowCount: 1 },
+      { rows: [dbCompanyRow()], rowCount: 1 },
+      { rows: [dbEmployeeRow()], rowCount: 1 },
+    ];
+
+    await getPnDashboardSummaryData({
+      companyId: "company_a",
+      periodType: "monthly",
+      employeeIds: ["employee_a"],
+      paymentMonths: ["2026-07"],
+    });
+
+    const employeeQuery = mocks.state.queries[0];
+    expect(employeeQuery?.sql).toContain("employee_id = any($2::text[])");
+    expect(employeeQuery?.sql).toContain("payment_month = any($3::text[])");
+    expect(employeeQuery?.params).toEqual(["company_a", ["employee_a"], ["2026-07"]]);
+
+    // The unscoped advance-rows lookup (employeeIds present) re-queries without the employee filter.
+    const advanceQuery = mocks.state.queries[2];
+    expect(advanceQuery?.sql).not.toContain("employee_id = any");
+    expect(advanceQuery?.sql).toContain("payment_month = any($2::text[])");
+  });
+
+  it("looks up the owning company id for an invoice, expense, and cash-flow entry", async () => {
+    mocks.state.selectResults = [
+      { rows: [{ company_id: "company_invoice" }], rowCount: 1 },
+      { rows: [{ company_id: "company_expense" }], rowCount: 1 },
+      { rows: [{ company_id: "company_entry" }], rowCount: 1 },
+    ];
+
+    await expect(getInvoiceCompanyId("invoice_1")).resolves.toBe("company_invoice");
+    await expect(getCompanyExpenseCompanyId("expense_1")).resolves.toBe("company_expense");
+    await expect(getEmployeeCashFlowEntryCompanyId("entry_1")).resolves.toBe("company_entry");
+
+    expect(mocks.state.queries[0]?.sql).toContain("from public.invoices");
+    expect(mocks.state.queries[0]?.params).toEqual(["invoice_1"]);
+    expect(mocks.state.queries[1]?.sql).toContain("from public.company_expenses");
+    expect(mocks.state.queries[2]?.sql).toContain("from public.invoice_payment_employee_entries");
+  });
+
+  it("returns undefined when no row is found for the id", async () => {
+    mocks.state.selectResults = [{ rows: [], rowCount: 0 }];
+
+    await expect(getInvoiceCompanyId("missing")).resolves.toBeUndefined();
   });
 });

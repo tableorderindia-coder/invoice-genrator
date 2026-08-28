@@ -1,19 +1,18 @@
 # Deploy Checklist
 
-## Supabase
+## Database (Neon)
 
-1. Open your Supabase project.
-2. Run [`supabase/schema.sql`](../../supabase/schema.sql).
-3. Optionally run [`supabase/seed.sql`](../../supabase/seed.sql).
+1. Provision a Neon database (the Vercel Marketplace integration sets `DATABASE_URL`
+   automatically; otherwise copy the pooled connection string from the Neon console).
+2. Run [`supabase/schema.neon.sql`](../../supabase/schema.neon.sql) against it.
 
 ## Vercel
 
 1. Push the repo to GitHub.
 2. Import the repo into Vercel.
 3. In Vercel Project Settings, add:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
-   - `SUPABASE_SECRET_KEY`
+   - `DATABASE_URL` (skip if the Neon Marketplace integration already set it)
+   - `SESSION_SECRET` (generate with `openssl rand -base64 48`)
 4. Deploy.
 
 ## After deploy

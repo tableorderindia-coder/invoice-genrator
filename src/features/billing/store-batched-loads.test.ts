@@ -1,39 +1,41 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+type QueryCall = { sql: string; params: unknown[] };
+
 const mocks = vi.hoisted(() => {
   const state: {
-    response: { data: unknown[] | null; error: unknown };
-    tableResponses: Record<string, { data: unknown[] | null; error: unknown }>;
-    chains: Array<Record<string, unknown>>;
+    calls: QueryCall[];
+    response: { rows: unknown[] };
+    tableResponses: Record<string, { rows: unknown[] }>;
   } = {
-    response: { data: [], error: null },
+    calls: [],
+    response: { rows: [] },
     tableResponses: {},
-    chains: [],
   };
 
-  const supabase = {
-    from: vi.fn((table: string) => {
-      const chain: Record<string, unknown> = {
-        table,
-        select: vi.fn(() => chain),
-        eq: vi.fn(() => chain),
-        in: vi.fn(() => chain),
-        order: vi.fn(() => chain),
-        then: (
-          resolve: (value: { data: unknown[] | null; error: unknown }) => unknown,
-          reject: (reason: unknown) => unknown,
-        ) => Promise.resolve(state.tableResponses[table] ?? state.response).then(resolve, reject),
-      };
-      state.chains.push(chain);
-      return chain;
-    }),
-  };
+  // Route a query to a configured response by sniffing the first table name
+  // referenced after FROM/UPDATE/INSERT INTO - good enough for these tests,
+  // which each touch exactly one table per query() call.
+  function tableForSql(sql: string): string | undefined {
+    const match = sql.match(/\bfrom\s+([a-z_]+)/i);
+    return match?.[1];
+  }
 
-  return { state, supabase };
+  const query = vi.fn(async (sql: string, params: unknown[] = []) => {
+    state.calls.push({ sql, params });
+    const table = tableForSql(sql);
+    const result = (table ? state.tableResponses[table] : undefined) ?? state.response;
+    return { rows: result.rows, rowCount: result.rows.length };
+  });
+
+  const withTransaction = vi.fn();
+
+  return { state, query, withTransaction, tableForSql };
 });
 
-vi.mock("@/lib/supabase/server", () => ({
-  createSupabaseServerClient: vi.fn(async () => mocks.supabase),
+vi.mock("@/lib/db/pool", () => ({
+  query: mocks.query,
+  withTransaction: mocks.withTransaction,
 }));
 
 import {
@@ -68,67 +70,58 @@ const invoiceRow = (id: string, companyId: string, year: number, month: number) 
 
 describe("batched billing store loads", () => {
   beforeEach(() => {
-    mocks.state.response = { data: [], error: null };
+    mocks.state.response = { rows: [] };
     mocks.state.tableResponses = {};
-    mocks.state.chains = [];
-    mocks.supabase.from.mockClear();
+    mocks.state.calls = [];
+    mocks.query.mockClear();
   });
 
   it("loads invoices for selected companies with one company_id in query", async () => {
     mocks.state.response = {
-      data: [
+      rows: [
         invoiceRow("invoice_old", "company_a", 2026, 6),
         invoiceRow("invoice_new", "company_b", 2026, 7),
       ],
-      error: null,
     };
 
     const invoices = await listInvoicesForCompanies(["company_a", "company_b", "company_a"]);
 
-    expect(mocks.supabase.from).toHaveBeenCalledTimes(1);
-    expect(mocks.supabase.from).toHaveBeenCalledWith("invoices");
-    expect(mocks.state.chains[0]?.in).toHaveBeenCalledWith("company_id", [
-      "company_a",
-      "company_b",
-    ]);
+    expect(mocks.query).toHaveBeenCalledTimes(1);
+    expect(mocks.state.calls[0]?.sql).toMatch(/from invoices/i);
+    expect(mocks.state.calls[0]?.sql).toMatch(/company_id = any\(\$1/);
+    expect(mocks.state.calls[0]?.params[0]).toEqual(["company_a", "company_b"]);
     expect(invoices.map((invoice) => invoice.id)).toEqual(["invoice_new", "invoice_old"]);
   });
 
   it("loads available payment months for selected companies with one company_id in query", async () => {
     mocks.state.tableResponses = {
       invoice_payment_employee_entries: {
-        data: [
+        rows: [
           { payment_month: "2026-06" },
           { payment_month: "2026-07" },
           { payment_month: "2026-06" },
         ],
-        error: null,
       },
       employee_salary_payments: {
-        data: [{ month: "2026-08" }, { month: "2026-07" }],
-        error: null,
+        rows: [{ month: "2026-08" }, { month: "2026-07" }],
       },
     };
 
     const months = await listAvailablePaymentMonthsForCompanies(["company_a", "company_b"]);
 
-    expect(mocks.supabase.from).toHaveBeenCalledTimes(2);
-    expect(mocks.supabase.from).toHaveBeenCalledWith("invoice_payment_employee_entries");
-    expect(mocks.supabase.from).toHaveBeenCalledWith("employee_salary_payments");
-    expect(mocks.state.chains[0]?.in).toHaveBeenCalledWith("company_id", [
-      "company_a",
-      "company_b",
-    ]);
-    expect(mocks.state.chains[1]?.in).toHaveBeenCalledWith("company_id", [
-      "company_a",
-      "company_b",
-    ]);
+    expect(mocks.query).toHaveBeenCalledTimes(2);
+    expect(mocks.state.calls[0]?.sql).toMatch(/from invoice_payment_employee_entries/i);
+    expect(mocks.state.calls[0]?.sql).toMatch(/company_id = any\(\$1/);
+    expect(mocks.state.calls[0]?.params[0]).toEqual(["company_a", "company_b"]);
+    expect(mocks.state.calls[1]?.sql).toMatch(/from employee_salary_payments/i);
+    expect(mocks.state.calls[1]?.sql).toMatch(/company_id = any\(\$1/);
+    expect(mocks.state.calls[1]?.params[0]).toEqual(["company_a", "company_b"]);
     expect(months).toEqual(["2026-08", "2026-07", "2026-06"]);
   });
 
   it("loads company expenses for selected companies with one company_id in query", async () => {
     mocks.state.response = {
-      data: [
+      rows: [
         {
           id: "expense_1",
           company_id: "company_a",
@@ -140,7 +133,6 @@ describe("batched billing store loads", () => {
           updated_at: "2026-07-01T00:00:00.000Z",
         },
       ],
-      error: null,
     };
 
     const expenses = await listCompanyExpensesForCompanies({
@@ -149,14 +141,13 @@ describe("batched billing store loads", () => {
       month: 7,
     });
 
-    expect(mocks.supabase.from).toHaveBeenCalledTimes(1);
-    expect(mocks.supabase.from).toHaveBeenCalledWith("company_expenses");
-    expect(mocks.state.chains[0]?.in).toHaveBeenCalledWith("company_id", [
-      "company_a",
-      "company_b",
-    ]);
-    expect(mocks.state.chains[0]?.eq).toHaveBeenCalledWith("year", 2026);
-    expect(mocks.state.chains[0]?.eq).toHaveBeenCalledWith("month", 7);
+    expect(mocks.query).toHaveBeenCalledTimes(1);
+    const call = mocks.state.calls[0];
+    expect(call?.sql).toMatch(/from company_expenses/i);
+    expect(call?.sql).toMatch(/company_id = any\(\$1/);
+    expect(call?.sql).toMatch(/year = \$2/);
+    expect(call?.sql).toMatch(/month = \$3/);
+    expect(call?.params).toEqual([["company_a", "company_b"], 2026, 7]);
     expect(expenses[0]).toMatchObject({
       id: "expense_1",
       companyId: "company_a",
@@ -166,7 +157,7 @@ describe("batched billing store loads", () => {
 
   it("filters company expenses for selected companies inside an inclusive period", async () => {
     mocks.state.response = {
-      data: [
+      rows: [
         {
           id: "expense_before",
           company_id: "company_a",
@@ -218,7 +209,6 @@ describe("batched billing store loads", () => {
           updated_at: "2026-03-01T00:00:00.000Z",
         },
       ],
-      error: null,
     };
 
     const expenses = await listCompanyExpensesForCompanies({
@@ -227,12 +217,11 @@ describe("batched billing store loads", () => {
       endMonth: "2026-02",
     });
 
-    expect(mocks.state.chains[0]?.in).toHaveBeenCalledWith("company_id", [
-      "company_a",
-      "company_b",
-    ]);
-    expect(mocks.state.chains[0]?.eq).not.toHaveBeenCalledWith("year", expect.any(Number));
-    expect(mocks.state.chains[0]?.eq).not.toHaveBeenCalledWith("month", expect.any(Number));
+    const call = mocks.state.calls[0];
+    expect(call?.sql).toMatch(/company_id = any\(\$1/);
+    expect(call?.params[0]).toEqual(["company_a", "company_b"]);
+    expect(call?.sql).not.toMatch(/year = \$/);
+    expect(call?.sql).not.toMatch(/month = \$/);
     expect(expenses.map((expense) => expense.id)).toEqual([
       "expense_dec",
       "expense_jan",
@@ -243,7 +232,7 @@ describe("batched billing store loads", () => {
   it("loads available team names for selected companies with batched team and employee queries", async () => {
     mocks.state.tableResponses = {
       teams: {
-        data: [
+        rows: [
           {
             id: "team_1",
             company_id: "company_a",
@@ -257,10 +246,9 @@ describe("batched billing store loads", () => {
             created_at: "2026-07-01T00:00:00.000Z",
           },
         ],
-        error: null,
       },
       employees: {
-        data: [
+        rows: [
           {
             id: "emp_1",
             company_id: "company_a",
@@ -288,7 +276,6 @@ describe("batched billing store loads", () => {
             created_at: "2026-04-01T00:00:00.000Z",
           },
         ],
-        error: null,
       },
     };
 
@@ -298,17 +285,11 @@ describe("batched billing store loads", () => {
       "company_a",
     ]);
 
-    expect(mocks.supabase.from).toHaveBeenCalledTimes(2);
-    expect(mocks.supabase.from).toHaveBeenNthCalledWith(1, "teams");
-    expect(mocks.supabase.from).toHaveBeenNthCalledWith(2, "employees");
-    expect(mocks.state.chains[0]?.in).toHaveBeenCalledWith("company_id", [
-      "company_a",
-      "company_b",
-    ]);
-    expect(mocks.state.chains[1]?.in).toHaveBeenCalledWith("company_id", [
-      "company_a",
-      "company_b",
-    ]);
+    expect(mocks.query).toHaveBeenCalledTimes(2);
+    expect(mocks.state.calls[0]?.sql).toMatch(/from teams/i);
+    expect(mocks.state.calls[0]?.params[0]).toEqual(["company_a", "company_b"]);
+    expect(mocks.state.calls[1]?.sql).toMatch(/from employees/i);
+    expect(mocks.state.calls[1]?.params[0]).toEqual(["company_a", "company_b"]);
     expect(namesByCompany).toEqual({
       company_a: ["Analytics", "Data"],
       company_b: ["Ops"],
@@ -317,7 +298,7 @@ describe("batched billing store loads", () => {
 
   it("can load only active employees for one company without changing the default historical load", async () => {
     mocks.state.response = {
-      data: [
+      rows: [
         {
           id: "emp_active",
           company_id: "company_a",
@@ -337,39 +318,37 @@ describe("batched billing store loads", () => {
           created_at: "2026-04-01T00:00:00.000Z",
         },
       ],
-      error: null,
     };
 
     await listEmployees("company_a");
     await listEmployees("company_a", { activeOnly: true });
 
-    expect(mocks.state.chains[0]?.eq).toHaveBeenCalledWith("company_id", "company_a");
-    expect(mocks.state.chains[0]?.eq).not.toHaveBeenCalledWith("is_active", true);
-    expect(mocks.state.chains[1]?.eq).toHaveBeenCalledWith("company_id", "company_a");
-    expect(mocks.state.chains[1]?.eq).toHaveBeenCalledWith("is_active", true);
+    expect(mocks.state.calls[0]?.sql).toMatch(/company_id = \$1/);
+    expect(mocks.state.calls[0]?.sql).not.toMatch(/is_active = true/);
+    expect(mocks.state.calls[0]?.params).toEqual(["company_a"]);
+    expect(mocks.state.calls[1]?.sql).toMatch(/company_id = \$1/);
+    expect(mocks.state.calls[1]?.sql).toMatch(/is_active = true/);
+    expect(mocks.state.calls[1]?.params).toEqual(["company_a"]);
   });
 
   it("can load only active employees for selected companies", async () => {
-    mocks.state.response = { data: [], error: null };
+    mocks.state.response = { rows: [] };
 
     await listEmployeesForCompanies(["company_a", "company_b"], { activeOnly: true });
 
-    expect(mocks.supabase.from).toHaveBeenCalledWith("employees");
-    expect(mocks.state.chains[0]?.in).toHaveBeenCalledWith("company_id", [
-      "company_a",
-      "company_b",
-    ]);
-    expect(mocks.state.chains[0]?.eq).toHaveBeenCalledWith("is_active", true);
+    expect(mocks.state.calls[0]?.sql).toMatch(/from employees/i);
+    expect(mocks.state.calls[0]?.sql).toMatch(/company_id = any\(\$1/);
+    expect(mocks.state.calls[0]?.params[0]).toEqual(["company_a", "company_b"]);
+    expect(mocks.state.calls[0]?.sql).toMatch(/is_active = true/);
   });
 
   it("excludes inactive employee default teams from new invoice team catalogs", async () => {
     mocks.state.tableResponses = {
       teams: {
-        data: [],
-        error: null,
+        rows: [],
       },
       employees: {
-        data: [
+        rows: [
           {
             id: "emp_active",
             company_id: "company_a",
@@ -389,13 +368,12 @@ describe("batched billing store loads", () => {
             created_at: "2026-04-01T00:00:00.000Z",
           },
         ],
-        error: null,
       },
     };
 
     const namesByCompany = await listAvailableTeamNamesForCompanies(["company_a"]);
 
-    expect(mocks.state.chains[1]?.eq).toHaveBeenCalledWith("is_active", true);
+    expect(mocks.state.calls[1]?.sql).toMatch(/is_active = true/);
     expect(namesByCompany).toEqual({
       company_a: ["Active Team"],
     });
