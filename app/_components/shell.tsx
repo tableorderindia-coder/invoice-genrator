@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
+  ArrowUpRight,
   BarChart3,
   Building2,
   CircleDollarSign,
@@ -57,6 +58,15 @@ type ShellLink = {
   label: string;
   Icon: ComponentType<{ className?: string; strokeWidth?: number }>;
 };
+
+// v2 (the cleaner rebuild, "pnl-tracker-test") is a separate Next.js app on
+// its own Vercel deployment/database - not a route in this app. This is a
+// plain external link, not client-side navigation, deliberately: the two
+// apps don't share a session or a database connection at the app layer.
+// Override with NEXT_PUBLIC_V2_PORTAL_URL if the v2 deployment moves (e.g.
+// once it gets a custom domain).
+const V2_PORTAL_URL =
+  process.env.NEXT_PUBLIC_V2_PORTAL_URL ?? "https://pnl-tracker-test.vercel.app";
 
 const links: ShellLink[] = [
   { href: "/", label: "Overview", Icon: Gauge },
@@ -630,6 +640,17 @@ export function Shell({
             <span className="sidebar-label">Legacy UI</span>
           </button>
           <a
+            href={V2_PORTAL_URL}
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Switch to v2 (opens in a new tab)"
+            className="sidebar-footer-action sidebar-icon-target"
+            {...tooltipEvents("Switch to v2", compact)}
+          >
+            <ArrowUpRight className="size-4 shrink-0" strokeWidth={2.2} />
+            <span className="sidebar-label">Switch to v2</span>
+          </a>
+          <a
             href="/logout"
             aria-label="Sign out"
             className="sidebar-footer-action sidebar-icon-target"
@@ -680,6 +701,16 @@ export function Shell({
               })}
             </nav>
             {renderUiModeButton()}
+            <a
+              href={V2_PORTAL_URL}
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Switch to v2 (opens in a new tab)"
+              className="flex h-10 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-all"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              <ArrowUpRight className="h-4 w-4" strokeWidth={2.2} /><span>Switch to v2</span>
+            </a>
             <a href="/logout" className="flex h-10 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-all" style={{ color: "var(--text-secondary)" }}>
               <LogOut className="h-4 w-4" strokeWidth={2.2} /><span>Sign out</span>
             </a>
