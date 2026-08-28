@@ -22,12 +22,15 @@
  *      and in active use by the app but were entirely missing from the
  *      static schema file). Any discovered table missing from the target is
  *      created on the fly from introspected column types + primary key.
- *   3. Copies every discovered table from source -> target. Target triggers
- *      (which is where FK-constraint checks live) are disabled for the
- *      duration so insert order across tables doesn't matter - including
- *      self-referential FKs like invoices.source_invoice_id - and
- *      re-enabled at the end so referential integrity is verified once all
- *      the data is in.
+ *   3. Copies every discovered table from source -> target, in an order
+ *      computed from the target's actual FK constraints (topological sort)
+ *      so parents always land before children - no elevated DB privilege
+ *      required (Neon's app-facing role can't ALTER TABLE ... DISABLE
+ *      TRIGGER ALL or SET session_replication_role - both are
+ *      superuser-only, confirmed against a real Neon database). A
+ *      self-referencing FK (invoices.source_invoice_id, for duplicated
+ *      invoices) is loaded in two passes: NULL first, then a follow-up
+ *      UPDATE backfills the real value once every row exists.
  *   4. Special-cases `profiles`: joins Supabase's `auth.users.encrypted_password`
  *      (a bcrypt hash) onto each profile row as `password_hash`, so existing
  *      users can log in with their EXISTING password after the cutover - no
@@ -90,9 +93,10 @@ async function getPrimaryKeyColumns(client, table) {
 // Creates a table on the target that exists on the source but wasn't part
 // of schema.neon.sql at all (e.g. pn_company_month_summaries -
 // discovered via supabase/migrations/ having drifted from schema.sql).
-// Columns + primary key only, deliberately no foreign keys: this only needs
-// to hold the data losslessly, and target triggers are disabled during the
-// copy anyway (see main()). Review these tables manually afterwards.
+// Columns + primary key only, deliberately no foreign keys - that keeps it
+// out of the FK topological sort entirely (order doesn't matter for a
+// table nothing depends on and that depends on nothing). Review these
+// tables manually afterwards.
 async function ensureTableExists(source, target, table) {
   const { rows: exists } = await target.query(
     `select 1 from information_schema.tables where table_schema='public' and table_name=$1`,
@@ -115,6 +119,63 @@ async function ensureTableExists(source, target, table) {
       `no foreign keys. Review whether it needs proper constraints/indexes afterwards.`,
   );
   await target.query(`create table if not exists public.${table} (\n  ${columnDefs.join(",\n  ")}${pkDef}\n)`);
+}
+
+// All FK constraints among `tables`, as {child, column, parent}. Used both
+// to order the copy (parents before children) and to find self-referencing
+// columns (child === parent) that need the null-then-backfill treatment.
+async function getForeignKeys(target, tables) {
+  const { rows } = await target.query(
+    `select
+       tc.table_name as child,
+       kcu.column_name as column,
+       ccu.table_name as parent
+     from information_schema.table_constraints tc
+     join information_schema.key_column_usage kcu
+       on tc.constraint_name = kcu.constraint_name and tc.table_schema = kcu.table_schema
+     join information_schema.constraint_column_usage ccu
+       on tc.constraint_name = ccu.constraint_name and tc.table_schema = ccu.table_schema
+     where tc.table_schema = 'public' and tc.constraint_type = 'FOREIGN KEY'
+       and tc.table_name = any($1::text[])`,
+    [tables],
+  );
+  return rows;
+}
+
+// Topological sort (Kahn's algorithm) so every table's FK parents are
+// copied before it. Self-references are excluded from the graph (a table
+// doesn't block on itself) and handled separately in copyTable via
+// selfRefColumns. Any residual cycle (shouldn't happen with this schema)
+// just gets appended in discovery order rather than crashing.
+function computeInsertOrder(tables, foreignKeys) {
+  const crossTableFks = foreignKeys.filter((fk) => fk.child !== fk.parent);
+  const dependsOn = new Map(tables.map((t) => [t, new Set()])); // child -> set(parent)
+  for (const fk of crossTableFks) {
+    if (dependsOn.has(fk.child) && dependsOn.has(fk.parent)) {
+      dependsOn.get(fk.child).add(fk.parent);
+    }
+  }
+
+  const ordered = [];
+  const remaining = new Set(tables);
+  while (remaining.size > 0) {
+    const ready = [...remaining].filter((t) => [...dependsOn.get(t)].every((p) => !remaining.has(p)));
+    if (ready.length === 0) {
+      console.warn(
+        `  WARNING: could not fully resolve FK order for [${[...remaining].join(", ")}] ` +
+          `(cycle?). Appending in discovery order - if any of these fail to insert, re-run ` +
+          `the script (it's idempotent) after the rest have landed.`,
+      );
+      ordered.push(...remaining);
+      break;
+    }
+    ready.sort();
+    for (const t of ready) {
+      ordered.push(t);
+      remaining.delete(t);
+    }
+  }
+  return ordered;
 }
 
 async function getColumns(client, table) {
@@ -172,10 +233,11 @@ async function healMissingTargetColumns(target, table, sourceCols, onlyInSource)
   }
 }
 
-async function copyTable(source, target, table) {
-  const [sourceCols, targetCols] = await Promise.all([
+async function copyTable(source, target, table, selfRefColumns = []) {
+  const [sourceCols, targetCols, pkColumns] = await Promise.all([
     getColumns(source, table),
     getColumns(target, table),
+    selfRefColumns.length ? getPrimaryKeyColumns(target, table) : Promise.resolve([]),
   ]);
   const sourceColumns = sourceCols.map((c) => c.column_name);
   const sourceSet = new Set(sourceColumns);
@@ -225,6 +287,11 @@ async function copyTable(source, target, table) {
     return { copied: 0 };
   }
 
+  const selfRefSet = new Set(selfRefColumns.filter((c) => columns.includes(c)));
+  // Rows whose self-ref column needs a follow-up UPDATE once every row in
+  // this table exists (inserted as NULL below in the meantime).
+  const backfill = []; // { pk: {col: value, ...}, col, value }
+
   const BATCH_SIZE = 500;
   let copied = 0;
   for (let i = 0; i < rows.length; i += BATCH_SIZE) {
@@ -240,6 +307,16 @@ async function copyTable(source, target, table) {
         // text for anything typed json/jsonb.
         if (jsonColumns.has(colName) && value !== null && value !== undefined) {
           value = JSON.stringify(value);
+        }
+        if (selfRefSet.has(colName)) {
+          if (value !== null && value !== undefined) {
+            backfill.push({
+              pk: Object.fromEntries(pkColumns.map((pkCol) => [pkCol, row[pkCol]])),
+              col: colName,
+              value,
+            });
+          }
+          value = null; // inserted now, backfilled once every row in this table exists
         }
         params.push(value);
         return `$${rowIdx * columns.length + colIdx + 1}`;
@@ -258,6 +335,18 @@ async function copyTable(source, target, table) {
       params,
     );
     copied += batch.length;
+  }
+
+  if (backfill.length) {
+    console.log(`  ${table}: backfilling ${backfill.length} self-referencing value(s)...`);
+    for (const item of backfill) {
+      const pkCols = Object.keys(item.pk);
+      const whereSql = pkCols.map((c, idx) => `"${c}" = $${idx + 2}`).join(" and ");
+      await target.query(
+        `update public.${table} set "${item.col}" = $1 where ${whereSql}`,
+        [item.value, ...pkCols.map((c) => item.pk[c])],
+      );
+    }
   }
 
   console.log(`  ${table}: copied ${copied} rows`);
@@ -352,34 +441,32 @@ async function main() {
       await ensureTableExists(source, target, table);
     }
 
-    // Disable triggers (where FK-constraint checks live) on every target
-    // table for the duration of the copy, so cross-table insert order and
-    // self-referential FKs (invoices.source_invoice_id) can't fail the
-    // load. Re-enabled in a `finally` further down so referential
-    // integrity is actually checked once, after all data is in.
-    console.log("Disabling target triggers for the bulk load...");
-    for (const table of sourceTables) {
-      await target.query(`alter table public.${table} disable trigger all`);
+    // Order the copy by the target's actual FK constraints (parents before
+    // children) instead of disabling triggers/constraints - Neon's
+    // app-facing role turned out not to have that privilege (confirmed:
+    // both ALTER TABLE ... DISABLE TRIGGER ALL and SET
+    // session_replication_role are superuser-only and Neon doesn't grant
+    // either here).
+    const foreignKeys = await getForeignKeys(target, sourceTables);
+    const insertOrder = computeInsertOrder(sourceTables, foreignKeys);
+    const selfRefColumnsByTable = new Map();
+    for (const fk of foreignKeys) {
+      if (fk.child !== fk.parent) continue;
+      if (!selfRefColumnsByTable.has(fk.child)) selfRefColumnsByTable.set(fk.child, []);
+      selfRefColumnsByTable.get(fk.child).push(fk.column);
     }
 
-    try {
-      console.log("Copying tables...");
-      for (const table of sourceTables) {
-        if (table === "profiles") {
-          await migrateProfiles(source, target);
-          continue;
-        }
-        if (SKIP_DATA_COPY.has(table)) {
-          console.log(`  ${table}: skipped (cache table, rebuilds on demand)`);
-          continue;
-        }
-        await copyTable(source, target, table);
+    console.log("Copying tables...");
+    for (const table of insertOrder) {
+      if (table === "profiles") {
+        await migrateProfiles(source, target);
+        continue;
       }
-    } finally {
-      console.log("Re-enabling target triggers...");
-      for (const table of sourceTables) {
-        await target.query(`alter table public.${table} enable trigger all`);
+      if (SKIP_DATA_COPY.has(table)) {
+        console.log(`  ${table}: skipped (cache table, rebuilds on demand)`);
+        continue;
       }
+      await copyTable(source, target, table, selfRefColumnsByTable.get(table) ?? []);
     }
 
     const allMatch = await verifyRowCounts(source, target, sourceTables);
