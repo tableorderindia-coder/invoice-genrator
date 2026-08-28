@@ -6,7 +6,9 @@ Important:
 
 - Vercel reads the real project config from the repo root, not from this folder.
 - The root config file is [`vercel.json`](../../vercel.json).
-- Supabase SQL files stay in [`supabase/`](../../supabase/).
+- The Postgres schema/history lives in [`supabase/`](../../supabase/) (name kept for
+  history - the app now runs on plain Postgres via Neon, not Supabase).
+  `supabase/schema.neon.sql` is the current target schema for a fresh Neon database.
 
 ## What is in this folder
 
@@ -15,8 +17,9 @@ Important:
 
 ## Before you deploy
 
-1. Confirm `supabase/schema.sql` has been run on your Supabase project.
-2. Confirm optional `supabase/seed.sql` has been run if you want starter data.
-3. Add the required environment variables in Vercel Project Settings.
+1. Provision a Neon database (via the Vercel Marketplace integration is easiest -
+   it sets `DATABASE_URL` for you automatically).
+2. Confirm `supabase/schema.neon.sql` has been run against it.
+3. Add `SESSION_SECRET` (and `DATABASE_URL` if not auto-set) in Vercel Project Settings.
 4. Push this repo to GitHub.
 5. Import the repo into Vercel and deploy.

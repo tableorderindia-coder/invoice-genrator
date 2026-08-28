@@ -16,7 +16,7 @@ Internal staffing billing app for:
 - Tailwind CSS
 - Vitest
 - PDFKit
-- Supabase-backed data layer
+- Postgres (Neon) via `pg`, with self-hosted bcrypt + signed-cookie auth (no Supabase)
 
 ## Local run
 
@@ -42,7 +42,11 @@ npm run build
 
 ## Current data mode
 
-The app now uses Supabase only through [`src/features/billing/store.ts`](./src/features/billing/store.ts).
+The app talks to Postgres directly via [`lib/db/pool.ts`](./lib/db/pool.ts) (a pooled
+`pg` client), mainly through [`src/features/billing/store.ts`](./src/features/billing/store.ts)
+and the other `*-store.ts` files in that folder. Auth is self-hosted:
+[`lib/auth/`](./lib/auth) does bcrypt password checks and signed-cookie sessions against
+the `profiles` table - no external auth service.
 
 Working flows:
 
@@ -55,22 +59,29 @@ Working flows:
 - cash out an invoice
 - open a generated PDF
 
-## Supabase wiring
+## Database wiring
 
-The initial SQL schema is in [`supabase/schema.sql`](./supabase/schema.sql).
+The target schema for a fresh Postgres (Neon) database is
+[`supabase/schema.neon.sql`](./supabase/schema.neon.sql). (The `supabase/` folder name is
+kept for history - it holds the original Supabase schema/migrations too, which document
+how the live schema evolved, but the app no longer talks to Supabase.)
 
-Client scaffolding is in:
-
-- [`src/lib/supabase/client.ts`](./src/lib/supabase/client.ts)
-- [`src/lib/supabase/server.ts`](./src/lib/supabase/server.ts)
+Client code is in [`lib/db/pool.ts`](./lib/db/pool.ts) (query/transaction helpers) and
+[`lib/auth/`](./lib/auth) (session cookies, password hashing, permission checks).
 
 To run this app locally or on Vercel:
 
-1. Create a Supabase project.
-2. Run the SQL in `supabase/schema.sql`.
-3. Optionally run `supabase/seed.sql` to preload sample records.
-4. Add `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and `SUPABASE_SECRET_KEY`.
-5. Restart the Next.js server or redeploy on Vercel.
+1. Provision a Postgres database - Neon via the Vercel Marketplace integration is the
+   supported path, and sets `DATABASE_URL` for you.
+2. Run the SQL in `supabase/schema.neon.sql`.
+3. Add `DATABASE_URL` (if not already set) and `SESSION_SECRET` (generate with
+   `openssl rand -base64 48`) to your environment.
+4. Restart the Next.js server or redeploy on Vercel.
+
+Admin users are created from `/admin/users` by another admin - there's no public
+sign-up. To bootstrap the very first admin, insert a row into `profiles` directly (see
+`scripts/migrate-supabase-to-neon.cjs` for how existing bcrypt password hashes are
+written) or reuse a migrated Supabase admin account, which keeps its existing password.
 
 ## Vercel deploy files
 
