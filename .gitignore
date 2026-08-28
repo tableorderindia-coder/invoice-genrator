@@ -48,3 +48,11 @@ next-env.d.ts
 .worktrees
 
 .vercel
+
+# ai tooling / local agent artifacts (not project source)
+.vibecheck/
+.cursor/
+.claude/
+.codex-dev*.log
+test-results/
+playwright-report/
