@@ -155,12 +155,12 @@ import {
   getInvoicePaymentPrefillData,
   listCashFlowInvoiceOptions,
   listSavedEmployeeCashFlowEntries,
-  normalizeEmployeeNameForMatch,
   replaceInvoicePaymentEmployeeEntries,
   updateDashboardEmployeeCashFlowEntry,
   updateSavedEmployeeCashFlowEntry,
   upsertInvoicePayment,
 } from "./employee-cash-flow-store";
+import { normalizeEmployeeNameForMatch } from "./employee-name-match";
 import { calculateEffectiveDollarInwardUsdCents } from "./employee-cash-flow";
 import type { EmployeeCashFlowSavedEntry } from "./employee-cash-flow-types";
 

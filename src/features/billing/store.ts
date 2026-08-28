@@ -43,7 +43,7 @@ import {
   type FounderWithdrawal,
   type ParsedFounderWithdrawalRow,
 } from "./founders-balance";
-import { normalizeEmployeeNameForMatch } from "./employee-cash-flow-store";
+import { normalizeEmployeeNameForMatch } from "./employee-name-match";
 import { isExpenseInPeriod, type ExpensePeriodRange } from "./expense-period";
 import { getDaysInMonth } from "./utils";
 import type {

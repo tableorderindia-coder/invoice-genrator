@@ -7,6 +7,7 @@ import {
   resolveEmployeeCashFlowStatus,
 } from "./employee-cash-flow";
 import { calculateEmployeePayoutMetrics } from "./domain";
+import { normalizeEmployeeNameForMatch } from "./employee-name-match";
 import { calculateSalaryPaidInrCents } from "./payroll";
 import { hasMissingSchemaColumn } from "./schema-fallback";
 import type {
@@ -303,13 +304,6 @@ function buildCashFlowBatchLabel(invoiceNumber: string, invoicePaymentId?: strin
   }
 
   return `${invoiceNumber} • ${invoicePaymentId.slice(-6)}`;
-}
-
-export function normalizeEmployeeNameForMatch(name: string | null | undefined) {
-  return String(name ?? "")
-    .trim()
-    .replace(/\s+/g, " ")
-    .toLowerCase();
 }
 
 export function appendMissingAdjustmentEntries(input: {

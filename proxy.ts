@@ -4,12 +4,11 @@ import type { NextRequest } from "next/server";
 import { query } from "@/lib/db/pool";
 import { verifySessionToken, SESSION_COOKIE_NAME } from "@/lib/auth/session";
 
-// Node.js APIs (node:crypto in session.ts, `pg` sockets in lib/db/pool.ts)
-// aren't available on the default Edge middleware runtime, so this opts
-// into the Node.js middleware runtime (stable since Next.js 15.2) instead -
-// same per-request DB lookup the old Supabase-JS middleware did via fetch,
-// just over a real TCP connection.
-export const runtime = "nodejs";
+// `proxy.ts` (the Next.js 16 rename of `middleware.ts`) always runs on the
+// Node.js runtime - it isn't configurable, unlike the old `middleware.ts`
+// Edge-by-default behavior - so node:crypto (session.ts) and `pg` sockets
+// (lib/db/pool.ts) are available here. Same per-request DB lookup the old
+// Supabase-JS middleware did via fetch, just over a real TCP connection.
 
 const PUBLIC_PATHS = ["/login"];
 const PASSWORD_RESET_ALLOWED_PATHS = ["/reset-password", "/logout"];
