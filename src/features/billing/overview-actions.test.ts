@@ -2,10 +2,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   requirePageAccess: vi.fn(),
+  query: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/server", () => ({
   requirePageAccess: mocks.requirePageAccess,
+}));
+
+vi.mock("@/lib/db/pool", () => ({
+  query: mocks.query,
 }));
 
 import { saveOverviewAdvancePreferenceAction } from "../../../app/overview-actions";
@@ -13,33 +18,24 @@ import { saveOverviewAdvancePreferenceAction } from "../../../app/overview-actio
 describe("overview preference action", () => {
   beforeEach(() => {
     mocks.requirePageAccess.mockReset();
+    mocks.query.mockReset();
   });
 
   it("saves the preference only for the authenticated user", async () => {
-    const eq = vi.fn(async () => ({ error: null }));
-    const update = vi.fn(() => ({ eq }));
-    const from = vi.fn(() => ({ update }));
-    mocks.requirePageAccess.mockResolvedValue({
-      userId: "user_1",
-      supabase: { from },
-    });
+    mocks.requirePageAccess.mockResolvedValue({ userId: "user_1" });
+    mocks.query.mockResolvedValue({ rows: [], rowCount: 1 });
 
     await expect(saveOverviewAdvancePreferenceAction(true)).resolves.toEqual({ ok: true });
     expect(mocks.requirePageAccess).toHaveBeenCalledWith("overview");
-    expect(from).toHaveBeenCalledWith("profiles");
-    expect(update).toHaveBeenCalledWith({
-      overview_exclude_onboarding_advance_from_net_pl: true,
-    });
-    expect(eq).toHaveBeenCalledWith("id", "user_1");
+    expect(mocks.query).toHaveBeenCalledWith(
+      expect.stringContaining("update public.profiles"),
+      [true, "user_1"],
+    );
   });
 
   it("returns a safe message when persistence fails", async () => {
-    const eq = vi.fn(async () => ({ error: new Error("database unavailable") }));
-    const update = vi.fn(() => ({ eq }));
-    mocks.requirePageAccess.mockResolvedValue({
-      userId: "user_1",
-      supabase: { from: vi.fn(() => ({ update })) },
-    });
+    mocks.requirePageAccess.mockResolvedValue({ userId: "user_1" });
+    mocks.query.mockRejectedValue(new Error("database unavailable"));
 
     await expect(saveOverviewAdvancePreferenceAction(false)).resolves.toEqual({
       ok: false,
@@ -47,15 +43,9 @@ describe("overview preference action", () => {
     });
   });
 
-  it("returns a safe message when Supabase throws", async () => {
-    const eq = vi.fn(async () => {
-      throw new Error("network unavailable");
-    });
-    const update = vi.fn(() => ({ eq }));
-    mocks.requirePageAccess.mockResolvedValue({
-      userId: "user_1",
-      supabase: { from: vi.fn(() => ({ update })) },
-    });
+  it("returns a safe message when the pool throws", async () => {
+    mocks.requirePageAccess.mockResolvedValue({ userId: "user_1" });
+    mocks.query.mockRejectedValue(new Error("network unavailable"));
 
     await expect(saveOverviewAdvancePreferenceAction(true)).resolves.toEqual({
       ok: false,

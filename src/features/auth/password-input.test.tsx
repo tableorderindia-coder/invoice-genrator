@@ -11,13 +11,8 @@ vi.mock("next/navigation", () => ({
   }),
 }));
 
-vi.mock("@supabase/ssr", () => ({
-  createBrowserClient: () => ({
-    auth: {
-      signInWithPassword: vi.fn(),
-    },
-    from: vi.fn(),
-  }),
+vi.mock("../../../lib/auth/actions", () => ({
+  loginAction: vi.fn(),
 }));
 
 vi.mock("../../../components/RiveCharacter", () => ({
@@ -51,12 +46,7 @@ describe("password input", () => {
 
 describe("login form", () => {
   it("renders the console login title and action copy", () => {
-    render(
-      <LoginForm
-        supabaseUrl="https://example.supabase.co"
-        supabaseKey="anon-key"
-      />,
-    );
+    render(<LoginForm />);
 
     expect(screen.getByText("EassyOnboard Console")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Login" })).toBeInTheDocument();

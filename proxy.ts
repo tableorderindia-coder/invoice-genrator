@@ -1,22 +1,18 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { createServerClient } from "@supabase/ssr";
 
-const PUBLIC_PATHS = ["/login", "/auth/callback", "/reset-password"];
+import { query } from "@/lib/db/pool";
+import { verifySessionToken, SESSION_COOKIE_NAME } from "@/lib/auth/session";
+
+// Node.js APIs (node:crypto in session.ts, `pg` sockets in lib/db/pool.ts)
+// aren't available on the default Edge middleware runtime, so this opts
+// into the Node.js middleware runtime (stable since Next.js 15.2) instead -
+// same per-request DB lookup the old Supabase-JS middleware did via fetch,
+// just over a real TCP connection.
+export const runtime = "nodejs";
+
+const PUBLIC_PATHS = ["/login"];
 const PASSWORD_RESET_ALLOWED_PATHS = ["/reset-password", "/logout"];
-
-function getSupabaseServerCredentials(env: Record<string, string | undefined>) {
-  const url = env.NEXT_PUBLIC_SUPABASE_URL;
-  const key =
-    env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-    env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !key) {
-    return null;
-  }
-
-  return { url, key };
-}
 
 function shouldForcePasswordReset(input: {
   mustChangePassword: boolean;
@@ -64,43 +60,25 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const credentials = getSupabaseServerCredentials(process.env);
-  if (!credentials) {
+  if (!process.env.DATABASE_URL) {
     return NextResponse.next();
   }
 
-  let response = NextResponse.next({
-    request,
-  });
+  const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
+  const session = verifySessionToken(token);
 
-  const supabase = createServerClient(credentials.url, credentials.key, {
-    cookies: {
-      getAll() {
-        return request.cookies.getAll();
-      },
-      setAll(cookiesToSet) {
-        for (const cookie of cookiesToSet) {
-          request.cookies.set(cookie.name, cookie.value);
-        }
-
-        response = NextResponse.next({
-          request,
-        });
-
-        for (const cookie of cookiesToSet) {
-          response.cookies.set(cookie.name, cookie.value, cookie.options);
-        }
-      },
-    },
-  });
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    if (isPublicPath(pathname)) {
-      return response;
+  if (!session) {
+    if (isPublicPath(pathname) || pathname.startsWith("/reset-password")) {
+      // /reset-password itself still requires a session (checked by
+      // changePasswordAction/getAuthContext) - there is no more
+      // unauthenticated "reset link" flow, but redirecting here would just
+      // bounce to /login anyway, so let the page render its own guard.
+      if (pathname.startsWith("/reset-password")) {
+        const loginUrl = new URL("/login", request.url);
+        loginUrl.searchParams.set("next", `${pathname}${request.nextUrl.search || ""}`);
+        return NextResponse.redirect(loginUrl);
+      }
+      return NextResponse.next();
     }
 
     const loginUrl = new URL("/login", request.url);
@@ -111,17 +89,13 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, must_change_password")
-    .eq("id", user.id)
-    .maybeSingle();
+  const { rows } = await query<{ role: "admin" | "user"; must_change_password: boolean }>(
+    `select role, must_change_password from public.profiles where id = $1`,
+    [session.sub],
+  );
+  const profile = rows[0];
 
   if (isPublicPath(pathname)) {
-    if (pathname === "/reset-password" || pathname.startsWith("/reset-password/")) {
-      return response;
-    }
-
     const redirectUrl = new URL(
       getDefaultRedirectPath({
         role: profile?.role ?? "user",
@@ -143,7 +117,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL("/reset-password", request.url));
   }
 
-  return response;
+  return NextResponse.next();
 }
 
 export const config = {

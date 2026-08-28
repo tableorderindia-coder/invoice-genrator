@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
 import { cache } from "react";
 
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { query } from "@/lib/db/pool";
 
+import { getSessionUserId } from "./cookies";
 import {
   canAccessCompany,
   canAccessPage,
@@ -27,7 +28,14 @@ export type AuthContext = {
   profile: AuthProfile;
   permissions: AppPermission[];
   companyAccess: string[];
-  supabase: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
+};
+
+type RawProfileRow = {
+  id: string;
+  email: string;
+  role: AppRole;
+  must_change_password: boolean;
+  created_at: string;
 };
 
 type RawPermissionRow = {
@@ -41,50 +49,35 @@ type RawCompanyAccessRow = {
 };
 
 export const getAuthContext = cache(async (): Promise<AuthContext | null> => {
-  const supabase = await createSupabaseServerClient();
-
-  if (!supabase) {
+  const userId = await getSessionUserId();
+  if (!userId) {
     return null;
   }
 
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
+  const { rows: profileRows } = await query<RawProfileRow>(
+    `select id, email, role, must_change_password, created_at
+     from public.profiles
+     where id = $1`,
+    [userId],
+  );
 
-  if (userError || !user) {
+  const profile = profileRows[0];
+  if (!profile) {
     return null;
   }
 
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("id, email, role, must_change_password, created_at")
-    .eq("id", user.id)
-    .maybeSingle();
+  const [{ rows: permissionRows }, { rows: companyAccessRows }] = await Promise.all([
+    query<RawPermissionRow>(
+      `select page, can_view, can_edit from public.permissions where user_id = $1`,
+      [userId],
+    ),
+    query<RawCompanyAccessRow>(
+      `select company_id from public.user_company_access where user_id = $1`,
+      [userId],
+    ),
+  ]);
 
-  if (profileError || !profile) {
-    return null;
-  }
-
-  const { data: permissionRows, error: permissionError } = await supabase
-    .from("permissions")
-    .select("page, can_view, can_edit")
-    .eq("user_id", user.id);
-
-  if (permissionError) {
-    return null;
-  }
-
-  const { data: companyAccessRows, error: companyAccessError } = await supabase
-    .from("user_company_access")
-    .select("company_id")
-    .eq("user_id", user.id);
-
-  if (companyAccessError) {
-    return null;
-  }
-
-  const permissions = ((permissionRows ?? []) as RawPermissionRow[])
+  const permissions = permissionRows
     .map((row) => {
       const page = normalizePermissionPage(row.page);
       if (!page) {
@@ -97,7 +90,7 @@ export const getAuthContext = cache(async (): Promise<AuthContext | null> => {
         canEdit: row.can_edit,
       } satisfies AppPermission;
     })
-    .filter(Boolean) as AppPermission[];
+    .filter((permission): permission is AppPermission => permission !== null);
 
   const mappedProfile: AuthProfile = {
     id: profile.id,
@@ -108,14 +101,11 @@ export const getAuthContext = cache(async (): Promise<AuthContext | null> => {
   };
 
   return {
-    userId: user.id,
-    email: user.email ?? profile.email,
+    userId: profile.id,
+    email: profile.email,
     profile: mappedProfile,
     permissions,
-    companyAccess: ((companyAccessRows ?? []) as RawCompanyAccessRow[]).map(
-      (row) => row.company_id,
-    ),
-    supabase,
+    companyAccess: companyAccessRows.map((row) => row.company_id),
   };
 });
 
@@ -128,6 +118,7 @@ async function requireAuthContext() {
 
   return context;
 }
+
 export async function requirePageAccess(page: AppPage) {
   const context = await requireAuthContext();
 
@@ -219,4 +210,3 @@ export async function requireAdminAccess() {
 
   return context;
 }
-
