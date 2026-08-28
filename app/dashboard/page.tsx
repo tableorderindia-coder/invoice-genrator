@@ -31,12 +31,12 @@ import {
   PERIOD_DASHBOARD_COLUMN_OPTIONS,
 } from "../../src/features/billing/dashboard-column-options";
 import {
+  getCachedPnDashboardSummaryData,
   listCachedAvailablePaymentMonthsForCompanies,
   listCachedCompanyExpensesForCompanies,
   listCachedCompanies,
   listCachedEmployeesForCompanies,
 } from "../../src/features/billing/cached-store";
-import { getPnDashboardSummaryData } from "../../src/features/billing/pn-summary-store";
 import { mergePnPeriodRows } from "../../src/features/billing/pn-dashboard";
 import type { PnDashboardData } from "../../src/features/billing/types";
 import { DashboardTables } from "./dashboard-tables";
@@ -271,7 +271,7 @@ export default async function DashboardPage({
         );
         return [
           companyId,
-          await getPnDashboardSummaryData({
+          await getCachedPnDashboardSummaryData({
             companyId,
             periodType,
             employeeIds: employeeFilterActive

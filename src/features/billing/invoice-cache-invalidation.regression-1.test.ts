@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // Report: .gstack/qa-reports/qa-report-127-0-0-1-2026-08-03.md
 
 const revalidatePathMock = vi.fn();
-const updateTagMock = vi.fn();
+const revalidateTagMock = vi.fn();
 const redirectMock = vi.fn((path: string) => {
   throw new Error(`REDIRECT:${path}`);
 });
@@ -17,7 +17,7 @@ const invalidatePortalSnapshotsForBillingMock = vi.fn();
 
 vi.mock("next/cache", () => ({
   revalidatePath: revalidatePathMock,
-  updateTag: updateTagMock,
+  revalidateTag: revalidateTagMock,
 }));
 
 vi.mock("next/navigation", () => ({ redirect: redirectMock }));

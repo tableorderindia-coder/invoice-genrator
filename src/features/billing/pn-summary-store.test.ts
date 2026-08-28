@@ -383,14 +383,20 @@ describe("P&L summary store", () => {
     expect(migration).toContain("comment on column public.pn_company_month_summaries.net_pl_inr_cents");
   });
 
-  it("uses persisted summaries from Overview and Dashboard pages", () => {
+  it("uses cached, persisted summaries from Overview and Dashboard pages", () => {
     const overviewSource = readSource("app/page.tsx");
     const dashboardSource = readSource("app/dashboard/page.tsx");
 
-    expect(overviewSource).toContain("getPnDashboardSummaryData");
-    expect(dashboardSource).toContain("getPnDashboardSummaryData");
-    expect(overviewSource).not.toContain("getCachedPnDashboardData");
-    expect(dashboardSource).not.toContain("getCachedPnDashboardData");
+    // getCachedPnDashboardSummaryData wraps getPnDashboardSummaryData (the
+    // fast, persisted pn_*_month_summaries reader) in unstable_cache - see
+    // cached-store.ts. The pages must not fall back to the slow raw
+    // aggregation path (getPnDashboardData / getCachedPnDashboardData,
+    // without "Summary"), which recomputes from
+    // invoice_payment_employee_entries on every call.
+    expect(overviewSource).toContain("getCachedPnDashboardSummaryData");
+    expect(dashboardSource).toContain("getCachedPnDashboardSummaryData");
+    expect(overviewSource).not.toContain("getCachedPnDashboardData(");
+    expect(dashboardSource).not.toContain("getCachedPnDashboardData(");
   });
 
   it("refreshes summaries synchronously from financial write actions", () => {

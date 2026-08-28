@@ -18,6 +18,7 @@ export const billingCacheTags = {
   invoices: (companyIds: string[]) => tag(["invoices", normalizeCacheScopeIds(companyIds)]),
   paymentMonths: (companyIds: string[]) =>
     tag(["payment-months", normalizeCacheScopeIds(companyIds)]),
+  expenses: (companyIds: string[]) => tag(["expenses", normalizeCacheScopeIds(companyIds)]),
   salary: (companyId: string, month?: string) => tag(["salary", companyId, month]),
   cashflow: (companyId: string, month?: string) => tag(["cashflow", companyId, month]),
   dashboard: (companyId: string) => tag(["dashboard", companyId]),
@@ -64,6 +65,7 @@ export function getBillingInvalidationTags(input: BillingInvalidationInput) {
       ];
     case "expense":
       return [
+        billingCacheTags.expenses([input.companyId]),
         billingCacheTags.dashboard(input.companyId),
         billingCacheTags.overview(input.companyId),
       ];

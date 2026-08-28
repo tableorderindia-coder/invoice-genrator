@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath, updateTag } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { requireCompanyPageEditAccess, requirePageEditAccess } from "@/lib/auth/server";
@@ -99,7 +99,12 @@ function buildFlashRedirect(path: string, status: "success" | "error", message: 
 
 function invalidateBillingCache(input: BillingInvalidationInput) {
   for (const tag of getBillingInvalidationTags(input)) {
-    updateTag(tag);
+    // { expire: 0 } = invalidate immediately, not Next 16's default
+    // stale-while-revalidate ("max" profile). This is financial data - a
+    // save must be reflected on the very next read (e.g. dashboard numbers
+    // right after a cash-out), not served stale while revalidating in the
+    // background.
+    revalidateTag(tag, { expire: 0 });
   }
 }
 

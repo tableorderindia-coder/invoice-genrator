@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const revalidatePathMock = vi.fn();
-const updateTagMock = vi.fn();
+const revalidateTagMock = vi.fn();
 const redirectMock = vi.fn((path: string) => {
   throw new Error(`REDIRECT:${path}`);
 });
@@ -28,7 +28,7 @@ const invalidatePortalSnapshotsForBillingMock = vi.fn();
 
 vi.mock("next/cache", () => ({
   revalidatePath: revalidatePathMock,
-  updateTag: updateTagMock,
+  revalidateTag: revalidateTagMock,
 }));
 
 vi.mock("next/navigation", () => ({
@@ -102,7 +102,7 @@ vi.mock("./portal-snapshot-cache", () => ({
 describe("updateDashboardEmployeeCashFlowEntryAction", () => {
   beforeEach(() => {
     revalidatePathMock.mockReset();
-    updateTagMock.mockReset();
+    revalidateTagMock.mockReset();
     redirectMock.mockClear();
     invalidatePortalSnapshotsForBillingMock.mockReset();
     invalidatePortalSnapshotsForBillingMock.mockResolvedValue(undefined);
@@ -284,11 +284,11 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
         }),
       ],
     });
-    expect(updateTagMock).toHaveBeenCalledWith("billing:salary:comp_1");
-    expect(updateTagMock).toHaveBeenCalledWith("billing:salary:comp_1:2026-07");
-    expect(updateTagMock).toHaveBeenCalledWith("billing:cashflow:comp_1");
-    expect(updateTagMock).toHaveBeenCalledWith("billing:dashboard:comp_1");
-    expect(updateTagMock).toHaveBeenCalledWith("billing:overview:comp_1");
+    expect(revalidateTagMock).toHaveBeenCalledWith("billing:salary:comp_1", { expire: 0 });
+    expect(revalidateTagMock).toHaveBeenCalledWith("billing:salary:comp_1:2026-07", { expire: 0 });
+    expect(revalidateTagMock).toHaveBeenCalledWith("billing:cashflow:comp_1", { expire: 0 });
+    expect(revalidateTagMock).toHaveBeenCalledWith("billing:dashboard:comp_1", { expire: 0 });
+    expect(revalidateTagMock).toHaveBeenCalledWith("billing:overview:comp_1", { expire: 0 });
     expect(revalidatePathMock).toHaveBeenCalledWith("/salary");
     expect(revalidatePathMock).toHaveBeenCalledWith("/employee-cash-flow");
   });
@@ -439,9 +439,9 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
         defaultTdsInrCents: 250000,
       }),
     );
-    expect(updateTagMock).toHaveBeenCalledWith("billing:employees:comp_1");
-    expect(updateTagMock).toHaveBeenCalledWith("billing:salary:comp_1");
-    expect(updateTagMock).toHaveBeenCalledWith("billing:dashboard:comp_1");
+    expect(revalidateTagMock).toHaveBeenCalledWith("billing:employees:comp_1", { expire: 0 });
+    expect(revalidateTagMock).toHaveBeenCalledWith("billing:salary:comp_1", { expire: 0 });
+    expect(revalidateTagMock).toHaveBeenCalledWith("billing:dashboard:comp_1", { expire: 0 });
   });
 
   it("passes employee cash-flow defaults through employee updates", async () => {
@@ -477,9 +477,9 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
         defaultTdsInrCents: 220000,
       }),
     );
-    expect(updateTagMock).toHaveBeenCalledWith("billing:employees:comp_1");
-    expect(updateTagMock).toHaveBeenCalledWith("billing:cashflow:comp_1");
-    expect(updateTagMock).toHaveBeenCalledWith("billing:overview:comp_1");
+    expect(revalidateTagMock).toHaveBeenCalledWith("billing:employees:comp_1", { expire: 0 });
+    expect(revalidateTagMock).toHaveBeenCalledWith("billing:cashflow:comp_1", { expire: 0 });
+    expect(revalidateTagMock).toHaveBeenCalledWith("billing:overview:comp_1", { expire: 0 });
   });
 
   it("passes days worked through to the dashboard cash-flow update", async () => {
@@ -684,10 +684,10 @@ describe("updateDashboardEmployeeCashFlowEntryAction", () => {
         paymentDate: "2026-04-25",
       }),
     );
-    expect(updateTagMock).toHaveBeenCalledWith("billing:cashflow:comp_1");
-    expect(updateTagMock).toHaveBeenCalledWith("billing:cashflow:comp_1:2026-04");
-    expect(updateTagMock).toHaveBeenCalledWith("billing:dashboard:comp_1");
-    expect(updateTagMock).toHaveBeenCalledWith("billing:overview:comp_1");
+    expect(revalidateTagMock).toHaveBeenCalledWith("billing:cashflow:comp_1", { expire: 0 });
+    expect(revalidateTagMock).toHaveBeenCalledWith("billing:cashflow:comp_1:2026-04", { expire: 0 });
+    expect(revalidateTagMock).toHaveBeenCalledWith("billing:dashboard:comp_1", { expire: 0 });
+    expect(revalidateTagMock).toHaveBeenCalledWith("billing:overview:comp_1", { expire: 0 });
   });
 
   it("rejects employee cash flow saves when the entries payload is missing", async () => {
