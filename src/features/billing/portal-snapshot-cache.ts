@@ -83,10 +83,19 @@ export async function getOrBuildPortalSnapshot<T>(input: {
   }
 
   try {
+    // $5/$6 were previously both $5 (the same placeholder reused for the
+    // text `source_version` column and the timestamptz `rebuilt_at`
+    // column). node-pg's extended query protocol has to declare one type
+    // per placeholder, so a single $5 feeding both a text and a timestamptz
+    // column raised "inconsistent types deduced for parameter $5" (Postgres
+    // 42P08) - this made every write to this cache table fail, which
+    // surfaced as a full page error since getOrBuildPortalSnapshot rethrows
+    // errors it doesn't recognize as "table missing"/"permission denied".
+    const nowIso = new Date().toISOString();
     await query(
       `insert into public.portal_company_snapshots
          (company_id, snapshot_type, month_key, payload_json, source_version, rebuilt_at)
-       values ($1, $2, $3, $4, $5, $5)
+       values ($1, $2, $3, $4, $5, $6)
        on conflict (company_id, snapshot_type, month_key)
        do update set
          payload_json = excluded.payload_json,
@@ -97,7 +106,8 @@ export async function getOrBuildPortalSnapshot<T>(input: {
         key.snapshotType,
         key.monthKey,
         JSON.stringify(payload),
-        new Date().toISOString(),
+        nowIso,
+        nowIso,
       ],
     );
   } catch (error) {

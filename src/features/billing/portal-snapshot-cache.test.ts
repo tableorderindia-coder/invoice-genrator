@@ -120,6 +120,35 @@ describe("portal snapshot cache", () => {
     ]);
   });
 
+  // Regression: 42P08 "inconsistent types deduced for parameter $5" in
+  // production. The insert reused a single $5 placeholder for both the text
+  // `source_version` column and the timestamptz `rebuilt_at` column - node-pg
+  // has to declare one type per placeholder, so binding it to two columns of
+  // different types made every write to this table fail. The mocked `query`
+  // above can't catch this by itself (it doesn't type-check SQL like real
+  // Postgres does), so assert structurally instead: the upserted column list
+  // has 6 columns, so the query must bind 6 distinct placeholders - reusing
+  // one (5 placeholders for 6 columns) is exactly the bug that shipped.
+  it("binds a distinct placeholder per upserted column (no placeholder reuse)", async () => {
+    const builder = vi.fn(async () => [{ id: "invoice_1" }]);
+
+    await getOrBuildPortalSnapshot({
+      key: buildPortalSnapshotKey({ companyId: "company_1", snapshotType: "invoices" }),
+      build: builder,
+    });
+
+    const upsert = mocks.state.upserts[0];
+    const insertedColumns = upsert?.sql.match(/insert into public\.portal_company_snapshots\s*\(([^)]+)\)/)?.[1]
+      .split(",")
+      .map((column) => column.trim());
+    const placeholdersUsed = upsert?.sql.match(/\$\d+/g) ?? [];
+
+    expect(insertedColumns).toHaveLength(6);
+    expect(new Set(placeholdersUsed).size).toBe(insertedColumns?.length);
+    expect(placeholdersUsed).toHaveLength(insertedColumns?.length ?? -1);
+    expect(upsert?.params).toHaveLength(insertedColumns?.length ?? -1);
+  });
+
   it("falls back to the source builder when the snapshot table is not migrated yet", async () => {
     mocks.state.selectError = {
       code: "42P01",
