@@ -1,4 +1,4 @@
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { query, withTransaction } from "@/lib/db/pool";
 import { getPnDashboardData } from "./store";
 import { calculatePnEmployeeAdvanceInrCents } from "./pn-dashboard";
 import type {
@@ -185,17 +185,6 @@ const numberValue = (value: number | string | null | undefined) => Number(value 
 const monthKey = (year: number, month: number) => `${year}-${String(month).padStart(2, "0")}`;
 const hasMonth = (row: PnPeriodRow): row is PnPeriodRow & { month: number } =>
   typeof row.month === "number";
-
-async function getSupabaseOrThrow() {
-  const client = await createSupabaseServerClient();
-  if (!client) {
-    throw new Error(
-      "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY before running the app.",
-    );
-  }
-
-  return client;
-}
 
 function fiscalYearKey(row: Pick<PnCompanyMonthSummaryRow, "year" | "month">) {
   return row.month >= 4 ? `${row.year}-${row.year + 1}` : `${row.year - 1}-${row.year}`;
@@ -502,38 +491,45 @@ async function listEmployeeSummaryRows(input: {
   employeeIds?: string[];
   paymentMonths?: string[];
 }) {
-  const supabase = await getSupabaseOrThrow();
-  let query = supabase
-    .from("pn_employee_month_summaries")
-    .select(employeeSummarySelect)
-    .eq("company_id", input.companyId);
+  const conditions = ["company_id = $1"];
+  const params: unknown[] = [input.companyId];
 
   if (input.employeeIds?.length) {
-    query = query.in("employee_id", input.employeeIds);
+    params.push(input.employeeIds);
+    conditions.push(`employee_id = any($${params.length}::text[])`);
   }
   if (input.paymentMonths?.length) {
-    query = query.in("payment_month", input.paymentMonths);
+    params.push(input.paymentMonths);
+    conditions.push(`payment_month = any($${params.length}::text[])`);
   }
 
-  const { data, error } = await query.order("employee_name_snapshot").order("payment_month");
-  if (error) throw error;
-  return ((data ?? []) as DbEmployeeSummary[]).map(toEmployeeSummaryRow);
+  const { rows } = await query<DbEmployeeSummary>(
+    `select ${employeeSummarySelect}
+     from public.pn_employee_month_summaries
+     where ${conditions.join(" and ")}
+     order by employee_name_snapshot, payment_month`,
+    params,
+  );
+  return rows.map(toEmployeeSummaryRow);
 }
 
 async function listCompanySummaryRows(input: { companyId: string; paymentMonths?: string[] }) {
-  const supabase = await getSupabaseOrThrow();
-  let query = supabase
-    .from("pn_company_month_summaries")
-    .select(companySummarySelect)
-    .eq("company_id", input.companyId);
+  const conditions = ["company_id = $1"];
+  const params: unknown[] = [input.companyId];
 
   if (input.paymentMonths?.length) {
-    query = query.in("payment_month", input.paymentMonths);
+    params.push(input.paymentMonths);
+    conditions.push(`payment_month = any($${params.length}::text[])`);
   }
 
-  const { data, error } = await query.order("payment_month");
-  if (error) throw error;
-  return ((data ?? []) as DbCompanySummary[]).map(toCompanySummaryRow);
+  const { rows } = await query<DbCompanySummary>(
+    `select ${companySummarySelect}
+     from public.pn_company_month_summaries
+     where ${conditions.join(" and ")}
+     order by payment_month`,
+    params,
+  );
+  return rows.map(toCompanySummaryRow);
 }
 
 export async function getPnDashboardSummaryData(input: {
@@ -647,6 +643,106 @@ function companySummaryToDb(row: PnCompanyMonthSummaryRow) {
   };
 }
 
+const EMPLOYEE_SUMMARY_COLUMNS = [
+  "company_id",
+  "employee_id",
+  "employee_name_snapshot",
+  "payment_month",
+  "year",
+  "month",
+  "payout_id",
+  "invoice_id",
+  "invoice_number",
+  "days_worked",
+  "days_in_month",
+  "dollar_inward_usd_cents",
+  "base_dollar_inward_usd_cents",
+  "onboarding_advance_usd_cents",
+  "advance_override_inr_cents",
+  "reimbursement_usd_cents",
+  "reimbursement_labels_text",
+  "reimbursement_inr_cents",
+  "appraisal_advance_usd_cents",
+  "appraisal_advance_inr_cents",
+  "offboarding_deduction_usd_cents",
+  "effective_dollar_inward_usd_cents",
+  "cash_in_inr_cents",
+  "cashout_usd_inr_rate",
+  "paid_usd_inr_rate",
+  "monthly_paid_inr_cents",
+  "salary_paid_inr_cents",
+  "pf_inr_cents",
+  "tds_inr_cents",
+  "actual_paid_inr_cents",
+  "fx_commission_inr_cents",
+  "total_commission_usd_cents",
+  "commission_earned_inr_cents",
+  "gross_earnings_inr_cents",
+  "net_profit_inr_cents",
+  "is_security_deposit_month",
+  "source_updated_at",
+  "rebuilt_at",
+] as const;
+
+const COMPANY_SUMMARY_COLUMNS = [
+  "company_id",
+  "payment_month",
+  "year",
+  "month",
+  "dollar_inward_usd_cents",
+  "onboarding_advance_usd_cents",
+  "reimbursement_usd_cents",
+  "reimbursement_labels_text",
+  "reimbursement_inr_cents",
+  "appraisal_advance_usd_cents",
+  "appraisal_advance_inr_cents",
+  "offboarding_deduction_usd_cents",
+  "effective_dollar_inward_usd_cents",
+  "cashout_usd_inr_rate",
+  "cash_in_inr_cents",
+  "paid_usd_inr_rate",
+  "monthly_paid_inr_cents",
+  "pf_inr_cents",
+  "tds_inr_cents",
+  "actual_paid_inr_cents",
+  "salary_paid_inr_cents",
+  "fx_commission_inr_cents",
+  "total_commission_usd_cents",
+  "commission_earned_inr_cents",
+  "gross_earnings_inr_cents",
+  "expenses_inr_cents",
+  "company_reimbursement_usd_cents",
+  "company_reimbursement_inr_cents",
+  "net_pl_inr_cents",
+  "source_updated_at",
+  "rebuilt_at",
+] as const;
+
+function rowValues(record: Record<string, unknown>, columns: readonly string[]) {
+  return columns.map((column) => record[column]);
+}
+
+function buildUpsertQuery(
+  table: string,
+  columns: readonly string[],
+  conflictColumns: readonly string[],
+  rowCount: number,
+) {
+  const updateColumns = columns.filter((column) => !conflictColumns.includes(column));
+  const valuesSql: string[] = [];
+  for (let rowIndex = 0; rowIndex < rowCount; rowIndex += 1) {
+    const offset = rowIndex * columns.length;
+    const placeholders = columns.map((_, columnIndex) => `$${offset + columnIndex + 1}`);
+    valuesSql.push(`(${placeholders.join(", ")})`);
+  }
+  const updateSql = updateColumns.map((column) => `${column} = excluded.${column}`).join(", ");
+
+  return `insert into public.${table} (${columns.join(", ")})
+    values ${valuesSql.join(", ")}
+    on conflict (${conflictColumns.join(", ")})
+    do update set ${updateSql}`;
+}
+
 export async function rebuildPnSummariesForCompany(companyId: string) {
   if (!companyId) return;
 
@@ -674,64 +770,68 @@ export async function rebuildPnSummariesForCompany(companyId: string) {
       sourceUpdatedAt: rebuiltAt,
     }));
 
-  const supabase = await getSupabaseOrThrow();
-  const [employeeDelete, companyDelete] = await Promise.all([
-    supabase.from("pn_employee_month_summaries").delete().eq("company_id", companyId),
-    supabase.from("pn_company_month_summaries").delete().eq("company_id", companyId),
-  ]);
-  if (employeeDelete.error) throw employeeDelete.error;
-  if (companyDelete.error) throw companyDelete.error;
+  await withTransaction(async (client) => {
+    await Promise.all([
+      client.query(`delete from public.pn_employee_month_summaries where company_id = $1`, [
+        companyId,
+      ]),
+      client.query(`delete from public.pn_company_month_summaries where company_id = $1`, [
+        companyId,
+      ]),
+    ]);
 
-  if (employeeRows.length > 0) {
-    const { error } = await supabase
-      .from("pn_employee_month_summaries")
-      .upsert(employeeRows.map(employeeSummaryToDb), {
-        onConflict: "company_id,employee_id,payment_month",
-      });
-    if (error) throw error;
-  }
+    if (employeeRows.length > 0) {
+      const records = employeeRows.map(employeeSummaryToDb);
+      const params = records.flatMap((record) => rowValues(record, EMPLOYEE_SUMMARY_COLUMNS));
+      await client.query(
+        buildUpsertQuery(
+          "pn_employee_month_summaries",
+          EMPLOYEE_SUMMARY_COLUMNS,
+          ["company_id", "employee_id", "payment_month"],
+          employeeRows.length,
+        ),
+        params,
+      );
+    }
 
-  if (companyRows.length > 0) {
-    const { error } = await supabase
-      .from("pn_company_month_summaries")
-      .upsert(companyRows.map(companySummaryToDb), {
-        onConflict: "company_id,payment_month",
-      });
-    if (error) throw error;
-  }
+    if (companyRows.length > 0) {
+      const records = companyRows.map(companySummaryToDb);
+      const params = records.flatMap((record) => rowValues(record, COMPANY_SUMMARY_COLUMNS));
+      await client.query(
+        buildUpsertQuery(
+          "pn_company_month_summaries",
+          COMPANY_SUMMARY_COLUMNS,
+          ["company_id", "payment_month"],
+          companyRows.length,
+        ),
+        params,
+      );
+    }
+  });
 }
 
 export async function getInvoiceCompanyId(invoiceId: string) {
-  const supabase = await getSupabaseOrThrow();
-  const { data, error } = await supabase
-    .from("invoices")
-    .select("company_id")
-    .eq("id", invoiceId)
-    .maybeSingle();
-  if (error) throw error;
-  return data?.company_id as string | undefined;
+  const { rows } = await query<{ company_id: string }>(
+    `select company_id from public.invoices where id = $1 limit 1`,
+    [invoiceId],
+  );
+  return rows[0]?.company_id;
 }
 
 export async function getCompanyExpenseCompanyId(expenseId: string) {
-  const supabase = await getSupabaseOrThrow();
-  const { data, error } = await supabase
-    .from("company_expenses")
-    .select("company_id")
-    .eq("id", expenseId)
-    .maybeSingle();
-  if (error) throw error;
-  return data?.company_id as string | undefined;
+  const { rows } = await query<{ company_id: string }>(
+    `select company_id from public.company_expenses where id = $1 limit 1`,
+    [expenseId],
+  );
+  return rows[0]?.company_id;
 }
 
 export async function getEmployeeCashFlowEntryCompanyId(entryId: string) {
-  const supabase = await getSupabaseOrThrow();
-  const { data, error } = await supabase
-    .from("invoice_payment_employee_entries")
-    .select("company_id")
-    .eq("id", entryId)
-    .maybeSingle();
-  if (error) throw error;
-  return data?.company_id as string | undefined;
+  const { rows } = await query<{ company_id: string }>(
+    `select company_id from public.invoice_payment_employee_entries where id = $1 limit 1`,
+    [entryId],
+  );
+  return rows[0]?.company_id;
 }
 
 export async function rebuildPnSummariesForInvoice(invoiceId: string) {

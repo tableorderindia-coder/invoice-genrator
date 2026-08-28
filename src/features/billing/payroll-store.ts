@@ -1,4 +1,4 @@
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { query } from "@/lib/db/pool";
 
 import {
   buildMonthlyPayrollRows,
@@ -9,8 +9,6 @@ import {
   type PayrollStatus,
 } from "./payroll";
 import type { Employee } from "./types";
-
-type SupabaseClient = NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
 
 type DbEmployee = {
   id: string;
@@ -63,6 +61,16 @@ type DbSalaryPayment = {
   updated_at?: string | null;
 };
 
+type DbExistingPaymentRow = {
+  id: string;
+  employee_id: string;
+};
+
+type DbEmployeeRateRow = {
+  id: string;
+  default_paid_usd_inr_rate: number | string | null;
+};
+
 export type SaveMonthlyPayrollRowInput = {
   employeeId: string;
   employeeName: string;
@@ -93,14 +101,6 @@ const nextPayrollId = () =>
   `salary_payment_${nowIso().replace(/[-:.TZ]/g, "").slice(0, 14)}_${Math.random()
     .toString(36)
     .slice(2, 8)}`;
-
-async function getSupabaseOrThrow() {
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) {
-    throw new Error("Supabase is not configured.");
-  }
-  return supabase;
-}
 
 function mapEmployee(row: DbEmployee): Employee {
   return {
@@ -157,15 +157,12 @@ function mapSalaryPayment(row: DbSalaryPayment): MonthlyPayrollPayment {
   };
 }
 
-async function listCompanyEmployees(supabase: SupabaseClient, companyId: string) {
-  const { data, error } = await supabase
-    .from("employees")
-    .select("*")
-    .eq("company_id", companyId)
-    .order("full_name");
-
-  if (error) throw error;
-  return (data ?? []).map((row) => mapEmployee(row as DbEmployee));
+async function listCompanyEmployees(companyId: string) {
+  const { rows } = await query<DbEmployee>(
+    `select * from public.employees where company_id = $1 order by full_name`,
+    [companyId],
+  );
+  return rows.map((row) => mapEmployee(row));
 }
 
 export async function listMonthlyPayrollRows(input: {
@@ -173,26 +170,20 @@ export async function listMonthlyPayrollRows(input: {
   month: string;
 }): Promise<MonthlyPayrollRow[]> {
   const month = normalizePayrollMonthKey(input.month);
-  const supabase = await getSupabaseOrThrow();
 
   const [employees, paymentsResult] = await Promise.all([
-    listCompanyEmployees(supabase, input.companyId),
-    supabase
-      .from("employee_salary_payments")
-      .select("*")
-      .eq("company_id", input.companyId)
-      .eq("month", month),
+    listCompanyEmployees(input.companyId),
+    query<DbSalaryPayment>(
+      `select * from public.employee_salary_payments where company_id = $1 and month = $2`,
+      [input.companyId, month],
+    ),
   ]);
-
-  if (paymentsResult.error) throw paymentsResult.error;
 
   return buildMonthlyPayrollRows({
     companyId: input.companyId,
     month,
     employees,
-    payments: (paymentsResult.data ?? []).map((row) =>
-      mapSalaryPayment(row as DbSalaryPayment),
-    ),
+    payments: paymentsResult.rows.map((row) => mapSalaryPayment(row)),
   });
 }
 
@@ -206,7 +197,6 @@ export async function saveMonthlyPayrollRows(input: {
   updateEmployeeIdentityFromImport?: boolean;
 }) {
   const month = normalizePayrollMonthKey(input.month);
-  const supabase = await getSupabaseOrThrow();
   const timestamp = nowIso();
 
   for (const row of input.rows) {
@@ -223,30 +213,23 @@ export async function saveMonthlyPayrollRows(input: {
   }
 
   const [existingRowsResult, employeeRowsResult] = await Promise.all([
-    supabase
-      .from("employee_salary_payments")
-      .select("id, employee_id")
-      .eq("company_id", input.companyId)
-      .eq("month", month),
-    supabase
-      .from("employees")
-      .select("id, default_paid_usd_inr_rate")
-      .eq("company_id", input.companyId),
+    query<DbExistingPaymentRow>(
+      `select id, employee_id from public.employee_salary_payments where company_id = $1 and month = $2`,
+      [input.companyId, month],
+    ),
+    query<DbEmployeeRateRow>(
+      `select id, default_paid_usd_inr_rate from public.employees where company_id = $1`,
+      [input.companyId],
+    ),
   ]);
-  const { data: existingRows, error: existingError } = existingRowsResult;
-  if (existingError) throw existingError;
-  if (employeeRowsResult.error) throw employeeRowsResult.error;
 
   const existingIdByEmployeeId = new Map(
-    (existingRows ?? []).map((row) => [
-      String((row as { employee_id: string }).employee_id),
-      String((row as { id: string }).id),
-    ]),
+    existingRowsResult.rows.map((row) => [String(row.employee_id), String(row.id)]),
   );
   const employeePaidRateById = new Map(
-    (employeeRowsResult.data ?? []).map((row) => [
-      String((row as { id: string }).id),
-      Number((row as { default_paid_usd_inr_rate?: number | null }).default_paid_usd_inr_rate ?? 0),
+    employeeRowsResult.rows.map((row) => [
+      String(row.id),
+      Number(row.default_paid_usd_inr_rate ?? 0),
     ]),
   );
 
@@ -288,10 +271,58 @@ export async function saveMonthlyPayrollRows(input: {
   });
 
   if (rows.length > 0) {
-    const { error } = await supabase.from("employee_salary_payments").upsert(rows, {
-      onConflict: "employee_id,company_id,month",
+    const columns = [
+      "id",
+      "employee_id",
+      "company_id",
+      "month",
+      "employee_name_snapshot",
+      "paid_usd_inr_rate",
+      "basic_inr_cents",
+      "special_allowance_inr_cents",
+      "insurance_inr_cents",
+      "bonus_inr_cents",
+      "monthly_paid_inr_cents",
+      "days_worked",
+      "days_in_month",
+      "actual_paid_inr_cents",
+      "salary_paid_inr_cents",
+      "pf_inr_cents",
+      "tds_inr_cents",
+      "paid_status",
+      "paid_date",
+      "status",
+      "verified_at",
+      "verified_by",
+      "notes",
+      "override_note",
+      "override_at",
+      "override_by",
+      "updated_at",
+    ] as const;
+
+    const valuesSql: string[] = [];
+    const params: unknown[] = [];
+    rows.forEach((row, rowIndex) => {
+      const rowValues = columns.map((column) => (row as Record<string, unknown>)[column]);
+      const placeholders = rowValues.map(
+        (_, colIndex) => `$${rowIndex * columns.length + colIndex + 1}`,
+      );
+      valuesSql.push(`(${placeholders.join(", ")})`);
+      params.push(...rowValues);
     });
-    if (error) throw error;
+
+    const updateSet = columns
+      .filter((column) => !["employee_id", "company_id", "month"].includes(column))
+      .map((column) => `${column} = excluded.${column}`)
+      .join(", ");
+
+    await query(
+      `insert into public.employee_salary_payments (${columns.join(", ")})
+       values ${valuesSql.join(", ")}
+       on conflict (employee_id, company_id, month) do update set ${updateSet}`,
+      params,
+    );
   }
 
   if (input.updateEmployeeMaster) {
@@ -300,39 +331,70 @@ export async function saveMonthlyPayrollRows(input: {
         row.paidUsdInrRate && row.paidUsdInrRate > 0
           ? row.paidUsdInrRate
           : employeePaidRateById.get(row.employeeId) ?? 0;
-      const { error } = await supabase
-        .from("employees")
-        .update({
-          ...(paidUsdInrRate > 0 ? { default_paid_usd_inr_rate: paidUsdInrRate } : {}),
-          default_actual_paid_inr_cents: row.monthlyPaidInrCents,
-          default_basic_inr_cents: row.basicInrCents,
-          default_special_allowance_inr_cents: row.specialAllowanceInrCents,
-          default_insurance_inr_cents: row.insuranceInrCents,
-          default_bonus_inr_cents: row.bonusInrCents,
-          default_pf_inr_cents: row.pfInrCents,
-          default_tds_inr_cents: row.tdsInrCents,
-        })
-        .eq("id", row.employeeId)
-        .eq("company_id", input.companyId);
-      if (error) throw error;
+
+      const setClauses = [
+        "default_actual_paid_inr_cents = $2",
+        "default_basic_inr_cents = $3",
+        "default_special_allowance_inr_cents = $4",
+        "default_insurance_inr_cents = $5",
+        "default_bonus_inr_cents = $6",
+        "default_pf_inr_cents = $7",
+        "default_tds_inr_cents = $8",
+      ];
+      const params: unknown[] = [
+        row.employeeId,
+        row.monthlyPaidInrCents,
+        row.basicInrCents,
+        row.specialAllowanceInrCents,
+        row.insuranceInrCents,
+        row.bonusInrCents,
+        row.pfInrCents,
+        row.tdsInrCents,
+      ];
+      if (paidUsdInrRate > 0) {
+        params.push(paidUsdInrRate);
+        setClauses.push(`default_paid_usd_inr_rate = $${params.length}`);
+      }
+      params.push(input.companyId);
+
+      await query(
+        `update public.employees set ${setClauses.join(", ")} where id = $1 and company_id = $${params.length}`,
+        params,
+      );
     }
   }
 
   if (input.updateEmployeeIdentityFromImport) {
     for (const row of input.rows) {
-      const employeeUpdates: Record<string, string> = {};
-      if (row.importedPanNumber) employeeUpdates.pan_number = row.importedPanNumber;
-      if (row.importedPfUan) employeeUpdates.pf_uan = row.importedPfUan;
-      if (row.importedDesignation) employeeUpdates.designation = row.importedDesignation;
-      if (row.importedActiveFrom) employeeUpdates.active_from = row.importedActiveFrom;
-      if (Object.keys(employeeUpdates).length === 0) continue;
+      const setClauses: string[] = [];
+      const params: unknown[] = [];
+      if (row.importedPanNumber) {
+        params.push(row.importedPanNumber);
+        setClauses.push(`pan_number = $${params.length}`);
+      }
+      if (row.importedPfUan) {
+        params.push(row.importedPfUan);
+        setClauses.push(`pf_uan = $${params.length}`);
+      }
+      if (row.importedDesignation) {
+        params.push(row.importedDesignation);
+        setClauses.push(`designation = $${params.length}`);
+      }
+      if (row.importedActiveFrom) {
+        params.push(row.importedActiveFrom);
+        setClauses.push(`active_from = $${params.length}`);
+      }
+      if (setClauses.length === 0) continue;
 
-      const { error } = await supabase
-        .from("employees")
-        .update(employeeUpdates)
-        .eq("id", row.employeeId)
-        .eq("company_id", input.companyId);
-      if (error) throw error;
+      params.push(row.employeeId);
+      const employeeIdParamIndex = params.length;
+      params.push(input.companyId);
+      const companyIdParamIndex = params.length;
+
+      await query(
+        `update public.employees set ${setClauses.join(", ")} where id = $${employeeIdParamIndex} and company_id = $${companyIdParamIndex}`,
+        params,
+      );
     }
   }
 
@@ -354,7 +416,34 @@ export async function saveMonthlyPayrollRows(input: {
     }));
 
   if (auditRows.length > 0) {
-    const { error } = await supabase.from("employee_salary_payment_audit").insert(auditRows);
-    if (error) throw error;
+    const columns = [
+      "id",
+      "employee_id",
+      "company_id",
+      "month",
+      "actor_user_id",
+      "salary_paid_inr_cents",
+      "pf_inr_cents",
+      "tds_inr_cents",
+      "override_note",
+      "created_at",
+    ] as const;
+
+    const valuesSql: string[] = [];
+    const params: unknown[] = [];
+    auditRows.forEach((row, rowIndex) => {
+      const rowValues = columns.map((column) => (row as Record<string, unknown>)[column]);
+      const placeholders = rowValues.map(
+        (_, colIndex) => `$${rowIndex * columns.length + colIndex + 1}`,
+      );
+      valuesSql.push(`(${placeholders.join(", ")})`);
+      params.push(...rowValues);
+    });
+
+    await query(
+      `insert into public.employee_salary_payment_audit (${columns.join(", ")})
+       values ${valuesSql.join(", ")}`,
+      params,
+    );
   }
 }

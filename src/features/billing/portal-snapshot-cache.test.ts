@@ -2,52 +2,48 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
   const state: {
-    snapshot: { payload_json: unknown } | null;
-    snapshotError: unknown;
-    upserts: unknown[];
+    snapshotRow: { payload_json: unknown } | null;
+    selectError: unknown;
+    upserts: Array<{ sql: string; params: unknown[] }>;
     upsertError: unknown;
-    deletes: Array<Record<string, unknown>>;
+    deletes: Array<{ sql: string; params: unknown[] }>;
   } = {
-    snapshot: null,
-    snapshotError: null,
+    snapshotRow: null,
+    selectError: null,
     upserts: [],
     upsertError: null,
     deletes: [],
   };
 
-  const supabase = {
-    from: vi.fn((table: string) => {
-      const chain: Record<string, unknown> = {
-        table,
-        select: vi.fn(() => chain),
-        eq: vi.fn(() => chain),
-        in: vi.fn(() => chain),
-        order: vi.fn(() => chain),
-        delete: vi.fn(() => {
-          state.deletes.push(chain);
-          return chain;
-        }),
-        upsert: vi.fn((payload: unknown) => {
-          state.upserts.push(payload);
-          return Promise.resolve({ data: null, error: state.upsertError });
-        }),
-        maybeSingle: vi.fn(() =>
-          Promise.resolve({ data: state.snapshot, error: state.snapshotError }),
-        ),
-        then: (
-          resolve: (value: { data: unknown[] | null; error: unknown }) => unknown,
-          reject: (reason: unknown) => unknown,
-        ) => Promise.resolve({ data: null, error: null }).then(resolve, reject),
-      };
-      return chain;
-    }),
-  };
+  const query = vi.fn(async (sql: string, params: unknown[] = []) => {
+    if (sql.trim().startsWith("select")) {
+      if (state.selectError) {
+        throw state.selectError;
+      }
+      return { rows: state.snapshotRow ? [state.snapshotRow] : [], rowCount: state.snapshotRow ? 1 : 0 };
+    }
 
-  return { state, supabase };
+    if (sql.trim().startsWith("insert")) {
+      state.upserts.push({ sql, params });
+      if (state.upsertError) {
+        throw state.upsertError;
+      }
+      return { rows: [], rowCount: 1 };
+    }
+
+    if (sql.trim().startsWith("delete")) {
+      state.deletes.push({ sql, params });
+      return { rows: [], rowCount: 0 };
+    }
+
+    throw new Error(`Unexpected query: ${sql}`);
+  });
+
+  return { state, query };
 });
 
-vi.mock("@/lib/supabase/server", () => ({
-  createSupabaseServerClient: vi.fn(async () => mocks.supabase),
+vi.mock("@/lib/db/pool", () => ({
+  query: mocks.query,
 }));
 
 import {
@@ -58,12 +54,12 @@ import {
 
 describe("portal snapshot cache", () => {
   beforeEach(() => {
-    mocks.state.snapshot = null;
-    mocks.state.snapshotError = null;
+    mocks.state.snapshotRow = null;
+    mocks.state.selectError = null;
     mocks.state.upserts = [];
     mocks.state.upsertError = null;
     mocks.state.deletes = [];
-    mocks.supabase.from.mockClear();
+    mocks.query.mockClear();
   });
 
   it("builds stable company-scoped snapshot keys", () => {
@@ -92,7 +88,7 @@ describe("portal snapshot cache", () => {
   });
 
   it("returns a stored snapshot without rebuilding", async () => {
-    mocks.state.snapshot = { payload_json: [{ id: "employee_1" }] };
+    mocks.state.snapshotRow = { payload_json: [{ id: "employee_1" }] };
     const builder = vi.fn(async () => [{ id: "rebuilt" }]);
 
     const data = await getOrBuildPortalSnapshot({
@@ -115,18 +111,19 @@ describe("portal snapshot cache", () => {
 
     expect(data).toEqual([{ id: "invoice_1" }]);
     expect(builder).toHaveBeenCalledTimes(1);
-    expect(mocks.state.upserts[0]).toMatchObject({
-      company_id: "company_1",
-      snapshot_type: "invoices",
-      month_key: "",
-      payload_json: [{ id: "invoice_1" }],
-    });
+    expect(mocks.state.upserts).toHaveLength(1);
+    expect(mocks.state.upserts[0]?.params.slice(0, 4)).toEqual([
+      "company_1",
+      "invoices",
+      "",
+      JSON.stringify([{ id: "invoice_1" }]),
+    ]);
   });
 
   it("falls back to the source builder when the snapshot table is not migrated yet", async () => {
-    mocks.state.snapshotError = {
-      code: "PGRST205",
-      message: "Could not find the table 'public.portal_company_snapshots'",
+    mocks.state.selectError = {
+      code: "42P01",
+      message: 'relation "public.portal_company_snapshots" does not exist',
     };
     const builder = vi.fn(async () => ["2026-07"]);
 
@@ -140,10 +137,10 @@ describe("portal snapshot cache", () => {
     expect(mocks.state.upserts).toEqual([]);
   });
 
-  it("returns rebuilt data when a view-only session cannot write the snapshot", async () => {
+  it("returns rebuilt data when a restricted role cannot write the snapshot", async () => {
     mocks.state.upsertError = {
       code: "42501",
-      message: "new row violates row-level security policy for table portal_company_snapshots",
+      message: "permission denied for table portal_company_snapshots",
     };
     const builder = vi.fn(async () => [{ id: "company_1" }]);
 
@@ -164,13 +161,13 @@ describe("portal snapshot cache", () => {
       month: "2026-07",
     });
 
-    expect(mocks.supabase.from).toHaveBeenCalledWith("portal_company_snapshots");
     expect(mocks.state.deletes).toHaveLength(1);
-    expect(mocks.state.deletes[0]?.in).toHaveBeenCalledWith("snapshot_type", [
+    expect(mocks.state.deletes[0]?.params[0]).toEqual([
       "salary-month",
       "payment-months",
       "employee-cash-flow",
       "founders-balance",
     ]);
+    expect(mocks.state.deletes[0]?.params[1]).toEqual(["company_1", "__global__"]);
   });
 });

@@ -1,4 +1,4 @@
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { query } from "@/lib/db/pool";
 
 import {
   buildDefaultPayslip,
@@ -12,8 +12,6 @@ import type { MonthlyPayrollRow } from "./payroll";
 import { listMonthlyPayrollRows } from "./payroll-store";
 import { listEmployees } from "./store";
 import type { Employee } from "./types";
-
-type SupabaseClient = NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
 
 type DbPayslip = {
   id: string;
@@ -59,14 +57,6 @@ const nextPayslipId = () =>
   `payslip_${nowIso().replace(/[-:.TZ]/g, "").slice(0, 14)}_${Math.random()
     .toString(36)
     .slice(2, 8)}`;
-
-async function getSupabaseOrThrow() {
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) {
-    throw new Error("Supabase is not configured.");
-  }
-  return supabase;
-}
 
 export function preparePayslipRecords(input: {
   companyId: string;
@@ -123,14 +113,13 @@ export async function prepareAndSavePayslips(input: {
   month: string;
   resetEmployeeIds?: Set<string>;
 }) {
-  const supabase = await getSupabaseOrThrow();
   const [employees, payrollRows, templatesByEmployeeId, existingPayslips, previousTaxPaidByEmployeeId] =
     await Promise.all([
       listEmployees(input.companyId),
       listMonthlyPayrollRows({ companyId: input.companyId, month: input.month }),
-      listPayslipTemplatesByEmployeeId(supabase, input.companyId),
+      listPayslipTemplatesByEmployeeId(input.companyId),
       listPayslipRecords({ companyId: input.companyId, month: input.month }),
-      listPreviousTaxPaidByEmployeeId(supabase, input.companyId, input.month),
+      listPreviousTaxPaidByEmployeeId(input.companyId, input.month),
     ]);
 
   const records = preparePayslipRecords({
@@ -152,29 +141,31 @@ export async function listPayslipRecords(input: {
   companyId: string;
   month: string;
 }): Promise<SavedPayslip[]> {
-  const supabase = await getSupabaseOrThrow();
-  const { data, error } = await supabase
-    .from("employee_payslips")
-    .select("*")
-    .eq("company_id", input.companyId)
-    .eq("month", input.month)
-    .order("employee_name_snapshot");
-  if (error) throw error;
-  return (data ?? []).map((row) => mapPayslip(row as DbPayslip));
+  const { rows } = await query<DbPayslip>(
+    `select * from public.employee_payslips
+     where company_id = $1 and month = $2
+     order by employee_name_snapshot`,
+    [input.companyId, input.month],
+  );
+  return rows.map((row) => mapPayslip(row));
 }
 
 export async function getPayslipRecord(input: {
   payslipId: string;
   companyId?: string;
 }): Promise<SavedPayslip | undefined> {
-  const supabase = await getSupabaseOrThrow();
-  let query = supabase.from("employee_payslips").select("*").eq("id", input.payslipId);
+  const conditions = ["id = $1"];
+  const params: unknown[] = [input.payslipId];
   if (input.companyId) {
-    query = query.eq("company_id", input.companyId);
+    params.push(input.companyId);
+    conditions.push(`company_id = $${params.length}`);
   }
-  const { data, error } = await query.maybeSingle();
-  if (error) throw error;
-  return data ? mapPayslip(data as DbPayslip) : undefined;
+
+  const { rows } = await query<DbPayslip>(
+    `select * from public.employee_payslips where ${conditions.join(" and ")} limit 1`,
+    params,
+  );
+  return rows[0] ? mapPayslip(rows[0]) : undefined;
 }
 
 export async function savePayslipRecord(input: SavePayslipInput) {
@@ -185,7 +176,6 @@ async function savePayslipRecords(records: SavePayslipInput[]) {
   if (records.length === 0) {
     return;
   }
-  const supabase = await getSupabaseOrThrow();
   const timestamp = nowIso();
   const payload = records.map((record) => ({
     id: record.id ?? nextPayslipId(),
@@ -206,10 +196,57 @@ async function savePayslipRecords(records: SavePayslipInput[]) {
     updated_at: timestamp,
   }));
 
-  const { error } = await supabase.from("employee_payslips").upsert(payload, {
-    onConflict: "company_id,employee_id,month",
+  const payslipColumns = [
+    "id",
+    "company_id",
+    "employee_id",
+    "month",
+    "employee_name_snapshot",
+    "pan_number",
+    "pf_uan",
+    "joining_date",
+    "designation_snapshot",
+    "effective_work_days",
+    "earnings",
+    "deductions",
+    "tds_earnings",
+    "tds_income_tax_deductions",
+    "tax_paid_months",
+    "updated_at",
+  ] as const;
+  const payslipJsonColumns = new Set([
+    "earnings",
+    "deductions",
+    "tds_earnings",
+    "tds_income_tax_deductions",
+    "tax_paid_months",
+  ]);
+
+  const payslipValuesSql: string[] = [];
+  const payslipParams: unknown[] = [];
+  payload.forEach((row, rowIndex) => {
+    const rowValues = payslipColumns.map((column) => {
+      const value = (row as Record<string, unknown>)[column];
+      return payslipJsonColumns.has(column) ? JSON.stringify(value) : value;
+    });
+    const placeholders = rowValues.map(
+      (_, colIndex) => `$${rowIndex * payslipColumns.length + colIndex + 1}`,
+    );
+    payslipValuesSql.push(`(${placeholders.join(", ")})`);
+    payslipParams.push(...rowValues);
   });
-  if (error) throw error;
+
+  const payslipUpdateSet = payslipColumns
+    .filter((column) => !["company_id", "employee_id", "month"].includes(column))
+    .map((column) => `${column} = excluded.${column}`)
+    .join(", ");
+
+  await query(
+    `insert into public.employee_payslips (${payslipColumns.join(", ")})
+     values ${payslipValuesSql.join(", ")}
+     on conflict (company_id, employee_id, month) do update set ${payslipUpdateSet}`,
+    payslipParams,
+  );
 
   const templatePayload = records.map((record) => ({
     id: `payslip_template_${record.employeeId}`,
@@ -245,12 +282,42 @@ async function savePayslipRecords(records: SavePayslipInput[]) {
     updated_at: timestamp,
   }));
 
-  const { error: templateError } = await supabase
-    .from("employee_payslip_templates")
-    .upsert(templatePayload, {
-      onConflict: "company_id,employee_id",
+  const templateColumns = [
+    "id",
+    "employee_id",
+    "company_id",
+    "earnings",
+    "deductions",
+    "tds_income_tax_deductions",
+    "updated_at",
+  ] as const;
+  const templateJsonColumns = new Set(["earnings", "deductions", "tds_income_tax_deductions"]);
+
+  const templateValuesSql: string[] = [];
+  const templateParams: unknown[] = [];
+  templatePayload.forEach((row, rowIndex) => {
+    const rowValues = templateColumns.map((column) => {
+      const value = (row as Record<string, unknown>)[column];
+      return templateJsonColumns.has(column) ? JSON.stringify(value) : value;
     });
-  if (templateError) throw templateError;
+    const placeholders = rowValues.map(
+      (_, colIndex) => `$${rowIndex * templateColumns.length + colIndex + 1}`,
+    );
+    templateValuesSql.push(`(${placeholders.join(", ")})`);
+    templateParams.push(...rowValues);
+  });
+
+  const templateUpdateSet = templateColumns
+    .filter((column) => !["company_id", "employee_id"].includes(column))
+    .map((column) => `${column} = excluded.${column}`)
+    .join(", ");
+
+  await query(
+    `insert into public.employee_payslip_templates (${templateColumns.join(", ")})
+     values ${templateValuesSql.join(", ")}
+     on conflict (company_id, employee_id) do update set ${templateUpdateSet}`,
+    templateParams,
+  );
 }
 
 function buildTemplateEarnings(record: SavePayslipInput) {
@@ -264,43 +331,39 @@ function buildTemplateEarnings(record: SavePayslipInput) {
   }));
 }
 
-async function listPayslipTemplatesByEmployeeId(supabase: SupabaseClient, companyId: string) {
-  const { data, error } = await supabase
-    .from("employee_payslip_templates")
-    .select("employee_id, earnings, deductions, tds_income_tax_deductions")
-    .eq("company_id", companyId);
-  if (error) throw error;
+async function listPayslipTemplatesByEmployeeId(companyId: string) {
+  const { rows } = await query<DbPayslipTemplate>(
+    `select employee_id, earnings, deductions, tds_income_tax_deductions
+     from public.employee_payslip_templates
+     where company_id = $1`,
+    [companyId],
+  );
 
   return new Map(
-    (data ?? []).map((row) => {
-      const templateRow = row as DbPayslipTemplate;
+    rows.map((row) => {
       return [
-        templateRow.employee_id,
+        row.employee_id,
         {
-          earnings: templateRow.earnings ?? [],
-          deductions: templateRow.deductions ?? [],
-          tdsIncomeTaxDeductions: templateRow.tds_income_tax_deductions ?? [],
+          earnings: row.earnings ?? [],
+          deductions: row.deductions ?? [],
+          tdsIncomeTaxDeductions: row.tds_income_tax_deductions ?? [],
         } satisfies PayslipTemplate,
       ] as const;
     }),
   );
 }
 
-async function listPreviousTaxPaidByEmployeeId(
-  supabase: SupabaseClient,
-  companyId: string,
-  selectedMonth: string,
-) {
+async function listPreviousTaxPaidByEmployeeId(companyId: string, selectedMonth: string) {
   const fiscalMonths = fiscalMonthKeys(selectedMonth);
-  const { data, error } = await supabase
-    .from("employee_payslips")
-    .select("employee_id, month, deductions")
-    .eq("company_id", companyId)
-    .in("month", fiscalMonths);
-  if (error) throw error;
+  const { rows } = await query<DbTaxPaid>(
+    `select employee_id, month, deductions
+     from public.employee_payslips
+     where company_id = $1 and month = any($2::text[])`,
+    [companyId, fiscalMonths],
+  );
 
   const byEmployee = new Map<string, Map<string, number>>();
-  for (const row of (data ?? []) as DbTaxPaid[]) {
+  for (const row of rows) {
     const employeeMap = byEmployee.get(row.employee_id) ?? new Map<string, number>();
     const tdsDeduction =
       row.deductions.find((deduction) => deduction.label.toUpperCase() === "INCOME TAX")?.amountInrCents ?? 0;
