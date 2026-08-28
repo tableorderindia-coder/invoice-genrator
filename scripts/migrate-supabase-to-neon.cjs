@@ -237,8 +237,24 @@ async function copyTable(source, target, table, selfRefColumns = []) {
   const [sourceCols, targetCols, pkColumns] = await Promise.all([
     getColumns(source, table),
     getColumns(target, table),
-    selfRefColumns.length ? getPrimaryKeyColumns(target, table) : Promise.resolve([]),
+    getPrimaryKeyColumns(target, table),
   ]);
+
+  // ON CONFLICT DO NOTHING only dedupes tables with a primary key/unique
+  // constraint to conflict against. A table with no PK at all (some of the
+  // dynamically-discovered migration_audit_* tables - one-off backup
+  // tables from past risky migrations, frozen in time, never written to
+  // by the app) would otherwise get fully re-inserted, duplicated, on
+  // every re-run. They're static, so "already has rows" is a safe signal
+  // to skip entirely rather than re-copy.
+  if (pkColumns.length === 0) {
+    const { rows: existing } = await target.query(`select 1 from public.${table} limit 1`);
+    if (existing.length > 0) {
+      console.log(`  ${table}: has no primary key and target already has rows - skipping (re-run safety)`);
+      return { copied: 0, skipped: true };
+    }
+  }
+
   const sourceColumns = sourceCols.map((c) => c.column_name);
   const sourceSet = new Set(sourceColumns);
   let targetColumns = targetCols.map((c) => c.column_name);
